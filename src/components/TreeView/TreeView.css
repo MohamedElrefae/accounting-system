@@ -1,0 +1,458 @@
+/* Tree View Container */
+.tree-view-container {
+  background-color: var(--content-bg);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+}
+
+/* Tree Header */
+.tree-node.tree-header {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover));
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-bottom: 2px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 1rem 1.5rem;
+}
+
+.tree-node.tree-header:hover {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover));
+}
+
+.tree-header .header-text {
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* Tree Node Wrapper */
+.tree-node-wrapper {
+  position: relative;
+}
+
+/* Tree Node */
+.tree-node {
+  display: grid;
+  grid-template-columns: auto auto 8px 120px minmax(200px, 1fr) 160px 80px 450px;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-light);
+  transition: background-color var(--transition-fast);
+  font-size: var(--font-size-sm);
+  gap: 0.5rem;
+}
+
+.tree-node:hover {
+  background-color: var(--hover-bg);
+}
+
+.tree-node.inactive {
+  opacity: 0.7;
+  background-color: rgba(239, 68, 68, 0.05);
+}
+
+/* Tree Node Spacer - for the 8px gap */
+.tree-node-spacer {
+  width: 8px;
+}
+
+/* Tree Node Expander */
+.tree-node-expander {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.tree-node-expander:hover:not(.no-children) {
+  background-color: var(--hover-bg);
+  color: var(--accent-primary);
+}
+
+.tree-node-expander.no-children {
+  cursor: default;
+  visibility: hidden;
+}
+
+.tree-node-expander .expander-icon {
+  transition: transform var(--transition-fast);
+}
+
+.tree-node-expander.expanded .expander-icon {
+  transform: rotate(90deg);
+}
+
+/* Tree Node Status Dot */
+.tree-node-status {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 0.5rem;
+}
+
+.tree-node-status.active {
+  background-color: var(--success);
+  box-shadow: 0 0 6px var(--success);
+}
+
+.tree-node-status.inactive {
+  background-color: var(--error);
+  box-shadow: 0 0 6px var(--error);
+}
+
+/* Tree Node Code */
+.tree-node-code {
+  font-weight: 600;
+  color: var(--accent-primary);
+  font-family: monospace;
+  font-size: 0.9em;
+  display: flex;
+  align-items: center;
+}
+
+.code-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover));
+  color: white;
+  border-radius: var(--radius-md);
+  font-family: monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Tree Node Name */
+.tree-node-name {
+  color: var(--text-primary);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.status-inactive-text {
+  color: var(--error);
+  margin-right: 8px;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+/* Tree Node Type */
+.tree-node-type {
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+}
+
+/* Tree Node Level */
+.tree-node-level {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.level-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  background-color: var(--surface);
+  color: var(--text-secondary);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--border-color);
+}
+
+/* Tree Node Actions */
+.tree-node-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+}
+
+/* Tree Node Children */
+.tree-node-children {
+  position: relative;
+}
+
+.tree-node-children::before {
+  content: '';
+  position: absolute;
+  left: 2rem;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background-color: var(--border-light);
+}
+
+/* Ultimate Enhanced Button Styles */
+.ultimate-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  min-width: 85px;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  user-select: none;
+  backdrop-filter: blur(10px);
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.1),
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.ultimate-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.ultimate-btn:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 4px 8px rgba(0, 0, 0, 0.15),
+    0 2px 4px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.ultimate-btn:not(:disabled):active {
+  transform: translateY(0);
+  transition-duration: 0.1s;
+}
+
+.btn-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  position: relative;
+  z-index: 2;
+}
+
+.btn-icon {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.btn-icon.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.btn-text {
+  white-space: nowrap;
+  line-height: 1;
+  font-size: 0.8rem;
+  margin-left: 0.2rem;
+}
+
+/* Edit Button - Blue */
+.ultimate-btn-edit {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+}
+
+.ultimate-btn-edit::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.ultimate-btn-edit:not(:disabled):hover::before {
+  opacity: 1;
+}
+
+/* Add Button - Green */
+.ultimate-btn-add {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+}
+
+.ultimate-btn-add::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.ultimate-btn-add:not(:disabled):hover::before {
+  opacity: 1;
+}
+
+/* Disable Button - Orange */
+.ultimate-btn-disable {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: white;
+}
+
+.ultimate-btn-disable::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.ultimate-btn-disable:not(:disabled):hover::before {
+  opacity: 1;
+}
+
+/* Enable Button - Teal */
+.ultimate-btn-enable {
+  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+  color: white;
+}
+
+.ultimate-btn-enable::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.ultimate-btn-enable:not(:disabled):hover::before {
+  opacity: 1;
+}
+
+/* Delete Button - Red */
+.ultimate-btn-delete {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+}
+
+.ultimate-btn-delete::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.ultimate-btn-delete:not(:disabled):hover::before {
+  opacity: 1;
+}
+
+.ultimate-btn-delete:disabled {
+  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+}
+
+/* Button States */
+.ultimate-btn.loading {
+  pointer-events: none;
+}
+
+.ultimate-btn.loading::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: loading-pulse 1.5s linear infinite;
+}
+
+@keyframes loading-pulse {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.ultimate-btn.success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: white;
+}
+
+.ultimate-btn.success .btn-icon {
+  animation: checkmark 0.6s ease-in-out;
+}
+
+@keyframes checkmark {
+  0% { transform: scale(0) rotate(45deg); }
+  50% { transform: scale(1.2) rotate(45deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+.ultimate-btn.error {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+  color: white;
+}
+
+.ultimate-btn.error .btn-icon {
+  animation: shake 0.6s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .tree-node-actions {
+    flex-wrap: wrap;
+  }
+  
+  .ultimate-btn {
+    min-height: 32px;
+    padding: 0.4rem 0.8rem;
+  }
+  
+  .btn-text {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .tree-node {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1rem;
+  }
+  
+  .tree-node-content {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+  
+  .tree-node-actions {
+    width: 100%;
+    justify-content: flex-start;
+    padding-left: 0;
+  }
+}

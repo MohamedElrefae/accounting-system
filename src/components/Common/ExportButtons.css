@@ -1,0 +1,296 @@
+/**
+ * Export Buttons Styles
+ * Comprehensive styling for export functionality with RTL support
+ */
+
+/* Base Export Buttons Container */
+.export-buttons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.export-buttons-wrapper {
+  display: inline-block;
+  position: relative;
+}
+
+/* Layout Variations */
+.export-buttons-horizontal {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.export-buttons-vertical {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* Base Export Button Styles */
+.export-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-weight: 500;
+  border: 1px solid #ddd;
+  border-radius: 0.375rem;
+  background: white;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  direction: rtl;
+}
+
+/* Size Variations */
+.export-btn-small {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.export-btn-medium {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+}
+
+.export-btn-large {
+  padding: 0.75rem 1.5rem;
+  font-size: 1.125rem;
+}
+
+/* Hover and Focus States */
+.export-btn:hover:not(:disabled) {
+  background: #f5f5f5;
+  border-color: #999;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.export-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.3);
+}
+
+.export-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Disabled State */
+.export-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f9f9f9;
+}
+
+/* Format-Specific Colors */
+.export-btn-pdf {
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+.export-btn-pdf:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #b91c1c;
+}
+
+.export-btn-excel {
+  border-color: #16a34a;
+  color: #16a34a;
+}
+
+.export-btn-excel:hover:not(:disabled) {
+  background: #dcfce7;
+  border-color: #15803d;
+}
+
+.export-btn-csv {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.export-btn-csv:hover:not(:disabled) {
+  background: #dbeafe;
+  border-color: #1d4ed8;
+}
+
+.export-btn-html {
+  border-color: #ea580c;
+  color: #ea580c;
+}
+
+.export-btn-html:hover:not(:disabled) {
+  background: #fed7aa;
+  border-color: #c2410c;
+}
+
+.export-btn-json {
+  border-color: #7c3aed;
+  color: #7c3aed;
+}
+
+.export-btn-json:hover:not(:disabled) {
+  background: #ede9fe;
+  border-color: #6d28d9;
+}
+
+.export-btn-batch {
+  border-color: #0891b2;
+  color: #0891b2;
+  font-weight: 600;
+}
+
+.export-btn-batch:hover:not(:disabled) {
+  background: #cffafe;
+  border-color: #0e7490;
+}
+
+/* Icon and Label Styles */
+.export-icon {
+  font-size: 1.25em;
+  display: inline-flex;
+  align-items: center;
+}
+
+.export-label {
+  display: inline-block;
+}
+
+/* Spinner Animation */
+.export-spinner {
+  animation: spin 1s linear infinite;
+  display: inline-flex;
+  align-items: center;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Dropdown Styles */
+.export-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.export-btn-dropdown {
+  min-width: 120px;
+}
+
+.dropdown-arrow {
+  margin-inline-start: 0.25rem;
+  font-size: 0.75em;
+  opacity: 0.7;
+}
+
+.export-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 1000;
+  display: none;
+  min-width: 200px;
+  margin-top: 0.25rem;
+  padding: 0.5rem 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 0.375rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.export-dropdown:hover .export-dropdown-menu,
+.export-dropdown:focus-within .export-dropdown-menu {
+  display: block;
+}
+
+.export-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  border: none;
+  background: none;
+  color: #333;
+  text-align: right;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  direction: rtl;
+}
+
+.export-dropdown-item:hover:not(:disabled) {
+  background: #f5f5f5;
+}
+
+.export-dropdown-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .export-buttons-horizontal {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .export-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .export-dropdown-menu {
+    right: auto;
+    left: 0;
+    width: 100%;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .export-btn {
+    background: #1f2937;
+    color: #f3f4f6;
+    border-color: #4b5563;
+  }
+  
+  .export-btn:hover:not(:disabled) {
+    background: #374151;
+    border-color: #6b7280;
+  }
+  
+  .export-btn:disabled {
+    background: #111827;
+    opacity: 0.4;
+  }
+  
+  .export-dropdown-menu {
+    background: #1f2937;
+    border-color: #4b5563;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  }
+  
+  .export-dropdown-item {
+    color: #f3f4f6;
+  }
+  
+  .export-dropdown-item:hover:not(:disabled) {
+    background: #374151;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .export-buttons,
+  .export-buttons-wrapper {
+    display: none !important;
+  }
+}

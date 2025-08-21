@@ -1,0 +1,508 @@
+import React, { useState } from 'react'
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Typography,
+  Box,
+  Grid,
+  Card,
+  CardContent,
+  CardActions,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Switch,
+  FormControlLabel,
+  Slider,
+  TextField,
+  Chip,
+  Divider,
+  IconButton,
+  Tabs,
+  Tab,
+  Alert,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  Tooltip,
+} from '@mui/material'
+import {
+  Palette as PaletteIcon,
+  TextFormat as FontIcon,
+  Settings as SettingsIcon,
+  Save as SaveIcon,
+  Delete as DeleteIcon,
+  Refresh as ResetIcon,
+  Preview as PreviewIcon,
+  GetApp as ExportIcon,
+  Publish as ImportIcon,
+} from '@mui/icons-material'
+import { useTheme } from '../contexts/ThemeContext'
+import { FONT_PRESETS, COLOR_PRESETS, TYPOGRAPHY_PRESETS } from '../types/theme'
+
+interface ThemeSettingsProps {
+  open: boolean
+  onClose: () => void
+}
+
+interface TabPanelProps {
+  children?: React.ReactNode
+  index: number
+  value: number
+}
+
+const TabPanel: React.FC<TabPanelProps> = ({ children, value, index, ...other }) => {
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`theme-tabpanel-${index}`}
+      aria-labelledby={`theme-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+    </div>
+  )
+}
+
+export const ThemeSettings: React.FC<ThemeSettingsProps> = ({ open, onClose }) => {
+  const {
+    currentTheme,
+    updateTheme,
+    resetTheme,
+    applyPreset,
+    saveTheme,
+    loadTheme,
+    getSavedThemes,
+    deleteTheme
+  } = useTheme()
+
+  const [activeTab, setActiveTab] = useState(0)
+  const [newThemeName, setNewThemeName] = useState('')
+  const [customColor, setCustomColor] = useState('')
+  const [notification, setNotification] = useState<string | null>(null)
+
+  const savedThemes = getSavedThemes()
+
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue)
+  }
+
+  const handleSaveCurrentTheme = () => {
+    if (newThemeName.trim()) {
+      const themeToSave = {
+        ...currentTheme,
+        name: newThemeName,
+        id: `custom-${Date.now()}`
+      }
+      saveTheme(themeToSave)
+      setNewThemeName('')
+      setNotification('Theme saved successfully!')
+      setTimeout(() => setNotification(null), 3000)
+    }
+  }
+
+  const handleDeleteTheme = (themeId: string) => {
+    deleteTheme(themeId)
+    setNotification('Theme deleted successfully!')
+    setTimeout(() => setNotification(null), 3000)
+  }
+
+  const ColorPicker: React.FC<{ 
+    label: string
+    color: string
+    onChange: (color: string) => void 
+  }> = ({ label, color, onChange }) => (
+    <Box sx={{ mb: 2 }}>
+      <Typography variant="body2" gutterBottom>
+        {label}
+      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box
+          sx={{
+            width: 40,
+            height: 40,
+            backgroundColor: color,
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 1,
+            cursor: 'pointer'
+          }}
+          component="input"
+          type="color"
+          value={color}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
+        />
+        <TextField
+          size="small"
+          value={color}
+          onChange={(e) => onChange(e.target.value)}
+          sx={{ width: '120px' }}
+        />
+      </Box>
+    </Box>
+  )
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
+      <DialogTitle>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <SettingsIcon />
+          <Typography variant="h5">Theme Settings</Typography>
+        </Box>
+      </DialogTitle>
+      
+      <DialogContent>
+        {notification && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            {notification}
+          </Alert>
+        )}
+
+        <Tabs value={activeTab} onChange={handleTabChange} sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tab icon={<FontIcon />} label="Fonts & Typography" />
+          <Tab icon={<PaletteIcon />} label="Colors" />
+          <Tab icon={<SettingsIcon />} label="General" />
+          <Tab icon={<SaveIcon />} label="Save & Load" />
+        </Tabs>
+
+        {/* Fonts & Typography Tab */}
+        <TabPanel value={activeTab} index={0}>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Typography variant="h6" gutterBottom>Font Presets</Typography>
+              {Object.entries(FONT_PRESETS).map(([presetName, fonts]) => (
+                <Card key={presetName} sx={{ mb: 2 }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ fontFamily: fonts.primary }}>
+                      {presetName.replace('_', ' ').toUpperCase()}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontFamily: fonts.primary }}>
+                      Primary: {fonts.primary}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontFamily: fonts.arabic }}>
+                      Arabic: {fonts.arabic}
+                    </Typography>
+                  </CardContent>
+                  <CardActions>
+                    <Button
+                      size="small"
+                      onClick={() => applyPreset('font', presetName)}
+                      variant={currentTheme.fonts.primary === fonts.primary ? 'contained' : 'outlined'}
+                    >
+                      Apply
+                    </Button>
+                  </CardActions>
+                </Card>
+              ))}
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Typography variant="h6" gutterBottom>Typography Scale</Typography>
+              {Object.entries(TYPOGRAPHY_PRESETS).map(([presetName, typography]) => (
+                <Card key={presetName} sx={{ mb: 2 }}>
+                  <CardContent>
+                    <Typography variant="h6">
+                      {presetName.toUpperCase()}
+                    </Typography>
+                    <Typography variant="h4" sx={typography.h4}>
+                      Heading Sample
+                    </Typography>
+                    <Typography variant="body1" sx={typography.body1}>
+                      Body text sample with proper spacing and readability.
+                    </Typography>
+                  </CardContent>
+                  <CardActions>
+                    <Button
+                      size="small"
+                      onClick={() => applyPreset('typography', presetName)}
+                      variant={currentTheme.typography.body1.fontSize === typography.body1.fontSize ? 'contained' : 'outlined'}
+                    >
+                      Apply
+                    </Button>
+                  </CardActions>
+                </Card>
+              ))}
+
+              <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>Language Settings</Typography>
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Language</InputLabel>
+                <Select
+                  value={currentTheme.language}
+                  label="Language"
+                  onChange={(e) => updateTheme({ 
+                    language: e.target.value as 'en' | 'ar' | 'mixed',
+                    direction: e.target.value === 'ar' ? 'rtl' : 'ltr'
+                  })}
+                >
+                  <MenuItem value="en">English</MenuItem>
+                  <MenuItem value="ar">Arabic</MenuItem>
+                  <MenuItem value="mixed">Mixed (English/Arabic)</MenuItem>
+                </Select>
+              </FormControl>
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={currentTheme.direction === 'rtl'}
+                    onChange={(e) => updateTheme({ direction: e.target.checked ? 'rtl' : 'ltr' })}
+                  />
+                }
+                label="Right-to-Left Layout"
+              />
+            </Grid>
+          </Grid>
+        </TabPanel>
+
+        {/* Colors Tab */}
+        <TabPanel value={activeTab} index={1}>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Typography variant="h6" gutterBottom>Color Presets</Typography>
+              {Object.entries(COLOR_PRESETS).map(([presetName, colors]) => (
+                <Card key={presetName} sx={{ mb: 2 }}>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                      {presetName.replace('_', ' ').toUpperCase()}
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      {Object.entries(colors).filter(([key]) => !key.includes('background') && !key.includes('text') && key !== 'divider').map(([colorName, colorValue]) => (
+                        <Chip
+                          key={colorName}
+                          label={colorName}
+                          sx={{
+                            backgroundColor: colorValue,
+                            color: colorName === 'warning' || colorName === 'accent' ? 'black' : 'white'
+                          }}
+                          size="small"
+                        />
+                      ))}
+                    </Box>
+                  </CardContent>
+                  <CardActions>
+                    <Button
+                      size="small"
+                      onClick={() => applyPreset('color', presetName)}
+                      variant={currentTheme.colors.primary === colors.primary ? 'contained' : 'outlined'}
+                    >
+                      Apply
+                    </Button>
+                  </CardActions>
+                </Card>
+              ))}
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Typography variant="h6" gutterBottom>Custom Colors</Typography>
+              <ColorPicker
+                label="Primary Color"
+                color={currentTheme.colors.primary}
+                onChange={(color) => updateTheme({
+                  colors: { ...currentTheme.colors, primary: color }
+                })}
+              />
+              <ColorPicker
+                label="Secondary Color"
+                color={currentTheme.colors.secondary}
+                onChange={(color) => updateTheme({
+                  colors: { ...currentTheme.colors, secondary: color }
+                })}
+              />
+              <ColorPicker
+                label="Accent Color"
+                color={currentTheme.colors.accent}
+                onChange={(color) => updateTheme({
+                  colors: { ...currentTheme.colors, accent: color }
+                })}
+              />
+              <ColorPicker
+                label="Success Color"
+                color={currentTheme.colors.success}
+                onChange={(color) => updateTheme({
+                  colors: { ...currentTheme.colors, success: color }
+                })}
+              />
+              <ColorPicker
+                label="Warning Color"
+                color={currentTheme.colors.warning}
+                onChange={(color) => updateTheme({
+                  colors: { ...currentTheme.colors, warning: color }
+                })}
+              />
+              <ColorPicker
+                label="Error Color"
+                color={currentTheme.colors.error}
+                onChange={(color) => updateTheme({
+                  colors: { ...currentTheme.colors, error: color }
+                })}
+              />
+            </Grid>
+          </Grid>
+        </TabPanel>
+
+        {/* General Settings Tab */}
+        <TabPanel value={activeTab} index={2}>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Typography variant="h6" gutterBottom>Theme Mode</Typography>
+              <FormControl fullWidth sx={{ mb: 3 }}>
+                <InputLabel>Mode</InputLabel>
+                <Select
+                  value={currentTheme.mode}
+                  label="Mode"
+                  onChange={(e) => updateTheme({ mode: e.target.value as 'light' | 'dark' })}
+                >
+                  <MenuItem value="light">Light</MenuItem>
+                  <MenuItem value="dark">Dark</MenuItem>
+                </Select>
+              </FormControl>
+
+              <Typography variant="h6" gutterBottom>Border Radius</Typography>
+              <Slider
+                value={currentTheme.borderRadius}
+                onChange={(_, value) => updateTheme({ borderRadius: value as number })}
+                min={0}
+                max={20}
+                marks
+                valueLabelDisplay="auto"
+                sx={{ mb: 3 }}
+              />
+
+              <Typography variant="h6" gutterBottom>Spacing</Typography>
+              <Slider
+                value={currentTheme.spacing}
+                onChange={(_, value) => updateTheme({ spacing: value as number })}
+                min={4}
+                max={16}
+                marks
+                valueLabelDisplay="auto"
+                sx={{ mb: 3 }}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Typography variant="h6" gutterBottom>Preview</Typography>
+              <Card>
+                <CardContent>
+                  <Typography variant="h4" gutterBottom>
+                    Sample Heading
+                  </Typography>
+                  <Typography variant="body1" paragraph>
+                    This is a sample paragraph to show how your theme looks with the current settings.
+                    You can see the font family, size, and color scheme in action.
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    <Button variant="contained" size="small">Primary</Button>
+                    <Button variant="contained" color="secondary" size="small">Secondary</Button>
+                    <Button variant="outlined" size="small">Outlined</Button>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </TabPanel>
+
+        {/* Save & Load Tab */}
+        <TabPanel value={activeTab} index={3}>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Typography variant="h6" gutterBottom>Save Current Theme</Typography>
+              <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
+                <TextField
+                  label="Theme Name"
+                  value={newThemeName}
+                  onChange={(e) => setNewThemeName(e.target.value)}
+                  size="small"
+                  fullWidth
+                />
+                <Button
+                  variant="contained"
+                  onClick={handleSaveCurrentTheme}
+                  disabled={!newThemeName.trim()}
+                  startIcon={<SaveIcon />}
+                >
+                  Save
+                </Button>
+              </Box>
+
+              <Typography variant="h6" gutterBottom>Quick Actions</Typography>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<ResetIcon />}
+                  onClick={resetTheme}
+                >
+                  Reset to Default
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<ExportIcon />}
+                  onClick={() => {
+                    const dataStr = JSON.stringify(currentTheme, null, 2)
+                    const dataBlob = new Blob([dataStr], { type: 'application/json' })
+                    const url = URL.createObjectURL(dataBlob)
+                    const link = document.createElement('a')
+                    link.href = url
+                    link.download = `${currentTheme.name}-theme.json`
+                    link.click()
+                  }}
+                >
+                  Export Theme
+                </Button>
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Typography variant="h6" gutterBottom>Saved Themes</Typography>
+              {savedThemes.length === 0 ? (
+                <Typography color="text.secondary">No saved themes yet.</Typography>
+              ) : (
+                <List>
+                  {savedThemes.map((theme) => (
+                    <ListItem key={theme.id} divider>
+                      <ListItemText
+                        primary={theme.name}
+                        secondary={`${theme.mode} • ${theme.fonts.primary.split(',')[0]}`}
+                      />
+                      <ListItemSecondaryAction>
+                        <Tooltip title="Load Theme">
+                          <IconButton
+                            onClick={() => loadTheme(theme.id)}
+                            size="small"
+                          >
+                            <PreviewIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete Theme">
+                          <IconButton
+                            onClick={() => handleDeleteTheme(theme.id)}
+                            size="small"
+                            color="error"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </ListItemSecondaryAction>
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </Grid>
+          </Grid>
+        </TabPanel>
+      </DialogContent>
+
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+        <Button variant="contained" onClick={onClose}>
+          Apply Changes
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}

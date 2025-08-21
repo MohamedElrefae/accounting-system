@@ -1,0 +1,85 @@
+/* Reuse the detailed styling from the previous Accounts page to match look and feel */
+@import '../../components/Common/ExportButtons.css';
+
+/* The following classes are referenced by the page component to ensure parity */
+.accounts-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(0,0,0,0.1);
+}
+
+.page-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.controls-container {
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 1px solid rgba(0,0,0,0.1);
+}
+
+.search-and-filters { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.search-input-wrapper { position: relative; }
+.search-input-wrapper .icon { position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); opacity: 0.6; }
+.search-input { padding: 0.75rem 1rem; padding-right: 2.5rem; border: 1px solid rgba(0,0,0,0.2); border-radius: 8px; width: 300px; }
+.filter-select { padding: 0.75rem 1rem; border: 1px solid rgba(0,0,0,0.2); border-radius: 8px; min-width: 150px; }
+
+.view-mode-toggle { display: flex; border: 1px solid rgba(0,0,0,0.2); border-radius: 10px; overflow: hidden; }
+.view-mode-btn { padding: 0.5rem 1rem; background: none; border: none; cursor: pointer; }
+.view-mode-btn.active { background: #3b82f6; color: #fff; }
+
+.content-area { 
+  flex-grow: 1; 
+  overflow: hidden;
+  padding: 1rem;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.accounts-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.accounts-table th, .accounts-table td { padding: 1rem; text-align: right; border-bottom: 1px solid rgba(0,0,0,0.1); }
+.accounts-table th { font-weight: 600; position: sticky; top: 0; z-index: 10; }
+.table-code-cell { font-family: monospace; font-weight: bold; color: #3b82f6; }
+.table-center { text-align: center; }
+
+/* TreeView styles are handled by ./src/components/TreeView/TreeView.css */
+
+/* Ultimate button look */
+.ultimate-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 8px 12px; border: none; border-radius: 8px; font-weight: 600; color: #fff; cursor: pointer; transition: all .3s ease; }
+.ultimate-btn .btn-content { display: inline-flex; align-items: center; gap: 8px; }
+.ultimate-btn-add { background: linear-gradient(135deg,#10b981,#059669); }
+.ultimate-btn-edit { background: linear-gradient(135deg,#3b82f6,#1d4ed8); }
+.ultimate-btn-delete { background: linear-gradient(135deg,#ef4444,#dc2626); }
+/* orange warning for disable */
+.ultimate-btn-warning { background: linear-gradient(135deg,#f97316,#ea580c); }
+.ultimate-btn-success { background: linear-gradient(135deg,#10b981,#059669); }
+.ultimate-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,.15); }
+

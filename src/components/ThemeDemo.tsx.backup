@@ -1,0 +1,309 @@
+import React, { useState } from 'react'
+import {
+  Box,
+  Typography,
+  Button,
+  Card,
+  CardContent,
+  CardActions,
+  Grid,
+  Paper,
+  Chip,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Fab,
+  Alert,
+  AppBar,
+  Toolbar,
+} from '@mui/material'
+import {
+  Settings as SettingsIcon,
+  AccountBalance as AccountIcon,
+  TrendingUp as TrendingIcon,
+  Receipt as ReceiptIcon,
+  Assessment as ReportIcon,
+  Palette as PaletteIcon,
+} from '@mui/icons-material'
+import { useTheme } from '../contexts/ThemeContext'
+import { ThemeSettings } from './ThemeSettings'
+
+export const ThemeDemo: React.FC = () => {
+  const { currentTheme } = useTheme()
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
+  const sampleData = {
+    revenue: 125000,
+    expenses: 78000,
+    netIncome: 47000,
+    accounts: 24,
+    transactions: 156
+  }
+
+  return (
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+      {/* App Bar */}
+      <AppBar position="static" elevation={1}>
+        <Toolbar>
+          <AccountIcon sx={{ mr: 2 }} />
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            Professional Accounting System
+          </Typography>
+          <Button color="inherit" startIcon={<SettingsIcon />} onClick={() => setSettingsOpen(true)}>
+            Theme Settings
+          </Button>
+        </Toolbar>
+      </AppBar>
+
+      <Box sx={{ p: 3 }}>
+        {/* Theme Info Alert */}
+        <Alert severity="info" sx={{ mb: 3 }}>
+          Current Theme: <strong>{currentTheme.name}</strong> • 
+          Font: <strong>{currentTheme.fonts.primary.split(',')[0].replace(/"/g, '')}</strong> • 
+          Mode: <strong>{currentTheme.mode}</strong> • 
+          Language: <strong>{currentTheme.language.toUpperCase()}</strong>
+        </Alert>
+
+        {/* Typography Showcase */}
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h3" gutterBottom color="primary">
+            Typography Showcase
+          </Typography>
+          <Typography variant="h4" gutterBottom>
+            Professional Font Hierarchy
+          </Typography>
+          <Typography variant="h5" gutterBottom color="text.secondary">
+            Segoe UI provides excellent readability for both English and Arabic text
+          </Typography>
+          <Typography variant="h6" gutterBottom>
+            Perfect for Windows Professional Environment
+          </Typography>
+          
+          <Box sx={{ my: 3 }}>
+            <Typography variant="body1" paragraph>
+              <strong>Body Text (Regular):</strong> This is the primary body text used throughout the application. 
+              It maintains excellent readability and professional appearance across different screen sizes.
+              The font weight and line height are optimized for extended reading sessions.
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>Body Text (Small):</strong> Secondary text with slightly smaller size, 
+              perfect for captions, descriptions, and supplementary information.
+            </Typography>
+            <Typography variant="caption" display="block" paragraph>
+              <strong>Caption Text:</strong> Small text for labels, timestamps, and fine print details.
+            </Typography>
+          </Box>
+
+          {/* Sample Arabic Text (if Arabic is enabled) */}
+          {(currentTheme.language === 'ar' || currentTheme.language === 'mixed') && (
+            <Box sx={{ mt: 3, textAlign: currentTheme.direction === 'rtl' ? 'right' : 'left' }}>
+              <Typography variant="h5" gutterBottom>
+                نموذج النص العربي
+              </Typography>
+              <Typography variant="body1" paragraph>
+                هذا نص تجريبي باللغة العربية لاختبار جودة عرض الخط في النظام المحاسبي المهني.
+                يتم عرض النص بخط Segoe UI المُحسّن للغة العربية مع التباعد والوضوح المناسبين.
+              </Typography>
+            </Box>
+          )}
+        </Paper>
+
+        {/* Dashboard Cards */}
+        <Grid container spacing={3} sx={{ mb: 3 }}>
+          <Grid item xs={12} md={6} lg={3}>
+            <Card elevation={2}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <TrendingIcon color="success" sx={{ mr: 1 }} />
+                  <Typography variant="h6" color="success.main">
+                    Total Revenue
+                  </Typography>
+                </Box>
+                <Typography variant="h4" fontWeight="bold">
+                  ${sampleData.revenue.toLocaleString()}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  +12% from last month
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={6} lg={3}>
+            <Card elevation={2}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <ReceiptIcon color="warning" sx={{ mr: 1 }} />
+                  <Typography variant="h6" color="warning.main">
+                    Total Expenses
+                  </Typography>
+                </Box>
+                <Typography variant="h4" fontWeight="bold">
+                  ${sampleData.expenses.toLocaleString()}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  -5% from last month
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={6} lg={3}>
+            <Card elevation={2}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <ReportIcon color="primary" sx={{ mr: 1 }} />
+                  <Typography variant="h6" color="primary.main">
+                    Net Income
+                  </Typography>
+                </Box>
+                <Typography variant="h4" fontWeight="bold">
+                  ${sampleData.netIncome.toLocaleString()}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  +18% from last month
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={6} lg={3}>
+            <Card elevation={2}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <AccountIcon color="info" sx={{ mr: 1 }} />
+                  <Typography variant="h6" color="info.main">
+                    Active Accounts
+                  </Typography>
+                </Box>
+                <Typography variant="h4" fontWeight="bold">
+                  {sampleData.accounts}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {sampleData.transactions} transactions
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
+        {/* Color Palette Preview */}
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h5" gutterBottom>
+            Current Color Palette
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
+            <Chip 
+              label="Primary" 
+              sx={{ 
+                backgroundColor: currentTheme.colors.primary, 
+                color: 'white',
+                fontWeight: 'bold'
+              }} 
+            />
+            <Chip 
+              label="Secondary" 
+              sx={{ 
+                backgroundColor: currentTheme.colors.secondary, 
+                color: 'white',
+                fontWeight: 'bold'
+              }} 
+            />
+            <Chip 
+              label="Success" 
+              sx={{ 
+                backgroundColor: currentTheme.colors.success, 
+                color: 'white',
+                fontWeight: 'bold'
+              }} 
+            />
+            <Chip 
+              label="Warning" 
+              sx={{ 
+                backgroundColor: currentTheme.colors.warning, 
+                color: 'black',
+                fontWeight: 'bold'
+              }} 
+            />
+            <Chip 
+              label="Error" 
+              sx={{ 
+                backgroundColor: currentTheme.colors.error, 
+                color: 'white',
+                fontWeight: 'bold'
+              }} 
+            />
+            <Chip 
+              label="Info" 
+              sx={{ 
+                backgroundColor: currentTheme.colors.info, 
+                color: 'white',
+                fontWeight: 'bold'
+              }} 
+            />
+          </Box>
+          
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <Button variant="contained" color="primary">Primary Button</Button>
+            <Button variant="contained" color="secondary">Secondary Button</Button>
+            <Button variant="outlined" color="primary">Outlined Button</Button>
+            <Button variant="text" color="primary">Text Button</Button>
+          </Box>
+        </Paper>
+
+        {/* Sample Menu/Navigation */}
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            Navigation Menu Preview
+          </Typography>
+          <List>
+            <ListItem>
+              <ListItemIcon>
+                <AccountIcon color="primary" />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Chart of Accounts" 
+                secondary="Manage your account structure"
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemIcon>
+                <ReceiptIcon color="primary" />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Journal Entries" 
+                secondary="Record double-entry transactions"
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemIcon>
+                <ReportIcon color="primary" />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Financial Reports" 
+                secondary="Trial balance, income statement, balance sheet"
+              />
+            </ListItem>
+          </List>
+        </Paper>
+      </Box>
+
+      {/* Floating Action Button */}
+      <Fab 
+        color="primary" 
+        aria-label="settings" 
+        sx={{ position: 'fixed', bottom: 16, right: 16 }}
+        onClick={() => setSettingsOpen(true)}
+      >
+        <PaletteIcon />
+      </Fab>
+
+      {/* Theme Settings Dialog */}
+      <ThemeSettings 
+        open={settingsOpen} 
+        onClose={() => setSettingsOpen(false)} 
+      />
+    </Box>
+  )
+}
