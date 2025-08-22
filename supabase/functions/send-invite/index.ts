@@ -43,7 +43,17 @@ serve(async (req: Request) => {
       });
     }
 
-    const body = await req.json().catch(() => ({} as any));
+    let body: any;
+    try {
+      body = await req.json();
+    } catch (e) {
+      console.error("JSON parse error", e);
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const email: string | undefined = body.email;
     const token: string | undefined = body.token;
 
@@ -56,7 +66,7 @@ serve(async (req: Request) => {
 
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
     const APP_BASE_URL = Deno.env.get("APP_BASE_URL") || "http://localhost:3000";
-    const FROM_EMAIL = Deno.env.get("INVITE_FROM_EMAIL") || "no-reply@example.com";
+    const FROM_EMAIL = Deno.env.get("INVITE_FROM_EMAIL") || "onboarding@resend.dev";
 
     if (!RESEND_API_KEY) {
       return new Response(JSON.stringify({ error: "Server missing RESEND_API_KEY" }), {
@@ -76,21 +86,31 @@ serve(async (req: Request) => {
         <p><a href="${link}">Click here to complete registration</a></p>
         <p>If you didn’t expect this, you can ignore this email.</p>
       `,
-    };
+    } as const;
 
-    const resendResp = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+    let resendResp: Response;
+    try {
+      resendResp = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (fetchErr) {
+      console.error("Resend fetch failed", fetchErr);
+      return new Response(JSON.stringify({ error: "Network error calling Resend", details: String(fetchErr) }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (!resendResp.ok) {
       const text = await resendResp.text().catch(() => "");
+      console.error("Resend returned error", resendResp.status, text);
       return new Response(
-        JSON.stringify({ error: "Resend failed", details: text || resendResp.statusText }),
+        JSON.stringify({ error: "Resend failed", status: resendResp.status, details: text || resendResp.statusText }),
         {
           status: 502,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -98,11 +118,14 @@ serve(async (req: Request) => {
       );
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
+    const apiResult = await resendResp.json().catch(() => ({}));
+
+    return new Response(JSON.stringify({ ok: true, provider: apiResult }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
+    console.error("Unhandled error", err);
     return new Response(
       JSON.stringify({ error: "Unexpected error", details: String(err) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
