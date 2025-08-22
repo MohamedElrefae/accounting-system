@@ -280,6 +280,11 @@ export function DatabaseDiagnostics() {
         <Typography variant="body2">
           Audit logging: {(import.meta as any)?.env?.VITE_ENABLE_AUDIT === 'true' ? 'Enabled' : 'Disabled'}
         </Typography>
+        <Box sx={{ mt: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+          <Typography variant="caption" component="pre" sx={{ fontFamily: 'monospace' }}>
+            VITE_ENABLE_AUDIT = {String((import.meta as any)?.env?.VITE_ENABLE_AUDIT)}
+          </Typography>
+        </Box>
       </Alert>
 
       <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
