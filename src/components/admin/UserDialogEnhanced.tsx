@@ -330,12 +330,14 @@ export const UserDialogEnhanced: React.FC<UserDialogProps> = ({
           if (roleError) throw roleError;
         }
 
-        // Log via secure RPC
-        await audit(supabase, 'user.update', 'user', user.id, {
-          updated_fields: Object.keys(formData).filter(k =>
-            !['password', 'confirm_password', 'send_invite'].includes(k)
-          )
-        });
+        // Log via secure RPC only if authenticated
+        if (currentUser?.id) {
+          await audit(supabase, 'user.update', 'user', user.id, {
+            updated_fields: Object.keys(formData).filter(k =>
+              !['password', 'confirm_password', 'send_invite'].includes(k)
+            )
+          });
+        }
 
       } else {
         // Create new user using signUp (client-safe)
@@ -389,12 +391,14 @@ export const UserDialogEnhanced: React.FC<UserDialogProps> = ({
             });
           }
 
-          // Log via secure RPC
-          await audit(supabase, 'user.create', 'user', signUpData.user.id, {
-            email: formData.email,
-            role_id: formData.role_id,
-            department: formData.department
-          });
+          // Log via secure RPC only if authenticated
+          if (currentUser?.id) {
+            await audit(supabase, 'user.create', 'user', signUpData.user.id, {
+              email: formData.email,
+              role_id: formData.role_id,
+              department: formData.department
+            });
+          }
         }
       }
 

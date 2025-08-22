@@ -132,10 +132,12 @@ export const UserDialog: React.FC<UserDialogProps> = ({
           if (roleError) throw roleError;
         }
 
-        // Log via secure RPC
-        await audit(supabase, 'user.update', 'user', user.id, {
-          updated_fields: Object.keys(formData).filter(k => k !== 'password' && k !== 'send_invite')
-        });
+        // Log via secure RPC only if authenticated
+        if (currentUser?.id) {
+          await audit(supabase, 'user.update', 'user', user.id, {
+            updated_fields: Object.keys(formData).filter(k => k !== 'password' && k !== 'send_invite')
+          });
+        }
       } else {
         // Create new user
         if (!formData.email || !formData.password) {
@@ -200,11 +202,13 @@ export const UserDialog: React.FC<UserDialogProps> = ({
               if (roleError) console.error('Error assigning role:', roleError);
             }
 
-            // Log via secure RPC
-            await audit(supabase, 'user.create', 'user', signUpData.user.id, {
-              email: formData.email,
-              role_id: formData.role_id
-            });
+            // Log via secure RPC only if authenticated
+            if (currentUser?.id) {
+              await audit(supabase, 'user.create', 'user', signUpData.user.id, {
+                email: formData.email,
+                role_id: formData.role_id
+              });
+            }
           }
         } else if (authData?.user) {
           // Admin API worked - create profile

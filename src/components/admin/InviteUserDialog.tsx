@@ -224,12 +224,14 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
 
       setResults(results);
 
-      // Log via secure RPC (won't throw on RLS and requires auth)
-      await audit(supabase, 'user.invite', 'user', null, {
-        invited_emails: invitationsToSend.map(inv => inv.email),
-        successful: results.filter(r => r.success).length,
-        failed: results.filter(r => !r.success).length
-      });
+      // Log via secure RPC only if authenticated
+      if (currentUser?.id) {
+        await audit(supabase, 'user.invite', 'user', null, {
+          invited_emails: invitationsToSend.map(inv => inv.email),
+          successful: results.filter(r => r.success).length,
+          failed: results.filter(r => !r.success).length
+        });
+      }
 
       const successCount = results.filter(r => r.success).length;
       if (successCount > 0) {

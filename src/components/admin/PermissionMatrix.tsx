@@ -337,12 +337,14 @@ export const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
           if (error) throw error;
         }
 
-        // Log via secure RPC
-        await audit(supabase, isGranted ? 'permission.grant' : 'permission.revoke', 'user_permission', userId, {
-          permission: permName,
-          target_user: userId,
-          granted: isGranted
-        });
+        // Log via secure RPC only if authenticated
+        if (currentUser?.id) {
+          await audit(supabase, isGranted ? 'permission.grant' : 'permission.revoke', 'user_permission', userId, {
+            permission: permName,
+            target_user: userId,
+            granted: isGranted
+          });
+        }
       }
 
       setSnackbar({
