@@ -25,7 +25,15 @@ import {
   InputAdornment,
   Alert,
   Skeleton,
-  Stack
+  Stack,
+  Checkbox,
+  Menu,
+  Toolbar,
+  Collapse,
+  Badge,
+  Divider,
+  FormControlLabel,
+  Switch
 } from '@mui/material';
 import {
   PersonAdd as PersonAddIcon,
@@ -33,13 +41,20 @@ import {
   Delete as DeleteIcon,
   Search as SearchIcon,
   Security as SecurityIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  CheckBox as CheckBoxIcon,
+  CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon,
+  Download as DownloadIcon,
+  Upload as UploadIcon,
+  Group as GroupIcon,
+  Email as EmailIcon
 } from '@mui/icons-material';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { PermissionGuard } from '../../components/auth/PermissionGuard';
 import { PermissionMatrix } from '../../components/admin/PermissionMatrix';
 import { UserDialogEnhanced as UserDialog } from '../../components/admin/UserDialogEnhanced';
+import { InviteUserDialog } from '../../components/admin/InviteUserDialog';
 import { PERMISSIONS } from '../../constants/permissions';
 
 interface User {
@@ -76,6 +91,10 @@ export default function UserManagement() {
   const [refreshing, setRefreshing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [userRoleMap, setUserRoleMap] = useState<Record<string, Role | null>>({});
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [showInactive, setShowInactive] = useState(true);
 
   useEffect(() => {
     loadData();
@@ -189,12 +208,16 @@ export default function UserManagement() {
     }
   };
 
-  const filteredUsers = users.filter(user => 
-    user.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.department?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.department?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = showInactive || user.is_active;
+    
+    return matchesSearch && matchesStatus;
+  });
 
   const getUserRole = (user: User) => {
     return userRoleMap[user.id] || null;
@@ -208,6 +231,139 @@ export default function UserManagement() {
       day: 'numeric'
     });
   };
+
+  // Bulk operations handlers
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const userIds = new Set(filteredUsers.filter(u => u.id !== currentUser?.id).map(u => u.id));
+      setSelectedUserIds(userIds);
+    } else {
+      setSelectedUserIds(new Set());
+    }
+  };
+
+  const handleSelectUser = (userId: string, checked: boolean) => {
+    const newSelected = new Set(selectedUserIds);
+    if (checked) {
+      newSelected.add(userId);
+    } else {
+      newSelected.delete(userId);
+    }
+    setSelectedUserIds(newSelected);
+  };
+
+  const handleBulkActivate = async (activate: boolean) => {
+    setBulkActionLoading(true);
+    try {
+      const userIds = Array.from(selectedUserIds);
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ is_active: activate })
+        .in('id', userIds);
+      
+      if (error) throw error;
+      
+      await loadUsers();
+      setSelectedUserIds(new Set());
+    } catch (error) {
+      console.error('Error in bulk activate:', error);
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkRoleAssignment = async (roleId: number | null) => {
+    setBulkActionLoading(true);
+    try {
+      const userIds = Array.from(selectedUserIds);
+      
+      // Remove existing roles for selected users
+      await supabase.from('user_roles').delete().in('user_id', userIds);
+      
+      // Add new role if selected
+      if (roleId) {
+        const insertData = userIds.map(userId => ({
+          user_id: userId,
+          role_id: roleId,
+          assigned_by: currentUser?.id,
+          is_active: true
+        }));
+        
+        const { error } = await supabase.from('user_roles').insert(insertData);
+        if (error) throw error;
+      }
+      
+      await loadUsers();
+      setSelectedUserIds(new Set());
+    } catch (error) {
+      console.error('Error in bulk role assignment:', error);
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`هل أنت متأكد من حذف ${selectedUserIds.size} مستخدم؟`)) {
+      return;
+    }
+    
+    setBulkActionLoading(true);
+    try {
+      const userIds = Array.from(selectedUserIds);
+      
+      // First remove from user_roles
+      await supabase.from('user_roles').delete().in('user_id', userIds);
+      
+      // Then remove from user_profiles  
+      const { error } = await supabase
+        .from('user_profiles')
+        .delete()
+        .in('id', userIds);
+      
+      if (error) throw error;
+      
+      await loadUsers();
+      setSelectedUserIds(new Set());
+    } catch (error) {
+      console.error('Error in bulk delete:', error);
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const exportToCSV = () => {
+    const selectedUsers = users.filter(u => selectedUserIds.has(u.id));
+    const csvData = selectedUsers.map(user => ({
+      Email: user.email,
+      FirstName: user.first_name || '',
+      LastName: user.last_name || '',
+      Department: user.department || '',
+      JobTitle: user.job_title || '',
+      Role: getUserRole(user)?.name_ar || '',
+      Status: user.is_active ? 'نشط' : 'غير نشط',
+      LastLogin: formatDate(user.last_login),
+      CreatedAt: formatDate(user.created_at)
+    }));
+    
+    const csv = [
+      Object.keys(csvData[0] || {}).join(','),
+      ...csvData.map(row => Object.values(row).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `users_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  };
+
+  const isAllSelected = selectedUserIds.size > 0 && 
+    selectedUserIds.size === filteredUsers.filter(u => u.id !== currentUser?.id).length;
+  const isIndeterminate = selectedUserIds.size > 0 && !isAllSelected;
 
   return (
     <Box sx={{ p: 3 }} dir="rtl">
@@ -224,6 +380,15 @@ export default function UserManagement() {
           >
             تحديث
           </Button>
+          <PermissionGuard permission={PERMISSIONS.USERS_CREATE}>
+            <Button
+              variant="outlined"
+              startIcon={<EmailIcon />}
+              onClick={() => setInviteDialogOpen(true)}
+            >
+              دعوة مستخدمين
+            </Button>
+          </PermissionGuard>
           <PermissionGuard permission={PERMISSIONS.USERS_CREATE}>
             <Button
               variant="contained"
@@ -246,25 +411,124 @@ export default function UserManagement() {
       )}
 
       <Paper sx={{ mb: 3, p: 2 }}>
-        <TextField
-          fullWidth
-          placeholder="البحث عن المستخدمين..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-        />
+        <Stack spacing={2}>
+          <TextField
+            fullWidth
+            placeholder="البحث عن المستخدمين..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
+          
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showInactive}
+                  onChange={(e) => setShowInactive(e.target.checked)}
+                />
+              }
+              label="عرض المستخدمين غير النشطين"
+            />
+            
+            {selectedUserIds.size > 0 && (
+              <Badge badgeContent={selectedUserIds.size} color="primary">
+                <Typography variant="body2" color="text.secondary">
+                  {selectedUserIds.size} مستخدم محدد
+                </Typography>
+              </Badge>
+            )}
+          </Stack>
+        </Stack>
       </Paper>
+
+      {/* Bulk Actions Toolbar */}
+      <Collapse in={selectedUserIds.size > 0}>
+        <Paper sx={{ mb: 2, p: 2, bgcolor: 'action.hover' }}>
+          <Toolbar sx={{ p: 0, minHeight: 'auto !important' }}>
+            <Typography sx={{ flex: '1 1 100%' }} color="inherit" variant="subtitle1">
+              {selectedUserIds.size} مستخدم محدد
+            </Typography>
+            
+            <Stack direction="row" spacing={1}>
+              <Button
+                size="small"
+                startIcon={<CheckBoxIcon />}
+                onClick={() => handleBulkActivate(true)}
+                disabled={bulkActionLoading}
+              >
+                تفعيل
+              </Button>
+              
+              <Button
+                size="small"
+                startIcon={<CheckBoxOutlineBlankIcon />}
+                onClick={() => handleBulkActivate(false)}
+                disabled={bulkActionLoading}
+              >
+                إلغاء تفعيل
+              </Button>
+              
+              <FormControl size="small" sx={{ minWidth: 120 }}>
+                <Select
+                  displayEmpty
+                  onChange={(e) => handleBulkRoleAssignment(e.target.value as number || null)}
+                  disabled={bulkActionLoading}
+                  value=""
+                >
+                  <MenuItem value="" disabled>تعيين دور</MenuItem>
+                  <MenuItem value={null}>إزالة الدور</MenuItem>
+                  {roles.map((role) => (
+                    <MenuItem key={role.id} value={role.id}>
+                      {role.name_ar}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              
+              <Button
+                size="small"
+                startIcon={<DownloadIcon />}
+                onClick={exportToCSV}
+                disabled={bulkActionLoading}
+              >
+                تصدير
+              </Button>
+              
+              <PermissionGuard permission={PERMISSIONS.USERS_DELETE}>
+                <Button
+                  size="small"
+                  startIcon={<DeleteIcon />}
+                  onClick={handleBulkDelete}
+                  disabled={bulkActionLoading}
+                  color="error"
+                >
+                  حذف
+                </Button>
+              </PermissionGuard>
+            </Stack>
+          </Toolbar>
+        </Paper>
+      </Collapse>
 
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
+              <TableCell padding="checkbox">
+                <Checkbox
+                  checked={isAllSelected}
+                  indeterminate={isIndeterminate}
+                  onChange={(e) => handleSelectAll(e.target.checked)}
+                  disabled={filteredUsers.filter(u => u.id !== currentUser?.id).length === 0}
+                />
+              </TableCell>
               <TableCell>المستخدم</TableCell>
               <TableCell>القسم</TableCell>
               <TableCell>الدور</TableCell>
@@ -277,6 +541,7 @@ export default function UserManagement() {
             {loading ? (
               [...Array(5)].map((_, i) => (
                 <TableRow key={i}>
+                  <TableCell padding="checkbox"><Skeleton /></TableCell>
                   <TableCell><Skeleton /></TableCell>
                   <TableCell><Skeleton /></TableCell>
                   <TableCell><Skeleton /></TableCell>
@@ -287,7 +552,7 @@ export default function UserManagement() {
               ))
             ) : filteredUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={7} align="center">
                   <Typography color="text.secondary" py={3}>
                     لا توجد مستخدمين
                   </Typography>
@@ -297,7 +562,14 @@ export default function UserManagement() {
               filteredUsers.map((user) => {
                 const userRole = getUserRole(user);
                 return (
-                  <TableRow key={user.id} hover>
+                  <TableRow key={user.id} hover selected={selectedUserIds.has(user.id)}>
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        checked={selectedUserIds.has(user.id)}
+                        onChange={(e) => handleSelectUser(user.id, e.target.checked)}
+                        disabled={user.id === currentUser?.id}
+                      />
+                    </TableCell>
                     <TableCell>
                       <Box display="flex" alignItems="center" gap={2}>
                         <Avatar sx={{ bgcolor: 'primary.main' }}>
@@ -413,6 +685,16 @@ export default function UserManagement() {
         onUserSaved={() => {
           setEditDialogOpen(false);
           loadData();
+        }}
+      />
+
+      {/* Invite Users Dialog */}
+      <InviteUserDialog
+        open={inviteDialogOpen}
+        onClose={() => setInviteDialogOpen(false)}
+        roles={roles}
+        onInvitationsSent={() => {
+          loadData(); // Refresh users after invitations sent
         }}
       />
     </Box>
