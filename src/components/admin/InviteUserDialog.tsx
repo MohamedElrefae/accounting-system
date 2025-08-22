@@ -75,6 +75,21 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
   const [bulkEmails, setBulkEmails] = useState('');
   const [bulkMode, setBulkMode] = useState(false);
   const [results, setResults] = useState<any[]>([]);
+  const [recentInvites, setRecentInvites] = useState<any[]>([]);
+
+  // Load recent invitations for context
+  useEffect(() => {
+    const loadRecent = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('invitation_management_view')
+          .select('*')
+          .limit(10);
+        if (!error) setRecentInvites(data || []);
+      } catch {}
+    };
+    if (open) loadRecent();
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -152,10 +167,10 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
 
       // Send email if requested
       if (invitation.send_welcome_email) {
-        // In a real implementation, you would send this via your email service
-        // For now, we'll just log it and mark as sent
-        console.log('Invitation email would be sent to:', invitation.email);
-        console.log('Invitation link:', invitationLink);
+        // NOTE: Email sending requires a backend (Supabase Edge Function/SMTP provider).
+        // For now we only mark as sent. To actually send emails, wire an Edge Function
+        // to listen for new rows in user_invitations or call a serverless endpoint here.
+        console.log('Invitation email placeholder ->', invitation.email, invitationLink);
         
         // Update invitation status to sent
         await supabase
@@ -217,10 +232,41 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
         throw new Error(`عناوين بريد إلكتروني غير صحيحة: ${invalidEmails.map(inv => inv.email).join(', ')}`);
       }
 
+      // Pre-check: prevent inviting existing users or duplicate pending invitations
+      const checked: Invitation[] = [];
+      const precheckResults: any[] = [];
+      for (const inv of invitationsToSend) {
+        // 1) existing user by user_profiles email
+        const { data: existing } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .ilike('email', inv.email)
+          .maybeSingle?.() ?? await supabase.from('user_profiles').select('id').ilike('email', inv.email).limit(1);
+        if (existing && (existing as any[]).length === 0 ? false : !!(existing as any)?.id || (Array.isArray(existing) && existing.length > 0)) {
+          precheckResults.push({ success: false, email: inv.email, error: 'المستخدم موجود بالفعل' });
+          continue;
+        }
+        // 2) duplicate pending invitation
+        const { data: dup } = await supabase
+          .from('user_invitations')
+          .select('id, status, expires_at')
+          .eq('email', inv.email)
+          .in('status', ['pending','sent'])
+          .order('created_at', { ascending: false })
+          .limit(1);
+        const d = Array.isArray(dup) ? dup[0] : null;
+        if (d && new Date(d.expires_at) > new Date()) {
+          precheckResults.push({ success: false, email: inv.email, error: 'دعوة قيد الانتظار موجودة بالفعل' });
+          continue;
+        }
+        checked.push(inv);
+      }
+
       // Send invitations
-      const results = await Promise.all(
-        invitationsToSend.map(invitation => sendInvitation(invitation))
-      );
+      const results = [
+        ...precheckResults,
+        ...(await Promise.all(checked.map(invitation => sendInvitation(invitation))))
+      ];
 
       setResults(results);
 
@@ -281,6 +327,23 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
           </Alert>
+        )}
+
+        {/* Recent invitations */}
+        {recentInvites.length > 0 && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle1">آخر الدعوات</Typography>
+            <List>
+              {recentInvites.map((inv, i) => (
+                <ListItem key={i}>
+                  <ListItemText
+                    primary={inv.email}
+                    secondary={`الحالة: ${inv.effective_status} - الدور: ${inv.role_name_ar || ''}`}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          </Box>
         )}
 
         {results.length > 0 && (
