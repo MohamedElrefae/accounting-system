@@ -106,6 +106,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (result?.data) {
         console.log('[Auth] Profile loaded:', !!result.data);
         setProfile(result.data as Profile);
+        // Persist super admin flag if present on profile row
+        try {
+          // @ts-ignore allow dynamic prop
+          const isSuper = (result.data as any)?.is_super_admin === true;
+          if (typeof isSuper === 'boolean') {
+            localStorage.setItem('is_super_admin', isSuper ? 'true' : 'false');
+          }
+        } catch {}
       }
     } catch (e: any) {
       console.log('[Auth] Profile load failed/timeout (continuing anyway):', e.message);

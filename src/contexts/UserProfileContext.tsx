@@ -86,6 +86,11 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
       };
 
       setProfile(p);
+      // Persist super admin flag for navigation gating
+      try {
+        const isSuper = roles.includes('super_admin') || data?.is_super_admin === true;
+        localStorage.setItem('is_super_admin', isSuper ? 'true' : 'false');
+      } catch {}
     } catch (e: any) {
       console.error('[UserProfile] Failed to load profile:', e.message);
       setError(e.message || 'Failed to load user profile');
