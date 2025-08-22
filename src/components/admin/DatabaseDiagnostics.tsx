@@ -276,13 +276,13 @@ export function DatabaseDiagnostics() {
       </Typography>
 
       {/* Audit logging indicator */}
-      <Alert severity={(import.meta as any)?.env?.VITE_ENABLE_AUDIT === 'true' ? 'success' : 'info'} sx={{ mb: 2 }}>
+      <Alert severity={import.meta.env.VITE_ENABLE_AUDIT === 'true' ? 'success' : 'info'} sx={{ mb: 2 }}>
         <Typography variant="body2">
-          Audit logging: {(import.meta as any)?.env?.VITE_ENABLE_AUDIT === 'true' ? 'Enabled' : 'Disabled'}
+          Audit logging: {import.meta.env.VITE_ENABLE_AUDIT === 'true' ? 'Enabled' : 'Disabled'}
         </Typography>
         <Box sx={{ mt: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
           <Typography variant="caption" component="pre" sx={{ fontFamily: 'monospace' }}>
-            VITE_ENABLE_AUDIT = {String((import.meta as any)?.env?.VITE_ENABLE_AUDIT)}
+            VITE_ENABLE_AUDIT = {String(import.meta.env.VITE_ENABLE_AUDIT)}
           </Typography>
         </Box>
       </Alert>
@@ -303,7 +303,7 @@ export function DatabaseDiagnostics() {
             setAuditStatus('running');
             setAuditMessage('');
             try {
-              if ((import.meta as any)?.env?.VITE_ENABLE_AUDIT !== 'true') {
+              if (import.meta.env.VITE_ENABLE_AUDIT !== 'true') {
                 setAuditStatus('error');
                 setAuditMessage('Audit is disabled by VITE_ENABLE_AUDIT flag');
                 return;

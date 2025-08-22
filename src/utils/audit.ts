@@ -5,7 +5,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 function isAuditEnabled(): boolean {
   // Feature flag: default to disabled to avoid noisy errors until configured
   // Set VITE_ENABLE_AUDIT=true in your .env to enable
-  const flag = (import.meta as any)?.env?.VITE_ENABLE_AUDIT;
+  const flag = import.meta.env.VITE_ENABLE_AUDIT;
   return String(flag).toLowerCase() === 'true';
 }
 
