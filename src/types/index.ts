@@ -17,6 +17,7 @@ export interface NavigationItem {
   path?: string;
   children?: NavigationItem[];
   badge?: number;
+  superAdminOnly?: boolean;
 }
 
 export interface StatCard {

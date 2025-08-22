@@ -43,9 +43,9 @@ import {
   Group,
   Tune,
   Backup,
+  Security,
 } from '@mui/icons-material';
 import useAppStore from '../../store/useAppStore';
-import { useTheme } from '../../contexts/ThemeContext';
 import { navigationItems } from '../../data/navigation';
 import type { NavigationItem } from '../../types';
 
@@ -82,6 +82,7 @@ const iconMap: Record<string, React.ReactElement> = {
   Group: <Group />,
   Tune: <Tune />,
   Backup: <Backup />,
+  Security: <Security />,
 };
 
 interface SidebarProps {
@@ -128,6 +129,13 @@ const Sidebar: React.FC<SidebarProps> = () => {
     const isExpanded = expandedItems.includes(item.id);
     const title = language === 'ar' ? item.titleAr : item.titleEn;
     const isItemActive = isActive(item.path);
+
+    // Super admin gate for certain items
+    // We rely on the presence of a badge or additional context later, but for now
+    // we simply hide items marked superAdminOnly if user is not super admin.
+    // We use a conservative approach: check a flag in localStorage set by auth/profile contexts.
+    const isSuperAdmin = localStorage.getItem('is_super_admin') === 'true';
+    if (item.superAdminOnly && !isSuperAdmin) return null;
 
     return (
       <React.Fragment key={item.id}>
