@@ -166,11 +166,23 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
       if (inviteError) throw inviteError;
 
       // Send email if requested
-      if (invitation.send_welcome_email) {
-        // NOTE: Email sending requires a backend (Supabase Edge Function/SMTP provider).
-        // For now we only mark as sent. To actually send emails, wire an Edge Function
-        // to listen for new rows in user_invitations or call a serverless endpoint here.
-        console.log('Invitation email placeholder ->', invitation.email, invitationLink);
+          if (invitation.send_welcome_email) {
+        // If edge email sending is enabled, invoke the function
+        if (import.meta.env.VITE_ENABLE_INVITE_EMAILS === 'true') {
+          const { data: fxData, error: fxErr } = await supabase.functions.invoke('send-invite', {
+            body: {
+              email: invitation.email,
+              token: invitationToken,
+            },
+          });
+          if (fxErr) {
+            console.warn('Edge email send failed:', fxErr.message);
+          } else {
+            console.log('Edge email send result:', fxData);
+          }
+        } else {
+          console.log('Invitation email placeholder ->', invitation.email, invitationLink);
+        }
         
         // Update invitation status to sent
         await supabase
