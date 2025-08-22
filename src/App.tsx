@@ -1,15 +1,26 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { CustomThemeProvider } from './contexts/ThemeContext';
-// import { ThemeDemo } from './components/ThemeDemo';
-// import { DatabaseTest } from './components/DatabaseTest';
+import { AuthProvider } from './contexts/AuthContext';
+import { useAuth } from './contexts/AuthContext';
 import useAppStore from './store/useAppStore';
-import { mockUser } from './data/mockData';
 import DashboardLayout from './components/layout/DashboardLayout';
 import Dashboard from './pages/Dashboard';
 const AccountsTreeLazy = React.lazy(() => import('./pages/MainData/AccountsTree'));
 import TestRTL from './pages/TestRTL';
 import ExportTestPage from './pages/ExportTestPage';
+import { LoginForm } from './components/auth/LoginForm';
+import { RegisterForm } from './components/auth/RegisterForm';
+import { ForgotPassword } from './components/auth/ForgotPassword';
+import { ResetPassword } from './components/auth/ResetPassword';
+import AuthDebug from './pages/AuthDebug';
+const UserManagement = React.lazy(() => import('./pages/admin/UserManagement'));
+const RoleManagement = React.lazy(() => import('./pages/admin/RoleManagement'));
+const Diagnostics = React.lazy(() => import('./pages/admin/Diagnostics'));
+import EditProfile from './pages/admin/EditProfile';
+import Profile from './pages/admin/Profile';
+import { ToastProvider } from './contexts/ToastContext';
+import { UserProfileProvider } from './contexts/UserProfileContext';
 
 // Placeholder components for other pages
 const PlaceholderPage: React.FC<{ title: string }> = ({ title }) => (
@@ -19,13 +30,30 @@ const PlaceholderPage: React.FC<{ title: string }> = ({ title }) => (
   </div>
 );
 
-const App: React.FC = () => {
-  const { setUser, language } = useAppStore();
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, loading } = useAuth();
+  console.log('[ProtectedRoute]', { user: !!user, loading });
+  
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div>Loading authentication...</div>
+      </div>
+    );
+  }
+  
+  if (!user) {
+    console.log('[ProtectedRoute] No user, redirecting to login');
+    return <Navigate to="/login" replace />;
+  }
+  
+  console.log('[ProtectedRoute] User found, rendering children');
+  return <>{children}</>;
+};
 
-  // Initialize user data
-  useEffect(() => {
-    setUser(mockUser);
-  }, [setUser]);
+const App: React.FC = () => {
+  const { language } = useAppStore();
+
 
   // Ensure document direction is set on mount and language changes
   useEffect(() => {
@@ -35,14 +63,26 @@ const App: React.FC = () => {
   }, [language]);
 
   return (
-    <CustomThemeProvider>
-      <Router>
-        <Routes>
+    <AuthProvider>
+      <CustomThemeProvider>
+        <ToastProvider>
+          <UserProfileProvider>
+            <Router>
+          <Routes>
           {/* Theme Demo Route */}
           {/* <Route path="/theme-demo" element={<ThemeDemo />} /> */}
           {/* <Route path="/database-test" element={<DatabaseTest />} /> */}
           
-          <Route path="/" element={<DashboardLayout />}>
+          <Route path="/login" element={<LoginForm />} />
+          <Route path="/register" element={<RegisterForm />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/auth-debug" element={<AuthDebug />} />
+          <Route path="/" element={
+            <ProtectedRoute>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }>
             <Route index element={<Dashboard />} />
             <Route path="/test-rtl" element={<TestRTL />} />
             
@@ -84,16 +124,34 @@ const App: React.FC = () => {
             
             {/* Settings */}
             <Route path="/settings/company" element={<PlaceholderPage title="Company Profile" />} />
-            <Route path="/settings/users" element={<PlaceholderPage title="Users Management" />} />
+            <Route path="/settings/diagnostics" element={
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <Diagnostics />
+              </React.Suspense>
+            } />
+            <Route path="/settings/users" element={
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <UserManagement />
+              </React.Suspense>
+            } />
+            <Route path="/settings/roles" element={
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <RoleManagement />
+              </React.Suspense>
+            } />
+            <Route path="/settings/profile" element={<Profile />} />
             <Route path="/settings/preferences" element={<PlaceholderPage title="Preferences" />} />
             <Route path="/settings/backup" element={<PlaceholderPage title="Backup & Restore" />} />
             
             {/* Export Test Page */}
             <Route path="/export-test" element={<ExportTestPage />} />
           </Route>
-        </Routes>
-      </Router>
-    </CustomThemeProvider>
+          </Routes>
+            </Router>
+          </UserProfileProvider>
+        </ToastProvider>
+      </CustomThemeProvider>
+    </AuthProvider>
   );
 };
 
