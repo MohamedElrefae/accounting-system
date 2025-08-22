@@ -273,6 +273,13 @@ export function DatabaseDiagnostics() {
         Run these tests to diagnose issues with database connection and permissions.
       </Typography>
 
+      {/* Audit logging indicator */}
+      <Alert severity={(import.meta as any)?.env?.VITE_ENABLE_AUDIT === 'true' ? 'success' : 'info'} sx={{ mb: 2 }}>
+        <Typography variant="body2">
+          Audit logging: {(import.meta as any)?.env?.VITE_ENABLE_AUDIT === 'true' ? 'Enabled' : 'Disabled'}
+        </Typography>
+      </Alert>
+
       <Button
         variant="contained"
         startIcon={<RunIcon />}
