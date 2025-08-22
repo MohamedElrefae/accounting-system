@@ -25,6 +25,8 @@ import {
 } from '@mui/icons-material';
 import useAppStore from '../../store/useAppStore';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { useUserProfile } from '../../contexts/UserProfileContext';
 // import { ThemeSettings } from "./ThemeSettings"; // Temporarily disabled
 import { translations } from '../../data/mockData';
 
@@ -33,11 +35,9 @@ interface TopBarProps {
 }
 
 const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
-  const {
-    user,
-    language,
-    toggleLanguage,
-  } = useAppStore();
+  const { language, toggleLanguage } = useAppStore();
+  const { user } = useAuth();
+  const { profile } = useUserProfile();
 
   const {
     themeMode,
@@ -77,6 +77,31 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
     if (hour < 12) return t.goodMorning;
     if (hour < 18) return t.goodAfternoon;
     return t.goodEvening;
+  };
+
+  // Helper function to get proper display name
+  const getDisplayName = () => {
+    if (profile?.first_name) {
+      return `${profile.first_name} ${profile.last_name || ''}`.trim();
+    }
+    if (profile?.full_name_ar) {
+      return profile.full_name_ar;
+    }
+    return user?.email?.split('@')[0] || 'User';
+  };
+
+  // Helper function to get proper avatar initials
+  const getAvatarInitials = () => {
+    if (profile?.first_name) {
+      return (profile.first_name.charAt(0) + (profile.last_name?.charAt(0) || '')).toUpperCase();
+    }
+    if (profile?.full_name_ar) {
+      const names = profile.full_name_ar.split(' ');
+      return names.length > 1 
+        ? (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase()
+        : profile.full_name_ar.charAt(0).toUpperCase();
+    }
+    return user?.email?.charAt(0).toUpperCase() || 'U';
   };
 
   return (
@@ -139,7 +164,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
             letterSpacing: '-0.5px',
           }}
         >
-          {getCurrentGreeting()}, {user?.name || 'User'}!
+          {getCurrentGreeting()}, {getDisplayName()}!
         </Typography>
 
         {/* Actions cluster - always opposite to menu (right in LTR, left in RTL) */}
@@ -301,9 +326,9 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
                 transition: 'all 0.2s ease',
               }}
             >
-              {user?.avatar ? (
+              {(profile?.avatar_url) ? (
                 <Avatar 
-                  src={user.avatar} 
+                  src={profile.avatar_url} 
                   sx={{ 
                     width: 36, 
                     height: 36,
@@ -323,7 +348,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
                     borderColor: 'background.paper',
                   }}
                 >
-                  {user?.name?.charAt(0) || 'U'}
+                  {getAvatarInitials()}
                 </Avatar>
               )}
             </IconButton>
@@ -343,23 +368,26 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
     >
       <MenuItem onClick={handleProfileMenuClose}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1 }}>
-          {user?.avatar ? (
-            <Avatar src={user.avatar} sx={{ width: 40, height: 40 }} />
+          {profile?.avatar_url ? (
+            <Avatar src={profile.avatar_url} sx={{ width: 40, height: 40 }} />
           ) : (
             <Avatar sx={{ width: 40, height: 40, bgcolor: 'primary.main' }}>
-              {user?.name?.charAt(0) || 'U'}
+              {getAvatarInitials()}
             </Avatar>
           )}
           <Box>
-            <Typography variant="subtitle2">{user?.name || 'User'}</Typography>
+            <Typography variant="subtitle2">{getDisplayName()}</Typography>
             <Typography variant="body2" color="text.secondary">
-              {user?.email || 'user@example.com'}
+              {user?.email || profile?.email || 'user@example.com'}
             </Typography>
           </Box>
         </Box>
       </MenuItem>
       <Divider />
-      <MenuItem onClick={handleProfileMenuClose}>
+      <MenuItem onClick={() => {
+        handleProfileMenuClose();
+        window.location.href = '/settings/profile';
+      }}>
         <AccountCircle sx={{ mr: 2 }} />
         {t.profile}
       </MenuItem>
