@@ -23,6 +23,8 @@ interface TestResult {
 export function DatabaseDiagnostics() {
   const [tests, setTests] = useState<TestResult[]>([]);
   const [running, setRunning] = useState(false);
+  const [auditStatus, setAuditStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
+  const [auditMessage, setAuditMessage] = useState<string>('');
 
   const runTests = async () => {
     setRunning(true);
@@ -280,15 +282,73 @@ export function DatabaseDiagnostics() {
         </Typography>
       </Alert>
 
-      <Button
-        variant="contained"
-        startIcon={<RunIcon />}
-        onClick={runTests}
-        disabled={running}
-        sx={{ mb: 3 }}
-      >
-        {running ? 'Running Tests...' : 'Run Diagnostics'}
-      </Button>
+      <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
+        <Button
+          variant="contained"
+          startIcon={<RunIcon />}
+          onClick={runTests}
+          disabled={running}
+        >
+          {running ? 'Running Tests...' : 'Run Diagnostics'}
+        </Button>
+
+        <Button
+          variant="outlined"
+          onClick={async () => {
+            setAuditStatus('running');
+            setAuditMessage('');
+            try {
+              if ((import.meta as any)?.env?.VITE_ENABLE_AUDIT !== 'true') {
+                setAuditStatus('error');
+                setAuditMessage('Audit is disabled by VITE_ENABLE_AUDIT flag');
+                return;
+              }
+
+              const { data: userRes } = await supabase.auth.getUser();
+              if (!userRes?.user?.id) {
+                setAuditStatus('error');
+                setAuditMessage('Not authenticated');
+                return;
+              }
+
+              const payload = {
+                p_action: 'diagnostics.test',
+                p_entity_type: 'diagnostics',
+                p_entity_id: userRes.user.id,
+                p_details: { page: 'diagnostics', ts: new Date().toISOString() }
+              };
+              const { data, error } = await supabase.rpc('log_audit', payload);
+              if (error) {
+                setAuditStatus('error');
+                setAuditMessage(error.message);
+              } else {
+                setAuditStatus('success');
+                setAuditMessage(typeof data === 'object' ? JSON.stringify(data) : String(data));
+              }
+            } catch (e: any) {
+              setAuditStatus('error');
+              setAuditMessage(e?.message || String(e));
+            }
+          }}
+        >
+          Test Audit Logging
+        </Button>
+      </Stack>
+
+      {auditStatus !== 'idle' && (
+        <Alert severity={auditStatus === 'success' ? 'success' : auditStatus === 'running' ? 'info' : 'error'} sx={{ mb: 2 }}>
+          <Typography variant="body2">
+            {auditStatus === 'running' ? 'Testing audit logging...' : auditStatus === 'success' ? 'Audit logging OK' : 'Audit logging failed'}
+          </Typography>
+          {auditMessage && (
+            <Box sx={{ mt: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+              <Typography variant="body2" component="pre" sx={{ fontFamily: 'monospace', fontSize: '0.85rem', overflow: 'auto' }}>
+                {auditMessage}
+              </Typography>
+            </Box>
+          )}
+        </Alert>
+      )}
 
       {tests.length > 0 && (
         <Stack spacing={2}>
