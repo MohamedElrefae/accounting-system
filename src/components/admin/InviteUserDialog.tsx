@@ -223,17 +223,21 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
 
       setResults(results);
 
-      // Log the invitation activity
-      await supabase.from('audit_logs').insert({
-        user_id: currentUser?.id,
-        action: 'user.invite',
-        entity_type: 'user',
-        details: {
-          invited_emails: invitationsToSend.map(inv => inv.email),
-          successful: results.filter(r => r.success).length,
-          failed: results.filter(r => !r.success).length
-        }
-      });
+      // Log the invitation activity (best-effort; ignore if table doesn't exist)
+      try {
+        await supabase.from('audit_logs').insert({
+          user_id: currentUser?.id,
+          action: 'user.invite',
+          entity_type: 'user',
+          details: {
+            invited_emails: invitationsToSend.map(inv => inv.email),
+            successful: results.filter(r => r.success).length,
+            failed: results.filter(r => !r.success).length
+          }
+        });
+      } catch (e) {
+        console.warn('Skipping audit_logs insert (table may not exist):', (e as any)?.message || e);
+      }
 
       const successCount = results.filter(r => r.success).length;
       if (successCount > 0) {
@@ -296,6 +300,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
                   </ListItemIcon>
                   <ListItemText
                     primary={result.email}
+                    secondaryTypographyProps={{ component: 'div' }}
                     secondary={
                       result.success ? (
                         <Stack direction="row" alignItems="center" spacing={1}>

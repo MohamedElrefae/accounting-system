@@ -336,18 +336,22 @@ export const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
           if (error) throw error;
         }
 
-        // Log the change
-        await supabase.from('audit_logs').insert({
-          user_id: currentUser?.id,
-          action: isGranted ? 'permission.grant' : 'permission.revoke',
-          entity_type: 'user_permission',
-          entity_id: userId,
-          details: {
-            permission: permName,
-            target_user: userId,
-            granted: isGranted
-          }
-        });
+        // Log the change (best-effort)
+        try {
+          await supabase.from('audit_logs').insert({
+            user_id: currentUser?.id,
+            action: isGranted ? 'permission.grant' : 'permission.revoke',
+            entity_type: 'user_permission',
+            entity_id: userId,
+            details: {
+              permission: permName,
+              target_user: userId,
+              granted: isGranted
+            }
+          });
+        } catch (e) {
+          console.warn('Skipping audit_logs insert (permission change):', (e as any)?.message || e);
+        }
       }
 
       setSnackbar({

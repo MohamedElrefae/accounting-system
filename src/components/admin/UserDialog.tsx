@@ -131,16 +131,20 @@ export const UserDialog: React.FC<UserDialogProps> = ({
           if (roleError) throw roleError;
         }
 
-        // Log the update
-        await supabase.from('audit_logs').insert({
-          user_id: currentUser?.id,
-          action: 'user.update',
-          entity_type: 'user',
-          entity_id: user.id,
-          details: {
-            updated_fields: Object.keys(formData).filter(k => k !== 'password' && k !== 'send_invite')
-          }
-        });
+        // Log the update (best-effort)
+        try {
+          await supabase.from('audit_logs').insert({
+            user_id: currentUser?.id,
+            action: 'user.update',
+            entity_type: 'user',
+            entity_id: user.id,
+            details: {
+              updated_fields: Object.keys(formData).filter(k => k !== 'password' && k !== 'send_invite')
+            }
+          });
+        } catch (e) {
+          console.warn('Skipping audit_logs insert (legacy dialog update):', (e as any)?.message || e);
+        }
       } else {
         // Create new user
         if (!formData.email || !formData.password) {
@@ -205,17 +209,21 @@ export const UserDialog: React.FC<UserDialogProps> = ({
               if (roleError) console.error('Error assigning role:', roleError);
             }
 
-            // Log the creation
-            await supabase.from('audit_logs').insert({
-              user_id: currentUser?.id,
-              action: 'user.create',
-              entity_type: 'user',
-              entity_id: signUpData.user.id,
-              details: {
-                email: formData.email,
-                role_id: formData.role_id
-              }
-            });
+            // Log the creation (best-effort)
+            try {
+              await supabase.from('audit_logs').insert({
+                user_id: currentUser?.id,
+                action: 'user.create',
+                entity_type: 'user',
+                entity_id: signUpData.user.id,
+                details: {
+                  email: formData.email,
+                  role_id: formData.role_id
+                }
+              });
+            } catch (e) {
+              console.warn('Skipping audit_logs insert (legacy dialog create):', (e as any)?.message || e);
+            }
           }
         } else if (authData?.user) {
           // Admin API worked - create profile
