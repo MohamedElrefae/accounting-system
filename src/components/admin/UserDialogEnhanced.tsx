@@ -36,6 +36,7 @@ import {
   Close as CloseIcon
 } from '@mui/icons-material';
 import { supabase } from '../../utils/supabase';
+import { audit } from '../../utils/audit';
 import { useAuth } from '../../contexts/AuthContext';
 
 // Predefined departments
@@ -329,22 +330,12 @@ export const UserDialogEnhanced: React.FC<UserDialogProps> = ({
           if (roleError) throw roleError;
         }
 
-        // Log the update (best-effort)
-        try {
-          await supabase.from('audit_logs').insert({
-            user_id: currentUser?.id,
-            action: 'user.update',
-            entity_type: 'user',
-            entity_id: user.id,
-            details: {
-              updated_fields: Object.keys(formData).filter(k => 
-                !['password', 'confirm_password', 'send_invite'].includes(k)
-              )
-            }
-          });
-        } catch (e) {
-          console.warn('Skipping audit_logs insert (update):', (e as any)?.message || e);
-        }
+        // Log via secure RPC
+        await audit(supabase, 'user.update', 'user', user.id, {
+          updated_fields: Object.keys(formData).filter(k =>
+            !['password', 'confirm_password', 'send_invite'].includes(k)
+          )
+        });
 
       } else {
         // Create new user using signUp (client-safe)
@@ -398,22 +389,12 @@ export const UserDialogEnhanced: React.FC<UserDialogProps> = ({
             });
           }
 
-          // Log the creation (best-effort)
-          try {
-            await supabase.from('audit_logs').insert({
-              user_id: currentUser?.id,
-              action: 'user.create',
-              entity_type: 'user',
-              entity_id: signUpData.user.id,
-              details: {
-                email: formData.email,
-                role_id: formData.role_id,
-                department: formData.department
-              }
-            });
-          } catch (e) {
-            console.warn('Skipping audit_logs insert (create):', (e as any)?.message || e);
-          }
+          // Log via secure RPC
+          await audit(supabase, 'user.create', 'user', signUpData.user.id, {
+            email: formData.email,
+            role_id: formData.role_id,
+            department: formData.department
+          });
         }
       }
 

@@ -34,6 +34,7 @@ import {
   ContentCopy as ContentCopyIcon
 } from '@mui/icons-material';
 import { supabase } from '../../utils/supabase';
+import { audit } from '../../utils/audit';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface InviteUserDialogProps {
@@ -223,21 +224,12 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
 
       setResults(results);
 
-      // Log the invitation activity (best-effort; ignore if table doesn't exist)
-      try {
-        await supabase.from('audit_logs').insert({
-          user_id: currentUser?.id,
-          action: 'user.invite',
-          entity_type: 'user',
-          details: {
-            invited_emails: invitationsToSend.map(inv => inv.email),
-            successful: results.filter(r => r.success).length,
-            failed: results.filter(r => !r.success).length
-          }
-        });
-      } catch (e) {
-        console.warn('Skipping audit_logs insert (table may not exist):', (e as any)?.message || e);
-      }
+      // Log via secure RPC (won't throw on RLS and requires auth)
+      await audit(supabase, 'user.invite', 'user', null, {
+        invited_emails: invitationsToSend.map(inv => inv.email),
+        successful: results.filter(r => r.success).length,
+        failed: results.filter(r => !r.success).length
+      });
 
       const successCount = results.filter(r => r.success).length;
       if (successCount > 0) {

@@ -40,6 +40,7 @@ import {
   Lock as RevokeIcon
 } from '@mui/icons-material';
 import { supabase } from '../../utils/supabase';
+import { audit } from '../../utils/audit';
 import { useAuth } from '../../contexts/AuthContext';
 import { PERMISSION_CATEGORIES } from '../../constants/permissions';
 import type { PermissionCategory, PermissionDefinition } from '../../constants/permissions';
@@ -336,22 +337,12 @@ export const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
           if (error) throw error;
         }
 
-        // Log the change (best-effort)
-        try {
-          await supabase.from('audit_logs').insert({
-            user_id: currentUser?.id,
-            action: isGranted ? 'permission.grant' : 'permission.revoke',
-            entity_type: 'user_permission',
-            entity_id: userId,
-            details: {
-              permission: permName,
-              target_user: userId,
-              granted: isGranted
-            }
-          });
-        } catch (e) {
-          console.warn('Skipping audit_logs insert (permission change):', (e as any)?.message || e);
-        }
+        // Log via secure RPC
+        await audit(supabase, isGranted ? 'permission.grant' : 'permission.revoke', 'user_permission', userId, {
+          permission: permName,
+          target_user: userId,
+          granted: isGranted
+        });
       }
 
       setSnackbar({
