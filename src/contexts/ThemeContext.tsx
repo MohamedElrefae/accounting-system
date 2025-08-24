@@ -62,6 +62,56 @@ export const CustomThemeProvider: React.FC<ThemeProviderProps> = ({ children }) 
     return newTheme;
   }, [themeMode, language, forceRender]);
 
+  // Sync MUI palette values into CSS custom properties for perfect parity
+  useEffect(() => {
+    const root = document.documentElement;
+    const p = theme.palette as any;
+    const mode = p?.mode || themeMode;
+    const set = (name: string, value?: string) => {
+      if (typeof value === 'string' && value.length) {
+        root.style.setProperty(name, value);
+      }
+    };
+
+    // Core brand and text
+    set('--accent-primary', p?.primary?.main);
+    set('--accent-primary-hover', p?.primary?.dark || p?.primary?.main);
+    try {
+      const onAccent = p?.getContrastText ? p.getContrastText(p?.primary?.main) : undefined;
+      set('--on-accent', onAccent || (mode === 'dark' ? '#ffffff' : '#ffffff'));
+    } catch {
+      set('--on-accent', mode === 'dark' ? '#ffffff' : '#ffffff');
+    }
+
+    // Surfaces and backgrounds
+    set('--background', p?.background?.default);
+    set('--surface', p?.background?.paper);
+    set('--content-bg', p?.background?.paper);
+
+    // Text
+    set('--text-primary', p?.text?.primary);
+    set('--text-secondary', p?.text?.secondary);
+
+    // Borders
+    set('--border-color', p?.divider || (mode === 'dark' ? '#3A3F47' : '#dfe6ea'));
+    set('--border-light', p?.divider || (mode === 'dark' ? '#374151' : '#e5e7eb'));
+
+    // Status colors
+    set('--success', p?.success?.main);
+    set('--success-strong', p?.success?.dark || p?.success?.main);
+    set('--warning', p?.warning?.main);
+    set('--warning-strong', p?.warning?.dark || p?.warning?.main);
+    set('--error', p?.error?.main);
+    set('--error-strong', p?.error?.dark || p?.error?.main);
+    set('--info', p?.info?.main);
+    set('--info-strong', p?.info?.dark || p?.info?.main);
+
+    // Interaction states
+    set('--hover-bg', p?.action?.hover || (mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'));
+    set('--chip-bg', p?.action?.selected || (mode === 'dark' ? 'rgba(255,255,255,0.10)' : '#e5e7eb'));
+    set('--row-alt-bg', p?.action?.selected || (mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#f7fafc'));
+  }, [theme, themeMode]);
+
   const contextValue: ThemeContextType = {
     themeMode,
     toggleTheme
