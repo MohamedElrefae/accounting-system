@@ -48,6 +48,8 @@ import {
 import useAppStore from '../../store/useAppStore';
 import { navigationItems } from '../../data/navigation';
 import type { NavigationItem } from '../../types';
+import { useHasPermission } from '../../hooks/useHasPermission';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const DRAWER_WIDTH = 280;
 export const DRAWER_COLLAPSED_WIDTH = 64;
@@ -95,6 +97,8 @@ const Sidebar: React.FC<SidebarProps> = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isRtl = language === 'ar';
+  const { user } = useAuth();
+  const hasPermission = useHasPermission();
   
   // Force component update when language changes
   React.useEffect(() => {
@@ -130,12 +134,9 @@ const Sidebar: React.FC<SidebarProps> = () => {
     const title = language === 'ar' ? item.titleAr : item.titleEn;
     const isItemActive = isActive(item.path);
 
-    // Super admin gate for certain items
-    // We rely on the presence of a badge or additional context later, but for now
-    // we simply hide items marked superAdminOnly if user is not super admin.
-    // We use a conservative approach: check a flag in localStorage set by auth/profile contexts.
-    const isSuperAdmin = localStorage.getItem('is_super_admin') === 'true';
-    if (item.superAdminOnly && !isSuperAdmin) return null;
+    // Permission gate: prefer requiredPermission; fallback to legacy superAdminOnly
+    if (item.requiredPermission && !hasPermission(item.requiredPermission)) return null;
+    if (item.superAdminOnly && !hasPermission('admin.all')) return null;
 
     return (
       <React.Fragment key={item.id}>

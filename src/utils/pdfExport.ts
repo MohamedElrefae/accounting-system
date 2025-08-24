@@ -1,7 +1,7 @@
 // PDF Export Utility with Arabic Text Support
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { formatForExport, processArabicText, formatArabicCurrency, formatArabicDate, cleanArabicText } from './ArabicTextEngine';
+import { formatArabicDate, cleanArabicText } from './ArabicTextEngine';
 
 // Extend jsPDF interface to include autoTable
 declare module 'jspdf' {
@@ -11,7 +11,7 @@ declare module 'jspdf' {
 }
 
 export interface PDFExportOptions {
-  title: string;
+  title?: string;
   subtitle?: string;
   orientation?: 'portrait' | 'landscape';
   includeHeader?: boolean;
@@ -98,7 +98,6 @@ export function exportTableToPDF(data: TableData, options: PDFExportOptions = {}
     includeHeader = true,
     includeFooter = true,
     fontSize = 10,
-    useArabicNumerals = true,
     rtlLayout = true
   } = options;
 

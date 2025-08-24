@@ -274,17 +274,17 @@
   margin-left: 0.2rem;
 }
 
-/* Edit Button - Blue */
+/* Edit Button - Brand Accent */
 .ultimate-btn-edit {
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-primary-hover) 100%);
+  color: var(--on-accent);
 }
 
 .ultimate-btn-edit::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  background: linear-gradient(135deg, var(--accent-primary-hover) 0%, var(--accent-primary) 100%);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -293,17 +293,17 @@
   opacity: 1;
 }
 
-/* Add Button - Green */
+/* Add Button - Success */
 .ultimate-btn-add {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--success) 0%, var(--success-strong) 100%);
+  color: var(--on-accent);
 }
 
 .ultimate-btn-add::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  background: linear-gradient(135deg, var(--success-strong) 0%, var(--success) 100%);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -312,17 +312,17 @@
   opacity: 1;
 }
 
-/* Disable Button - Orange */
+/* Disable Button - Warning */
 .ultimate-btn-disable {
-  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--warning) 0%, var(--warning-strong) 100%);
+  color: var(--on-accent);
 }
 
 .ultimate-btn-disable::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+  background: linear-gradient(135deg, var(--warning-strong) 0%, var(--warning) 100%);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -331,17 +331,17 @@
   opacity: 1;
 }
 
-/* Enable Button - Teal */
+/* Enable Button - Info */
 .ultimate-btn-enable {
-  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--info) 0%, var(--info-strong) 100%);
+  color: var(--on-accent);
 }
 
 .ultimate-btn-enable::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
+  background: linear-gradient(135deg, var(--info-strong) 0%, var(--info) 100%);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -350,17 +350,17 @@
   opacity: 1;
 }
 
-/* Delete Button - Red */
+/* Delete Button - Error */
 .ultimate-btn-delete {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--error) 0%, var(--error-strong) 100%);
+  color: var(--on-accent);
 }
 
 .ultimate-btn-delete::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+  background: linear-gradient(135deg, var(--error-strong) 0%, var(--error) 100%);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -370,7 +370,7 @@
 }
 
 .ultimate-btn-delete:disabled {
-  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+  background: linear-gradient(135deg, var(--border-color) 0%, var(--text-disabled) 100%);
 }
 
 /* Button States */
@@ -393,8 +393,8 @@
 }
 
 .ultimate-btn.success {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
-  color: white;
+  background: linear-gradient(135deg, var(--success) 0%, var(--success-strong) 100%) !important;
+  color: var(--on-accent);
 }
 
 .ultimate-btn.success .btn-icon {
@@ -408,8 +408,8 @@
 }
 
 .ultimate-btn.error {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
-  color: white;
+  background: linear-gradient(135deg, var(--error) 0%, var(--error-strong) 100%) !important;
+  color: var(--on-accent);
 }
 
 .ultimate-btn.error .btn-icon {

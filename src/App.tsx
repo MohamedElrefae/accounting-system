@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
+import { useIdleLogout } from './hooks/useIdleLogout';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { CustomThemeProvider } from './contexts/ThemeContext';
-import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/AuthContext';
 import useAppStore from './store/useAppStore';
 import DashboardLayout from './components/layout/DashboardLayout';
@@ -9,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 const AccountsTreeLazy = React.lazy(() => import('./pages/MainData/AccountsTree'));
 import TestRTL from './pages/TestRTL';
 import ExportTestPage from './pages/ExportTestPage';
+import TransactionsPage from './pages/Transactions/Transactions';
 import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
 import { ForgotPassword } from './components/auth/ForgotPassword';
@@ -19,8 +19,7 @@ const RoleManagement = React.lazy(() => import('./pages/admin/RoleManagement'));
 const Diagnostics = React.lazy(() => import('./pages/admin/Diagnostics'));
 import EditProfile from './pages/admin/EditProfile';
 import Profile from './pages/admin/Profile';
-import { ToastProvider } from './contexts/ToastContext';
-import { UserProfileProvider } from './contexts/UserProfileContext';
+import { useHasPermission } from './hooks/useHasPermission';
 
 // Placeholder components for other pages
 const PlaceholderPage: React.FC<{ title: string }> = ({ title }) => (
@@ -51,9 +50,17 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
-const App: React.FC = () => {
-  const { language } = useAppStore();
+const RequirePermission: React.FC<{ perm: string; children: React.ReactNode; fallback?: React.ReactNode }> = ({ perm, children, fallback }) => {
+  const hasPerm = useHasPermission();
+  if (!hasPerm(perm)) {
+    return fallback ?? <Navigate to="/transactions/my" replace />;
+  }
+  return <>{children}</>;
+};
 
+const App: React.FC = () => {
+  useIdleLogout();
+  const { language } = useAppStore();
 
   // Ensure document direction is set on mount and language changes
   useEffect(() => {
@@ -63,31 +70,36 @@ const App: React.FC = () => {
   }, [language]);
 
   return (
-    <AuthProvider>
-      <CustomThemeProvider>
-        <ToastProvider>
-          <UserProfileProvider>
-            <Router>
-          <Routes>
-          {/* Theme Demo Route */}
-          {/* <Route path="/theme-demo" element={<ThemeDemo />} /> */}
-          {/* <Route path="/database-test" element={<DatabaseTest />} /> */}
+    <Router>
+      <Routes>
+        {/* Theme Demo Route */}
+        {/* <Route path="/theme-demo" element={<ThemeDemo />} /> */}
+        {/* <Route path="/database-test" element={<DatabaseTest />} /> */}
+        
+        <Route path="/login" element={<LoginForm />} />
+        <Route path="/register" element={<RegisterForm />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/auth-debug" element={<AuthDebug />} />
+        <Route path="/" element={
+          <ProtectedRoute>
+            <DashboardLayout />
+          </ProtectedRoute>
+        }>
+          <Route index element={<Dashboard />} />
+          <Route path="/test-rtl" element={<TestRTL />} />
           
-          <Route path="/login" element={<LoginForm />} />
-          <Route path="/register" element={<RegisterForm />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/auth-debug" element={<AuthDebug />} />
-          <Route path="/" element={
-            <ProtectedRoute>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }>
-            <Route index element={<Dashboard />} />
-            <Route path="/test-rtl" element={<TestRTL />} />
-            
           {/* Main Data */}
           <Route path="/main-data/accounts-tree" element={<React.Suspense fallback={<>Loading...</>}><AccountsTreeLazy /></React.Suspense>} />
+
+          {/* Transactions - Single row entry */}
+          <Route path="/transactions/my" element={<TransactionsPage />} />
+          <Route path="/transactions/pending" element={
+            <RequirePermission perm="transactions.post">
+              <TransactionsPage />
+            </RequirePermission>
+          } />
+          <Route path="/transactions/all" element={<TransactionsPage />} />
 
           {/* Chart of Accounts (legacy placeholders) */}
           <Route path="/accounts" element={<PlaceholderPage title="Accounts List" />} />
@@ -96,7 +108,7 @@ const App: React.FC = () => {
             {/* Transactions */}
             <Route path="/transactions/journal" element={<PlaceholderPage title="Journal Entries" />} />
             <Route path="/transactions/ledger" element={<PlaceholderPage title="General Ledger" />} />
-            <Route path="/transactions/trial-balance" element={<PlaceholderPage title="Trial Balance" />} />
+            <Route path="/transactions/trial-balance" element={<PlaceholderPage title="Trial Balance (legacy)" />} />
             
             {/* Invoicing */}
             <Route path="/invoicing/sales" element={<PlaceholderPage title="Sales Invoices" />} />
@@ -112,6 +124,13 @@ const App: React.FC = () => {
             <Route path="/suppliers/statements" element={<PlaceholderPage title="Supplier Statements" />} />
             
             {/* Financial Reports */}
+            <Route path="/reports/trial-balance" element={
+              <ProtectedRoute>
+                <React.Suspense fallback={<>Loading...</>}>
+                  {React.createElement(React.lazy(() => import('./pages/Reports/TrialBalance')))}
+                </React.Suspense>
+              </ProtectedRoute>
+            } />
             <Route path="/reports/profit-loss" element={<PlaceholderPage title="Profit & Loss Report" />} />
             <Route path="/reports/balance-sheet" element={<PlaceholderPage title="Balance Sheet" />} />
             <Route path="/reports/cash-flow" element={<PlaceholderPage title="Cash Flow Report" />} />
@@ -146,12 +165,8 @@ const App: React.FC = () => {
             {/* Export Test Page */}
             <Route path="/export-test" element={<ExportTestPage />} />
           </Route>
-          </Routes>
-            </Router>
-          </UserProfileProvider>
-        </ToastProvider>
-      </CustomThemeProvider>
-    </AuthProvider>
+      </Routes>
+    </Router>
   );
 };
 

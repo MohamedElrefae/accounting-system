@@ -17,21 +17,7 @@ import {
 import type { ArabicTextOptions, ExportOptions } from './ArabicTextEngine';
 import { utils as XLSXUtils, writeFile } from 'xlsx';
 
-// Type definitions for jspdf-autotable
-type ThemeType = 'striped' | 'grid' | 'plain';
-
-interface AutoTableOptions {
-  columns?: any[];
-  body?: any[];
-  head?: any[];
-  startY?: number;
-  styles?: any;
-  headStyles?: any;
-  columnStyles?: any;
-  alternateRowStyles?: any;
-  margin?: any;
-  theme?: ThemeType;
-}
+// (Removed unused jspdf-autotable type declarations)
 
 export interface UniversalExportOptions {
   title: string;
@@ -559,21 +545,6 @@ export class UniversalExportManager {
 </html>`;
   }
 
-  /**
-   * Get column styles for PDF (now unused but kept for compatibility)
-   */
-  private getColumnStyles(columns: UniversalTableColumn[]): any {
-    const styles: any = {};
-    
-    columns.forEach((col, index) => {
-      styles[index] = {
-        halign: col.align || 'right',
-        cellWidth: col.width ? col.width / 3 : 'auto'
-      };
-    });
-    
-    return styles;
-  }
 
   /**
    * Escape CSV values

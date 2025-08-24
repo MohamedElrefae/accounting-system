@@ -15,7 +15,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem;
-  border-bottom: 1px solid rgba(0,0,0,0.1);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .page-header-left {
@@ -42,18 +42,18 @@
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  border-bottom: 1px solid rgba(0,0,0,0.1);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .search-and-filters { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .search-input-wrapper { position: relative; }
 .search-input-wrapper .icon { position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); opacity: 0.6; }
-.search-input { padding: 0.75rem 1rem; padding-right: 2.5rem; border: 1px solid rgba(0,0,0,0.2); border-radius: 8px; width: 300px; }
-.filter-select { padding: 0.75rem 1rem; border: 1px solid rgba(0,0,0,0.2); border-radius: 8px; min-width: 150px; }
+.search-input { padding: 0.75rem 1rem; padding-right: 2.5rem; border: 1px solid var(--border-color); border-radius: 8px; width: 300px; }
+.filter-select { padding: 0.75rem 1rem; border: 1px solid var(--border-color); border-radius: 8px; min-width: 150px; }
 
-.view-mode-toggle { display: flex; border: 1px solid rgba(0,0,0,0.2); border-radius: 10px; overflow: hidden; }
+.view-mode-toggle { display: flex; border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; }
 .view-mode-btn { padding: 0.5rem 1rem; background: none; border: none; cursor: pointer; }
-.view-mode-btn.active { background: #3b82f6; color: #fff; }
+.view-mode-btn.active { background: var(--accent-primary); color: var(--on-accent); }
 
 .content-area { 
   flex-grow: 1; 
@@ -65,21 +65,57 @@
 }
 
 .accounts-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.accounts-table th, .accounts-table td { padding: 1rem; text-align: right; border-bottom: 1px solid rgba(0,0,0,0.1); }
+.accounts-table th, .accounts-table td { padding: 1rem; text-align: right; border-bottom: 1px solid var(--border-light); }
 .accounts-table th { font-weight: 600; position: sticky; top: 0; z-index: 10; }
-.table-code-cell { font-family: monospace; font-weight: bold; color: #3b82f6; }
+
+/* Sticky first column (RTL/LTR aware using logical properties) */
+.accounts-table th:first-child,
+.accounts-table td:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 2; /* stay above other cells */
+  background: inherit; /* retain zebra/hover background */
+  border-inline-end: 1px solid var(--border-light);
+}
+
+/* Keep header cell above sticky body cell */
+.accounts-table thead th:first-child {
+  z-index: 3;
+}
+
+/* Zebra striping */
+.accounts-table tbody tr:nth-child(odd) { background: var(--row-alt-bg); }
+.accounts-table tbody tr:nth-child(even) { background: var(--surface); }
+
+/* Hover state */
+.accounts-table tbody tr:hover { background: var(--hover-bg); }
+
+.table-code-cell { font-family: monospace; font-weight: bold; color: var(--accent-primary); }
 .table-center { text-align: center; }
 
 /* TreeView styles are handled by ./src/components/TreeView/TreeView.css */
 
 /* Ultimate button look */
-.ultimate-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 8px 12px; border: none; border-radius: 8px; font-weight: 600; color: #fff; cursor: pointer; transition: all .3s ease; }
+.ultimate-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 8px 12px; border: none; border-radius: 8px; font-weight: 600; color: var(--on-accent); cursor: pointer; transition: all .3s ease; }
 .ultimate-btn .btn-content { display: inline-flex; align-items: center; gap: 8px; }
-.ultimate-btn-add { background: linear-gradient(135deg,#10b981,#059669); }
-.ultimate-btn-edit { background: linear-gradient(135deg,#3b82f6,#1d4ed8); }
-.ultimate-btn-delete { background: linear-gradient(135deg,#ef4444,#dc2626); }
+.ultimate-btn-add { background: linear-gradient(135deg, var(--success), var(--success-strong)); }
+.ultimate-btn-edit { background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover)); }
+.ultimate-btn-delete { background: linear-gradient(135deg, var(--error), var(--error-strong)); }
 /* orange warning for disable */
-.ultimate-btn-warning { background: linear-gradient(135deg,#f97316,#ea580c); }
-.ultimate-btn-success { background: linear-gradient(135deg,#10b981,#059669); }
+.ultimate-btn-warning { background: linear-gradient(135deg, var(--warning), var(--warning-strong)); }
+.ultimate-btn-success { background: linear-gradient(135deg, var(--success), var(--success-strong)); }
 .ultimate-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,.15); }
+
+/* Match table view styling to tree view */
+.accounts-table-view {
+  background: var(--content-bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.accounts-table thead th {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover));
+  color: var(--on-accent);
+}
 

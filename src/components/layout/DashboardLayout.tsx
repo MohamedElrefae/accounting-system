@@ -2,10 +2,8 @@ import React from 'react';
 import { Box, CssBaseline, Toolbar } from '@mui/material';
 import { Outlet } from 'react-router-dom';
 import TopBar from './TopBar';
-import Sidebar from './Sidebar';
 import SidebarPortal from "./SidebarPortal";
 import useAppStore from '../../store/useAppStore';
-import { useTheme } from '../../contexts/ThemeContext';
 
 const DashboardLayout: React.FC = () => {
   const { sidebarCollapsed, toggleSidebar, language } = useAppStore();

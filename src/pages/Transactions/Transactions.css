@@ -1,0 +1,47 @@
+/* Transactions Page styling aligned with AccountsTree theme */
+@import '../../components/Common/ExportButtons.css';
+
+.transactions-container { display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden; }
+
+.transactions-header { display: flex; align-items: center; justify-content: space-between; padding: 1.5rem; border-bottom: 1px solid rgba(0,0,0,0.1); }
+.transactions-title { margin: 0; font-size: 1.75rem; font-weight: 700; }
+.transactions-actions { display: flex; align-items: center; gap: 0.75rem; }
+
+.controls-container { padding: 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid rgba(0,0,0,0.1); flex-wrap: wrap; }
+
+.search-input { padding: 0.75rem 1rem; border: 1px solid rgba(0,0,0,0.2); border-radius: 8px; width: 300px; }
+.filter-input, .filter-select { padding: 0.75rem 1rem; border: 1px solid rgba(0,0,0,0.2); border-radius: 8px; min-width: 150px; }
+
+.input-field, .select-field, .textarea-field { padding: 0.75rem 1rem; border: 1px solid rgba(0,0,0,0.2); border-radius: 8px; background: var(--surface, #0f0f0f); color: var(--text-primary, #eaeaea); }
+
+.transactions-content { flex-grow: 1; overflow: hidden; padding: 1rem; width: 100%; display: flex; flex-direction: column; }
+.transactions-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.transactions-table th, .transactions-table td { padding: 1rem; text-align: right; border-bottom: 1px solid rgba(0,0,0,0.1); }
+.transactions-table th { font-weight: 600; position: sticky; top: 0; z-index: 10; }
+.amount-cell { font-family: monospace; font-weight: bold; color: #3b82f6; }
+
+.tree-node-actions { display: flex; gap: 0.5rem; }
+
+/* Ultimate buttons consistent with AccountsTree */
+.ultimate-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 8px 12px; border: none; border-radius: 8px; font-weight: 600; color: #fff; cursor: pointer; transition: all .3s ease; }
+.ultimate-btn .btn-content { display: inline-flex; align-items: center; gap: 8px; }
+.ultimate-btn-add { background: linear-gradient(135deg,#10b981,#059669); }
+.ultimate-btn-edit { background: linear-gradient(135deg,#3b82f6,#1d4ed8); }
+.ultimate-btn-success { background: linear-gradient(135deg,#10b981,#059669); }
+.ultimate-btn-warning { background: linear-gradient(135deg,#f97316,#ea580c); }
+.ultimate-btn-delete { background: linear-gradient(135deg,#ef4444,#dc2626); }
+.ultimate-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,.15); }
+
+/* Modal aligned to theme */
+.transaction-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; }
+.transaction-modal-content { background: var(--surface, #0f0f0f); border: 1px solid rgba(0,0,0,0.2); border-radius: 10px; width: min(680px, 95vw); padding: 1rem; display: grid; gap: 0.75rem; }
+.modal-title { margin: 0 0 0.5rem 0; font-weight: 700; }
+.textarea-field { min-height: 80px; }
+.textarea-field.notes { min-height: 60px; }
+.button-container { display: flex; gap: 0.5rem; justify-content: flex-start; margin-top: 0.5rem; }
+.error-message { color: #ff6b6b; padding: 0.5rem; background: #390b0b; border: 1px solid #7a1f1f; border-radius: 8px; }
+.loading-container { display: grid; place-items: center; padding: 2rem; }
+.error-container { color: #ff6b6b; padding: 1rem; }
+.loading-spinner { width: 24px; height: 24px; border: 3px solid #333; border-top-color: #999; border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+

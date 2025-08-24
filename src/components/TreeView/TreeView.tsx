@@ -26,6 +26,10 @@ interface TreeViewProps {
   onAdd?: (parentNode: TreeNode) => void;
   onToggleStatus?: (node: TreeNode) => void;
   onDelete?: (node: TreeNode) => void;
+  onSelect?: (node: TreeNode) => void;
+  onToggleExpand?: (node: TreeNode) => void | Promise<void>;
+  canHaveChildren?: (node: TreeNode) => boolean;
+  getChildrenCount?: (node: TreeNode) => number | null | undefined;
   maxLevel?: number;
 }
 
@@ -35,6 +39,10 @@ const TreeView: React.FC<TreeViewProps> = ({
   onAdd, 
   onToggleStatus, 
   onDelete,
+  onSelect,
+  onToggleExpand,
+  canHaveChildren,
+  getChildrenCount,
   maxLevel = 4 
 }) => {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
@@ -59,8 +67,8 @@ const TreeView: React.FC<TreeViewProps> = ({
   const handleButtonWithStates = async (
     buttonId: string,
     action: () => Promise<void> | void,
-    successMessage?: string,
-    errorMessage?: string
+    _successMessage?: string,
+    _errorMessage?: string
   ) => {
     try {
       // Set loading state
@@ -105,7 +113,8 @@ const TreeView: React.FC<TreeViewProps> = ({
 
   const renderTreeNode = (node: TreeNode, depth: number = 0): React.ReactNode => {
     const isExpanded = expandedNodes.has(node.id);
-    const hasChildren = node.children && node.children.length > 0;
+    const hasLoadedChildren = node.children && node.children.length > 0;
+    const mayHaveChildren = hasLoadedChildren || (canHaveChildren ? !!canHaveChildren(node) : false);
     const canAddSubAccount = node.level < maxLevel;
 
     return (
@@ -114,11 +123,17 @@ const TreeView: React.FC<TreeViewProps> = ({
           className={`tree-node ${!node.is_active ? 'inactive' : ''}`}
         >
           <div 
-            className={`tree-node-expander ${isExpanded ? 'expanded' : ''} ${!hasChildren ? 'no-children' : ''}`}
-            onClick={() => hasChildren && toggleNode(node.id)}
+            className={`tree-node-expander ${isExpanded ? 'expanded' : ''} ${!mayHaveChildren ? 'no-children' : ''}`}
+            onClick={async () => {
+              if (!mayHaveChildren) return;
+              if (onToggleExpand) {
+                await onToggleExpand(node);
+              }
+              toggleNode(node.id);
+            }}
             style={{ marginLeft: `${depth * 20}px` }}
           >
-            {hasChildren && <ChevronRight className="expander-icon" size={16} />}
+            {mayHaveChildren && <ChevronRight className="expander-icon" size={16} />}
           </div>
           
           <div className={`tree-node-status ${node.is_active ? 'active' : 'inactive'}`} />
@@ -129,9 +144,14 @@ const TreeView: React.FC<TreeViewProps> = ({
             <span className="code-badge">{node.code}</span>
           </div>
           
-          <div className="tree-node-name">
+          <div className="tree-node-name" onClick={() => onSelect && onSelect(node)} style={{ cursor: onSelect ? 'pointer' : 'default' }}>
             {node.name_ar}
             {!node.is_active && <span className="status-inactive-text">(معطل)</span>}
+            {mayHaveChildren && (
+              <span style={{ marginRight: 8, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                {hasLoadedChildren ? (getChildrenCount ? getChildrenCount(node) ?? '' : '') : '…'}
+              </span>
+            )}
           </div>
           
           <div className="tree-node-type">
@@ -274,8 +294,8 @@ const TreeView: React.FC<TreeViewProps> = ({
               } ${
                 getButtonState(`delete-${node.id}`).error ? 'error' : ''
               }`}
-              disabled={getButtonState(`delete-${node.id}`).loading || hasChildren}
-              title={hasChildren ? 'لا يمكن حذف حساب له فروع' : 'حذف'}
+              disabled={getButtonState(`delete-${node.id}`).loading || hasLoadedChildren}
+              title={hasLoadedChildren ? 'لا يمكن حذف حساب له فروع' : 'حذف'}
             >
               <div className="btn-content">
                 <div className={`btn-icon ${
@@ -297,7 +317,7 @@ const TreeView: React.FC<TreeViewProps> = ({
           </div>
         </div>
         
-        {isExpanded && hasChildren && (
+        {isExpanded && hasLoadedChildren && (
           <div className="tree-node-children">
             {node.children!.map(child => renderTreeNode(child, depth + 1))}
           </div>

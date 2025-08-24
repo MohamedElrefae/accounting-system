@@ -46,6 +46,13 @@ export const CustomThemeProvider: React.FC<ThemeProviderProps> = ({ children }) 
     setThemeMode(prev => prev === 'light' ? 'dark' : 'light');
   };
 
+  // Keep a CSS data-theme attribute in sync for CSS variable tokens
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', themeMode);
+    }
+  }, [themeMode]);
+
   // Create the Material-UI theme using our unified theme system
   // Include forceRender in dependencies to ensure recreation
   const theme = React.useMemo(() => {

@@ -179,7 +179,7 @@ export const prepareTableData = (
     dateFields?: string[];
   } = {}
 ): UniversalTableData => {
-  const { splitDebitCredit = false, currencyFields = [], dateFields = [] } = options;
+  const { splitDebitCredit = false, currencyFields = [], dateFields: _dateFields = [] } = options;
 
   let processedColumns = [...columns];
   let processedRows = rows;

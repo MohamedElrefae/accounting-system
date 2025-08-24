@@ -1,0 +1,234 @@
+-- ALL-IN-ONE DATABASE INVENTORY + SAMPLES (cross-schema)
+-- Safe to run: read-only except for temporary tables created in-session.
+
+-- Choose which schemas to include (edit if you want fewer/more)
+-- Exclude system schemas by default
+create temporary table if not exists _include_schemas(schema_name text primary key);
+truncate _include_schemas;
+insert into _include_schemas(schema_name)
+select nspname
+from pg_namespace
+where nspname not in ('pg_catalog','information_schema','pg_toast');
+
+-- Section 0: Environment
+select 'SECTION 0: ENVIRONMENT' as section, now() as at_utc;
+
+select
+  (select version()) as postgres_version,
+  (select current_database()) as database,
+  (select current_schema()) as current_schema,
+  (select extname from pg_extension where extname='ltree') as has_ltree,
+  (select extname from pg_extension where extname='pgcrypto') as has_pgcrypto,
+  (select extname from pg_extension where extname='uuid-ossp') as has_uuid_ossp;
+
+-- Section 1: Schemas
+select 'SECTION 1: SCHEMAS' as section;
+select schema_name
+from _include_schemas
+order by schema_name;
+
+-- Section 2: Tables
+select 'SECTION 2: TABLES' as section;
+select
+  t.table_schema,
+  t.table_name,
+  t.table_type
+from information_schema.tables t
+join _include_schemas s on s.schema_name = t.table_schema
+order by t.table_schema, t.table_name;
+
+-- Section 3: Columns
+select 'SECTION 3: COLUMNS' as section;
+select
+  c.table_schema,
+  c.table_name,
+  c.ordinal_position,
+  c.column_name,
+  c.data_type,
+  c.udt_name as udt,
+  c.is_nullable,
+  c.column_default,
+  c.is_generated,
+  c.generation_expression
+from information_schema.columns c
+join _include_schemas s on s.schema_name = c.table_schema
+order by c.table_schema, c.table_name, c.ordinal_position;
+
+-- Section 4: Primary Keys (fixed ambiguity)
+select 'SECTION 4: PRIMARY KEYS' as section;
+with pk as (
+  select
+    n.nspname as table_schema,
+    c.relname as table_name,
+    k.conname as constraint_name,
+    a.attname as column_name,
+    a.attnum   as column_attnum
+  from pg_constraint k
+  join pg_class c on c.oid = k.conrelid
+  join pg_namespace n on n.oid = c.relnamespace
+  join unnest(k.conkey) as ck(attnum) on true
+  join pg_attribute a on a.attrelid = c.oid and a.attnum = ck.attnum
+  join _include_schemas s on s.schema_name = n.nspname
+  where k.contype = 'p'
+)
+select table_schema, table_name, constraint_name,
+       array_agg(column_name order by column_attnum) as pk_columns
+from pk
+group by table_schema, table_name, constraint_name
+order by table_schema, table_name;
+
+-- Section 5: Foreign Keys (disambiguated)
+select 'SECTION 5: FOREIGN KEYS' as section;
+with fk as (
+  select
+    src_ns.nspname as table_schema,
+    src_tbl.relname as table_name,
+    k.conname as constraint_name,
+    src_col.attname as src_column,
+    tgt_ns.nspname as ref_schema,
+    tgt_tbl.relname as ref_table,
+    tgt_col.attname as ref_column,
+    src_att.ordinality as ord,
+    k.confupdtype as on_update_action,
+    k.confdeltype as on_delete_action
+  from pg_constraint k
+  join pg_class src_tbl on src_tbl.oid = k.conrelid
+  join pg_namespace src_ns on src_ns.oid = src_tbl.relnamespace
+  join pg_class tgt_tbl on tgt_tbl.oid = k.confrelid
+  join pg_namespace tgt_ns on tgt_ns.oid = tgt_tbl.relnamespace
+  join unnest(k.conkey) with ordinality as src_att(attnum, ordinality) on true
+  join pg_attribute src_col on src_col.attrelid = src_tbl.oid and src_col.attnum = src_att.attnum
+  join unnest(k.confkey) with ordinality as tgt_att(attnum, ordinality) on true
+  join pg_attribute tgt_col on tgt_col.attrelid = tgt_tbl.oid and tgt_col.attnum = tgt_att.attnum and tgt_att.ordinality = src_att.ordinality
+  join _include_schemas s on s.schema_name = src_ns.nspname
+  where k.contype = 'f'
+)
+select
+  table_schema,
+  table_name,
+  constraint_name,
+  array_agg(src_column order by ord) as fk_columns,
+  ref_schema,
+  ref_table,
+  array_agg(ref_column order by ord) as ref_columns,
+  on_update_action,
+  on_delete_action
+from fk
+group by table_schema, table_name, constraint_name, ref_schema, ref_table, on_update_action, on_delete_action
+order by table_schema, table_name, constraint_name;
+
+-- Section 6: Indexes
+select 'SECTION 6: INDEXES' as section;
+select
+  schemaname,
+  tablename,
+  indexname,
+  indexdef
+from pg_indexes
+where schemaname in (select schema_name from _include_schemas)
+order by schemaname, tablename, indexname;
+
+-- Section 7: Triggers
+select 'SECTION 7: TRIGGERS' as section;
+select
+  event_object_schema as table_schema,
+  event_object_table  as table_name,
+  trigger_name,
+  action_timing,
+  event_manipulation as event,
+  action_statement as function_call
+from information_schema.triggers
+where event_object_schema in (select schema_name from _include_schemas)
+order by table_schema, table_name, trigger_name;
+
+-- Section 8: Views
+select 'SECTION 8: VIEWS' as section;
+select
+  table_schema,
+  table_name as view_name,
+  left(view_definition, 2000) as view_definition_snippet
+from information_schema.views
+where table_schema in (select schema_name from _include_schemas)
+order by table_schema, view_name;
+
+-- Section 9: Functions and Procedures
+select 'SECTION 9: FUNCTIONS & PROCEDURES' as section;
+select
+  r.routine_schema,
+  r.routine_name,
+  r.routine_type,
+  r.data_type as return_type
+from information_schema.routines r
+where r.specific_schema in (select schema_name from _include_schemas)
+order by r.routine_schema, r.routine_type, r.routine_name;
+
+-- Section 10: RLS Policies
+select 'SECTION 10: RLS POLICIES' as section;
+select
+  schemaname,
+  tablename,
+  policyname,
+  permissive,
+  roles,
+  cmd,
+  qual,
+  with_check
+from pg_policies
+where schemaname in (select schema_name from _include_schemas)
+order by schemaname, tablename, policyname;
+
+-- Section 11: Extensions
+select 'SECTION 11: EXTENSIONS' as section;
+select extname as extension_name, extversion as version
+from pg_extension
+order by extname;
+
+-- Section 12: Estimated Row Counts (by table)
+select 'SECTION 12: ROW COUNT ESTIMATES' as section;
+select
+  n.nspname as table_schema,
+  c.relname as table_name,
+  coalesce(s.n_live_tup, c.reltuples)::bigint as approx_rows
+from pg_class c
+join pg_namespace n on n.oid = c.relnamespace
+left join pg_stat_all_tables s on s.relid = c.oid
+where n.nspname in (select schema_name from _include_schemas)
+  and c.relkind = 'r'
+order by n.nspname, c.relname;
+
+-- Section 13: Data samples for every table (up to 5 rows) as JSON (subject to RLS)
+create temporary table if not exists _table_samples(
+  schema_name text,
+  table_name  text,
+  sample      jsonb
+);
+truncate _table_samples;
+
+do $$
+declare r record;
+begin
+  for r in
+    select table_schema, table_name
+    from information_schema.tables
+    where table_schema in (select schema_name from _include_schemas)
+      and table_type = 'BASE TABLE'
+    order by table_schema, table_name
+  loop
+    begin
+      execute format(
+        'insert into _table_samples(schema_name, table_name, sample)
+         select %L, %L, coalesce(jsonb_agg(t), ''[]''::jsonb)
+         from (select * from %I.%I limit 5) t',
+        r.table_schema, r.table_name, r.table_schema, r.table_name
+      );
+    exception when others then
+      -- ignore tables we cannot read due to RLS or permissions
+      null;
+    end;
+  end loop;
+end$$;
+
+select 'SECTION 13: DATA SAMPLES (JSON, up to 5 rows per table)' as section;
+select schema_name, table_name, sample
+from _table_samples
+order by schema_name, table_name;

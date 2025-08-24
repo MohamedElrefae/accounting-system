@@ -181,14 +181,17 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
             console.log('Edge email send result:', fxData);
           }
         } else {
-          console.log('Invitation email placeholder ->', invitation.email, invitationLink);
+          // Using DB trigger to send emails; status will be set to 'sent' by the trigger upon success.
+          console.log('DB trigger will send invitation email ->', invitation.email, invitationLink);
         }
         
-        // Update invitation status to sent
-        await supabase
-          .from('user_invitations')
-          .update({ status: 'sent', sent_at: new Date().toISOString() })
-          .eq('id', invitationData.id);
+        // If we used the Edge Function path, we mark as sent on the client.
+        if (import.meta.env.VITE_ENABLE_INVITE_EMAILS === 'true') {
+          await supabase
+            .from('user_invitations')
+            .update({ status: 'sent', sent_at: new Date().toISOString() })
+            .eq('id', invitationData.id);
+        }
       }
 
       return {

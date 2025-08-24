@@ -43,23 +43,88 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-/* Theme colors are now handled by the unified theme system */
-/* Inject legacy tokens from previous app for exact parity */
+/* Theme tokens for both light and dark modes. Driven by data-theme attribute on <html>. */
+/* Default fallback (light-ish) to avoid FOUC before JS sets data-theme */
 :root {
-  --background: #111827;
-  --surface: #1f2937;
+  --background: #ecf0f1;
+  --surface: #ffffff;
+  --content-bg: #ffffff;
+  --hover-bg: rgba(0, 0, 0, 0.05);
+  --text-primary: #2c3e50;
+  --text-secondary: #7f8c8d;
+  --text-disabled: #b0b7bd;
+  --heading-text: #2c3e50;
+  --border-color: #dfe6ea;
+  --border-light: #e5e7eb;
+  --accent-primary: #3498db;
+  --accent-primary-hover: #2c80c9;
+  --on-accent: #ffffff;
+  --success: #10b981;
+  --success-strong: #059669;
+  --warning: #f59e0b;
+  --warning-strong: #ea580c;
+  --error: #ef4444;
+  --error-strong: #dc2626;
+  --info: #14b8a6;
+  --info-strong: #0d9488;
+  --chip-bg: #e5e7eb;
+  --row-alt-bg: #f7fafc;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+  --transition-fast: 0.2s ease;
+  --font-size-sm: 0.9rem;
+}
+
+html[data-theme='dark'] {
+  --background: #1E2329;
+  --surface: #252A31;
   --content-bg: #1f2937;
-  --hover-bg: rgba(255, 255, 255, 0.1);
-  --text-primary: #f9fafb;
-  --text-secondary: #d1d5db;
+  --hover-bg: rgba(255, 255, 255, 0.08);
+  --text-primary: #FFFFFF;
+  --text-secondary: #8A9099;
   --text-disabled: #6b7280;
   --heading-text: #ffffff;
-  --border-color: #374151;
+  --border-color: #3A3F47;
   --border-light: #374151;
-  --button-primary: #3b82f6;
-  --button-primary-hover: #2563eb;
+  --accent-primary: #4A90E2;
+  --accent-primary-hover: #357ABD;
+  --on-accent: #ffffff;
   --success: #10b981;
+  --success-strong: #059669;
   --warning: #f59e0b;
+  --warning-strong: #ea580c;
   --error: #ef4444;
-  --error-hover: #dc2626;
+  --error-strong: #dc2626;
+  --info: #14b8a6;
+  --info-strong: #0d9488;
+  --chip-bg: rgba(255, 255, 255, 0.1);
+  --row-alt-bg: rgba(255, 255, 255, 0.03);
+}
+
+html[data-theme='light'] {
+  --background: #ecf0f1;
+  --surface: #ffffff;
+  --content-bg: #ffffff;
+  --hover-bg: rgba(0, 0, 0, 0.05);
+  --text-primary: #2c3e50;
+  --text-secondary: #7f8c8d;
+  --text-disabled: #b0b7bd;
+  --heading-text: #2c3e50;
+  --border-color: #dfe6ea;
+  --border-light: #e5e7eb;
+  --accent-primary: #3498db;
+  --accent-primary-hover: #2c80c9;
+  --on-accent: #ffffff;
+  --success: #10b981;
+  --success-strong: #059669;
+  --warning: #f59e0b;
+  --warning-strong: #ea580c;
+  --error: #ef4444;
+  --error-strong: #dc2626;
+  --info: #14b8a6;
+  --info-strong: #0d9488;
+  --chip-bg: #e5e7eb;
+  --row-alt-bg: #f7fafc;
 }

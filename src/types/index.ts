@@ -17,7 +17,8 @@ export interface NavigationItem {
   path?: string;
   children?: NavigationItem[];
   badge?: number;
-  superAdminOnly?: boolean;
+  superAdminOnly?: boolean; // legacy; prefer requiredPermission
+  requiredPermission?: string; // permission name required to view this item
 }
 
 export interface StatCard {

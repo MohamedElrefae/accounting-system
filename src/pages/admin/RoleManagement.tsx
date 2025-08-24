@@ -33,7 +33,8 @@ import {
   ExpandMore as ExpandMoreIcon,
   Search as SearchIcon,
   Save as SaveIcon,
-  AdminPanelSettings as AdminIcon
+  AdminPanelSettings as AdminIcon,
+  LockOpen as UnlockIcon
 } from '@mui/icons-material';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -66,6 +67,8 @@ export default function RoleManagement() {
     permissions: [] as string[]
   });
   const [saving, setSaving] = useState(false);
+  const [savingPerms, setSavingPerms] = useState(false);
+  const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
 
   useEffect(() => {
     loadRoles();
@@ -144,11 +147,18 @@ export default function RoleManagement() {
   };
 
   const handleSaveRole = async () => {
+    // Basic client-side validation
+    const name = formData.name.trim();
+    const nameAr = formData.name_ar.trim();
+    if (!name || !nameAr) {
+      alert('يرجى إدخال اسم الدور باللغتين قبل الحفظ');
+      return;
+    }
     try {
       setSaving(true);
 
       if (selectedRole) {
-        // Update existing role
+        // Update existing role (info only)
         const { error: updateError } = await supabase
           .from('roles')
           .update({
@@ -161,90 +171,177 @@ export default function RoleManagement() {
 
         if (updateError) throw updateError;
 
-        // Update permissions
-        // First, delete existing permissions
-        await supabase
-          .from('role_permissions')
-          .delete()
-          .eq('role_id', selectedRole.id);
-
-        // Then add new permissions
-        if (formData.permissions.length > 0) {
-          // Get permission IDs
-          const { data: perms } = await supabase
-            .from('permissions')
-            .select('id, name')
-            .in('name', formData.permissions);
-
-          if (perms && perms.length > 0) {
-            const rolePermissions = perms.map(p => ({
-              role_id: selectedRole.id,
-              permission_id: p.id,
-              granted_by: currentUser?.id
-            }));
-
-            await supabase.from('role_permissions').insert(rolePermissions);
-          }
-        }
+        // Do not touch permissions here for edit unless user explicitly saves permissions
       } else {
-        // Create new role
+        // Create new role (first step) and keep dialog open to assign permissions next
         const { data: newRole, error: createError } = await supabase
           .from('roles')
           .insert({
-            name: formData.name,
-            name_ar: formData.name_ar,
+            name: formData.name.trim(),
+            name_ar: formData.name_ar.trim(),
             description: formData.description,
-            description_ar: formData.description_ar,
-            is_system: false
+            description_ar: formData.description_ar
           })
           .select()
           .single();
 
         if (createError) throw createError;
 
-        // Add permissions
-        if (formData.permissions.length > 0 && newRole) {
-          const { data: perms } = await supabase
-            .from('permissions')
-            .select('id, name')
-            .in('name', formData.permissions);
-
-          if (perms && perms.length > 0) {
-            const rolePermissions = perms.map(p => ({
-              role_id: newRole.id,
-              permission_id: p.id,
-              granted_by: currentUser?.id
-            }));
-
-            await supabase.from('role_permissions').insert(rolePermissions);
-          }
-        }
+        // Set the created role so permissions section becomes actionable
+        setSelectedRole(newRole as Role);
+        alert('تم إنشاء الدور. يمكنك الآن تعيين الصلاحيات ثم الضغط على حفظ الصلاحيات.');
+        await loadRoles();
+        return; // Exit early to prevent closing the dialog
       }
 
-      setEditDialogOpen(false);
       await loadRoles();
-    } catch (error) {
+      alert('تم حفظ معلومات الدور');
+    } catch (error: any) {
       console.error('Error saving role:', error);
-      alert('فشل حفظ الدور');
+      // Surface clearer messages
+      let msg = 'فشل حفظ الدور';
+      const code = error?.code || error?.status || '';
+      const details = error?.details || error?.message || '';
+      if (code === '23505') {
+        msg = 'فشل حفظ الدور: الاسم مستخدم من قبل. اختر اسمًا فريدًا.';
+      } else if (code === '42501' || error?.message?.toLowerCase?.().includes('rls') || error?.message?.toLowerCase?.().includes('policy')) {
+        msg = 'فشل حفظ الدور: لا توجد صلاحية للكتابة (تحقق من سياسات RLS لجدول roles).';
+      } else if (details) {
+        msg = `فشل حفظ الدور: ${details}`;
+      }
+      alert(msg);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDeleteRole = async (roleId: number) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الدور؟')) return;
+  const handleSavePermissions = async () => {
+    if (!selectedRole) {
+      alert('احفظ الدور أولاً قبل تعيين الصلاحيات');
+      return;
+    }
+    try {
+      setSavingPerms(true);
 
+      // Reset existing permissions for this role
+      await supabase
+        .from('role_permissions')
+        .delete()
+        .eq('role_id', selectedRole.id);
+
+      if (formData.permissions.length > 0) {
+        // Resolve permission IDs
+        const { data: perms, error: permsError } = await supabase
+          .from('permissions')
+          .select('id, name')
+          .in('name', formData.permissions);
+
+        if (permsError) throw permsError;
+
+        if (perms && perms.length > 0) {
+          const rolePermissions = perms.map(p => ({
+            role_id: selectedRole.id,
+            permission_id: p.id
+          }));
+
+          const { error: insertError } = await supabase.from('role_permissions').insert(rolePermissions);
+          if (insertError) throw insertError;
+        }
+      }
+
+      alert('تم حفظ الصلاحيات بنجاح');
+      await loadRoles();
+      setEditDialogOpen(false);
+    } catch (error: any) {
+      console.error('Error saving role permissions:', error);
+      let msg = 'فشل حفظ الصلاحيات';
+      const code = error?.code || error?.status || '';
+      const details = error?.details || error?.message || '';
+      if (code === '23503') {
+        msg = 'فشل حفظ الصلاحيات: صلاحية غير موجودة أو الدور غير موجود.';
+      } else if (code === '42501' || error?.message?.toLowerCase?.().includes('rls') || error?.message?.toLowerCase?.().includes('policy')) {
+        msg = 'فشل حفظ الصلاحيات: لا توجد صلاحية للكتابة (تحقق من سياسات RLS لجدول role_permissions).';
+      } else if (details) {
+        msg = `فشل حفظ الصلاحيات: ${details}`;
+      }
+      alert(msg);
+    } finally {
+      setSavingPerms(false);
+    }
+  };
+
+  const handleDeleteRole = async (roleId: number) => {
+    if (!confirm('هل أنت متأكد من حذف هذا الدور؟ سيتم إزالة الصلاحيات والمستخدمين المرتبطين به.')) return;
+
+    try {
+      // Remove related rows first (best-effort)
+      await supabase.from('user_roles').delete().eq('role_id', roleId);
+      await supabase.from('role_permissions').delete().eq('role_id', roleId);
+
+      const { error } = await supabase.from('roles').delete().eq('id', roleId);
+      if (error) throw error;
+
+      setSelectedRoleIds(prev => prev.filter(id => id !== roleId));
+      await loadRoles();
+      alert('تم حذف الدور بنجاح');
+    } catch (error: any) {
+      console.error('Error deleting role:', error);
+      let msg = 'فشل حذف الدور';
+      if (error?.message?.toLowerCase?.().includes('rls') || error?.message?.toLowerCase?.().includes('policy')) {
+        msg = 'فشل حذف الدور: سياسة RLS تمنع الحذف. أضف سياسة حذف للمشرف العام.';
+      }
+      alert(msg);
+    }
+  };
+
+  const handleDemoteSystemRole = async (role: Role) => {
+    if (!role.is_system) return;
+    if (!confirm(`تحويل الدور "${role.name_ar || role.name}" إلى دور عادي؟`)) return;
     try {
       const { error } = await supabase
         .from('roles')
-        .delete()
-        .eq('id', roleId);
-
+        .update({ is_system: false })
+        .eq('id', role.id);
       if (error) throw error;
       await loadRoles();
-    } catch (error) {
-      console.error('Error deleting role:', error);
-      alert('فشل حذف الدور');
+      alert('تم تحويل الدور إلى غير نظامي. يمكنك الآن حذفه إن رغبت.');
+    } catch (error: any) {
+      console.error('Demote system role failed:', error);
+      let msg = 'فشل تحويل الدور';
+      if (error?.message?.toLowerCase?.().includes('column') && error?.message?.includes('is_system')) {
+        msg = 'فشل التحويل: عمود is_system غير موجود في الجدول roles.';
+      }
+      alert(msg);
+    }
+  };
+
+  const handleToggleSelectRole = (roleId: number, checked: boolean) => {
+    setSelectedRoleIds(prev => {
+      const set = new Set(prev);
+      if (checked) set.add(roleId); else set.delete(roleId);
+      return Array.from(set);
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedRoleIds.length === 0) return;
+    if (!confirm(`سيتم حذف ${selectedRoleIds.length} دور/أدوار مع إلغاء ربط المستخدمين والصلاحيات. هل تريد المتابعة؟`)) return;
+    try {
+      for (const roleId of selectedRoleIds) {
+        await supabase.from('user_roles').delete().eq('role_id', roleId);
+        await supabase.from('role_permissions').delete().eq('role_id', roleId);
+        await supabase.from('roles').delete().eq('id', roleId);
+      }
+      setSelectedRoleIds([]);
+      await loadRoles();
+      alert('تم حذف الأدوار المحددة بنجاح');
+    } catch (error: any) {
+      console.error('Bulk delete error:', error);
+      let msg = 'فشل حذف بعض الأدوار';
+      if (error?.message?.toLowerCase?.().includes('rls') || error?.message?.toLowerCase?.().includes('policy')) {
+        msg = 'فشل الحذف: سياسة RLS تمنع الحذف. أضف سياسات الحذف للمشرف العام.';
+      }
+      alert(msg);
     }
   };
 
@@ -262,15 +359,24 @@ export default function RoleManagement() {
         <Typography variant="h4" fontWeight="bold">
           إدارة الأدوار والصلاحيات
         </Typography>
-        <PermissionGuard permission={PERMISSIONS.ROLES_CREATE}>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleEditRole(null)}
-          >
-            دور جديد
-          </Button>
-        </PermissionGuard>
+        <Stack direction="row" spacing={1}>
+          {selectedRoleIds.length > 0 && (
+            <PermissionGuard permission={PERMISSIONS.ROLES_DELETE}>
+              <Button color="error" variant="outlined" onClick={handleBulkDelete}>
+                حذف الأدوار المحددة ({selectedRoleIds.length})
+              </Button>
+            </PermissionGuard>
+          )}
+          <PermissionGuard permission={PERMISSIONS.ROLES_CREATE}>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => handleEditRole(null)}
+            >
+              دور جديد
+            </Button>
+          </PermissionGuard>
+        </Stack>
       </Stack>
 
       {loading ? (
@@ -325,6 +431,15 @@ export default function RoleManagement() {
                   </Stack>
                 </CardContent>
                 <CardActions>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={selectedRoleIds.includes(role.id)}
+                        onChange={(e) => handleToggleSelectRole(role.id, e.target.checked)}
+                      />
+                    }
+                    label="تحديد"
+                  />
                   <PermissionGuard permission={PERMISSIONS.ROLES_UPDATE}>
                     <IconButton
                       size="small"
@@ -334,12 +449,24 @@ export default function RoleManagement() {
                       <EditIcon />
                     </IconButton>
                   </PermissionGuard>
+                  {role.is_system && (
+                    <PermissionGuard permission={PERMISSIONS.ROLES_UPDATE}>
+                      <IconButton
+                        size="small"
+                        color="warning"
+                        onClick={() => handleDemoteSystemRole(role)}
+                        title="تحويل إلى غير نظامي"
+                      >
+                        <UnlockIcon />
+                      </IconButton>
+                    </PermissionGuard>
+                  )}
                   <PermissionGuard permission={PERMISSIONS.ROLES_DELETE}>
                     <IconButton
                       size="small"
                       color="error"
                       onClick={() => handleDeleteRole(role.id)}
-                      disabled={role.is_system || role.user_count > 0}
+                      disabled={role.is_system}
                     >
                       <DeleteIcon />
                     </IconButton>
@@ -409,11 +536,16 @@ export default function RoleManagement() {
             </Grid>
 
             <Box>
-              <Typography variant="subtitle1" fontWeight="medium" mb={2}>
+              <Typography variant="subtitle1" fontWeight="medium" mb={1}>
                 الصلاحيات
               </Typography>
+              {!selectedRole && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  أنشئ الدور أولاً باستخدام زر "إنشاء الدور"، ثم قم باختيار الصلاحيات واضغط "حفظ الصلاحيات".
+                </Alert>
+              )}
               {PERMISSION_CATEGORIES.map(category => (
-                <Accordion key={category.key}>
+                <Accordion key={category.key} disabled={!selectedRole}>
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                     <Stack direction="row" alignItems="center" spacing={2}>
                       <Typography>{category.nameAr}</Typography>
@@ -433,6 +565,7 @@ export default function RoleManagement() {
                               <Checkbox
                                 checked={formData.permissions.includes(permission.name)}
                                 onChange={() => handlePermissionToggle(permission.name)}
+                                disabled={!selectedRole}
                               />
                             }
                             label={
@@ -454,17 +587,27 @@ export default function RoleManagement() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditDialogOpen(false)} disabled={saving}>
+          <Button onClick={() => setEditDialogOpen(false)} disabled={saving || savingPerms}>
             إلغاء
           </Button>
-          <Button
-            onClick={handleSaveRole}
-            variant="contained"
-            disabled={saving || !formData.name || !formData.name_ar}
-            startIcon={<SaveIcon />}
-          >
-            {saving ? 'جاري الحفظ...' : 'حفظ'}
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button
+              onClick={handleSaveRole}
+              variant="outlined"
+              disabled={saving || !formData.name || !formData.name_ar}
+              startIcon={<SaveIcon />}
+            >
+              {selectedRole ? (saving ? 'جاري الحفظ...' : 'حفظ بيانات الدور') : (saving ? 'جاري الإنشاء...' : 'إنشاء الدور')}
+            </Button>
+            <Button
+              onClick={handleSavePermissions}
+              variant="contained"
+              disabled={savingPerms || !selectedRole}
+              startIcon={<SaveIcon />}
+            >
+              {savingPerms ? 'جاري حفظ الصلاحيات...' : 'حفظ الصلاحيات'}
+            </Button>
+          </Stack>
         </DialogActions>
       </Dialog>
     </Box>

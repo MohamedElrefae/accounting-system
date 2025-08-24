@@ -40,16 +40,7 @@ const WESTERN_NUMERALS = {
   '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
 };
 
-// Arabic letter connection mapping for basic shaping
-const ARABIC_LETTER_FORMS = {
-  // Alef forms
-  '\u0627': { isolated: '\uFE8D', final: '\uFE8E' },
-  // Beh forms
-  '\u0628': { isolated: '\uFE8F', initial: '\uFE91', medial: '\uFE92', final: '\uFE90' },
-  // Teh forms
-  '\u062A': { isolated: '\uFE95', initial: '\uFE97', medial: '\uFE98', final: '\uFE96' },
-  // Add more as needed...
-};
+// Arabic letter connection mapping placeholder (removed unused detailed mapping)
 
 // Diacritics to remove for clean export
 const DIACRITICS = /[\u064B-\u065F\u0670\u06D6-\u06ED]/g;
@@ -292,5 +283,3 @@ export const formatForExport = (text: string, options: ExportOptions) =>
 export const cleanArabicText = (text: string) =>
   arabicEngine.cleanText(text);
 
-// Re-export types for convenience
-export type { ArabicTextOptions, ExportOptions };

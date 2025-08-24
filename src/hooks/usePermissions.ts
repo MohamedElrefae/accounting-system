@@ -27,24 +27,31 @@ export function usePermissions() {
     try {
       setLoading(true);
       
-      // Get user's role permissions
-      const { data: rolePerms, error: roleError } = await supabase
+      // Get user's active role IDs (simple query to avoid nested relationship 406)
+      const { data: userRoles, error: rolesErr } = await supabase
         .from('user_roles')
-        .select(`
-          roles (
-            role_permissions (
-              permissions (
-                name
-              )
-            )
-          )
-        `)
+        .select('role_id')
         .eq('user_id', user?.id)
-        .eq('is_active', true)
-        .single();
+        .eq('is_active', true);
 
-      if (roleError && roleError.code !== 'PGRST116') {
-        console.error('Error loading role permissions:', roleError);
+      if (rolesErr) {
+        console.error('Error loading user roles:', rolesErr);
+      }
+
+      const roleIds: number[] = (userRoles ?? []).map((r: any) => r.role_id).filter((id: any) => id != null);
+
+      // Get permissions for those roles (flat join avoided; select only needed field)
+      let rolePermissions: any[] = [];
+      if (roleIds.length > 0) {
+        const { data: rpData, error: rpErr } = await supabase
+          .from('role_permissions')
+          .select('permissions(name)')
+          .in('role_id', roleIds);
+        if (rpErr) {
+          console.error('Error loading role permissions:', rpErr);
+        } else {
+          rolePermissions = rpData ?? [];
+        }
       }
 
       // Get user's direct permissions
@@ -67,9 +74,9 @@ export function usePermissions() {
       const allPermissions = new Set<string>();
       
       // Add role permissions
-      if (rolePerms?.roles?.role_permissions) {
-        rolePerms.roles.role_permissions.forEach((rp: any) => {
-          if (rp.permissions?.name) {
+      if (rolePermissions && Array.isArray(rolePermissions)) {
+        rolePermissions.forEach((rp: any) => {
+          if (rp?.permissions?.name) {
             allPermissions.add(rp.permissions.name);
           }
         });
