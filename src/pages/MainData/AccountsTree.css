@@ -64,7 +64,7 @@
   flex-direction: column;
 }
 
-.accounts-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.accounts-table { width: max-content; min-width: 100%; border-collapse: collapse; table-layout: fixed; }
 .accounts-table th, .accounts-table td { padding: 1rem; text-align: right; border-bottom: 1px solid var(--border-light); }
 .accounts-table th { font-weight: 600; position: sticky; top: 0; z-index: 10; }
 
@@ -111,7 +111,7 @@
   background: var(--content-bg);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow: auto; /* allow scroll to see full width */
 }
 
 .accounts-table thead th {

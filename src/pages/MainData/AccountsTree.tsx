@@ -4,6 +4,8 @@ import { createStandardColumns, prepareTableData } from '../../hooks/useUniversa
 import TreeView from '../../components/TreeView/TreeView';
 import './AccountsTree.css';
 import { supabase } from '../../utils/supabase';
+import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, FormControlLabel, Switch, MenuItem, Select, InputLabel, FormControl, Stack, CircularProgress } from '@mui/material';
+import { useToast } from '../../contexts/ToastContext';
 
 interface AccountItem {
   id: string;
@@ -48,6 +50,14 @@ const AccountsTreePage: React.FC = () => {
   const [projects, setProjects] = useState<{ id: string; code: string; name: string; name_ar?: string }[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [balanceMode, setBalanceMode] = useState<'posted' | 'all'>('posted');
+
+  // Edit/Add dialog state
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<'edit' | 'add'>('edit');
+  const [draft, setDraft] = useState<Partial<AccountItem>>({});
+  const [saving, setSaving] = useState(false);
+
+  const { showToast } = useToast();
 
   useEffect(() => {
     loadRoots().catch(() => {});
@@ -165,6 +175,123 @@ const AccountsTreePage: React.FC = () => {
     });
     if (!error) setBreadcrumbs((data || []) as AncestorItem[]);
   }
+
+  // Shared action handlers for both views (Tree and Table)
+  const handleEdit = (node: AccountItem) => {
+    setDialogMode('edit');
+    setDraft({ ...node });
+    setDialogOpen(true);
+  };
+
+  const handleAdd = async (parent: AccountItem) => {
+    setDialogMode('add');
+    setDraft({
+      id: undefined,
+      code: '',
+      name: '',
+      name_ar: '',
+      level: Math.min((parent.level || 0) + 1, 4),
+      status: 'active',
+      parent_id: parent.id,
+      account_type: ''
+    });
+    setDialogOpen(true);
+  };
+
+  const handleToggleStatus = async (node: AccountItem) => {
+    try {
+      const { error } = await supabase.rpc('toggle_account_status', {
+        p_org_id: ORG_ID,
+        p_account_id: node.id,
+      });
+      if (error) throw error;
+      setAccounts(prev => prev.map(a => a.id === node.id ? { ...a, status: a.status === 'active' ? 'inactive' : 'active' } : a));
+      showToast('تم تغيير الحالة بنجاح', { severity: 'success' });
+    } catch (e) {
+      console.error('toggle_account_status failed', e);
+      showToast('فشل تغيير حالة الحساب', { severity: 'error' });
+    }
+  };
+
+  const handleDelete = async (node: AccountItem) => {
+    if (!window.confirm(`هل أنت متأكد من حذف "${node.name_ar || node.name}"؟`)) return;
+    try {
+      const { error } = await supabase.rpc('account_delete', {
+        p_org_id: ORG_ID,
+        p_account_id: node.id,
+      });
+      if (error) throw error;
+      setAccounts(prev => prev.filter(a => a.id !== node.id));
+      showToast('تم حذف الحساب', { severity: 'success' });
+    } catch (e) {
+      console.error('account_delete failed', e);
+      showToast('فشل حذف الحساب', { severity: 'error' });
+    }
+  };
+
+  const handleDialogClose = () => {
+    setDialogOpen(false);
+  };
+
+  const handleDialogSave = async () => {
+    if (!draft) return;
+    setSaving(true);
+    try {
+      if (dialogMode === 'edit' && draft.id) {
+        const { data, error } = await supabase.rpc('account_update', {
+          p_org_id: ORG_ID,
+          p_id: draft.id,
+          p_code: draft.code,
+          p_name: draft.name,
+          p_name_ar: draft.name_ar,
+          p_account_type: draft.account_type,
+          p_level: draft.level,
+          p_status: draft.status,
+        });
+        if (error) throw error;
+        const updated = (data as any) || draft;
+        setAccounts(prev => prev.map(a => (a.id === draft.id ? { ...a, ...updated } as AccountItem : a)));
+        showToast('تم تحديث الحساب', { severity: 'success' });
+      } else if (dialogMode === 'add') {
+        const { data, error } = await supabase.rpc('account_insert_child', {
+          p_org_id: ORG_ID,
+          p_parent_id: draft.parent_id,
+          p_code: draft.code,
+          p_name: draft.name,
+          p_name_ar: draft.name_ar,
+          p_account_type: draft.account_type,
+          p_level: draft.level,
+          p_status: draft.status,
+        });
+        if (error) throw error;
+        const inserted = (data as any);
+        if (inserted) {
+          setAccounts(prev => [...prev, inserted]);
+          showToast('تم إضافة الحساب الفرعي', { severity: 'success' });
+        } else {
+          // Fallback optimistic append
+          setAccounts(prev => [...prev, {
+            id: `tmp-${Date.now()}`,
+            code: String(draft.code || ''),
+            name: String(draft.name || ''),
+            name_ar: (draft.name_ar as string) || String(draft.name || ''),
+            level: (draft.level as number) || 1,
+            status: (draft.status as any) || 'active',
+            parent_id: (draft.parent_id as string) || null,
+            account_type: (draft.account_type as string) || undefined,
+            has_children: false,
+            has_active_children: false,
+          }]);
+        }
+      }
+    } catch (e) {
+      console.error('save failed', e);
+      showToast('فشل حفظ التغييرات', { severity: 'error' });
+    } finally {
+      setSaving(false);
+    }
+    setDialogOpen(false);
+  };
 
   async function loadProjects() {
     const { data, error } = await supabase
@@ -382,10 +509,10 @@ const AccountsTreePage: React.FC = () => {
               name_ar: (n as any).name_ar || n.name,
               is_active: n.status === 'active',
             })) as any}
-            onEdit={() => {}}
-            onAdd={async (parent) => { await ensureChildrenLoaded(parent as any); await toggleNode(parent as any); }}
-            onToggleStatus={() => {}}
-            onDelete={() => {}}
+            onEdit={(node) => handleEdit(node as any)}
+            onAdd={(parent) => handleAdd(parent as any)}
+            onToggleStatus={(node) => handleToggleStatus(node as any)}
+            onDelete={(node) => handleDelete(node as any)}
             onSelect={(node) => selectAccount(node as any)}
             onToggleExpand={async (node) => { await ensureChildrenLoaded(node as any); }}
             canHaveChildren={(node) => {
@@ -400,30 +527,87 @@ const AccountsTreePage: React.FC = () => {
         ) : (
           <div className="accounts-table-view">
             <table className="accounts-table">
+              <colgroup>
+                <col style={{ width: '120px' }} />
+                <col />
+                <col style={{ width: '160px' }} />
+                <col style={{ width: '80px' }} />
+                <col style={{ width: '450px' }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th>الكود</th>
-                  <th>الاسم</th>
+                  <th>اسم الحساب</th>
+                  <th>نوع الحساب</th>
                   <th>المستوى</th>
-                  <th>الحالة</th>
+                  <th>الإجراءات</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredAndSorted.map((item) => (
-                  <tr key={item.id} data-inactive={item.status !== 'active'}>
-                    <td className="table-code-cell">{item.code}</td>
-                    <td>{item.name_ar || item.name}</td>
-                    <td className="table-center">{item.level}</td>
-                    <td className="table-center">
-                      <span className={`status-badge ${item.status === 'active' ? 'active' : 'inactive'}`}>{item.status === 'active' ? 'نشط' : 'غير نشط'}</span>
-                    </td>
-                  </tr>
-                ))}
+                {filteredAndSorted.map((item) => {
+                  const canAddSub = item.level < 4;
+                  const isActive = item.status === 'active';
+                  return (
+                    <tr key={item.id} data-inactive={!isActive}>
+                      <td className="table-code-cell">{item.code}</td>
+                      <td>{item.name_ar || item.name}</td>
+                      <td className="table-center">{item.account_type || '—'}</td>
+                      <td className="table-center">{item.level}</td>
+                      <td>
+                        <div className="tree-node-actions">
+                          <button className="ultimate-btn ultimate-btn-edit" title="تعديل" onClick={() => handleEdit(item)}> 
+                            <div className="btn-content"><span className="btn-text">تعديل</span></div>
+                          </button>
+                          {canAddSub && (
+                            <button className="ultimate-btn ultimate-btn-add" title="إضافة فرعي" onClick={() => handleAdd(item)}>
+                              <div className="btn-content"><span className="btn-text">إضافة فرعي</span></div>
+                            </button>
+                          )}
+                          <button className={`ultimate-btn ${isActive ? 'ultimate-btn-disable' : 'ultimate-btn-enable'}`} title={isActive ? 'تعطيل' : 'تفعيل'} onClick={() => handleToggleStatus(item)}>
+                            <div className="btn-content"><span className="btn-text">{isActive ? 'تعطيل' : 'تفعيل'}</span></div>
+                          </button>
+                          <button className="ultimate-btn ultimate-btn-delete" title="حذف" onClick={() => handleDelete(item)}>
+                            <div className="btn-content"><span className="btn-text">حذف</span></div>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
+
+      {/* Edit/Add Dialog */}
+      <Dialog open={dialogOpen} onClose={handleDialogClose} fullWidth maxWidth="sm">
+        <DialogTitle>{dialogMode === 'edit' ? 'تعديل الحساب' : 'إضافة حساب فرعي'}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField label="الكود" value={draft.code || ''} onChange={(e) => setDraft(d => ({ ...d, code: e.target.value }))} size="small" />
+            <TextField label="الاسم" value={draft.name || ''} onChange={(e) => setDraft(d => ({ ...d, name: e.target.value }))} size="small" />
+            <TextField label="الاسم العربي" value={draft.name_ar || ''} onChange={(e) => setDraft(d => ({ ...d, name_ar: e.target.value }))} size="small" />
+            <FormControl size="small">
+              <InputLabel id="type-label">نوع الحساب</InputLabel>
+              <Select labelId="type-label" label="نوع الحساب" value={draft.account_type || ''} onChange={(e) => setDraft(d => ({ ...d, account_type: e.target.value as string }))}>
+                <MenuItem value="">—</MenuItem>
+                <MenuItem value="Asset">أصل</MenuItem>
+                <MenuItem value="Liability">التزامات</MenuItem>
+                <MenuItem value="Equity">حقوق ملكية</MenuItem>
+                <MenuItem value="Revenue">إيراد</MenuItem>
+                <MenuItem value="Expense">مصروف</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField type="number" label="المستوى" inputProps={{ min: 1, max: 4 }} value={draft.level ?? 1} onChange={(e) => setDraft(d => ({ ...d, level: Math.max(1, Math.min(4, Number(e.target.value))) }))} size="small" />
+            <FormControlLabel control={<Switch checked={(draft.status || 'active') === 'active'} onChange={(e) => setDraft(d => ({ ...d, status: e.target.checked ? 'active' : 'inactive' }))} />} label="نشط" />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDialogClose}>إلغاء</Button>
+          <Button variant="contained" onClick={handleDialogSave} disabled={saving} startIcon={saving ? <CircularProgress size={16} /> : undefined}>حفظ</Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };
