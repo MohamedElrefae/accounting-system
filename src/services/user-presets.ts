@@ -5,7 +5,7 @@ export interface ReportPreset {
   report_key: string
   name: string
   filters: any
-  columns: string[]
+  columns: any
   created_at: string
   updated_at: string
 }

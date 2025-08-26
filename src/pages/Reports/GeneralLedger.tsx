@@ -96,12 +96,37 @@ const GeneralLedger: React.FC = () => {
     })()
   }, [])
 
-  // Load presets
+  // Load presets and apply last used if present
   useEffect(() => {
     (async () => {
       try {
         const items = await listReportPresets(reportKey)
         setPresets(items)
+        const lastId = localStorage.getItem(`reportPreset:${reportKey}`) || ''
+        if (lastId) {
+          const p = items.find(x => x.id === lastId)
+          if (p) {
+            setSelectedPresetId(lastId)
+            const f = p.filters || {}
+            setAccountId(f.accountId || '')
+            setOrgId(f.orgId || '')
+            setProjectId(f.projectId || '')
+            setFilters(prev => ({
+              ...prev,
+              dateFrom: f.dateFrom || prev.dateFrom,
+              dateTo: f.dateTo || prev.dateTo,
+              includeOpening: typeof f.includeOpening === 'boolean' ? f.includeOpening : prev.includeOpening,
+              postedOnly: typeof f.postedOnly === 'boolean' ? f.postedOnly : prev.postedOnly,
+            }))
+            const cols: any = (p as any).columns
+            if (Array.isArray(cols)) {
+              setVisibleColumns(cols as string[])
+            } else if (cols && typeof cols === 'object') {
+              if (Array.isArray(cols.details)) setVisibleColumns(cols.details)
+              if (Array.isArray(cols.overview)) setVisibleOverviewColumns(cols.overview)
+            }
+          }
+        }
       } catch (e) {
         // ignore
       }
@@ -223,6 +248,7 @@ const GeneralLedger: React.FC = () => {
             setSelectedPresetId(id)
             const p = presets.find(x => x.id === id)
             if (p) {
+              localStorage.setItem(`reportPreset:${reportKey}`, id)
               const f = p.filters || {}
               setAccountId(f.accountId || '')
               setOrgId(f.orgId || '')
@@ -234,7 +260,12 @@ const GeneralLedger: React.FC = () => {
                 includeOpening: typeof f.includeOpening === 'boolean' ? f.includeOpening : prev.includeOpening,
                 postedOnly: typeof f.postedOnly === 'boolean' ? f.postedOnly : prev.postedOnly,
               }))
-              if (Array.isArray(p.columns)) setVisibleColumns(p.columns as string[])
+              const cols: any = (p as any).columns
+              if (Array.isArray(cols)) setVisibleColumns(cols as string[])
+              else if (cols && typeof cols === 'object') {
+                if (Array.isArray(cols.details)) setVisibleColumns(cols.details)
+                if (Array.isArray(cols.overview)) setVisibleOverviewColumns(cols.overview)
+              }
             }
           }}>
             <option value=''>اختر تهيئة محفوظة</option>
@@ -255,12 +286,13 @@ const GeneralLedger: React.FC = () => {
                 projectId,
                 accountId,
               },
-              columns: visibleColumns,
+              columns: { details: visibleColumns, overview: visibleOverviewColumns },
             })
             setNewPresetName('')
             const items = await listReportPresets(reportKey)
             setPresets(items)
             setSelectedPresetId(saved.id)
+            localStorage.setItem(`reportPreset:${reportKey}`, saved.id)
           }}>حفظ</button>
           <button className={styles.presetButton} onClick={async () => {
             if (!selectedPresetId) return
