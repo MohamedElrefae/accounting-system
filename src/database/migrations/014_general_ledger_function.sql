@@ -107,7 +107,7 @@ as $$
       p.*,
       a.code as account_code,
       coalesce(a.name_ar, a.name) as account_name_ar,
-      coalesce(a.name_en, a.name) as account_name_en
+      a.name as account_name_en
     from period_rows p
     join public.accounts a on a.id = p.account_id
   ),
