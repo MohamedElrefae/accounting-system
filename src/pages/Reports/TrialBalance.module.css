@@ -1,0 +1,92 @@
+/* TrialBalance.module.css */
+.loading {
+  padding: 2rem;
+}
+
+.rowClickable {
+  cursor: pointer;
+}
+
+.totalCell {
+  font-weight: 700;
+}
+
+.totalLabel {
+  font-weight: 700;
+  text-align: right;
+}
+
+/* Hierarchical grouping styles */
+.groupRow {
+  background-color: #f7f9fc;
+}
+
+.groupCell {
+  font-weight: 600;
+}
+
+/* Indentation levels for groups */
+.level1 .groupName { padding-inline-start: 0px; }
+.level2 .groupName { padding-inline-start: 12px; }
+.level3 .groupName { padding-inline-start: 24px; }
+.level4 .groupName { padding-inline-start: 36px; }
+
+.groupName {
+  margin-inline-start: 6px;
+}
+
+.expandIcon {
+  display: inline-block;
+  width: 1.25rem;
+}
+
+.checkboxLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-inline-start: 1rem;
+}
+
+/* Column chooser (aligns with theme variables) */
+.columnPanel {
+  position: relative;
+}
+.columnDropdown {
+  position: absolute;
+  top: 36px;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  z-index: 10;
+}
+.columnList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+  gap: 6px 16px;
+}
+.columnItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.columnGroupTitle {
+  margin: 6px 0 4px 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  grid-column: 1 / -1;
+}
+.columnActions {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 8px 0;
+  grid-column: 1 / -1;
+}
+.columnActionBtn {
+  --btn-padding-y: 4px;
+  --btn-padding-x: 8px;
+  --btn-font-size: 0.85rem;
+}
+

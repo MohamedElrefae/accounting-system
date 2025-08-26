@@ -21,7 +21,7 @@ export async function saveReportPreset(params: {
   reportKey: string
   name: string
   filters: any
-  columns: string[]
+  columns: any
 }): Promise<ReportPreset> {
   const { data, error } = await supabase.rpc('upsert_report_preset', {
     p_id: params.id ?? null,

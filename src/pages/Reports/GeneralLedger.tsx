@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react'
 import styles from './GeneralLedger.module.css'
 import { fetchGeneralLedgerReport, type GLFilters, type GLRow } from '../../services/reports/general-ledger'
 import ExportButtons from '../../components/Common/ExportButtons'
-import { listReportPresets, saveReportPreset, deleteReportPreset, type ReportPreset } from '../../services/user-presets'
+import PresetBar from '../../components/Common/PresetBar'
 import { fetchGLAccountSummary, type GLAccountSummaryRow } from '../../services/reports/gl-account-summary'
 import { fetchOrganizations, fetchProjects, fetchAccountsMinimal, type LookupOption } from '../../services/lookups'
 import type { UniversalTableData } from '../../utils/UniversalExportManager'
+import { useReportPresets } from '../../hooks/useReportPresets'
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
 
@@ -33,15 +34,17 @@ const GeneralLedger: React.FC = () => {
   const [pageSize, setPageSize] = useState<number>(25)
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [totalRows, setTotalRows] = useState<number>(0)
+  // Compare mode
+  const [compareMode, setCompareMode] = useState<boolean>(false)
+  const [compareTotals, setCompareTotals] = useState<{ prev: number, curr: number, variance: number, pct: number | null } | null>(null)
+  const [showCompareOverview, setShowCompareOverview] = useState<boolean>(true)
   const [orgOptions, setOrgOptions] = useState<LookupOption[]>([])
   const [projectOptions, setProjectOptions] = useState<LookupOption[]>([])
   const [accountOptions, setAccountOptions] = useState<LookupOption[]>([])
 
   // Presets and columns
   const reportKey = 'general-ledger'
-  const [presets, setPresets] = useState<ReportPreset[]>([])
-  const [selectedPresetId, setSelectedPresetId] = useState<string>('')
-  const [newPresetName, setNewPresetName] = useState<string>('')
+  const { presets, selectedPresetId, setSelectedPresetId, newPresetName, setNewPresetName, loadPresetsAndApplyLast, selectPresetAndApply, saveCurrentPreset, deleteSelectedPreset } = useReportPresets(reportKey)
   const [columnMenuOpen, setColumnMenuOpen] = useState<boolean>(false)
   const detailColumnOptions = [
     { key: 'entry_number', label: 'رقم القيد' },
@@ -54,7 +57,19 @@ const GeneralLedger: React.FC = () => {
     { key: 'running_debit', label: 'رصيد جاري مدين' },
     { key: 'running_credit', label: 'رصيد جاري دائن' },
   ] as const
+  const overviewColumnOptions = [
+    { key: 'account_code', label: 'رمز الحساب' },
+    { key: 'account_name', label: 'اسم الحساب' },
+    { key: 'opening_debit', label: 'رصيد افتتاحي مدين' },
+    { key: 'opening_credit', label: 'رصيد افتتاحي دائن' },
+    { key: 'period_debits', label: 'إجمالي مدين الفترة' },
+    { key: 'period_credits', label: 'إجمالي دائن الفترة' },
+    { key: 'closing_debit', label: 'رصيد ختامي مدين' },
+    { key: 'closing_credit', label: 'رصيد ختامي دائن' },
+    { key: 'transaction_count', label: 'عدد القيود' },
+  ] as const
   const [visibleColumns, setVisibleColumns] = useState<string[]>(detailColumnOptions.map(c => c.key))
+  const [visibleOverviewColumns, setVisibleOverviewColumns] = useState<string[]>(overviewColumnOptions.map(c => c.key))
 
   // Initialize from query parameters once on mount
   useEffect(() => {
@@ -96,42 +111,29 @@ const GeneralLedger: React.FC = () => {
     })()
   }, [])
 
-  // Load presets and apply last used if present
+  // Load presets and auto-apply last used
   useEffect(() => {
-    (async () => {
-      try {
-        const items = await listReportPresets(reportKey)
-        setPresets(items)
-        const lastId = localStorage.getItem(`reportPreset:${reportKey}`) || ''
-        if (lastId) {
-          const p = items.find(x => x.id === lastId)
-          if (p) {
-            setSelectedPresetId(lastId)
-            const f = p.filters || {}
-            setAccountId(f.accountId || '')
-            setOrgId(f.orgId || '')
-            setProjectId(f.projectId || '')
-            setFilters(prev => ({
-              ...prev,
-              dateFrom: f.dateFrom || prev.dateFrom,
-              dateTo: f.dateTo || prev.dateTo,
-              includeOpening: typeof f.includeOpening === 'boolean' ? f.includeOpening : prev.includeOpening,
-              postedOnly: typeof f.postedOnly === 'boolean' ? f.postedOnly : prev.postedOnly,
-            }))
-            const cols: any = (p as any).columns
-            if (Array.isArray(cols)) {
-              setVisibleColumns(cols as string[])
-            } else if (cols && typeof cols === 'object') {
-              if (Array.isArray(cols.details)) setVisibleColumns(cols.details)
-              if (Array.isArray(cols.overview)) setVisibleOverviewColumns(cols.overview)
-            }
-          }
-        }
-      } catch (e) {
-        // ignore
+    loadPresetsAndApplyLast((p) => {
+      const f: any = p.filters || {}
+      setAccountId(f.accountId || '')
+      setOrgId(f.orgId || '')
+      setProjectId(f.projectId || '')
+      setFilters(prev => ({
+        ...prev,
+        dateFrom: f.dateFrom || prev.dateFrom,
+        dateTo: f.dateTo || prev.dateTo,
+        includeOpening: typeof f.includeOpening === 'boolean' ? f.includeOpening : prev.includeOpening,
+        postedOnly: typeof f.postedOnly === 'boolean' ? f.postedOnly : prev.postedOnly,
+      }))
+      const cols: any = (p as any).columns
+      if (Array.isArray(cols)) {
+        setVisibleColumns(cols as string[])
+      } else if (cols && typeof cols === 'object') {
+        if (Array.isArray(cols.details)) setVisibleColumns(cols.details)
+        if (Array.isArray(cols.overview)) setVisibleOverviewColumns(cols.overview)
       }
-    })()
-  }, [])
+    }).catch(() => {})
+  }, [loadPresetsAndApplyLast])
 
   useEffect(() => {
     const load = async () => {
@@ -192,6 +194,65 @@ const GeneralLedger: React.FC = () => {
     loadSummary()
   }, [view, filters.dateFrom, filters.dateTo, filters.postedOnly, orgId, projectId, pageSize, currentPage])
 
+  // Helper: derive previous period range matching the current window length
+  const prevRange = useMemo(() => {
+    try {
+      const dFrom = filters.dateFrom ? new Date(filters.dateFrom) : null
+      const dTo = filters.dateTo ? new Date(filters.dateTo) : null
+      if (!dFrom || !dTo) return null
+      const ms = dTo.getTime() - dFrom.getTime()
+      const prevTo = new Date(dFrom.getTime() - 24*60*60*1000) // day before current from
+      const prevFrom = new Date(prevTo.getTime() - ms)
+      const toISO = (d: Date) => d.toISOString().slice(0,10)
+      return { prevFrom: toISO(prevFrom), prevTo: toISO(prevTo) }
+    } catch { return null }
+  }, [filters.dateFrom, filters.dateTo])
+
+  // Period compare totals via GL account summary service (fast aggregation)
+  useEffect(() => {
+    const run = async () => {
+      if (!compareMode || !filters.dateFrom || !filters.dateTo || !prevRange) { setCompareTotals(null); return }
+      try {
+        const [currRows, prevRows] = await Promise.all([
+          fetchGLAccountSummary({
+            dateFrom: filters.dateFrom,
+            dateTo: filters.dateTo,
+            orgId: orgId || null,
+            projectId: projectId || null,
+            postedOnly: filters.postedOnly,
+            limit: 10000, // large cap for summary
+            offset: 0,
+          }),
+          fetchGLAccountSummary({
+            dateFrom: prevRange.prevFrom,
+            dateTo: prevRange.prevTo,
+            orgId: orgId || null,
+            projectId: projectId || null,
+            postedOnly: filters.postedOnly,
+            limit: 10000,
+            offset: 0,
+          }),
+        ])
+        const sumCurr = currRows.reduce((s, r) => s + Number(r.period_debits || 0) - Number(r.period_credits || 0), 0)
+        const sumPrev = prevRows.reduce((s, r) => s + Number(r.period_debits || 0) - Number(r.period_credits || 0), 0)
+        const variance = sumCurr - sumPrev
+        const pct = sumPrev !== 0 ? (variance / Math.abs(sumPrev)) : null
+        setCompareTotals({ prev: sumPrev, curr: sumCurr, variance, pct })
+      } catch {
+        setCompareTotals(null)
+      }
+    }
+    run()
+  }, [compareMode, filters.dateFrom, filters.dateTo, filters.postedOnly, orgId, projectId, prevRange])
+
+  // Tooltip text for compare period explanation
+  const compareTooltip = useMemo(() => {
+    if (!filters.dateFrom || !filters.dateTo || !prevRange) {
+      return 'الفترة السابقة تحسب بنفس طول الفترة الحالية وتسبقها مباشرة.'
+    }
+    return `الفترة السابقة محسوبة من ${prevRange.prevFrom} إلى ${prevRange.prevTo} (بنفس طول الفترة الحالية).`
+  }, [filters.dateFrom, filters.dateTo, prevRange])
+
   // Summary totals (from detailed rows if needed)
   const summary = useMemo(() => {
     const openingDebit = data.reduce((s, r) => s + (r.opening_debit || 0), 0)
@@ -204,52 +265,98 @@ const GeneralLedger: React.FC = () => {
   }, [data])
 
   // Export data
-  const exportData: UniversalTableData = useMemo(() => {
-    return {
-      columns: detailColumnOptions
-        .filter(c => visibleColumns.includes(c.key))
-        .map(c => ({ key: c.key, header: c.label, type: ['debit','credit','running_debit','running_credit'].includes(c.key) ? 'currency' : (c.key === 'entry_date' ? 'date' : 'text'), align: 'right' as const })),
-        { key: 'entry_number', header: 'رقم القيد', type: 'text', align: 'right' },
-        { key: 'entry_date', header: 'التاريخ', type: 'date', align: 'right' },
-        { key: 'account_code', header: 'رمز الحساب', type: 'text', align: 'right' },
-        { key: 'account_name_ar', header: 'اسم الحساب', type: 'text', align: 'right' },
-        { key: 'description', header: 'الوصف', type: 'text', align: 'right' },
-        { key: 'debit', header: 'مدين', type: 'currency', align: 'right' },
-        { key: 'credit', header: 'دائن', type: 'currency', align: 'right' },
-        { key: 'running_debit', header: 'رصيد جاري مدين', type: 'currency', align: 'right' },
-        { key: 'running_credit', header: 'رصيد جاري دائن', type: 'currency', align: 'right' },
-      ],
-      rows: data.map(r => ({
-        entry_number: r.entry_number ?? '',
-        entry_date: r.entry_date,
-        account_code: r.account_code,
-        account_name_ar: r.account_name_ar ?? r.account_name_en ?? '',
-        description: r.description ?? '',
-        debit: Number(r.debit || 0),
-        credit: Number(r.credit || 0),
-        running_debit: Number(r.running_debit || 0),
-        running_credit: Number(r.running_credit || 0),
-      })).map(row => Object.fromEntries(Object.entries(row).filter(([k]) => visibleColumns.includes(k as string)))),
-      metadata: {
-        generatedAt: new Date(),
-        filters
-      }
+  const exportDataDetails: UniversalTableData = useMemo(() => {
+    const columns = detailColumnOptions
+      .filter(c => visibleColumns.includes(c.key))
+      .map(c => ({
+        key: c.key,
+        header: c.label,
+        type: ['debit','credit','running_debit','running_credit'].includes(c.key) ? 'currency' : (c.key === 'entry_date' ? 'date' : 'text'),
+        align: 'right' as const,
+      }))
+    const rows = data.map(r => ({
+      entry_number: r.entry_number ?? '',
+      entry_date: r.entry_date,
+      account_code: r.account_code,
+      account_name_ar: r.account_name_ar ?? r.account_name_en ?? '',
+      description: r.description ?? '',
+      debit: Number(r.debit || 0),
+      credit: Number(r.credit || 0),
+      running_debit: Number(r.running_debit || 0),
+      running_credit: Number(r.running_credit || 0),
+    })).map(row => Object.fromEntries(Object.entries(row).filter(([k]) => visibleColumns.includes(k as string)))) as any[]
+
+    // Build prepend summary rows if compareMode is enabled and totals are available
+    const prependRows: any[][] = []
+    const pad = (cells: any[]) => {
+      const arr = [...cells]
+      while (arr.length < columns.length) arr.push('')
+      return arr
     }
-  }, [data, filters])
+    if (compareMode && compareTotals) {
+      prependRows.push(pad(['الفترة السابقة (صافي)', Number(compareTotals.prev || 0)]))
+      prependRows.push(pad(['الفترة الحالية (صافي)', Number(compareTotals.curr || 0)]))
+      prependRows.push(pad(['الفرق', Number(compareTotals.variance || 0)]))
+      prependRows.push(pad(['% التغير', compareTotals.pct == null ? '' : `${(compareTotals.pct * 100).toFixed(2)}%`]))
+      // spacer row
+      prependRows.push(pad(['']))
+    }
+
+    return { columns, rows, metadata: { generatedAt: new Date(), filters, prependRows: prependRows.length ? prependRows : undefined } }
+  }, [data, filters, visibleColumns, compareMode, compareTotals])
+
+  const exportDataOverview: UniversalTableData = useMemo(() => {
+    const columns = overviewColumnOptions
+      .filter(c => visibleOverviewColumns.includes(c.key))
+      .map(c => ({
+        key: c.key,
+        header: c.label,
+        type: ['opening_debit','opening_credit','period_debits','period_credits','closing_debit','closing_credit'].includes(c.key) ? 'currency' : 'text',
+        align: 'right' as const,
+      }))
+    const rows = summaryRows.map(r => ({
+      account_code: r.account_code,
+      account_name: r.account_name_ar || r.account_name_en || '',
+      opening_debit: Number(r.opening_debit || 0),
+      opening_credit: Number(r.opening_credit || 0),
+      period_debits: Number(r.period_debits || 0),
+      period_credits: Number(r.period_credits || 0),
+      closing_debit: Number(r.closing_debit || 0),
+      closing_credit: Number(r.closing_credit || 0),
+      transaction_count: r.transaction_count,
+    })).map(row => Object.fromEntries(Object.entries(row).filter(([k]) => visibleOverviewColumns.includes(k as string)))) as any[]
+
+    // Prepend compare summary rows when compare mode is enabled
+    const prependRows: any[][] = []
+    const pad = (cells: any[]) => {
+      const arr = [...cells]
+      while (arr.length < columns.length) arr.push('')
+      return arr
+    }
+    if (compareMode && compareTotals) {
+      prependRows.push(pad(['الفترة السابقة (صافي)', Number(compareTotals.prev || 0)]))
+      prependRows.push(pad(['الفترة الحالية (صافي)', Number(compareTotals.curr || 0)]))
+      prependRows.push(pad(['الفرق', Number(compareTotals.variance || 0)]))
+      prependRows.push(pad(['% التغير', compareTotals.pct == null ? '' : `${(compareTotals.pct * 100).toFixed(2)}%`]))
+      // spacer row
+      prependRows.push(pad(['']))
+    }
+
+    return { columns, rows, metadata: { generatedAt: new Date(), filters, prependRows: prependRows.length ? prependRows : undefined } }
+  }, [summaryRows, filters, visibleOverviewColumns, compareMode, compareTotals])
 
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
 
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.presetBar}>
-          <select className={styles.presetSelect} value={selectedPresetId} onChange={async (e) => {
-            const id = e.target.value
-            setSelectedPresetId(id)
-            const p = presets.find(x => x.id === id)
-            if (p) {
-              localStorage.setItem(`reportPreset:${reportKey}`, id)
-              const f = p.filters || {}
+        <PresetBar
+          presets={presets}
+          selectedPresetId={selectedPresetId}
+          newPresetName={newPresetName}
+          onChangePreset={async (id) => {
+            await selectPresetAndApply(String(id), (p) => {
+              const f: any = p.filters || {}
               setAccountId(f.accountId || '')
               setOrgId(f.orgId || '')
               setProjectId(f.projectId || '')
@@ -266,16 +373,12 @@ const GeneralLedger: React.FC = () => {
                 if (Array.isArray(cols.details)) setVisibleColumns(cols.details)
                 if (Array.isArray(cols.overview)) setVisibleOverviewColumns(cols.overview)
               }
-            }
-          }}>
-            <option value=''>اختر تهيئة محفوظة</option>
-            {presets.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
-          </select>
-          <input className={styles.presetInput} placeholder='اسم التهيئة' value={newPresetName} onChange={e => setNewPresetName(e.target.value)} />
-          <button className={styles.presetButton} onClick={async () => {
+            })
+          }}
+          onChangeName={(v) => setNewPresetName(v)}
+          onSave={async () => {
             if (!newPresetName.trim()) return
-            const saved = await saveReportPreset({
-              reportKey,
+            const saved = await saveCurrentPreset({
               name: newPresetName.trim(),
               filters: {
                 dateFrom: filters.dateFrom,
@@ -288,20 +391,20 @@ const GeneralLedger: React.FC = () => {
               },
               columns: { details: visibleColumns, overview: visibleOverviewColumns },
             })
-            setNewPresetName('')
-            const items = await listReportPresets(reportKey)
-            setPresets(items)
-            setSelectedPresetId(saved.id)
-            localStorage.setItem(`reportPreset:${reportKey}`, saved.id)
-          }}>حفظ</button>
-          <button className={styles.presetButton} onClick={async () => {
+            if (saved) setNewPresetName('')
+          }}
+          onDelete={async () => {
             if (!selectedPresetId) return
-            await deleteReportPreset(selectedPresetId)
-            setSelectedPresetId('')
-            const items = await listReportPresets(reportKey)
-            setPresets(items)
-          }}>حذف</button>
-        </div>
+            await deleteSelectedPreset()
+          }}
+          wrapperClassName={styles.presetBar}
+          selectClassName={styles.presetSelect}
+          inputClassName={styles.presetInput}
+          buttonClassName={styles.presetButton}
+          placeholder='اسم التهيئة'
+          saveLabel='حفظ'
+          deleteLabel='حذف'
+        />
         <h2 className={styles.title}>دفتر الأستاذ العام</h2>
         <div className={styles.actions}>
           <div className={styles.columnPanel}>
@@ -309,6 +412,20 @@ const GeneralLedger: React.FC = () => {
             {columnMenuOpen && (
               <div className={styles.columnDropdown}>
                 <div className={styles.columnList}>
+                  <div className={styles.columnGroupTitle}>ملخص الحسابات</div>
+                  {overviewColumnOptions.map(opt => (
+                    <label key={`ov-${opt.key}`} className={styles.columnItem}>
+                      <input
+                        type='checkbox'
+                        checked={visibleOverviewColumns.includes(opt.key)}
+                        onChange={(e) => {
+                          setVisibleOverviewColumns(prev => e.target.checked ? [...prev, opt.key] : prev.filter(k => k !== opt.key))
+                        }}
+                      />
+                      <span>{opt.label}</span>
+                    </label>
+                  ))}
+                  <div className={styles.columnGroupTitle}>تفاصيل القيود</div>
                   {detailColumnOptions.map(opt => (
                     <label key={opt.key} className={styles.columnItem}>
                       <input
@@ -325,17 +442,31 @@ const GeneralLedger: React.FC = () => {
               </div>
             )}
           </div>
-          <ExportButtons
-            data={exportData}
-            config={{
-              title: 'تقرير دفتر الأستاذ العام',
-              orientation: 'landscape',
-              useArabicNumerals: true,
-              rtlLayout: true,
-            }}
-            size="small"
-            layout="horizontal"
-          />
+          {view === 'overview' ? (
+            <ExportButtons
+              data={exportDataOverview}
+              config={{
+                title: 'ملخص دفتر الأستاذ العام',
+                orientation: 'landscape',
+                useArabicNumerals: true,
+                rtlLayout: true,
+              }}
+              size="small"
+              layout="horizontal"
+            />
+          ) : (
+            <ExportButtons
+              data={exportDataDetails}
+              config={{
+                title: 'تقرير دفتر الأستاذ العام',
+                orientation: 'landscape',
+                useArabicNumerals: true,
+                rtlLayout: true,
+              }}
+              size="small"
+              layout="horizontal"
+            />
+          )}
         </div>
       </div>
 
@@ -390,7 +521,7 @@ const GeneralLedger: React.FC = () => {
             ))}
           </select>
         </div>
-        <div className={styles.filterGroup}>
+          <div className={styles.filterGroup}>
           <label className={styles.label}>خيارات</label>
           <div className={styles.checkboxRow}>
             <input
@@ -410,6 +541,26 @@ const GeneralLedger: React.FC = () => {
             />
             <label htmlFor="postedOnly">قيود معتمدة فقط</label>
           </div>
+          <div className={styles.checkboxRow}>
+            <input
+              id="compareMode"
+              type="checkbox"
+              checked={!!compareMode}
+              onChange={e => { setCompareMode(e.target.checked) }}
+            />
+            <label htmlFor="compareMode" title={compareTooltip}>وضع المقارنة</label>
+          </div>
+          {compareMode && (
+            <div className={styles.checkboxRow} title={compareTooltip}>
+              <input
+                id="showCompareOverview"
+                type="checkbox"
+                checked={!!showCompareOverview}
+                onChange={e => setShowCompareOverview(e.target.checked)}
+              />
+              <label htmlFor="showCompareOverview" title={compareTooltip}>إظهار بطاقات المقارنة في الملخص</label>
+            </div>
+          )}
         </div>
       </div>
 
@@ -420,6 +571,26 @@ const GeneralLedger: React.FC = () => {
               <div className={styles.cardLabel}>عدد الحسابات</div>
               <div className={styles.cardValue}>{totalRows.toLocaleString('ar-EG')}</div>
             </div>
+            {compareMode && compareTotals && showCompareOverview && (
+              <>
+                <div className={styles.card}>
+                  <div className={styles.cardLabel} title={compareTooltip}>صافي الفترة السابقة</div>
+                  <div className={styles.cardValue}>{Number(compareTotals.prev || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</div>
+                </div>
+                <div className={styles.card}>
+                  <div className={styles.cardLabel} title={compareTooltip}>صافي الفترة الحالية</div>
+                  <div className={styles.cardValue}>{Number(compareTotals.curr || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</div>
+                </div>
+                <div className={styles.card}>
+                  <div className={styles.cardLabel} title={compareTooltip}>الفرق</div>
+                  <div className={styles.cardValue}>{Number(compareTotals.variance || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</div>
+                </div>
+                <div className={styles.card}>
+                  <div className={styles.cardLabel} title={compareTooltip}>% التغير</div>
+                  <div className={styles.cardValue}>{compareTotals.pct == null ? '—' : `${(compareTotals.pct * 100).toFixed(2)}%`}</div>
+                </div>
+              </>
+            )}
           </div>
           <div className={styles.tableWrap}>
             {loadingSummary ? (
@@ -428,29 +599,23 @@ const GeneralLedger: React.FC = () => {
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>رمز الحساب</th>
-                    <th>اسم الحساب</th>
-                    <th>رصيد افتتاحي مدين</th>
-                    <th>رصيد افتتاحي دائن</th>
-                    <th>إجمالي مدين الفترة</th>
-                    <th>إجمالي دائن الفترة</th>
-                    <th>رصيد ختامي مدين</th>
-                    <th>رصيد ختامي دائن</th>
-                    <th>عدد القيود</th>
+                    {overviewColumnOptions.filter(c => visibleOverviewColumns.includes(c.key)).map(c => (
+                      <th key={c.key}>{c.label}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {summaryRows.map(row => (
                     <tr key={row.account_id} onClick={() => { setAccountId(row.account_id); setView('details'); setCurrentPage(1); }}>
-                      <td>{row.account_code}</td>
-                      <td>{row.account_name_ar || row.account_name_en || ''}</td>
-                      <td>{Number(row.opening_debit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
-                      <td>{Number(row.opening_credit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
-                      <td>{Number(row.period_debits || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
-                      <td>{Number(row.period_credits || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
-                      <td>{Number(row.closing_debit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
-                      <td>{Number(row.closing_credit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
-                      <td>{row.transaction_count}</td>
+                      {visibleOverviewColumns.includes('account_code') && (<td>{row.account_code}</td>)}
+                      {visibleOverviewColumns.includes('account_name') && (<td>{row.account_name_ar || row.account_name_en || ''}</td>)}
+                      {visibleOverviewColumns.includes('opening_debit') && (<td>{Number(row.opening_debit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>)}
+                      {visibleOverviewColumns.includes('opening_credit') && (<td>{Number(row.opening_credit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>)}
+                      {visibleOverviewColumns.includes('period_debits') && (<td>{Number(row.period_debits || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>)}
+                      {visibleOverviewColumns.includes('period_credits') && (<td>{Number(row.period_credits || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>)}
+                      {visibleOverviewColumns.includes('closing_debit') && (<td>{Number(row.closing_debit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>)}
+                      {visibleOverviewColumns.includes('closing_credit') && (<td>{Number(row.closing_credit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>)}
+                      {visibleOverviewColumns.includes('transaction_count') && (<td>{row.transaction_count}</td>)}
                     </tr>
                   ))}
                 </tbody>
@@ -497,6 +662,29 @@ const GeneralLedger: React.FC = () => {
           </div>
         </div>
       )
+
+      {view === 'details' && compareMode && compareTotals && (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>الفترة السابقة (صافي)</th>
+                <th>الفترة الحالية (صافي)</th>
+                <th>الفرق</th>
+                <th>% التغير</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{Number(compareTotals.prev || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
+                <td>{Number(compareTotals.curr || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
+                <td>{Number(compareTotals.variance || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
+                <td>{compareTotals.pct == null ? '—' : `${(compareTotals.pct * 100).toFixed(2)}%`}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {view === 'details' && (
       <div className={styles.tableWrap}>

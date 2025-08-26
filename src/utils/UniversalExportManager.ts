@@ -68,6 +68,9 @@ export interface UniversalTableData {
     generatedAt?: Date;
     filters?: any;
     userInfo?: any;
+    // Optional: array of rows to prepend before the header in exports (Excel/CSV)
+    // Each inner array is a row of cell values; cells beyond provided headers are allowed
+    prependRows?: any[][];
   };
 }
 
@@ -289,21 +292,35 @@ export class UniversalExportManager {
       const dataRows = data.rows.map(row => {
         return data.columns.map(col => {
           const value = row[col.key];
-          // Processing cell value for export
-          return value || '';
+          return value ?? '';
         });
       });
+
+      const preRows = Array.isArray(data.metadata?.prependRows) ? (data.metadata!.prependRows as any[][]) : [];
+      const preRowsCount = preRows.length;
       
       // Prepare worksheet data
-      const worksheetData = [
-        headers,
-        ...dataRows
-      ];
+      const      // Header styling (bold + shaded background)
+      try {
+        for (let c = 0; c < data.columns.length; c++) {
+          const cellRef = XLSXUtils.encode_cell({ r: preRowsCount, c });
+          const cell = (worksheet as any)[cellRef];
+          if (!cell) continue;
+          const base = cell.s || {};
+          (worksheet as any)[cellRef].s = Object.assign({}, base, {
+            font: Object.assign({}, (base as any).font || {}, { bold: true, color: { rgb: '2C3E50' } }),
+            fill: { patternType: 'solid', fgColor: { rgb: 'F8F9FA' } },
+            alignment: { horizontal: options.rtlLayout ? 'right' : 'left', vertical: 'center' }
+          });
+        }
+      } catch {}
 
-      // Worksheet data prepared for export
-
-      // Create worksheet
-      const worksheet = XLSXUtils.aoa_to_sheet(worksheetData);
+      // Attempt to freeze header row and first column (account for preheader rows)
+      try {
+        const ySplit = preRowsCount + 1; // header row index (1-based)
+        const topLeftCell = `B${ySplit + 1}`; // one row below header
+        (worksheet as any)['!freeze'] = { xSplit: 1, ySplit, topLeftCell, activePane: 'bottomRight', state: 'frozen' };
+      } catch {}
       
       // Set column widths
       const columnWidths = data.columns.map(col => ({
@@ -313,8 +330,40 @@ export class UniversalExportManager {
       
       // Apply RTL formatting to the worksheet if needed
       if (options.rtlLayout) {
-        worksheet['!dir'] = 'rtl';
+        (worksheet as any)['!dir'] = 'rtl';
       }
+
+      // Apply basic styles: currency formats and bold subtotal rows (best-effort)
+      try {
+        const currencyColIdx: number[] = [];
+        data.columns.forEach((col, idx) => {
+          if (col.type === 'currency' || col.type === 'number' || col.format === 'currency') {
+            currencyColIdx.push(idx);
+          }
+        });
+        // Iterate over data rows (1-based offset in sheet for header)
+        for (let r = 0; r < dataRows.length; r++) {
+          const sheetRow = preRowsCount + 1 + r; // header at preRowsCount
+          const isGroupSubtotal = typeof data.rows[r]?.name === 'string' && (data.rows[r].name as string).startsWith('[مجموعة]');
+          for (let c = 0; c < data.columns.length; c++) {
+            const cellRef = XLSXUtils.encode_cell({ r: sheetRow, c });
+            const cell = (worksheet as any)[cellRef];
+            if (!cell) continue;
+            // Currency / number format
+            if (currencyColIdx.includes(c) && typeof cell.v === 'number') {
+              cell.z = '#,##0.00';
+            }
+            // Bold and shade group subtotal rows (support varies by environment)
+            if (isGroupSubtotal) {
+              const baseStyle = cell.s || {};
+              cell.s = Object.assign({}, baseStyle, {
+                font: Object.assign({}, (baseStyle as any).font || {}, { bold: true }),
+                fill: { patternType: 'solid', fgColor: { rgb: 'EEEEEE' } }
+              });
+            }
+          }
+        }
+      } catch {}
 
       // Add worksheet to workbook
       XLSXUtils.book_append_sheet(workbook, worksheet, 'تقرير');
@@ -333,8 +382,14 @@ export class UniversalExportManager {
    */
   private async exportToCSV(data: UniversalTableData, options: UniversalExportOptions): Promise<void> {
     try {
+      // Optional preheader rows (before header)
+      const preRows = Array.isArray(data.metadata?.prependRows) ? (data.metadata!.prependRows as any[][]) : [];
+      const preRowsLines = preRows.map(r => r.map(cell => this.csvEscape(String(cell ?? ''))).join(','));
+
       // Prepare CSV content
       const csvContent = [
+        // Prepend summary rows if any
+        ...preRowsLines,
         // Header row
         data.columns.map(col => this.csvEscape(col.header)).join(','),
         // Data rows
