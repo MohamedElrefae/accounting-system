@@ -58,6 +58,22 @@
   border-bottom: 1px solid var(--border-color);
 }
 
+.select {
+  height: 36px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--surface);
+  color: var(--text-primary);
+}
+  display: grid;
+  grid-template-columns: repeat(6, minmax(160px, 1fr));
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-color);
+}
+
 .filterGroup {
   display: flex;
   flex-direction: column;

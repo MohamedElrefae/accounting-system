@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react'
 import styles from './GeneralLedger.module.css'
 import { fetchGeneralLedgerReport, type GLFilters, type GLRow } from '../../services/reports/general-ledger'
 import ExportButtons from '../../components/Common/ExportButtons'
+import { fetchGLAccountSummary, type GLAccountSummaryRow } from '../../services/reports/gl-account-summary'
+import { fetchOrganizations, fetchProjects, fetchAccountsMinimal, type LookupOption } from '../../services/lookups'
 import type { UniversalTableData } from '../../utils/UniversalExportManager'
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
@@ -22,12 +24,17 @@ const GeneralLedger: React.FC = () => {
   const [projectId, setProjectId] = useState<string>('')
 
   const [data, setData] = useState<GLRow[]>([])
+  const [summaryRows, setSummaryRows] = useState<GLAccountSummaryRow[]>([])
+  const [loadingSummary, setLoadingSummary] = useState<boolean>(false)
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<ViewMode>('overview')
   const [pageSize, setPageSize] = useState<number>(25)
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [totalRows, setTotalRows] = useState<number>(0)
+  const [orgOptions, setOrgOptions] = useState<LookupOption[]>([])
+  const [projectOptions, setProjectOptions] = useState<LookupOption[]>([])
+  const [accountOptions, setAccountOptions] = useState<LookupOption[]>([])
 
   // Initialize from query parameters once on mount
   useEffect(() => {
@@ -54,6 +61,20 @@ const GeneralLedger: React.FC = () => {
       }));
     } catch {}
   }, []);
+
+  // Load dropdown lookups
+  useEffect(() => {
+    (async () => {
+      const [orgs, projects, accounts] = await Promise.all([
+        fetchOrganizations(),
+        fetchProjects(),
+        fetchAccountsMinimal(),
+      ])
+      setOrgOptions(orgs)
+      setProjectOptions(projects)
+      setAccountOptions(accounts)
+    })()
+  }, [])
 
   useEffect(() => {
     const load = async () => {
@@ -86,7 +107,35 @@ const GeneralLedger: React.FC = () => {
     load()
   }, [filters.dateFrom, filters.dateTo, filters.includeOpening, filters.postedOnly, accountId, orgId, projectId, pageSize, currentPage])
 
-  // Summary totals
+  // Load account summary when on overview (or always, guarded by view)
+  useEffect(() => {
+    if (view !== 'overview') return
+    const loadSummary = async () => {
+      setLoadingSummary(true)
+      try {
+        const rows = await fetchGLAccountSummary({
+          dateFrom: filters.dateFrom || null,
+          dateTo: filters.dateTo || null,
+          orgId: orgId || null,
+          projectId: projectId || null,
+          postedOnly: filters.postedOnly,
+          limit: pageSize,
+          offset: (currentPage - 1) * pageSize,
+        })
+        setSummaryRows(rows)
+        if (rows && rows.length > 0 && typeof rows[0].total_rows === 'number') {
+          setTotalRows(rows[0].total_rows as number)
+        } else {
+          setTotalRows(rows.length)
+        }
+      } finally {
+        setLoadingSummary(false)
+      }
+    }
+    loadSummary()
+  }, [view, filters.dateFrom, filters.dateTo, filters.postedOnly, orgId, projectId, pageSize, currentPage])
+
+  // Summary totals (from detailed rows if needed)
   const summary = useMemo(() => {
     const openingDebit = data.reduce((s, r) => s + (r.opening_debit || 0), 0)
     const openingCredit = data.reduce((s, r) => s + (r.opening_credit || 0), 0)
@@ -176,33 +225,30 @@ const GeneralLedger: React.FC = () => {
         </div>
         <div className={styles.filterGroup}>
           <label className={styles.label}>الحساب (اختياري)</label>
-          <input
-            className={styles.input}
-            type="text"
-            placeholder="Account ID"
-            value={accountId}
-            onChange={e => setAccountId(e.target.value)}
-          />
+          <select className={styles.select} value={accountId} onChange={e => setAccountId(e.target.value)}>
+            <option value=''>جميع الحسابات</option>
+            {accountOptions.map(o => (
+              <option key={o.id} value={o.id}>{o.code ? `${o.code} - ` : ''}{o.name_ar || o.name}</option>
+            ))}
+          </select>
         </div>
         <div className={styles.filterGroup}>
           <label className={styles.label}>المؤسسة (اختياري)</label>
-          <input
-            className={styles.input}
-            type="text"
-            placeholder="Organization ID"
-            value={orgId}
-            onChange={e => setOrgId(e.target.value)}
-          />
+          <select className={styles.select} value={orgId} onChange={e => setOrgId(e.target.value)}>
+            <option value=''>جميع المؤسسات</option>
+            {orgOptions.map(o => (
+              <option key={o.id} value={o.id}>{o.code ? `${o.code} - ` : ''}{o.name_ar || o.name}</option>
+            ))}
+          </select>
         </div>
         <div className={styles.filterGroup}>
           <label className={styles.label}>المشروع (اختياري)</label>
-          <input
-            className={styles.input}
-            type="text"
-            placeholder="Project ID"
-            value={projectId}
-            onChange={e => setProjectId(e.target.value)}
-          />
+          <select className={styles.select} value={projectId} onChange={e => setProjectId(e.target.value)}>
+            <option value=''>جميع المشاريع</option>
+            {projectOptions.map(o => (
+              <option key={o.id} value={o.id}>{o.code ? `${o.code} - ` : ''}{o.name_ar || o.name}</option>
+            ))}
+          </select>
         </div>
         <div className={styles.filterGroup}>
           <label className={styles.label}>خيارات</label>
@@ -228,6 +274,53 @@ const GeneralLedger: React.FC = () => {
       </div>
 
       {view === 'overview' && (
+        <>
+          <div className={styles.summary}>
+            <div className={styles.card}>
+              <div className={styles.cardLabel}>عدد الحسابات</div>
+              <div className={styles.cardValue}>{totalRows.toLocaleString('ar-EG')}</div>
+            </div>
+          </div>
+          <div className={styles.tableWrap}>
+            {loadingSummary ? (
+              <div className={styles.footer}>جاري تحميل الملخص...</div>
+            ) : (
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>رمز الحساب</th>
+                    <th>اسم الحساب</th>
+                    <th>رصيد افتتاحي مدين</th>
+                    <th>رصيد افتتاحي دائن</th>
+                    <th>إجمالي مدين الفترة</th>
+                    <th>إجمالي دائن الفترة</th>
+                    <th>رصيد ختامي مدين</th>
+                    <th>رصيد ختامي دائن</th>
+                    <th>عدد القيود</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summaryRows.map(row => (
+                    <tr key={row.account_id} onClick={() => { setAccountId(row.account_id); setView('details'); setCurrentPage(1); }}>
+                      <td>{row.account_code}</td>
+                      <td>{row.account_name_ar || row.account_name_en || ''}</td>
+                      <td>{Number(row.opening_debit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
+                      <td>{Number(row.opening_credit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
+                      <td>{Number(row.period_debits || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
+                      <td>{Number(row.period_credits || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
+                      <td>{Number(row.closing_debit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
+                      <td>{Number(row.closing_credit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
+                      <td>{row.transaction_count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+
+      {view === 'details' && (
         <div className={styles.summary}>
           <div className={styles.card}>
             <div className={styles.cardLabel}>رصيد افتتاحي مدين</div>
@@ -290,6 +383,7 @@ const GeneralLedger: React.FC = () => {
         </div>
       </div>
 
+      {view === 'details' && (
       <div className={styles.tableWrap}>
         {loading ? (
           <div className={styles.footer}>جاري تحميل البيانات...</div>
@@ -328,6 +422,7 @@ const GeneralLedger: React.FC = () => {
           </table>
         )}
       </div>
+      )}
 
       <div className={styles.pagination}>
         <div>
