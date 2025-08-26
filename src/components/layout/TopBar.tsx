@@ -1,34 +1,31 @@
 import React, { useState } from 'react';
-import {
-  AppBar,
-  Toolbar,
-  IconButton,
-  Typography,
-  Badge,
-  Menu,
-  MenuItem,
-  Avatar,
-  Box,
-  Tooltip,
-  Divider,
-} from '@mui/material';
-import {
-  Menu as MenuIcon,
-  Notifications as NotificationsIcon,
-  AccountCircle,
-  Brightness4,
-  Brightness7,
-  Language as LanguageIcon,
-  Settings as SettingsIcon,
-  Logout as LogoutIcon,
-  Palette as PaletteIcon,
-} from '@mui/icons-material';
+import AppBar from '@mui/material/AppBar';
+import Toolbar from '@mui/material/Toolbar';
+import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
+import Badge from '@mui/material/Badge';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import Avatar from '@mui/material/Avatar';
+import Box from '@mui/material/Box';
+import Tooltip from '@mui/material/Tooltip';
+import Divider from '@mui/material/Divider';
+import MenuIcon from '@mui/icons-material/Menu';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import AccountCircle from '@mui/icons-material/AccountCircle';
+import Brightness4 from '@mui/icons-material/Brightness4';
+import Brightness7 from '@mui/icons-material/Brightness7';
+import LanguageIcon from '@mui/icons-material/Language';
+import SettingsIcon from '@mui/icons-material/Settings';
+import LogoutIcon from '@mui/icons-material/Logout';
+import PaletteIcon from '@mui/icons-material/Palette';
 import useAppStore from '../../store/useAppStore';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useCustomTheme } from '../../contexts/ThemeContext';
+
 import { useAuth } from '../../contexts/AuthContext';
 import { useUserProfile } from '../../contexts/UserProfileContext';
 // import { ThemeSettings } from "./ThemeSettings"; // Temporarily disabled
-import { translations } from '../../data/mockData';
+import { mergedTranslations as translations } from '../../data/mockData';
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -42,7 +39,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
   const {
     themeMode,
     toggleTheme,
-  } = useTheme();
+  } = useCustomTheme();
 
   const [profileMenuAnchor, setProfileMenuAnchor] = useState<null | HTMLElement>(null);
   const [notificationMenuAnchor, setNotificationMenuAnchor] = useState<null | HTMLElement>(null);
@@ -53,7 +50,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
 
   // Force component update when language changes
   React.useEffect(() => {
-    console.log('[TopBar] Language changed to:', language, 'isRtl:', isRtl);
+    // Language changed silently
   }, [language, isRtl]);
 
   const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
@@ -176,7 +173,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
           {/* Theme Settings - Modern Glass Effect */}
           <Tooltip title="Theme Settings" placement="bottom">
             <IconButton 
-              onClick={() => console.log('Theme settings coming soon!')} 
+              onClick={() => {/* Theme settings coming soon! */}}
               sx={{
                 color: 'text.primary',
                 bgcolor: 'transparent',
@@ -220,9 +217,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
           <Tooltip title={language === 'en' ? 'Switch to Arabic' : 'Switch to English'} placement="bottom">
             <IconButton 
               onClick={() => {
-                console.log('[TopBar] Before toggle - Language:', language);
-                toggleLanguage();
-                console.log('[TopBar] After toggle called');
+                toggleLanguage?.();
               }}
               sx={{
                 color: 'text.primary',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -16,22 +16,15 @@ import {
   MenuItem,
   Select,
   FormControl,
-  InputLabel,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Avatar,
   InputAdornment,
   Alert,
   Skeleton,
   Stack,
   Checkbox,
-  Menu,
   Toolbar,
   Collapse,
   Badge,
-  Divider,
   FormControlLabel,
   Switch
 } from '@mui/material';
@@ -45,8 +38,6 @@ import {
   CheckBox as CheckBoxIcon,
   CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon,
   Download as DownloadIcon,
-  Upload as UploadIcon,
-  Group as GroupIcon,
   Email as EmailIcon
 } from '@mui/icons-material';
 import { supabase } from '../../utils/supabase';
@@ -478,12 +469,12 @@ export default function UserManagement() {
               <FormControl size="small" sx={{ minWidth: 120 }}>
                 <Select
                   displayEmpty
-                  onChange={(e) => handleBulkRoleAssignment(e.target.value as number || null)}
+onChange={(e) => { const v = e.target.value as unknown as string; handleBulkRoleAssignment(v === '' ? null : Number(v)); }}
                   disabled={bulkActionLoading}
                   value=""
                 >
                   <MenuItem value="" disabled>تعيين دور</MenuItem>
-                  <MenuItem value={null}>إزالة الدور</MenuItem>
+<MenuItem value="__none__">إزالة الدور</MenuItem>
                   {roles.map((role) => (
                     <MenuItem key={role.id} value={role.id}>
                       {role.name_ar}

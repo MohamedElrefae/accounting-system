@@ -4,8 +4,10 @@ import { createStandardColumns, prepareTableData } from '../../hooks/useUniversa
 import TreeView from '../../components/TreeView/TreeView';
 import './AccountsTree.css';
 import { supabase } from '../../utils/supabase';
-import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, FormControlLabel, Switch, MenuItem, Select, InputLabel, FormControl, Stack, CircularProgress } from '@mui/material';
 import { useToast } from '../../contexts/ToastContext';
+import UnifiedCRUDForm, { type UnifiedCRUDFormHandle } from '../../components/Common/UnifiedCRUDForm';
+import { createAccountFormConfig } from '../../components/Accounts/AccountFormConfig';
+import DraggableResizablePanel from '../../components/Common/DraggableResizablePanel';
 
 interface AccountItem {
   id: string;
@@ -37,6 +39,22 @@ function getOrgId(): string {
 }
 const ORG_ID = getOrgId();
 
+// Enum mapping functions to convert frontend values to database enum types
+function mapAccountTypeToDbEnum(frontendType: string): string {
+  const mapping: { [key: string]: string } = {
+    'assets': 'asset',
+    'liabilities': 'liability', 
+    'equity': 'equity',
+    'revenue': 'revenue',
+    'expenses': 'expense'
+  };
+  return mapping[frontendType] || frontendType;
+}
+
+function mapStatusToDbEnum(isActive: boolean): string {
+  return isActive ? 'active' : 'inactive';
+}
+
 const AccountsTreePage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'tree' | 'table'>('tree');
   const [searchTerm, setSearchTerm] = useState('');
@@ -44,18 +62,117 @@ const AccountsTreePage: React.FC = () => {
   const [sortBy, setSortBy] = useState<'code' | 'name' | 'level'>('code');
   const [accounts, setAccounts] = useState<AccountItem[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [selectedAccount, setSelectedAccount] = useState<AccountItem | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<AncestorItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [projects, setProjects] = useState<{ id: string; code: string; name: string; name_ar?: string }[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [balanceMode, setBalanceMode] = useState<'posted' | 'all'>('posted');
 
-  // Edit/Add dialog state
+  // Edit/Add dialog state (must be before unifiedConfig)
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'edit' | 'add'>('edit');
   const [draft, setDraft] = useState<Partial<AccountItem>>({});
   const [saving, setSaving] = useState(false);
+
+  // Draggable panel state for the unified form
+  // Remember preference
+  const [rememberPanel, setRememberPanel] = useState<boolean>(() => {
+    try { const v = localStorage.getItem('accountsTreePanelRemember'); return v ? v === 'true' : true; } catch { return true; }
+  });
+
+  // Defaults; actual restore happens when dialog opens (per-mode)
+  const [panelPosition, setPanelPosition] = useState<{ x: number; y: number }>({ x: 100, y: 100 });
+  const [panelSize, setPanelSize] = useState<{ width: number; height: number }>({ width: 940, height: 640 });
+  const [panelMax, setPanelMax] = useState<boolean>(false);
+  const [panelDocked, setPanelDocked] = useState<boolean>(false);
+  const [panelDockPos, setPanelDockPos] = useState<'left' | 'right' | 'top' | 'bottom'>('right');
+
+  // Parent accounts list for unified form config
+  const parentAccountsLite = useMemo(() => {
+    return accounts.map(a => ({
+      id: a.id,
+      code: a.code,
+      name_ar: a.name_ar || a.name,
+      name_en: a.name,
+      level: a.level,
+      account_type: (a.account_type || '') as string,
+      statement_type: '',
+      parent_id: a.parent_id,
+      is_active: a.status === 'active',
+      allow_transactions: a.level >= 3,
+    }));
+  }, [accounts]);
+
+  const formRef = React.useRef<UnifiedCRUDFormHandle>(null);
+
+  // Persist remember preference
+  useEffect(() => {
+    try { localStorage.setItem('accountsTreePanelRemember', rememberPanel ? 'true' : 'false'); } catch {}
+  }, [rememberPanel]);
+
+  // Persist panel state (per-mode) when open and remember is on
+  useEffect(() => {
+    if (!dialogOpen || !rememberPanel) return;
+    const key = dialogMode === 'edit' ? 'accountsTreePanelState:edit' : 'accountsTreePanelState:add';
+    const state = {
+      position: panelPosition,
+      size: panelSize,
+      isMaximized: panelMax,
+      isDocked: panelDocked,
+      dockPosition: panelDockPos,
+    };
+    try { localStorage.setItem(key, JSON.stringify(state)); } catch {}
+  }, [dialogOpen, rememberPanel, dialogMode, panelPosition, panelSize, panelMax, panelDocked, panelDockPos]);
+
+  // Restore panel state when dialog opens (per-mode)
+  useEffect(() => {
+    if (!dialogOpen) return;
+    const key = dialogMode === 'edit' ? 'accountsTreePanelState:edit' : 'accountsTreePanelState:add';
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      const st = JSON.parse(raw);
+      if (st?.position) setPanelPosition(st.position);
+      if (st?.size) setPanelSize(st.size);
+      if (typeof st?.isMaximized === 'boolean') setPanelMax(st.isMaximized);
+      if (typeof st?.isDocked === 'boolean') setPanelDocked(st.isDocked);
+      if (st?.dockPosition) setPanelDockPos(st.dockPosition);
+    } catch {}
+  }, [dialogOpen, dialogMode]);
+
+  // Keyboard shortcuts: Esc to close, Ctrl/Cmd+Enter to save when dialog open
+  useEffect(() => {
+    if (!dialogOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setDialogOpen(false);
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        formRef.current?.submit();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [dialogOpen]);
+
+  const unifiedConfig = useMemo(() => {
+    const existing = (dialogMode === 'edit' && draft?.id)
+      ? {
+          id: draft.id as string,
+          code: String(draft.code || ''),
+          name_ar: String(draft.name_ar || draft.name || ''),
+          name_en: draft.name || '',
+          level: Number(draft.level || 1),
+          account_type: String(draft.account_type || ''),
+          statement_type: '',
+          parent_id: (draft.parent_id as string) || null,
+          is_active: (draft.status || 'active') === 'active',
+          allow_transactions: ((draft.level as number) || 1) >= 3,
+        }
+      : undefined;
+    return createAccountFormConfig(dialogMode === 'edit', parentAccountsLite, existing as any, true);
+  }, [dialogMode, draft, parentAccountsLite]);
 
   const { showToast } = useToast();
 
@@ -129,22 +246,6 @@ const AccountsTreePage: React.FC = () => {
     };
   }
 
-  async function ensureChildrenLoaded(node: AccountItem) {
-    // Load children only if none are present yet in the flat list for this parent
-    const alreadyHasAnyChild = accounts.some(a => a.parent_id === node.id);
-    if (alreadyHasAnyChild) return;
-    const children = await loadChildren(node.id);
-    if (children.length > 0) {
-      setAccounts(prev => {
-        const existingIds = new Set(prev.map(a => a.id));
-        const merged = [...prev];
-        for (const c of children) {
-          if (!existingIds.has(c.id)) merged.push(c);
-        }
-        return merged;
-      });
-    }
-  }
 
   async function toggleNode(node: AccountItem) {
     const newSet = new Set(expanded);
@@ -167,8 +268,7 @@ const AccountsTreePage: React.FC = () => {
     setExpanded(newSet);
   }
 
-  async function selectAccount(node: AccountItem) {
-    setSelectedAccount(node);
+  async function handleSelectAccount(node: AccountItem) {
     const { data, error } = await supabase.rpc('get_account_ancestors', {
       p_org_id: ORG_ID,
       p_account_id: node.id,
@@ -193,7 +293,7 @@ const AccountsTreePage: React.FC = () => {
       level: Math.min((parent.level || 0) + 1, 4),
       status: 'active',
       parent_id: parent.id,
-      account_type: ''
+      account_type: parent.account_type || ''
     });
     setDialogOpen(true);
   };
@@ -229,69 +329,6 @@ const AccountsTreePage: React.FC = () => {
     }
   };
 
-  const handleDialogClose = () => {
-    setDialogOpen(false);
-  };
-
-  const handleDialogSave = async () => {
-    if (!draft) return;
-    setSaving(true);
-    try {
-      if (dialogMode === 'edit' && draft.id) {
-        const { data, error } = await supabase.rpc('account_update', {
-          p_org_id: ORG_ID,
-          p_id: draft.id,
-          p_code: draft.code,
-          p_name: draft.name,
-          p_name_ar: draft.name_ar,
-          p_account_type: draft.account_type,
-          p_level: draft.level,
-          p_status: draft.status,
-        });
-        if (error) throw error;
-        const updated = (data as any) || draft;
-        setAccounts(prev => prev.map(a => (a.id === draft.id ? { ...a, ...updated } as AccountItem : a)));
-        showToast('تم تحديث الحساب', { severity: 'success' });
-      } else if (dialogMode === 'add') {
-        const { data, error } = await supabase.rpc('account_insert_child', {
-          p_org_id: ORG_ID,
-          p_parent_id: draft.parent_id,
-          p_code: draft.code,
-          p_name: draft.name,
-          p_name_ar: draft.name_ar,
-          p_account_type: draft.account_type,
-          p_level: draft.level,
-          p_status: draft.status,
-        });
-        if (error) throw error;
-        const inserted = (data as any);
-        if (inserted) {
-          setAccounts(prev => [...prev, inserted]);
-          showToast('تم إضافة الحساب الفرعي', { severity: 'success' });
-        } else {
-          // Fallback optimistic append
-          setAccounts(prev => [...prev, {
-            id: `tmp-${Date.now()}`,
-            code: String(draft.code || ''),
-            name: String(draft.name || ''),
-            name_ar: (draft.name_ar as string) || String(draft.name || ''),
-            level: (draft.level as number) || 1,
-            status: (draft.status as any) || 'active',
-            parent_id: (draft.parent_id as string) || null,
-            account_type: (draft.account_type as string) || undefined,
-            has_children: false,
-            has_active_children: false,
-          }]);
-        }
-      }
-    } catch (e) {
-      console.error('save failed', e);
-      showToast('فشل حفظ التغييرات', { severity: 'error' });
-    } finally {
-      setSaving(false);
-    }
-    setDialogOpen(false);
-  };
 
   async function loadProjects() {
     const { data, error } = await supabase
@@ -513,8 +550,8 @@ const AccountsTreePage: React.FC = () => {
             onAdd={(parent) => handleAdd(parent as any)}
             onToggleStatus={(node) => handleToggleStatus(node as any)}
             onDelete={(node) => handleDelete(node as any)}
-            onSelect={(node) => selectAccount(node as any)}
-            onToggleExpand={async (node) => { await ensureChildrenLoaded(node as any); }}
+            onSelect={(node) => handleSelectAccount(node as any)}
+            onToggleExpand={async (node) => { toggleNode(node as any); }}
             canHaveChildren={(node) => {
               const id = (node as any).id as string;
               const item = accounts.find(a => a.id === id);
@@ -549,7 +586,7 @@ const AccountsTreePage: React.FC = () => {
                   const isActive = item.status === 'active';
                   return (
                     <tr key={item.id} data-inactive={!isActive}>
-                      <td className="table-code-cell">{item.code}</td>
+                      <td className={`table-code-cell contrast-table-code-${document.documentElement.getAttribute('data-theme') || 'light'}`}>{item.code}</td>
                       <td>{item.name_ar || item.name}</td>
                       <td className="table-center">{item.account_type || '—'}</td>
                       <td className="table-center">{item.level}</td>
@@ -580,34 +617,154 @@ const AccountsTreePage: React.FC = () => {
         )}
       </div>
 
-      {/* Edit/Add Dialog */}
-      <Dialog open={dialogOpen} onClose={handleDialogClose} fullWidth maxWidth="sm">
-        <DialogTitle>{dialogMode === 'edit' ? 'تعديل الحساب' : 'إضافة حساب فرعي'}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField label="الكود" value={draft.code || ''} onChange={(e) => setDraft(d => ({ ...d, code: e.target.value }))} size="small" />
-            <TextField label="الاسم" value={draft.name || ''} onChange={(e) => setDraft(d => ({ ...d, name: e.target.value }))} size="small" />
-            <TextField label="الاسم العربي" value={draft.name_ar || ''} onChange={(e) => setDraft(d => ({ ...d, name_ar: e.target.value }))} size="small" />
-            <FormControl size="small">
-              <InputLabel id="type-label">نوع الحساب</InputLabel>
-              <Select labelId="type-label" label="نوع الحساب" value={draft.account_type || ''} onChange={(e) => setDraft(d => ({ ...d, account_type: e.target.value as string }))}>
-                <MenuItem value="">—</MenuItem>
-                <MenuItem value="Asset">أصل</MenuItem>
-                <MenuItem value="Liability">التزامات</MenuItem>
-                <MenuItem value="Equity">حقوق ملكية</MenuItem>
-                <MenuItem value="Revenue">إيراد</MenuItem>
-                <MenuItem value="Expense">مصروف</MenuItem>
-              </Select>
-            </FormControl>
-            <TextField type="number" label="المستوى" inputProps={{ min: 1, max: 4 }} value={draft.level ?? 1} onChange={(e) => setDraft(d => ({ ...d, level: Math.max(1, Math.min(4, Number(e.target.value))) }))} size="small" />
-            <FormControlLabel control={<Switch checked={(draft.status || 'active') === 'active'} onChange={(e) => setDraft(d => ({ ...d, status: e.target.checked ? 'active' : 'inactive' }))} />} label="نشط" />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleDialogClose}>إلغاء</Button>
-          <Button variant="contained" onClick={handleDialogSave} disabled={saving} startIcon={saving ? <CircularProgress size={16} /> : undefined}>حفظ</Button>
-        </DialogActions>
-      </Dialog>
+      {/* Unified Edit/Add Form */}
+      {dialogOpen && (
+        <DraggableResizablePanel
+          title={dialogMode === 'edit' ? 'تعديل الحساب' : 'إضافة حساب جديد'}
+          subtitle={draft?.code ? `الكود: ${draft.code}` : undefined}
+          headerGradient={'linear-gradient(90deg, #5b21b6, #8b5cf6, #06b6d4)'}
+          headerActions={(
+            <>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'white', fontSize: 12, marginInlineEnd: 8 }}>
+                <input type="checkbox" checked={rememberPanel} onChange={(e) => setRememberPanel(e.target.checked)} />
+                تذكر التخطيط
+              </label>
+              <button className="ultimate-btn ultimate-btn-add" title="حفظ" onClick={() => formRef.current?.submit()}>
+                <div className="btn-content"><span className="btn-text">حفظ</span></div>
+              </button>
+              <button className="ultimate-btn ultimate-btn-delete" title="إلغاء" onClick={() => {
+                const dirty = formRef.current?.hasUnsavedChanges?.();
+                if (dirty) {
+                  const ok = window.confirm('لديك تغييرات غير محفوظة. هل تريد إغلاق النافذة دون حفظ؟');
+                  if (!ok) return;
+                }
+                setDialogOpen(false);
+              }}>
+                <div className="btn-content"><span className="btn-text">إلغاء</span></div>
+              </button>
+            </>
+          )}
+          isOpen={dialogOpen}
+          onClose={() => {
+            const dirty = formRef.current?.hasUnsavedChanges?.();
+            if (dirty) {
+              const ok = window.confirm('لديك تغييرات غير محفوظة. هل تريد إغلاق النافذة دون حفظ؟');
+              if (!ok) return;
+            }
+            setDialogOpen(false);
+          }}
+          position={panelPosition}
+          size={panelSize}
+          isMaximized={panelMax}
+          isDocked={panelDocked}
+          dockPosition={panelDockPos}
+          onMove={setPanelPosition}
+          onResize={setPanelSize}
+          onMaximize={() => setPanelMax(m => !m)}
+          onDock={(pos) => { setPanelDocked(true); setPanelDockPos(pos); }}
+          onResetPosition={() => { setPanelDocked(false); setPanelMax(false); setPanelPosition({ x: 100, y: 100 }); setPanelSize({ width: 940, height: 640 }); }}
+        >
+          <div style={{ padding: '1rem' }}>
+            <UnifiedCRUDForm
+              ref={formRef}
+              config={unifiedConfig}
+              initialData={{
+              code: draft.code || '',
+              name_ar: (draft.name_ar || draft.name || '') as string,
+              name_en: (draft as any).name || '',
+              account_type: (draft.account_type || '') as string,
+              statement_type: '',
+              parent_id: (draft.parent_id as string) || '',
+              is_active: ((draft.status || 'active') === 'active'),
+              allow_transactions: ((draft.level as number) || 1) >= 3,
+              level: (draft.level as number) ?? 1,
+            }}
+            isLoading={saving}
+            onSubmit={async (form) => {
+              setSaving(true);
+              try {
+                if (dialogMode === 'edit' && draft.id) {
+                  // Map frontend enum values to database enum types
+                  const accountType = mapAccountTypeToDbEnum(form.account_type);
+                  const status = mapStatusToDbEnum(form.is_active);
+                  
+                  // Prepare account update data
+                  
+                  const { data, error } = await supabase.rpc('account_update', {
+                    p_org_id: ORG_ID,
+                    p_id: draft.id,
+                    p_code: form.code,
+                    p_name: form.name_en || form.name_ar,
+                    p_name_ar: form.name_ar,
+                    p_account_type: accountType,
+                    p_level: parseInt(String(form.level)) || 1,
+                    p_status: status,
+                  });
+                  
+                  if (error) {
+                    throw error;
+                  }
+                  
+                  if (!data) {
+                    throw new Error('No data returned from update function');
+                  }
+                  
+                  const updated = data as any;
+                  
+                  setAccounts(prev => prev.map(a => (a.id === draft.id ? {
+                    ...a,
+                    code: updated.code || form.code,
+                    name: updated.name || updated.name_ar || form.name_ar,
+                    name_ar: updated.name_ar || form.name_ar,
+                    level: updated.level || form.level,
+                    status: updated.status || (form.is_active ? 'active' : 'inactive'),
+                    account_type: updated.category || updated.account_type || accountType,
+                  } : a)));
+                  
+                  showToast('تم تحديث الحساب بنجاح', { severity: 'success' });
+                } else {
+                  // Map frontend enum values to database enum types
+                  const accountType = mapAccountTypeToDbEnum(form.account_type);
+                  const status = mapStatusToDbEnum(form.is_active);
+                  
+                  const { data, error } = await supabase.rpc('account_insert_child', {
+                    p_org_id: ORG_ID,
+                    p_parent_id: form.parent_id || null,
+                    p_code: form.code,
+                    p_name: form.name_en || form.name_ar,
+                    p_name_ar: form.name_ar,
+                    p_account_type: accountType,
+                    p_level: parseInt(String(form.level)) || 1,
+                    p_status: status,
+                  });
+                  if (error) throw error;
+                  const inserted = data as any;
+                  if (inserted) setAccounts(prev => [...prev, inserted]);
+                  showToast('تم إضافة الحساب', { severity: 'success' });
+                }
+                setDialogOpen(false);
+              } catch (e: any) {
+                const msg = e?.message || e?.error_description || e?.hint || e?.details || '';
+                console.error('save failed', e, msg);
+                showToast(`فشل حفظ التغييرات${msg ? `: ${msg}` : ''}`, { severity: 'error' });
+                throw e;
+              } finally {
+                setSaving(false);
+              }
+            }}
+            onCancel={() => {
+              const dirty = formRef.current?.hasUnsavedChanges?.();
+              if (dirty) {
+                const ok = window.confirm('لديك تغييرات غير محفوظة. هل تريد إلغاء دون حفظ؟');
+                if (!ok) return;
+              }
+              setDialogOpen(false);
+            }}
+            showAutoFillNotification
+          />
+          </div>
+        </DraggableResizablePanel>
+      )}
     </div>
   );
 };

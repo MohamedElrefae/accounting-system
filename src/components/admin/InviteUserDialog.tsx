@@ -6,7 +6,6 @@ import {
   DialogActions,
   Button,
   TextField,
-  Grid,
   Stack,
   Typography,
   Alert,
@@ -23,11 +22,11 @@ import {
   Divider,
   IconButton
 } from '@mui/material';
+import Grid from '@mui/material/Grid';
 import {
   PersonAdd as PersonAddIcon,
   Send as SendIcon,
   Email as EmailIcon,
-  Refresh as RefreshIcon,
   CheckCircle as CheckCircleIcon,
   Schedule as ScheduleIcon,
   Error as ErrorIcon,
@@ -257,7 +256,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
           .select('id')
           .ilike('email', inv.email)
           .maybeSingle?.() ?? await supabase.from('user_profiles').select('id').ilike('email', inv.email).limit(1);
-        if (existing && (existing as any[]).length === 0 ? false : !!(existing as any)?.id || (Array.isArray(existing) && existing.length > 0)) {
+        if (Array.isArray(existing) ? existing.length > 0 : !!(existing as any)?.id) {
           precheckResults.push({ success: false, email: inv.email, error: 'المستخدم موجود بالفعل' });
           continue;
         }
@@ -415,11 +414,11 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
           {bulkMode ? (
             // Bulk invitation mode
             <Grid container spacing={2}>
-              <Grid item xs={12}>
+<Grid size={{ xs: 12 }}>
                 <TextField
                   fullWidth
                   multiline
-                  rows={6}
+                  rows={1}
                   label="عناوين البريد الإلكتروني"
                   value={bulkEmails}
                   onChange={(e) => setBulkEmails(e.target.value)}
@@ -428,7 +427,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
                 />
               </Grid>
               
-              <Grid item xs={12} md={6}>
+<Grid size={{ xs: 12, md: 6 }}>
                 <TextField
                   fullWidth
                   select
@@ -445,7 +444,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
                 </TextField>
               </Grid>
 
-              <Grid item xs={12} md={6}>
+<Grid size={{ xs: 12, md: 6 }}>
                 <TextField
                   fullWidth
                   type="datetime-local"
@@ -475,7 +474,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
                   </Stack>
 
                   <Grid container spacing={2}>
-                    <Grid item xs={12} md={6}>
+<Grid size={{ xs: 12, md: 6 }}>
                       <TextField
                         fullWidth
                         label="البريد الإلكتروني"
@@ -490,7 +489,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
                       />
                     </Grid>
 
-                    <Grid item xs={12} md={6}>
+<Grid size={{ xs: 12, md: 6 }}>
                       <TextField
                         fullWidth
                         select
@@ -515,7 +514,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
                       </TextField>
                     </Grid>
 
-                    <Grid item xs={12} md={6}>
+<Grid size={{ xs: 12, md: 6 }}>
                       <TextField
                         fullWidth
                         type="datetime-local"
@@ -526,7 +525,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
                       />
                     </Grid>
 
-                    <Grid item xs={12} md={6}>
+<Grid size={{ xs: 12, md: 6 }}>
                       <FormControlLabel
                         control={
                           <Switch

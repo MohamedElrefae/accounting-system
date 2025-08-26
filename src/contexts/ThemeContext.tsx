@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
-import { CssBaseline } from '@mui/material';
+import CssBaseline from '@mui/material/CssBaseline';
 import { createAppTheme } from '../styles/theme';
 import type { ThemeMode } from '../types';
 import useAppStore from '../store/useAppStore';
@@ -73,35 +73,63 @@ export const CustomThemeProvider: React.FC<ThemeProviderProps> = ({ children }) 
       }
     };
 
-    // Core brand and text
-    set('--accent-primary', p?.primary?.main);
-    set('--accent-primary-hover', p?.primary?.dark || p?.primary?.main);
-    try {
-      const onAccent = p?.getContrastText ? p.getContrastText(p?.primary?.main) : undefined;
-      set('--on-accent', onAccent || (mode === 'dark' ? '#ffffff' : '#ffffff'));
-    } catch {
-      set('--on-accent', mode === 'dark' ? '#ffffff' : '#ffffff');
-    }
-
-    // Surfaces and backgrounds
+    // Unified Color System tokens
     set('--background', p?.background?.default);
     set('--surface', p?.background?.paper);
-    set('--content-bg', p?.background?.paper);
+    set('--border', p?.divider);
+    set('--accent', p?.primary?.main);
+    set('--text', p?.text?.primary);
+    set('--muted_text', p?.text?.secondary);
+    set('--heading', p?.text?.primary);
+    set('--error', p?.error?.main);
+    set('--success', p?.success?.main);
+    set('--warning', p?.warning?.main);
+    
+    // Specific component tokens based on mode
+    if (mode === 'dark') {
+      set('--field_bg', p?.background?.paper);
+      set('--selected_bg', '#343940');
+      set('--sidebar_bg', '#22262A');
+      set('--topbar_bg', p?.background?.paper);
+      set('--button_bg', p?.primary?.main);
+      set('--button_text', '#FFFFFF');
+      set('--table_header_bg', '#22262A');
+      set('--table_row_bg', p?.background?.paper);
+      set('--modal_bg', p?.background?.paper);
+      set('--active_tab_bg', '#343940');
+    } else {
+      set('--field_bg', '#F1F3F7');
+      set('--selected_bg', '#E4EAFE');
+      set('--sidebar_bg', '#FFFFFF');
+      set('--topbar_bg', p?.background?.default);
+      set('--button_bg', p?.primary?.main);
+      set('--button_text', '#FFFFFF');
+      set('--table_header_bg', '#F1F3F7');
+      set('--table_row_bg', '#FFFFFF');
+      set('--modal_bg', '#FFFFFF');
+      set('--active_tab_bg', '#E4EAFE');
+    }
 
-    // Text
+    // Legacy aliases for backward compatibility
+    set('--accent-primary', p?.primary?.main);
+    set('--accent-primary-hover', p?.primary?.dark || p?.primary?.main);
+    set('--content-bg', p?.background?.paper);
     set('--text-primary', p?.text?.primary);
     set('--text-secondary', p?.text?.secondary);
-
-    // Borders
-    set('--border-color', p?.divider || (mode === 'dark' ? '#3A3F47' : '#dfe6ea'));
-    set('--border-light', p?.divider || (mode === 'dark' ? '#374151' : '#e5e7eb'));
+    set('--border-color', p?.divider);
+    set('--border-light', p?.divider);
+    set('--primary-blue', p?.primary?.main);
+    
+    try {
+      const onAccent = p?.getContrastText ? p.getContrastText(p?.primary?.main) : undefined;
+      set('--on-accent', onAccent || '#ffffff');
+    } catch {
+      set('--on-accent', '#ffffff');
+    }
 
     // Status colors
-    set('--success', p?.success?.main);
     set('--success-strong', p?.success?.dark || p?.success?.main);
-    set('--warning', p?.warning?.main);
     set('--warning-strong', p?.warning?.dark || p?.warning?.main);
-    set('--error', p?.error?.main);
     set('--error-strong', p?.error?.dark || p?.error?.main);
     set('--info', p?.info?.main);
     set('--info-strong', p?.info?.dark || p?.info?.main);
@@ -110,6 +138,7 @@ export const CustomThemeProvider: React.FC<ThemeProviderProps> = ({ children }) 
     set('--hover-bg', p?.action?.hover || (mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'));
     set('--chip-bg', p?.action?.selected || (mode === 'dark' ? 'rgba(255,255,255,0.10)' : '#e5e7eb'));
     set('--row-alt-bg', p?.action?.selected || (mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#f7fafc'));
+    set('--info-bg', mode === 'dark' ? 'rgba(32, 118, 255, 0.08)' : 'rgba(32, 118, 255, 0.08)');
   }, [theme, themeMode]);
 
   const contextValue: ThemeContextType = {
@@ -127,10 +156,10 @@ export const CustomThemeProvider: React.FC<ThemeProviderProps> = ({ children }) 
   );
 };
 
-export const useTheme = (): ThemeContextType => {
+export const useCustomTheme = (): ThemeContextType => {
   const context = useContext(ThemeContext);
   if (context === undefined) {
-    throw new Error('useTheme must be used within a CustomThemeProvider');
+    throw new Error('useCustomTheme must be used within a CustomThemeProvider');
   }
   return context;
 };

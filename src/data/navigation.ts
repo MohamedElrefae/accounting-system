@@ -1,117 +1,156 @@
-import type { NavigationItem } from '../types';
+import type { NavigationItem } from "../types";
 
 export const navigationItems: NavigationItem[] = [
   {
-    id: 'dashboard',
-    titleEn: 'Dashboard',
-    titleAr: 'لوحة التحكم',
-    icon: 'Dashboard',
-    path: '/',
+    id: "dashboard",
+    label: "Dashboard",
+    titleEn: "Dashboard",
+    titleAr: "لوحة التحكم",
+    icon: "dashboard",
+    path: "/"
   },
   {
-    id: 'main-data',
-    titleEn: 'Main Data',
-    titleAr: 'البيانات الرئيسية',
-    icon: 'AccountTree',
+    id: "main-data",
+    label: "Main Data",
+    titleEn: "Main Data", 
+    titleAr: "البيانات الأساسية",
+    icon: "database",
     children: [
       {
-        id: 'accounts-tree',
-        titleEn: 'Tree of Accounts',
-        titleAr: 'شجرة الحسابات',
-        icon: 'List',
-        path: '/main-data/accounts-tree',
+        id: "accounts-tree",
+        label: "Accounts Tree",
+        titleEn: "Tree of Accounts",
+        titleAr: "شجرة الحسابات", 
+        icon: "tree-structure",
+        path: "/main-data/accounts-tree"
       },
-    ],
+      {
+        id: "organizations",
+        label: "Organizations",
+        titleEn: "Organizations",
+        titleAr: "إدارة المؤسسات",
+        icon: "building",
+        path: "/main-data/organizations"
+      },
+      {
+        id: "projects",
+        label: "Projects",
+        titleEn: "Projects",
+        titleAr: "إدارة المشاريع",
+        icon: "folder",
+        path: "/main-data/projects"
+      }
+    ]
   },
   {
-    id: 'transactions',
-    titleEn: 'Transactions',
-    titleAr: 'المعاملات',
-    icon: 'SwapHoriz',
+    id: "transactions",
+    label: "Transactions",
+    titleEn: "Transactions",
+    titleAr: "المعاملات المالية",
+    icon: "receipt",
     children: [
       {
-        id: 'my-transactions',
-        titleEn: 'My Transactions',
-        titleAr: 'معاملاتي',
-        icon: 'List',
-        path: '/transactions/my',
-        requiredPermission: 'transactions.read.own',
+        id: "my-transactions",
+        label: "My Transactions", 
+        titleEn: "My Transactions",
+        titleAr: "معاملاتي",
+        icon: "user-check",
+        path: "/transactions/my",
+        requiredPermission: "transactions.read.own"
       },
       {
-        id: 'pending-transactions',
-        titleEn: 'Pending Approval',
-        titleAr: 'المعاملات المعلقة',
-        icon: 'Summarize',
-        path: '/transactions/pending',
-        requiredPermission: 'transactions.post',
+        id: "pending-transactions",
+        label: "Pending Approval",
+        titleEn: "Pending Approval", 
+        titleAr: "في انتظار الموافقة",
+        icon: "clock",
+        path: "/transactions/pending",
+        requiredPermission: "transactions.post"
       },
       {
-        id: 'all-transactions',
-        titleEn: 'All Transactions',
-        titleAr: 'كل المعاملات',
-        icon: 'Summarize',
-        path: '/transactions/all',
-        requiredPermission: 'transactions.read.all',
-      },
-    ],
+        id: "all-transactions",
+        label: "All Transactions",
+        titleEn: "All Transactions",
+        titleAr: "جميع المعاملات", 
+        icon: "list",
+        path: "/transactions/all",
+        requiredPermission: "transactions.read.all"
+      }
+    ]
   },
   {
-    id: 'reports',
-    titleEn: 'Reports',
-    titleAr: 'التقارير',
-    icon: 'Assessment',
+    id: "reports", 
+    label: "Reports",
+    titleEn: "Financial Reports",
+    titleAr: "التقارير المالية",
+    icon: "chart-line",
     children: [
       {
-        id: 'trial-balance',
-        titleEn: 'Trial Balance',
-        titleAr: 'ميزان المراجعة',
-        icon: 'BarChart',
-        path: '/reports/trial-balance',
+        id: "trial-balance",
+        label: "Trial Balance",
+        titleEn: "Trial Balance",
+        titleAr: "ميزان المراجعة",
+        icon: "scale",
+        path: "/reports/trial-balance"
       },
       {
-        id: 'profit-loss',
-        titleEn: 'Profit & Loss',
-        titleAr: 'الأرباح والخسائر',
-        icon: 'TrendingUp',
-        path: '/reports/profit-loss',
+        id: "profit-loss",
+        label: "Profit & Loss", 
+        titleEn: "Profit & Loss",
+        titleAr: "قائمة الدخل",
+        icon: "trending-up",
+        path: "/reports/profit-loss"
       },
       {
-        id: 'balance-sheet',
-        titleEn: 'Balance Sheet',
-        titleAr: 'الميزانية العمومية',
-        icon: 'AccountBalance',
-        path: '/reports/balance-sheet',
-      },
-    ],
+        id: "balance-sheet",
+        label: "Balance Sheet",
+        titleEn: "Balance Sheet", 
+        titleAr: "الميزانية العمومية", 
+        icon: "file-text",
+        path: "/reports/balance-sheet"
+      }
+    ]
   },
   {
-    id: 'settings',
-    titleEn: 'Settings',
-    titleAr: 'الإعدادات',
-    icon: 'Settings',
+    id: "settings",
+    label: "Settings",
+    titleEn: "System Settings",
+    titleAr: "إعدادات النظام",
+    icon: "settings",
     children: [
       {
-        id: 'users',
-        titleEn: 'Users',
-        titleAr: 'المستخدمين',
-        icon: 'Group',
-        path: '/settings/users',
+        id: "users",
+        label: "Users",
+        titleEn: "Users",
+        titleAr: "المستخدمون",
+        icon: "users",
+        path: "/settings/users"
       },
       {
-        id: 'roles',
-        titleEn: 'Roles & Permissions',
-        titleAr: 'الأدوار والصلاحيات',
-        icon: 'Security',
-        path: '/settings/roles',
+        id: "roles",
+        label: "Roles & Permissions",
+        titleEn: "Roles & Permissions", 
+        titleAr: "الأدوار والصلاحيات",
+        icon: "shield",
+        path: "/settings/roles"
       },
       {
-        id: 'diagnostics',
-        titleEn: 'Diagnostics',
-        titleAr: 'التشخيص',
-        icon: 'Security',
-        path: '/settings/diagnostics',
+        id: "company-settings",
+        label: "Company Settings",
+        titleEn: "Company Settings",
+        titleAr: "إعدادات الشركة",
+        icon: "building",
+        path: "/settings/company"
+      },
+      {
+        id: "diagnostics",
+        label: "Diagnostics",
+        titleEn: "Diagnostics",
+        titleAr: "التشخيص",
+        icon: "activity", 
+        path: "/settings/diagnostics",
         superAdminOnly: true
-      },
-    ],
+      }
+    ]
   }
 ];

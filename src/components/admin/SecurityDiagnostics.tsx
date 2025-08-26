@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Box, Card, CardContent, CardHeader, Divider, Grid, Stack, Typography, Button } from '@mui/material';
+import { Card, CardContent, CardHeader, Divider, Stack, Typography, Button } from '@mui/material';
+import Grid from '@mui/material/Grid';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useUserProfile } from '../../contexts/UserProfileContext';
 
@@ -75,26 +76,27 @@ export const SecurityDiagnostics: React.FC = () => {
       <Divider />
       <CardContent>
         <Grid container spacing={2}>
-          <Grid item xs={12} md={4}>
+<Grid size={{ xs: 12, md: 4 }}>
+
             <Stack spacing={1}>
               <Typography variant="subtitle2">Idle auto-logout</Typography>
               <Typography variant="body2">Timeout: {idleMinutes} minute(s)</Typography>
             </Stack>
-          </Grid>
-          <Grid item xs={12} md={4}>
+</Grid>
+<Grid size={{ xs: 12, md: 4 }}>
             <Stack spacing={1}>
               <Typography variant="subtitle2">Feature flags</Typography>
               <Typography variant="body2">Audit logging: {isAuditEnabled ? 'enabled' : 'disabled'}</Typography>
               <Typography variant="body2">Invite emails (Edge Function): {isInviteFxEnabled ? 'enabled' : 'disabled'}</Typography>
             </Stack>
-          </Grid>
-          <Grid item xs={12} md={4}>
+</Grid>
+<Grid size={{ xs: 12, md: 4 }}>
             <Stack spacing={1}>
               <Typography variant="subtitle2">Current user</Typography>
               <Typography variant="body2">User ID: {profile?.id || '—'}</Typography>
               <Typography variant="body2">Roles: {(profile?.roles || []).join(', ') || '—'}</Typography>
             </Stack>
-          </Grid>
+</Grid>
         </Grid>
         <Divider sx={{ my: 2 }} />
         <Stack direction="row" spacing={2} alignItems="center">

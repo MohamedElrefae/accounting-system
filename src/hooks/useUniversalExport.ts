@@ -72,21 +72,10 @@ export const useUniversalExport = (options: ExportHookOptions = {}): ExportMetho
 
       const finalConfig = { ...defaultConfig, ...config };
       
-      console.log(`🔄 Starting ${format.toUpperCase()} export...`);
-      console.log(`📊 Data summary: ${data.rows.length} rows, ${data.columns.length} columns`);
-      console.log(`📊 Data structure:`, data);
-      console.log(`⚙️ Export config:`, finalConfig);
-      console.log(`🔍 Export function:`, exportFunction);
-
       await exportFunction(data, finalConfig);
-
-      console.log(`✅ ${format.toUpperCase()} export completed successfully`);
       options.onExportComplete?.(format);
     } catch (error) {
-      console.error(`❌ ${format.toUpperCase()} export failed:`, error);
-      console.error(`❌ Error details:`, error);
       options.onExportError?.(format, error as Error);
-      alert(`Export failed: ${error}`);
       throw error;
     } finally {
       setIsExporting(false);
@@ -135,8 +124,6 @@ export const useUniversalExport = (options: ExportHookOptions = {}): ExportMetho
     const formats = ['pdf', 'excel', 'csv', 'html', 'json'];
     const finalConfig = { ...defaultConfig, ...config };
     
-    console.log('🔄 Starting batch export for all formats...');
-    
     for (const format of formats) {
       try {
         const exportFunction = {
@@ -151,11 +138,9 @@ export const useUniversalExport = (options: ExportHookOptions = {}): ExportMetho
           await executeExport(exportFunction, format, data, finalConfig);
         }
       } catch (error) {
-        console.error(`Failed to export ${format}:`, error);
+        // Silent error handling for batch export
       }
     }
-    
-    console.log('✅ Batch export completed');
   }, [defaultConfig, executeExport]);
 
   return {

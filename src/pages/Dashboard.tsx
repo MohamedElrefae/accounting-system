@@ -30,17 +30,17 @@ const Dashboard: React.FC = () => {
   const t = translations[language];
 
   // Transform data for recharts
-  const chartData = monthlyRevenueData.labels.map((label, index) => ({
+  const chartData = monthlyRevenueData?.labels?.map((label, index) => ({
     month: label,
-    revenue: monthlyRevenueData.datasets[0].data[index],
-    expenses: monthlyRevenueData.datasets[1].data[index],
-  }));
+    revenue: monthlyRevenueData.datasets?.[0]?.data?.[index] || 0,
+    expenses: monthlyRevenueData.datasets?.[1]?.data?.[index] || 0,
+  })) || [];
 
-  const pieData = expenseBreakdown.labels.map((label, index) => ({
+  const pieData = expenseBreakdown?.labels?.map((label, index) => ({
     name: label,
-    value: expenseBreakdown.datasets[0].data[index],
-    color: expenseBreakdown.datasets[0].backgroundColor![index],
-  }));
+    value: expenseBreakdown.datasets?.[0]?.data?.[index] || 0,
+    color: expenseBreakdown.datasets?.[0]?.backgroundColor?.[index] || "#000000",
+  })) || [];
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -142,17 +142,17 @@ const Dashboard: React.FC = () => {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 600 }}>{t.date}</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>{t.description}</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>{t.category}</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>{t.type}</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>{t.amount}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{'Date'}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{'Description'}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{'Category'}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{'Type'}</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>{'Amount'}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {recentTransactions.map((transaction) => (
                   <TableRow key={transaction.id} hover>
-                    <TableCell>{formatDate(transaction.date)}</TableCell>
+                    <TableCell>{formatDate(transaction.date || '')}</TableCell>
                     <TableCell>{transaction.description}</TableCell>
                     <TableCell>{transaction.category}</TableCell>
                     <TableCell>
@@ -184,3 +184,8 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
+
+
+
+
+

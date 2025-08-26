@@ -4,11 +4,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useAuth } from './contexts/AuthContext';
 import useAppStore from './store/useAppStore';
 import DashboardLayout from './components/layout/DashboardLayout';
-import Dashboard from './pages/Dashboard';
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const AccountsTreeLazy = React.lazy(() => import('./pages/MainData/AccountsTree'));
-import TestRTL from './pages/TestRTL';
-import ExportTestPage from './pages/ExportTestPage';
-import TransactionsPage from './pages/Transactions/Transactions';
+const TestRTL = React.lazy(() => import('./pages/TestRTL'));
+const ExportTestPage = React.lazy(() => import('./pages/ExportTestPage'));
+const TransactionsPage = React.lazy(() => import('./pages/Transactions/Transactions'));
 import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
 import { ForgotPassword } from './components/auth/ForgotPassword';
@@ -17,8 +17,10 @@ import AuthDebug from './pages/AuthDebug';
 const UserManagement = React.lazy(() => import('./pages/admin/UserManagement'));
 const RoleManagement = React.lazy(() => import('./pages/admin/RoleManagement'));
 const Diagnostics = React.lazy(() => import('./pages/admin/Diagnostics'));
-import EditProfile from './pages/admin/EditProfile';
-import Profile from './pages/admin/Profile';
+const Profile = React.lazy(() => import('./pages/admin/Profile'));
+const CompanySettings = React.lazy(() => import('./components/Settings/CompanySettings'));
+const OrganizationManagement = React.lazy(() => import('./components/Organizations/OrganizationManagement'));
+const ProjectManagement = React.lazy(() => import('./components/Projects/ProjectManagement'));
 import { useHasPermission } from './hooks/useHasPermission';
 
 // Placeholder components for other pages
@@ -86,20 +88,48 @@ const App: React.FC = () => {
             <DashboardLayout />
           </ProtectedRoute>
         }>
-          <Route index element={<Dashboard />} />
-          <Route path="/test-rtl" element={<TestRTL />} />
+          <Route index element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <Dashboard />
+            </React.Suspense>
+          } />
+          <Route path="/test-rtl" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <TestRTL />
+            </React.Suspense>
+          } />
           
           {/* Main Data */}
           <Route path="/main-data/accounts-tree" element={<React.Suspense fallback={<>Loading...</>}><AccountsTreeLazy /></React.Suspense>} />
+          <Route path="/main-data/organizations" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <OrganizationManagement />
+            </React.Suspense>
+          } />
+          <Route path="/main-data/projects" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <ProjectManagement />
+            </React.Suspense>
+          } />
 
           {/* Transactions - Single row entry */}
-          <Route path="/transactions/my" element={<TransactionsPage />} />
+          <Route path="/transactions/my" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <TransactionsPage />
+            </React.Suspense>
+          } />
           <Route path="/transactions/pending" element={
             <RequirePermission perm="transactions.post">
-              <TransactionsPage />
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <TransactionsPage />
+              </React.Suspense>
             </RequirePermission>
           } />
-          <Route path="/transactions/all" element={<TransactionsPage />} />
+          <Route path="/transactions/all" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <TransactionsPage />
+            </React.Suspense>
+          } />
 
           {/* Chart of Accounts (legacy placeholders) */}
           <Route path="/accounts" element={<PlaceholderPage title="Accounts List" />} />
@@ -142,7 +172,11 @@ const App: React.FC = () => {
             <Route path="/inventory/reports" element={<PlaceholderPage title="Stock Reports" />} />
             
             {/* Settings */}
-            <Route path="/settings/company" element={<PlaceholderPage title="Company Profile" />} />
+            <Route path="/settings/company" element={
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <CompanySettings />
+              </React.Suspense>
+            } />
             <Route path="/settings/diagnostics" element={
               <React.Suspense fallback={<div>Loading...</div>}>
                 <Diagnostics />
@@ -158,12 +192,20 @@ const App: React.FC = () => {
                 <RoleManagement />
               </React.Suspense>
             } />
-            <Route path="/settings/profile" element={<Profile />} />
+            <Route path="/settings/profile" element={
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <Profile />
+              </React.Suspense>
+            } />
             <Route path="/settings/preferences" element={<PlaceholderPage title="Preferences" />} />
             <Route path="/settings/backup" element={<PlaceholderPage title="Backup & Restore" />} />
             
             {/* Export Test Page */}
-            <Route path="/export-test" element={<ExportTestPage />} />
+            <Route path="/export-test" element={
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <ExportTestPage />
+              </React.Suspense>
+            } />
           </Route>
       </Routes>
     </Router>

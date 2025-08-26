@@ -43,45 +43,33 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
   });
 
   const handleExport = async (format: string) => {
-    console.log(`📤 Export button clicked for format: ${format}`);
-    console.log(`📤 Disabled: ${disabled}, isExporting: ${exportMethods.isExporting}`);
-    console.log(`📤 Data:`, data);
-    console.log(`📤 Config:`, config);
-    
     if (disabled || exportMethods.isExporting) {
-      console.log(`⚠️ Export blocked - disabled: ${disabled}, isExporting: ${exportMethods.isExporting}`);
       return;
     }
 
     try {
       switch (format) {
         case 'pdf':
-          console.log('📄 Calling exportToPDF...');
           await exportMethods.exportToPDF(data, config);
           break;
         case 'excel':
-          console.log('📊 Calling exportToExcel...');
           await exportMethods.exportToExcel(data, config);
           break;
         case 'csv':
-          console.log('📋 Calling exportToCSV...');
           await exportMethods.exportToCSV(data, config);
           break;
         case 'html':
-          console.log('🌐 Calling exportToHTML...');
           await exportMethods.exportToHTML(data, config);
           break;
         case 'json':
-          console.log('🔧 Calling exportToJSON...');
           await exportMethods.exportToJSON(data, config);
           break;
         case 'all':
-          console.log('📦 Calling exportAll...');
           await exportMethods.exportAll(data, config);
           break;
       }
     } catch (error) {
-      console.error(`Export failed for format ${format}:`, error);
+      // Silent error handling - error already handled by export hooks
     }
   };
 

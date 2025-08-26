@@ -278,9 +278,7 @@ export class UniversalExportManager {
    */
   private async exportToExcel(data: UniversalTableData, options: UniversalExportOptions): Promise<void> {
     try {
-      console.log('🔍 Excel Export - Starting with preprocessed data');
-      console.log('🔍 Excel Export - Options:', options);
-      console.log('🔍 Excel Export - Sample row data:', data.rows[0]);
+      // Starting Excel export with preprocessed data
       
       const workbook = XLSXUtils.book_new();
       
@@ -291,7 +289,7 @@ export class UniversalExportManager {
       const dataRows = data.rows.map(row => {
         return data.columns.map(col => {
           const value = row[col.key];
-          console.log('🔍 Excel Export - Final cell value:', col.key, value);
+          // Processing cell value for export
           return value || '';
         });
       });
@@ -302,7 +300,7 @@ export class UniversalExportManager {
         ...dataRows
       ];
 
-      console.log('🔍 Excel Export - Worksheet data sample:', worksheetData[0], worksheetData[1]);
+      // Worksheet data prepared for export
 
       // Create worksheet
       const worksheet = XLSXUtils.aoa_to_sheet(worksheetData);

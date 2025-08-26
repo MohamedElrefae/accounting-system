@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Card, CardContent, Typography, TextField, Grid, Button, Avatar, Stack, Alert, CircularProgress } from '@mui/material';
+import { Box, Card, CardContent, Typography, TextField, Button, Avatar, Stack, Alert, CircularProgress } from '@mui/material';
+import Grid from '@mui/material/Grid';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUserProfile } from '../../contexts/UserProfileContext';
 import { supabase } from '../../utils/supabase';
@@ -93,7 +94,7 @@ const EditProfile: React.FC = () => {
       <Card>
         <CardContent>
           <Grid container spacing={3}>
-            <Grid item xs={12} md={3}>
+<Grid size={{ xs: 12, md: 3 }}>
               <Stack alignItems="center" spacing={2}>
                 <Avatar src={avatarUrl || undefined} sx={{ width: 120, height: 120 }} />
                 <Button component="label" variant="outlined" disabled={uploading}>
@@ -102,21 +103,21 @@ const EditProfile: React.FC = () => {
                 </Button>
               </Stack>
             </Grid>
-            <Grid item xs={12} md={9}>
+<Grid size={{ xs: 12, md: 9 }}>
               <Grid container spacing={2}>
-                <Grid item xs={12} md={6}>
+<Grid size={{ xs: 12, md: 6 }}>
                   <TextField fullWidth label="الاسم الأول" value={form.first_name}
                     onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
                 </Grid>
-                <Grid item xs={12} md={6}>
+<Grid size={{ xs: 12, md: 6 }}>
                   <TextField fullWidth label="اسم العائلة" value={form.last_name}
                     onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
                 </Grid>
-                <Grid item xs={12}>
+<Grid size={{ xs: 12 }}>
                   <TextField fullWidth label="الاسم الكامل بالعربية" value={form.full_name_ar}
                     onChange={(e) => setForm({ ...form, full_name_ar: e.target.value })} />
                 </Grid>
-                <Grid item xs={12} md={6}>
+<Grid size={{ xs: 12, md: 6 }}>
                   <TextField fullWidth label="الهاتف" value={form.phone}
                     onChange={(e) => setForm({ ...form, phone: e.target.value })} />
                 </Grid>

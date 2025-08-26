@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { getAccounts, getTransactions, createTransaction, deleteTransaction, postTransaction, updateTransaction, getTransactionAudit, generateEntryNumber, getCurrentUserId, type Account, type TransactionRecord, type TransactionAudit } from '../../services/transactions'
+import { getAccounts, getTransactions, createTransaction, deleteTransaction, postTransaction, updateTransaction, getTransactionAudit, getCurrentUserId, getProjects, type Account, type TransactionRecord, type TransactionAudit, type Project } from '../../services/transactions'
+import { getOrganizations } from '../../services/organization'
+import type { Organization } from '../../types'
 import { useHasPermission } from '../../hooks/useHasPermission'
 import './Transactions.css'
 import { useToast } from '../../contexts/ToastContext'
@@ -8,10 +10,19 @@ import ExportButtons from '../../components/Common/ExportButtons'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
 import TransactionView from './TransactionView'
 import ClientErrorLogs from '../admin/ClientErrorLogs'
-import { Autocomplete, TextField } from '@mui/material'
 import PermissionBadge from '../../components/Common/PermissionBadge'
 import { WithPermission } from '../../components/Common/withPermission'
 import { logClientError } from '../../services/telemetry'
+import UnifiedCRUDForm, { type UnifiedCRUDFormHandle } from '../../components/Common/UnifiedCRUDForm'
+import DraggableResizablePanel from '../../components/Common/DraggableResizablePanel'
+import { createTransactionFormConfig } from '../../components/Transactions/TransactionFormConfig'
+import { TextField } from '@mui/material'
+import { Autocomplete } from '@mui/material'
+import ResizableTable from '../../components/Common/ResizableTable'
+import ColumnConfiguration from '../../components/Common/ColumnConfiguration'
+import type { ColumnConfig } from '../../components/Common/ColumnConfiguration'
+import useColumnPreferences from '../../hooks/useColumnPreferences'
+
 
 interface FilterState {
   dateFrom: string
@@ -23,29 +34,32 @@ interface FilterState {
 
 const TransactionsPage: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [organizations, setOrganizations] = useState<Organization[]>([])
   const [transactions, setTransactions] = useState<TransactionRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [_formErrors, _setFormErrors] = useState<Record<string, string>>({})
   const [postingId, setPostingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  // Simple single-row form state
+  // Unified form state
   const [formOpen, setFormOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<TransactionRecord | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [detailsFor, setDetailsFor] = useState<TransactionRecord | null>(null)
   const [audit, setAudit] = useState<TransactionAudit[]>([])
-  const [entryNumber, setEntryNumber] = useState('')
-  const [entryDate, setEntryDate] = useState<string>(new Date().toISOString().split('T')[0])
-  const [description, setDescription] = useState('')
-  const [referenceNumber, setReferenceNumber] = useState('')
-  const [debitAccountId, setDebitAccountId] = useState('')
-  const [creditAccountId, setCreditAccountId] = useState('')
-  const [amount, setAmount] = useState<number>(0)
-  const [notes, setNotes] = useState('')
+  
+  // Unified form panel state
+  const [panelPosition, setPanelPosition] = useState<{ x: number; y: number }>({ x: 100, y: 100 })
+  const [panelSize, setPanelSize] = useState<{ width: number; height: number }>({ width: 800, height: 700 })
+  const [panelMax, setPanelMax] = useState<boolean>(false)
+  const [panelDocked, setPanelDocked] = useState<boolean>(false)
+  const [panelDockPos, setPanelDockPos] = useState<'left' | 'right' | 'top' | 'bottom'>('right')
+  
+  const formRef = React.useRef<UnifiedCRUDFormHandle>(null)
 
   const [filters, setFilters] = useState<FilterState>({
     dateFrom: '',
@@ -60,6 +74,9 @@ const TransactionsPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(20)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [userNames, setUserNames] = useState<Record<string, string>>({})
+  
+  // Column configuration state
+  const [columnConfigOpen, setColumnConfigOpen] = useState(false)
 
   const location = useLocation()
   const hasPerm = useHasPermission()
@@ -74,17 +91,51 @@ const TransactionsPage: React.FC = () => {
     ? 'pending'
     : 'all'
 
+  // Default column configuration for transactions table
+  const defaultColumns: ColumnConfig[] = useMemo(() => [
+    { key: 'entry_number', label: 'رقم القيد', visible: true, width: 120, minWidth: 100, maxWidth: 200, type: 'text', resizable: true },
+    { key: 'entry_date', label: 'التاريخ', visible: true, width: 130, minWidth: 120, maxWidth: 180, type: 'date', resizable: true },
+    { key: 'description', label: 'البيان', visible: true, width: 250, minWidth: 200, maxWidth: 400, type: 'text', resizable: true },
+    { key: 'debit_account_label', label: 'الحساب المدين', visible: true, width: 200, minWidth: 150, maxWidth: 300, type: 'text', resizable: true },
+    { key: 'credit_account_label', label: 'الحساب الدائن', visible: true, width: 200, minWidth: 150, maxWidth: 300, type: 'text', resizable: true },
+    { key: 'amount', label: 'المبلغ', visible: true, width: 140, minWidth: 120, maxWidth: 200, type: 'currency', resizable: true },
+    { key: 'organization_name', label: 'المؤسسة', visible: true, width: 180, minWidth: 150, maxWidth: 250, type: 'text', resizable: true },
+    { key: 'project_name', label: 'المشروع', visible: true, width: 180, minWidth: 150, maxWidth: 250, type: 'text', resizable: true },
+    { key: 'reference_number', label: 'المرجع', visible: false, width: 120, minWidth: 100, maxWidth: 180, type: 'text', resizable: true },
+    { key: 'notes', label: 'الملاحظات', visible: false, width: 200, minWidth: 150, maxWidth: 300, type: 'text', resizable: true },
+    { key: 'created_by_name', label: 'أنشئت بواسطة', visible: false, width: 140, minWidth: 120, maxWidth: 200, type: 'text', resizable: true },
+    { key: 'posted_by_name', label: 'مرحلة بواسطة', visible: false, width: 140, minWidth: 120, maxWidth: 200, type: 'text', resizable: true },
+    { key: 'status', label: 'الحالة', visible: true, width: 100, minWidth: 80, maxWidth: 150, type: 'text', resizable: true },
+    { key: 'actions', label: 'الإجراءات', visible: true, width: 200, minWidth: 180, maxWidth: 250, type: 'actions', resizable: false }
+  ], [])
+
+  // Column preferences hook
+  const {
+    columns,
+    handleColumnResize,
+    handleColumnConfigChange,
+    resetToDefaults
+  } = useColumnPreferences({
+    storageKey: 'transactions_table_columns',
+    defaultColumns,
+    userId: currentUserId || undefined
+  })
+
   // Server-side load
   const [totalCount, setTotalCount] = useState(0)
   useEffect(() => {
     async function load() {
       setLoading(true)
       try {
-        const [accs, uid] = await Promise.all([
+        const [accs, projectsList, orgsList, uid] = await Promise.all([
           getAccounts(),
+          getProjects().catch(() => []), // Don't fail if projects service isn't available
+          getOrganizations().catch(() => []), // Don't fail if organizations service isn't available
           getCurrentUserId(),
         ])
         setAccounts(accs)
+        setProjects(projectsList)
+        setOrganizations(orgsList)
         setCurrentUserId(uid)
         await reload()
       } catch (e: any) {
@@ -122,7 +173,6 @@ const TransactionsPage: React.FC = () => {
       const map = await getUserDisplayMap(ids)
       setUserNames(map)
     } catch {}
-    setEntryNumber(generateEntryNumber((total || 0) + 1))
   }
 
   // With server-side, filtered equals transactions
@@ -130,6 +180,33 @@ const TransactionsPage: React.FC = () => {
 
   // Pagination handled server-side; local page shows fetched rows
   const paged = transactions
+
+  // Prepare table data for ResizableTable
+  const tableData = useMemo(() => {
+    const accLabel = (id?: string | null) => {
+      if (!id) return ''
+      const a = accounts.find(x => x.id === id)
+      return a ? `${a.code} - ${a.name}` : id
+    }
+
+    return paged.map((t) => ({
+      entry_number: t.entry_number,
+      entry_date: t.entry_date, // Keep raw date for DateFormatter
+      description: t.description,
+      debit_account_label: accLabel(t.debit_account_id),
+      credit_account_label: accLabel(t.credit_account_id),
+      amount: t.amount,
+      organization_name: (t as any).organization_name || '—',
+      project_name: (t as any).project_name || '—',
+      reference_number: t.reference_number || '—',
+      notes: t.notes || '—',
+      created_by_name: t.created_by ? (userNames[t.created_by] || t.created_by.substring(0, 8)) : '—',
+      posted_by_name: t.posted_by ? (userNames[t.posted_by] || t.posted_by.substring(0, 8)) : '—',
+      status: t.is_posted ? 'مرحلة' : 'غير مرحلة',
+      actions: null, // Will be handled by renderCell
+      original: t // Keep reference to original transaction for actions
+    }))
+  }, [paged, accounts, userNames])
 
   // Export data
   const exportData = useMemo(() => {
@@ -169,72 +246,147 @@ const TransactionsPage: React.FC = () => {
     return prepareTableData(columns, rows)
   }, [transactions, userNames, accounts])
 
-  const resetForm = () => {
-    setEntryNumber(generateEntryNumber((transactions?.length || 0) + 1))
-    setEntryDate(new Date().toISOString().split('T')[0])
-    setDescription('')
-    setReferenceNumber('')
-    setDebitAccountId('')
-    setCreditAccountId('')
-    setAmount(0)
-    setNotes('')
-    setFormErrors({})
-  }
+  // Create unified form configuration
+  const transactionFormConfig = useMemo(() => {
+    return createTransactionFormConfig(
+      editingTx !== null,
+      accounts,
+      projects,
+      organizations,
+      editingTx || undefined
+    )
+  }, [editingTx, accounts, projects, organizations])
+  
+  // Get initial data for the form
+  const getInitialFormData = useMemo(() => {
+    if (editingTx) {
+      return {
+        entry_number: editingTx.entry_number,
+        entry_date: editingTx.entry_date,
+        description: editingTx.description,
+        debit_account_id: editingTx.debit_account_id,
+        credit_account_id: editingTx.credit_account_id,
+        amount: editingTx.amount,
+        reference_number: editingTx.reference_number || '',
+        notes: editingTx.notes || '',
+        organization_id: editingTx.org_id || '',
+        project_id: editingTx.project_id || ''
+      }
+    } else {
+      // Get default organization (MAIN) and project (GENERAL)
+      const defaultOrg = organizations.find(org => org.code === 'MAIN');
+      const defaultProject = projects.find(project => project.code === 'GENERAL');
+      
+      return {
+        entry_number: 'سيتم توليده تلقائياً',
+        entry_date: new Date().toISOString().split('T')[0],
+        description: '',
+        debit_account_id: '',
+        credit_account_id: '',
+        amount: 0,
+        reference_number: '',
+        notes: '',
+        organization_id: defaultOrg?.id || '',
+        project_id: defaultProject?.id || ''
+      }
+    }
+  }, [editingTx, organizations, projects])
 
-  const save = async () => {
-    setFormErrors({})
+  // Unified form handlers
+  const handleFormSubmit = async (data: any) => {
+    _setFormErrors({})
     try {
       setIsSaving(true)
-      // optimistic prepend a temp record for better UX
-      const tempId = `temp-${Date.now()}`
-      const temp: TransactionRecord = {
-        id: tempId,
-        entry_number: entryNumber,
-        entry_date: entryDate,
-        description,
-        reference_number: referenceNumber || null,
-        debit_account_id: debitAccountId,
-        credit_account_id: creditAccountId,
-        amount,
-        notes: notes || null,
-        is_posted: false,
-        posted_at: null,
-        posted_by: null,
-        created_by: currentUserId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-      setTransactions(prev => [temp, ...prev])
 
-      const rec = await createTransaction({
-        entry_number: entryNumber,
-        entry_date: entryDate,
-        description,
-        reference_number: referenceNumber || undefined,
-        debit_account_id: debitAccountId,
-        credit_account_id: creditAccountId,
-        amount,
-        notes: notes || undefined,
-      })
-      // replace temp with real
-      setTransactions(prev => prev.map(t => t.id === tempId ? rec : t))
-      resetForm()
+      if (editingTx) {
+        // Update existing transaction
+        const updated = await updateTransaction(editingTx.id, {
+          entry_date: data.entry_date,
+          description: data.description,
+          reference_number: data.reference_number || null,
+          debit_account_id: data.debit_account_id,
+          credit_account_id: data.credit_account_id,
+          amount: parseFloat(data.amount),
+          notes: data.notes || null,
+          org_id: data.organization_id || null,
+          project_id: data.project_id || null,
+        })
+        setTransactions(prev => prev.map(t => t.id === updated.id ? updated : t))
+        showToast('تم تحديث المعاملة', { severity: 'success' })
+      } else {
+        // Create new transaction with optimistic update
+        const tempId = `temp-${Date.now()}`
+        const temp: TransactionRecord = {
+          id: tempId,
+          entry_number: data.entry_number,
+          entry_date: data.entry_date,
+          description: data.description,
+          reference_number: data.reference_number || null,
+          debit_account_id: data.debit_account_id,
+          credit_account_id: data.credit_account_id,
+          amount: parseFloat(data.amount),
+          notes: data.notes || null,
+          org_id: data.organization_id || null,
+          project_id: data.project_id || null,
+          is_posted: false,
+          posted_at: null,
+          posted_by: null,
+          created_by: currentUserId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+        setTransactions(prev => [temp, ...prev])
+
+        const rec = await createTransaction({
+          entry_number: data.entry_number,
+          entry_date: data.entry_date,
+          description: data.description,
+          reference_number: data.reference_number || undefined,
+          debit_account_id: data.debit_account_id,
+          credit_account_id: data.credit_account_id,
+          amount: parseFloat(data.amount),
+          notes: data.notes || undefined,
+          org_id: data.organization_id || undefined,
+          project_id: data.project_id || undefined,
+        })
+        // Replace temp with real
+        setTransactions(prev => prev.map(t => t.id === tempId ? rec : t))
+        showToast('تم إنشاء المعاملة', { severity: 'success' })
+      }
+
+      setEditingTx(null)
       setFormOpen(false)
     } catch (e: any) {
-      // rollback removal of temp
-      setTransactions(prev => prev.filter(t => !t.id.startsWith('temp-')))
+      // Rollback optimistic update if it was a create
+      if (!editingTx) {
+        setTransactions(prev => prev.filter(t => !t.id.startsWith('temp-')))
+      }
       const msg = e?.message || 'خطأ في حفظ المعاملة'
-      setFormErrors({ general: msg })
-      showToast(`فشل إنشاء المعاملة (رقم القيد ${entryNumber}). تم التراجع عن العملية. السبب: ${msg}`.trim(), { severity: 'error' })
+      _setFormErrors({ general: msg })
+      const operation = editingTx ? 'تحديث' : 'إنشاء'
+      const detail = editingTx ? ` (رقم القيد ${editingTx.entry_number})` : ''
+      showToast(`فشل ${operation} المعاملة${detail}. تم التراجع عن العملية. السبب: ${msg}`.trim(), { severity: 'error' })
       logClientError({
-        context: 'transactions.create',
+        context: editingTx ? 'transactions.update' : 'transactions.create',
         message: msg,
-        extra: { entry_number: entryNumber, entry_date: entryDate, debit_account_id: debitAccountId, credit_account_id: creditAccountId, amount }
+        extra: editingTx ? { id: editingTx.id } : data
       })
     } finally {
       setIsSaving(false)
     }
   }
+
+  const handleFormCancel = () => {
+    setEditingTx(null)
+    setFormOpen(false)
+    _setFormErrors({})
+  }
+
+  const openNewTransactionForm = () => {
+    setEditingTx(null)
+    setFormOpen(true)
+  }
+
 
   const handleDelete = async (id: string) => {
     const ok = window.confirm('هل أنت متأكد من حذف هذه المعاملة غير المرحلة؟')
@@ -296,11 +448,14 @@ const TransactionsPage: React.FC = () => {
         <div className="transactions-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {mode === 'my' && (
             <WithPermission perm="transactions.create">
-              <button className="ultimate-btn ultimate-btn-add" onClick={() => { resetForm(); setFormOpen(true) }}>
+              <button className="ultimate-btn ultimate-btn-add" onClick={openNewTransactionForm}>
                 <div className="btn-content"><span className="btn-text">+ معاملة جديدة</span></div>
               </button>
             </WithPermission>
           )}
+          <button className="ultimate-btn ultimate-btn-edit" onClick={() => setColumnConfigOpen(true)}>
+            <div className="btn-content"><span className="btn-text">⚙️ إعدادات الأعمدة</span></div>
+          </button>
           <ExportButtons
             data={exportData}
             config={{ title: 'تقرير المعاملات', rtlLayout: true, useArabicNumerals: true }}
@@ -345,7 +500,7 @@ const TransactionsPage: React.FC = () => {
           options={accounts.filter(a => a.is_postable)}
           getOptionLabel={(a) => `${a.code} - ${a.name}`}
           value={accounts.find(a => a.id === debitFilterId) || null}
-          onChange={(e, val) => { setDebitFilterId(val?.id || ''); setPage(1) }}
+onChange={(_e, val) => { setDebitFilterId(val?.id || ''); setPage(1) }}
           renderInput={(params) => <TextField {...params} label="تصفية: الحساب المدين" />}
           sx={{ minWidth: 260 }}
         />
@@ -353,7 +508,7 @@ const TransactionsPage: React.FC = () => {
           options={accounts.filter(a => a.is_postable)}
           getOptionLabel={(a) => `${a.code} - ${a.name}`}
           value={accounts.find(a => a.id === creditFilterId) || null}
-          onChange={(e, val) => { setCreditFilterId(val?.id || ''); setPage(1) }}
+onChange={(_e, val) => { setCreditFilterId(val?.id || ''); setPage(1) }}
           renderInput={(params) => <TextField {...params} label="تصفية: الحساب الدائن" />}
           sx={{ minWidth: 260 }}
         />
@@ -386,166 +541,105 @@ const TransactionsPage: React.FC = () => {
             </select>
           </div>
         </div>
-        <table className="transactions-table">
-          <thead>
-            <tr>
-              <th>رقم القيد</th>
-              <th>التاريخ</th>
-              <th>البيان</th>
-              <th>المرجع</th>
-              <th>المبلغ</th>
-              <th>أنشئت بواسطة</th>
-              <th>مرحلة بواسطة</th>
-              <th>الحالة</th>
-              <th>الإجراءات</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paged.map(t => (
-              <tr key={t.id}>
-                <td>{t.entry_number}</td>
-                <td>{new Date(t.entry_date).toLocaleDateString('ar-EG')}</td>
-                <td>{t.description}</td>
-                <td>{t.reference_number || '—'}</td>
-                <td className="amount-cell">{t.amount.toLocaleString('ar-EG')}</td>
-                <td>{t.created_by ? (userNames[t.created_by] || t.created_by.substring(0, 8)) : '—'}</td>
-                <td>{t.posted_by ? (userNames[t.posted_by] || t.posted_by.substring(0, 8)) : '—'}</td>
-                <td>{t.is_posted ? 'مرحلة' : 'غير مرحلة'}</td>
-                <td>
-                  <div className="tree-node-actions">
-                    {/* View details (audit) */}
-                    <button className="ultimate-btn ultimate-btn-edit" onClick={async () => {
-                      setDetailsFor(t)
-                      try {
-                        const rows = await getTransactionAudit(t.id)
-                        setAudit(rows)
-                      } catch {}
-                      setDetailsOpen(true)
-                    }}><div className="btn-content"><span className="btn-text">تفاصيل</span></div></button>
-                    {/* Approve/Post in pending mode if permitted */}
-                    {mode === 'pending' && !t.is_posted && (
-                      <WithPermission perm="transactions.post">
-                      <button className="ultimate-btn ultimate-btn-success" onClick={() => handlePost(t.id)} disabled={postingId === t.id}>
-                        <div className="btn-content"><span className="btn-text">{postingId === t.id ? 'جارٍ الترحيل...' : 'ترحيل'}</span></div>
-                      </button>
-                      </WithPermission>
-                    )}
-                    {/* Edit (my) */}
-                    {mode === 'my' && !t.is_posted && hasPerm('transactions.update') && t.created_by === currentUserId && (
-                      <button className="ultimate-btn ultimate-btn-edit" onClick={() => {
-                        setEditingTx(t)
-                        setFormOpen(true)
-                        setEntryNumber(t.entry_number)
-                        setEntryDate(t.entry_date)
-                        setDescription(t.description)
-                        setReferenceNumber(t.reference_number || '')
-                        setDebitAccountId(t.debit_account_id)
-                        setCreditAccountId(t.credit_account_id)
-                        setAmount(t.amount)
-                        setNotes(t.notes || '')
-                      }}><div className="btn-content"><span className="btn-text">تعديل</span></div></button>
-                    )}
-                    {/* Edit (all) via manage */}
-                    {mode === 'all' && !t.is_posted && hasPerm('transactions.manage') && (
-                      <button className="ultimate-btn ultimate-btn-edit" onClick={() => {
-                        setEditingTx(t)
-                        setFormOpen(true)
-                        setEntryNumber(t.entry_number)
-                        setEntryDate(t.entry_date)
-                        setDescription(t.description)
-                        setReferenceNumber(t.reference_number || '')
-                        setDebitAccountId(t.debit_account_id)
-                        setCreditAccountId(t.credit_account_id)
-                        setAmount(t.amount)
-                        setNotes(t.notes || '')
-                      }}><div className="btn-content"><span className="btn-text">تعديل</span></div></button>
-                    )}
-                    {/* Delete only in my mode, unposted, with permission */}
-                    {mode === 'my' && !t.is_posted && hasPerm('transactions.delete') && t.created_by === currentUserId && (
-                      <button className="ultimate-btn ultimate-btn-delete" onClick={() => handleDelete(t.id)} disabled={deletingId === t.id}><div className="btn-content"><span className="btn-text">{deletingId === t.id ? 'جارٍ الحذف...' : 'حذف'}</span></div></button>
-                    )}
-                    {/* Manage delete in all view if privileged (still only unposted) */}
-                    {mode === 'all' && !t.is_posted && hasPerm('transactions.manage') && (
-                      <button className="ultimate-btn ultimate-btn-delete" onClick={() => handleDelete(t.id)}><div className="btn-content"><span className="btn-text">حذف</span></div></button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ResizableTable
+          columns={columns}
+          data={tableData}
+          onColumnResize={handleColumnResize}
+          className="transactions-resizable-table"
+          isLoading={loading}
+          emptyMessage="لا توجد معاملات"
+          renderCell={(_value, column, row, _rowIndex) => {
+            if (column.key === 'actions') {
+              return (
+                <div className="tree-node-actions">
+                  {/* View details (audit) */}
+                  <button className="ultimate-btn ultimate-btn-edit" onClick={async () => {
+                    setDetailsFor(row.original)
+                    try {
+                      const rows = await getTransactionAudit(row.original.id)
+                      setAudit(rows)
+                    } catch {}
+                    setDetailsOpen(true)
+                  }}><div className="btn-content"><span className="btn-text">تفاصيل</span></div></button>
+                  {/* Approve/Post in pending mode if permitted */}
+                  {mode === 'pending' && !row.original.is_posted && (
+                    <WithPermission perm="transactions.post">
+                    <button className="ultimate-btn ultimate-btn-success" onClick={() => handlePost(row.original.id)} disabled={postingId === row.original.id}>
+                      <div className="btn-content"><span className="btn-text">{postingId === row.original.id ? 'جارٍ الترحيل...' : 'ترحيل'}</span></div>
+                    </button>
+                    </WithPermission>
+                  )}
+                  {/* Edit (my) */}
+                  {mode === 'my' && !row.original.is_posted && hasPerm('transactions.update') && row.original.created_by === currentUserId && (
+                    <button className="ultimate-btn ultimate-btn-edit" onClick={() => {
+                      setEditingTx(row.original)
+                      setFormOpen(true)
+                    }}><div className="btn-content"><span className="btn-text">تعديل</span></div></button>
+                  )}
+                  {/* Edit (all) via manage */}
+                  {mode === 'all' && !row.original.is_posted && hasPerm('transactions.manage') && (
+                    <button className="ultimate-btn ultimate-btn-edit" onClick={() => {
+                      setEditingTx(row.original)
+                      setFormOpen(true)
+                    }}><div className="btn-content"><span className="btn-text">تعديل</span></div></button>
+                  )}
+                  {/* Delete only in my mode, unposted, with permission */}
+                  {mode === 'my' && !row.original.is_posted && hasPerm('transactions.delete') && row.original.created_by === currentUserId && (
+                    <button className="ultimate-btn ultimate-btn-delete" onClick={() => handleDelete(row.original.id)} disabled={deletingId === row.original.id}><div className="btn-content"><span className="btn-text">{deletingId === row.original.id ? 'جارٍ الحذف...' : 'حذف'}</span></div></button>
+                  )}
+                  {/* Manage delete in all view if privileged (still only unposted) */}
+                  {mode === 'all' && !row.original.is_posted && hasPerm('transactions.manage') && (
+                    <button className="ultimate-btn ultimate-btn-delete" onClick={() => handleDelete(row.original.id)}><div className="btn-content"><span className="btn-text">حذف</span></div></button>
+                  )}
+                </div>
+              )
+            }
+            return undefined // Let default formatting handle other columns
+          }}
+        />
       </div>
 
-      {/* Single-row modal */}
-      {formOpen && (
-        <div className="transaction-modal" onClick={() => setFormOpen(false)}>
-          <div className="transaction-modal-content" onClick={e => e.stopPropagation()}>
-            <h3 className="modal-title">{editingTx ? 'تعديل المعاملة' : 'معاملة جديدة'}</h3>
-            {formErrors.general && <div className="error-message">{formErrors.general}</div>}
-            <input className="input-field" placeholder="رقم القيد" value={entryNumber} readOnly />
-            <input className="input-field" type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} />
-            <textarea className="textarea-field" placeholder="وصف المعاملة" value={description} onChange={e => setDescription(e.target.value)} />
-
-            <Autocomplete
-              options={accounts.filter(a => a.is_postable)}
-              getOptionLabel={(a) => `${a.code} - ${a.name}`}
-              value={accounts.find(a => a.id === debitAccountId) || null}
-              onChange={(e, val) => setDebitAccountId(val?.id || '')}
-              renderInput={(params) => <TextField {...params} label="الحساب المدين" />}
-            />
-
-            <Autocomplete
-              options={accounts.filter(a => a.is_postable)}
-              getOptionLabel={(a) => `${a.code} - ${a.name}`}
-              value={accounts.find(a => a.id === creditAccountId) || null}
-              onChange={(e, val) => setCreditAccountId(val?.id || '')}
-              renderInput={(params) => <TextField {...params} label="الحساب الدائن" />}
-            />
-
-            <input className="input-field" type="number" placeholder="المبلغ" value={amount} onChange={e => setAmount(parseFloat(e.target.value) || 0)} />
-            <input className="input-field" placeholder="رقم المرجع" value={referenceNumber} onChange={e => setReferenceNumber(e.target.value)} />
-            <textarea className="textarea-field notes" placeholder="ملاحظات" value={notes} onChange={e => setNotes(e.target.value)} />
-
-            <div className="button-container">
-              {editingTx ? (
-                <button className="ultimate-btn ultimate-btn-add" onClick={async () => {
-                  try {
-                    setIsSaving(true)
-                    const updated = await updateTransaction(editingTx.id, {
-                      entry_date: entryDate,
-                      description,
-                      reference_number: referenceNumber || null,
-                      debit_account_id: debitAccountId,
-                      credit_account_id: creditAccountId,
-                      amount,
-                      notes: notes || null,
-                    })
-                    setTransactions(prev => prev.map(t => t.id === updated.id ? updated : t))
-                    setEditingTx(null)
-                    setFormOpen(false)
-                    showToast('تم تحديث المعاملة', { severity: 'success' })
-                  } catch (e: any) {
-                    const msg = e?.message || 'فشل تحديث المعاملة'
-                    showToast(`فشل تحديث المعاملة (رقم القيد ${editingTx.entry_number}). السبب: ${msg}`.trim(), { severity: 'error' })
-                    logClientError({ context: 'transactions.update', message: msg, extra: { id: editingTx.id } })
-                  } finally {
-                    setIsSaving(false)
-                  }
-                }} disabled={isSaving}>
-                  <div className="btn-content"><span className="btn-text">تحديث</span></div>
-                </button>
-              ) : (
-                <button className="ultimate-btn ultimate-btn-add" onClick={save} disabled={isSaving}>
-                  <div className="btn-content"><span className="btn-text">حفظ</span></div>
-                </button>
-              )}
-              <button className="ultimate-btn ultimate-btn-delete" onClick={() => { setEditingTx(null); setFormOpen(false) }} disabled={isSaving}>
-                <div className="btn-content"><span className="btn-text">إلغاء</span></div>
-              </button>
-            </div>
-          </div>
+      {/* Debug information */}
+      {process.env.NODE_ENV === 'development' && (
+        <div style={{ position: 'fixed', top: 10, left: 10, background: 'red', color: 'white', padding: '5px', zIndex: 9999 }}>
+          formOpen: {formOpen.toString()}, accounts: {accounts.length}, editingTx: {editingTx ? 'yes' : 'no'}
         </div>
       )}
+      
+      {/* Unified Transaction Form Panel */}
+      <DraggableResizablePanel
+        title={editingTx ? 'تعديل المعاملة' : 'معاملة جديدة'}
+        isOpen={formOpen}
+        onClose={handleFormCancel}
+        position={panelPosition}
+        size={panelSize}
+        onMove={setPanelPosition}
+        onResize={setPanelSize}
+        isMaximized={panelMax}
+        onMaximize={() => setPanelMax(!panelMax)}
+        isDocked={panelDocked}
+        dockPosition={panelDockPos}
+        onDock={(pos) => {
+          setPanelDocked(true)
+          setPanelDockPos(pos)
+        }}
+        onResetPosition={() => {
+          setPanelPosition({ x: 100, y: 100 })
+          setPanelSize({ width: 800, height: 700 })
+          setPanelMax(false)
+          setPanelDocked(false)
+        }}
+      >
+          <UnifiedCRUDForm
+            ref={formRef}
+            config={transactionFormConfig}
+            initialData={getInitialFormData}
+            onSubmit={handleFormSubmit}
+            onCancel={handleFormCancel}
+            isLoading={isSaving}
+          />
+      </DraggableResizablePanel>
+      
       {/* Details Drawer */}
       {detailsOpen && detailsFor && (
         <TransactionView transaction={detailsFor} audit={audit} userNames={userNames} onClose={() => setDetailsOpen(false)} />
@@ -565,9 +659,20 @@ const TransactionsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Column Configuration Modal */}
+      <ColumnConfiguration
+        columns={columns}
+        onConfigChange={handleColumnConfigChange}
+        isOpen={columnConfigOpen}
+        onClose={() => setColumnConfigOpen(false)}
+        onReset={resetToDefaults}
+      />
     </div>
   )
 }
 
 export default TransactionsPage
+
+
 

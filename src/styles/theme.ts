@@ -76,54 +76,95 @@ const commonTheme = {
   },
 };
 
-// Light theme (Professional Light)
+// Light theme (Unified Color System)
 const lightTheme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: '#2c3e50',
-      light: '#34495e',
-      dark: '#1a252f',
+      main: '#2076FF', // accent
+      light: '#4A90FF',
+      dark: '#1A5FE6',
     },
     secondary: {
-      main: '#3498db',
+      main: '#21C197', // success
     },
     background: {
-      default: '#ecf0f1',
-      paper: '#ffffff',
+      default: '#F5F6FA', // background
+      paper: '#FFFFFF',   // surface
     },
     text: {
-      primary: '#2c3e50',
-      secondary: '#7f8c8d',
+      primary: '#181C23',   // text
+      secondary: '#70778A', // muted_text
+    },
+    divider: '#E2E6ED',    // border
+    error: {
+      main: '#DE3F3F',
+      light: '#FF6B6B',
+      dark: '#C53030',
+    },
+    warning: {
+      main: '#FFC048',
+      light: '#FFD369',
+      dark: '#F6A000',
+    },
+    success: {
+      main: '#21C197',
+      light: '#4ED4A8',
+      dark: '#16A085',
+    },
+    info: {
+      main: '#2076FF',
+      light: '#4A90FF',
+      dark: '#1A5FE6',
     },
   },
   ...commonTheme,
 });
 
-// Dark theme (Professional Dark - matching reference)
+// Dark theme (Unified Color System)
 const darkTheme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#4A90E2',
-      light: '#6BA3E7',
-      dark: '#357ABD',
+      main: '#2076FF', // accent
+      light: '#4A90FF',
+      dark: '#1A5FE6',
     },
     secondary: {
-      main: '#50C878',
+      main: '#21C197', // success
     },
     background: {
-      default: '#1E2329',
-      paper: '#252A31',
+      default: '#181A20', // background
+      paper: '#23272F',   // surface
     },
     text: {
-      primary: '#FFFFFF',
-      secondary: '#8A9099',
+      primary: '#EDEDED',   // text
+      secondary: '#8D94A2', // muted_text
     },
-    divider: '#3A3F47',
+    divider: '#393C43',    // border
+    error: {
+      main: '#DE3F3F',
+      light: '#FF6B6B',
+      dark: '#C53030',
+    },
+    warning: {
+      main: '#FFC048',
+      light: '#FFD369',
+      dark: '#F6A000',
+    },
+    success: {
+      main: '#21C197',
+      light: '#4ED4A8',
+      dark: '#16A085',
+    },
+    info: {
+      main: '#2076FF',
+      light: '#4A90FF',
+      dark: '#1A5FE6',
+    },
     action: {
-      hover: 'rgba(74, 144, 226, 0.08)',
-      selected: 'rgba(74, 144, 226, 0.12)',
+      hover: 'rgba(32, 118, 255, 0.08)',
+      selected: 'rgba(32, 118, 255, 0.12)',
     },
   },
   ...commonTheme,

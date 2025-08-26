@@ -19,9 +19,6 @@ import {
   Alert,
   Skeleton,
   IconButton,
-  Tooltip,
-  Divider,
-  Grid,
   Snackbar,
   CircularProgress,
   Switch
@@ -30,8 +27,6 @@ import {
   ExpandMore as ExpandMoreIcon,
   Search as SearchIcon,
   Security as SecurityIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
   Info as InfoIcon,
   Save as SaveIcon,
   Refresh as RefreshIcon,
@@ -39,6 +34,7 @@ import {
   LockOpen as GrantIcon,
   Lock as RevokeIcon
 } from '@mui/icons-material';
+import Grid from '@mui/material/Grid';
 import { supabase } from '../../utils/supabase';
 import { audit } from '../../utils/audit';
 import { useAuth } from '../../contexts/AuthContext';
@@ -54,19 +50,19 @@ interface PermissionMatrixProps {
   onPermissionsUpdated?: () => void;
 }
 
-interface UserPermission {
+/* interface UserPermission {
   permission_id: number;
   permission_name: string;
   is_granted: boolean;
   granted_by?: string;
   granted_at?: string;
-}
+*/
 
-interface RolePermission {
+/* interface RolePermission {
   permission_name: string;
   role_name: string;
   role_name_ar: string;
-}
+*/
 
 interface PermissionState {
   name: string;
@@ -165,7 +161,7 @@ export const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
       // Process role permissions
       if (rolePerms) {
         rolePerms.forEach((userRole: any) => {
-          const roleName = userRole.roles?.name_ar || userRole.roles?.name;
+          const roleName = String(userRole.roles?.name_ar || userRole.roles?.name || '');
           if (userRole.roles?.role_permissions) {
             userRole.roles.role_permissions.forEach((rp: any) => {
               const permName = rp.permissions?.name;
@@ -175,10 +171,10 @@ export const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
                   hasFromRole: false,
                   hasDirectGrant: false,
                   hasDirectRevoke: false,
-                  roles: []
+                  roles: [] as string[]
                 };
                 existing.hasFromRole = true;
-                existing.roles.push(roleName);
+                if (roleName) existing.roles.push(roleName);
                 stateMap.set(permName, existing);
               }
             });
@@ -196,7 +192,7 @@ export const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
               hasFromRole: false,
               hasDirectGrant: false,
               hasDirectRevoke: false,
-              roles: []
+              roles: [] as string[]
             };
             if (up.granted) {
               existing.hasDirectGrant = true;
@@ -267,7 +263,7 @@ export const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
       hasFromRole: false,
       hasDirectGrant: false,
       hasDirectRevoke: false,
-      roles: []
+      roles: [] as string[]
     };
 
     if (newValue === null) {
@@ -591,7 +587,7 @@ export const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
                             if (showEffectiveOnly && !isEffective) return null;
 
                             return (
-                              <Grid item xs={12} md={6} key={permission.name}>
+<Grid size={{ xs: 12, md: 6 }} key={permission.name}>
                                 <Box
                                   sx={{
                                     p: 1.5,
@@ -619,9 +615,9 @@ export const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
                                       <Typography variant="caption" color="text.secondary">
                                         {permission.descriptionAr}
                                       </Typography>
-                                      {state?.roles.length > 0 && (
+                                      {(state?.roles?.length ?? 0) > 0 && (
                                         <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }}>
-                                          {state.roles.map(role => (
+                                          {(state?.roles || []).map(role => (
                                             <Chip
                                               key={role}
                                               label={role}

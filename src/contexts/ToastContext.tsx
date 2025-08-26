@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import { Alert, Snackbar } from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Snackbar from '@mui/material/Snackbar';
 
 interface ToastOptions {
   severity?: 'success' | 'info' | 'warning' | 'error';

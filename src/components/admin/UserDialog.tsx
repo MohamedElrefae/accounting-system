@@ -6,7 +6,6 @@ import {
   DialogActions,
   Button,
   TextField,
-  Grid,
   Stack,
   Typography,
   Alert,
@@ -15,12 +14,13 @@ import {
   FormControlLabel,
   Switch
 } from '@mui/material';
+import Grid from '@mui/material/Grid';
 import {
   Person as PersonIcon,
-  Save as SaveIcon,
   Email as EmailIcon,
   Work as WorkIcon,
-  Business as BusinessIcon
+  Business as BusinessIcon,
+  Save as SaveIcon
 } from '@mui/icons-material';
 import { supabase } from '../../utils/supabase';
 import { audit } from '../../utils/audit';
@@ -269,7 +269,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
         )}
 
         <Grid container spacing={2}>
-          <Grid item xs={12}>
+<Grid size={{ xs: 12 }}>
             <TextField
               fullWidth
               label="البريد الإلكتروني"
@@ -282,10 +282,10 @@ export const UserDialog: React.FC<UserDialogProps> = ({
               }}
               required
             />
-          </Grid>
+</Grid>
 
           {!user && (
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 fullWidth
                 label="كلمة المرور"
@@ -295,28 +295,28 @@ export const UserDialog: React.FC<UserDialogProps> = ({
                 helperText="يجب أن تكون 6 أحرف على الأقل"
                 required
               />
-            </Grid>
+</Grid>
           )}
 
-          <Grid item xs={12} md={6}>
+<Grid size={{ xs: 12, md: 6 }}>
             <TextField
               fullWidth
               label="الاسم الأول"
               value={formData.first_name}
               onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
             />
-          </Grid>
+</Grid>
 
-          <Grid item xs={12} md={6}>
+<Grid size={{ xs: 12, md: 6 }}>
             <TextField
               fullWidth
               label="اسم العائلة"
               value={formData.last_name}
               onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
             />
-          </Grid>
+</Grid>
 
-          <Grid item xs={12}>
+<Grid size={{ xs: 12 }}>
             <TextField
               fullWidth
               label="الاسم الكامل بالعربية"
@@ -325,7 +325,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
             />
           </Grid>
 
-          <Grid item xs={12} md={6}>
+<Grid size={{ xs: 12, md: 6 }}>
             <TextField
               fullWidth
               label="القسم"
@@ -337,7 +337,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
             />
           </Grid>
 
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <TextField
               fullWidth
               label="الوظيفة"
@@ -349,7 +349,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
             />
           </Grid>
 
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <TextField
               fullWidth
               label="رقم الهاتف"
@@ -358,7 +358,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
             />
           </Grid>
 
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <TextField
               fullWidth
               select
@@ -375,7 +375,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
             </TextField>
           </Grid>
 
-          <Grid item xs={12}>
+<Grid size={{ xs: 12 }}>
             <FormControlLabel
               control={
                 <Switch
@@ -388,7 +388,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
           </Grid>
 
           {!user && (
-            <Grid item xs={12}>
+<Grid size={{ xs: 12 }}>
               <FormControlLabel
                 control={
                   <Switch

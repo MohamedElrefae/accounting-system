@@ -1,5 +1,7 @@
 import React from 'react';
-import { Box, CssBaseline, Toolbar } from '@mui/material';
+import Box from '@mui/material/Box';
+import CssBaseline from '@mui/material/CssBaseline';
+import Toolbar from '@mui/material/Toolbar';
 import { Outlet } from 'react-router-dom';
 import TopBar from './TopBar';
 import SidebarPortal from "./SidebarPortal";
@@ -32,7 +34,7 @@ const DashboardLayout: React.FC = () => {
 
 
   const handleMenuClick = () => {
-    toggleSidebar();
+    toggleSidebar?.();
   };
 
   console.log('[DashboardLayout] Rendering with isRtl:', isRtl, 'language:', language, 'mounted:', mounted);

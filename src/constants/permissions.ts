@@ -152,6 +152,27 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         category: 'transactions'
       },
       {
+        name: 'transactions.read.own',
+        nameAr: 'عرض معاملاتي',
+        description: 'View own transactions',
+        descriptionAr: 'عرض المعاملات الخاصة بي',
+        category: 'transactions'
+      },
+      {
+        name: 'transactions.read.all',
+        nameAr: 'عرض جميع المعاملات',
+        description: 'View all transactions in system',
+        descriptionAr: 'عرض جميع المعاملات في النظام',
+        category: 'transactions'
+      },
+      {
+        name: 'transactions.post',
+        nameAr: 'ترحيل المعاملات',
+        description: 'Post and approve transactions',
+        descriptionAr: 'ترحيل واعتماد المعاملات',
+        category: 'transactions'
+      },
+      {
         name: 'transactions.create',
         nameAr: 'إنشاء معاملات',
         description: 'Create new transactions',
@@ -369,6 +390,9 @@ export const PERMISSIONS = {
   
   // Transactions
   TRANSACTIONS_VIEW: 'transactions.view',
+  TRANSACTIONS_READ_OWN: 'transactions.read.own',
+  TRANSACTIONS_READ_ALL: 'transactions.read.all',
+  TRANSACTIONS_POST: 'transactions.post',
   TRANSACTIONS_CREATE: 'transactions.create',
   TRANSACTIONS_UPDATE: 'transactions.update',
   TRANSACTIONS_DELETE: 'transactions.delete',

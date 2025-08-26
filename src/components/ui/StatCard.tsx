@@ -1,18 +1,14 @@
 import React from 'react';
-import {
-  Card,
-  CardContent,
-  Typography,
-  Box,
-  Avatar,
-  Chip,
-} from '@mui/material';
-import {
-  TrendingUp,
-  TrendingDown,
-  AccountBalance,
-  Receipt,
-} from '@mui/icons-material';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box';
+import Avatar from '@mui/material/Avatar';
+import Chip from '@mui/material/Chip';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import TrendingDown from '@mui/icons-material/TrendingDown';
+import AccountBalance from '@mui/icons-material/AccountBalance';
+import Receipt from '@mui/icons-material/Receipt';
 import type { StatCard as StatCardType } from '../../types';
 import useAppStore from '../../store/useAppStore';
 
@@ -31,7 +27,7 @@ const StatCard: React.FC<StatCardProps> = ({ stat }) => {
   const { language } = useAppStore();
   
   const title = language === 'ar' ? stat.titleAr : stat.titleEn;
-  const isPositive = stat.change > 0;
+  const isPositive = (stat.change ?? 0) > 0;
 
   return (
     <Card 

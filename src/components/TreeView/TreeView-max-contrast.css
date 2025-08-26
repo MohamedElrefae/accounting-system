@@ -1,0 +1,54 @@
+/* إصلاح تباين الكود فقط دون تمييز عمود الكود عن باقي الأعمدة */
+
+/* تحسين لون الكود للوضع المظلم - تباين واضح بدون تمييز مفرط */
+html[data-theme='dark'] .tree-node-code,
+html[data-theme='dark'] .table-code-cell {
+  color: #FFFFFF !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
+  font-weight: 600 !important;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+  letter-spacing: 0.5px !important;
+  padding: inherit !important;
+  border-radius: 0 !important;
+  position: static !important;
+  z-index: auto !important;
+}
+
+/* تحسين لون الكود للوضع الفاتح - تباين واضح بدون تمييز مفرط */
+html[data-theme='light'] .tree-node-code,
+html[data-theme='light'] .table-code-cell {
+  color: #1E293B !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  font-weight: 600 !important;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+  letter-spacing: 0.5px !important;
+  padding: inherit !important;
+  border-radius: 0 !important;
+  position: static !important;
+  z-index: auto !important;
+}
+
+/* إزالة جميع التأثيرات الإضافية */
+.tree-node-code::before,
+.table-code-cell::before {
+  display: none !important;
+}
+
+/* فئات التباين المبسطة */
+.contrast-code-dark,
+.contrast-table-code-dark {
+  color: #FFFFFF !important;
+  background: transparent !important;
+}
+
+.contrast-code-light,
+.contrast-table-code-light {
+  color: #1E293B !important;
+  background: transparent !important;
+}

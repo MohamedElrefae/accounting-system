@@ -53,10 +53,11 @@ const TrialBalancePage: React.FC = () => {
 
     if (asOf) {
       // As-of variant using balances-as-of RPC, then map to trial-balance columns
-      const { data, error } = await supabase.rpc('get_account_balances_as_of_tx', {
+      const { data, error } = await supabase.rpc('get_account_balances_as_of_tx_enhanced', {
         p_org_id: ORG_ID,
         p_as_of: new Date(asOf).toISOString(),
         p_mode: balanceMode,
+        p_project_id: selectedProject || null,
       })
       if (!error) {
         const mapped: TrialBalanceRow[] = (data as any[] | null)?.map((r: any) => {
@@ -109,8 +110,8 @@ const TrialBalancePage: React.FC = () => {
     const columns = createStandardColumns([
       { key: 'code', header: 'رمز الحساب', type: 'text' },
       { key: 'name', header: 'اسم الحساب', type: 'text' },
-      { key: 'debit', header: 'مدين', type: 'currency' },
-      { key: 'credit', header: 'دائن', type: 'currency' },
+      { key: 'debit', header: 'مدين (ج.م)', type: 'currency' },
+      { key: 'credit', header: 'دائن (ج.م)', type: 'currency' },
     ])
     const data = filtered.map(r => ({
       code: r.code,
@@ -120,6 +121,24 @@ const TrialBalancePage: React.FC = () => {
     }))
     return prepareTableData(columns, data)
   }, [filtered])
+
+  const exportConfig = useMemo(() => {
+    const modeLabel = balanceMode === 'posted' ? 'منشورة فقط' : 'جميع العمليات'
+    const dateLabel = asOf ? `حتى ${asOf}` : 'الحالي'
+    const projectLabel = selectedProject ? ` | مشروع: ${projects.find(p => p.id === selectedProject)?.code || selectedProject}` : ''
+    const title = `ميزان المراجعة (${dateLabel})`
+    const subtitle = `النمط: ${modeLabel}${projectLabel}`
+    const filename = `trial_balance_${asOf || 'current'}_${balanceMode}${selectedProject ? '_' + (projects.find(p => p.id === selectedProject)?.code || 'project') : ''}`
+    return {
+      title,
+      subtitle,
+      filename,
+      rtlLayout: true,
+      useArabicNumerals: true,
+      currency: 'EGP',
+      exportFormats: ['csv','xlsx'],
+    }
+  }, [balanceMode, asOf, selectedProject, projects])
 
   if (loading) return <div className="accounts-page" dir="rtl" style={{ padding: '2rem' }}>جاري التحميل...</div>
 
@@ -132,7 +151,7 @@ const TrialBalancePage: React.FC = () => {
         <div className="page-actions">
           <ExportButtons
             data={exportData}
-            config={{ title: 'ميزان المراجعة', rtlLayout: true, useArabicNumerals: true }}
+            config={exportConfig as any}
             size="small"
             layout="horizontal"
           />
@@ -146,7 +165,7 @@ const TrialBalancePage: React.FC = () => {
             <option value="all">جميع العمليات</option>
           </select>
 
-          <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className="filter-select" disabled={!!asOf}>
+          <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className="filter-select">
             <option value="">جميع المشاريع</option>
             {projects.map(p => (
               <option key={p.id} value={p.id}>{p.code} - {p.name_ar || p.name}</option>

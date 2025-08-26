@@ -43,30 +43,50 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-/* Theme tokens for both light and dark modes. Driven by data-theme attribute on <html>. */
-/* Default fallback (light-ish) to avoid FOUC before JS sets data-theme */
+/* Unified Color System for both light and dark modes */
+/* Default fallback (light mode) to avoid FOUC before JS sets data-theme */
 :root {
-  --background: #ecf0f1;
-  --surface: #ffffff;
-  --content-bg: #ffffff;
+  /* Core tokens from unified system */
+  --background: #F5F6FA;
+  --surface: #FFFFFF;
+  --border: #E2E6ED;
+  --accent: #2076FF;
+  --text: #181C23;
+  --muted_text: #70778A;
+  --heading: #14213D;
+  --error: #DE3F3F;
+  --success: #21C197;
+  --warning: #FFC048;
+  --field_bg: #F1F3F7;
+  --selected_bg: #E4EAFE;
+  --sidebar_bg: #FFFFFF;
+  --topbar_bg: #F5F6FA;
+  --button_bg: #2076FF;
+  --button_text: #FFFFFF;
+  --table_header_bg: #F1F3F7;
+  --table_row_bg: #FFFFFF;
+  --modal_bg: #FFFFFF;
+  --active_tab_bg: #E4EAFE;
+  
+  /* Legacy aliases for existing components */
+  --content-bg: var(--surface);
   --hover-bg: rgba(0, 0, 0, 0.05);
-  --text-primary: #2c3e50;
-  --text-secondary: #7f8c8d;
+  --text-primary: var(--text);
+  --text-secondary: var(--muted_text);
   --text-disabled: #b0b7bd;
-  --heading-text: #2c3e50;
-  --border-color: #dfe6ea;
-  --border-light: #e5e7eb;
-  --accent-primary: #3498db;
-  --accent-primary-hover: #2c80c9;
-  --on-accent: #ffffff;
-  --success: #10b981;
-  --success-strong: #059669;
-  --warning: #f59e0b;
-  --warning-strong: #ea580c;
-  --error: #ef4444;
-  --error-strong: #dc2626;
-  --info: #14b8a6;
-  --info-strong: #0d9488;
+  --heading-text: var(--heading);
+  --border-color: var(--border);
+  --border-light: var(--border);
+  --accent-primary: var(--accent);
+  --accent-primary-hover: #1A5FE6;
+  --primary-blue: var(--accent);
+  --info-bg: rgba(32, 118, 255, 0.08);
+  --on-accent: var(--button_text);
+  --success-strong: #16A085;
+  --warning-strong: #F6A000;
+  --error-strong: #C53030;
+  --info: var(--accent);
+  --info-strong: #1A5FE6;
   --chip-bg: #e5e7eb;
   --row-alt-bg: #f7fafc;
   --radius-sm: 6px;
@@ -78,53 +98,91 @@ button:focus-visible {
 }
 
 html[data-theme='dark'] {
-  --background: #1E2329;
-  --surface: #252A31;
-  --content-bg: #1f2937;
+  /* Core tokens from unified system - dark mode */
+  --background: #181A20;
+  --surface: #23272F;
+  --border: #393C43;
+  --accent: #2076FF;
+  --text: #EDEDED;
+  --muted_text: #8D94A2;
+  --heading: #FAFAFA;
+  --error: #DE3F3F;
+  --success: #21C197;
+  --warning: #FFC048;
+  --field_bg: #23272F;
+  --selected_bg: #343940;
+  --sidebar_bg: #22262A;
+  --topbar_bg: #23272F;
+  --button_bg: #2076FF;
+  --button_text: #FFFFFF;
+  --table_header_bg: #22262A;
+  --table_row_bg: #23272F;
+  --modal_bg: #23272F;
+  --active_tab_bg: #343940;
+  
+  /* Legacy aliases for existing components */
+  --content-bg: var(--surface);
   --hover-bg: rgba(255, 255, 255, 0.08);
-  --text-primary: #FFFFFF;
-  --text-secondary: #8A9099;
+  --text-primary: var(--text);
+  --text-secondary: var(--muted_text);
   --text-disabled: #6b7280;
-  --heading-text: #ffffff;
-  --border-color: #3A3F47;
-  --border-light: #374151;
-  --accent-primary: #4A90E2;
-  --accent-primary-hover: #357ABD;
-  --on-accent: #ffffff;
-  --success: #10b981;
-  --success-strong: #059669;
-  --warning: #f59e0b;
-  --warning-strong: #ea580c;
-  --error: #ef4444;
-  --error-strong: #dc2626;
-  --info: #14b8a6;
-  --info-strong: #0d9488;
+  --heading-text: var(--heading);
+  --border-color: var(--border);
+  --border-light: var(--border);
+  --accent-primary: var(--accent);
+  --accent-primary-hover: #4A90FF;
+  --primary-blue: var(--accent);
+  --info-bg: rgba(32, 118, 255, 0.08);
+  --on-accent: var(--button_text);
+  --success-strong: #16A085;
+  --warning-strong: #F6A000;
+  --error-strong: #C53030;
+  --info: var(--accent);
+  --info-strong: #4A90FF;
   --chip-bg: rgba(255, 255, 255, 0.1);
   --row-alt-bg: rgba(255, 255, 255, 0.03);
 }
 
 html[data-theme='light'] {
-  --background: #ecf0f1;
-  --surface: #ffffff;
-  --content-bg: #ffffff;
+  /* Core tokens from unified system - light mode */
+  --background: #F5F6FA;
+  --surface: #FFFFFF;
+  --border: #E2E6ED;
+  --accent: #2076FF;
+  --text: #181C23;
+  --muted_text: #70778A;
+  --heading: #14213D;
+  --error: #DE3F3F;
+  --success: #21C197;
+  --warning: #FFC048;
+  --field_bg: #F1F3F7;
+  --selected_bg: #E4EAFE;
+  --sidebar_bg: #FFFFFF;
+  --topbar_bg: #F5F6FA;
+  --button_bg: #2076FF;
+  --button_text: #FFFFFF;
+  --table_header_bg: #F1F3F7;
+  --table_row_bg: #FFFFFF;
+  --modal_bg: #FFFFFF;
+  --active_tab_bg: #E4EAFE;
+  
+  /* Legacy aliases for existing components */
+  --content-bg: var(--surface);
   --hover-bg: rgba(0, 0, 0, 0.05);
-  --text-primary: #2c3e50;
-  --text-secondary: #7f8c8d;
+  --text-primary: var(--text);
+  --text-secondary: var(--muted_text);
   --text-disabled: #b0b7bd;
-  --heading-text: #2c3e50;
-  --border-color: #dfe6ea;
-  --border-light: #e5e7eb;
-  --accent-primary: #3498db;
-  --accent-primary-hover: #2c80c9;
-  --on-accent: #ffffff;
-  --success: #10b981;
-  --success-strong: #059669;
-  --warning: #f59e0b;
-  --warning-strong: #ea580c;
-  --error: #ef4444;
-  --error-strong: #dc2626;
-  --info: #14b8a6;
-  --info-strong: #0d9488;
+  --heading-text: var(--heading);
+  --border-color: var(--border);
+  --border-light: var(--border);
+  --accent-primary: var(--accent);
+  --accent-primary-hover: #1A5FE6;
+  --on-accent: var(--button_text);
+  --success-strong: #16A085;
+  --warning-strong: #F6A000;
+  --error-strong: #C53030;
+  --info: var(--accent);
+  --info-strong: #1A5FE6;
   --chip-bg: #e5e7eb;
   --row-alt-bg: #f7fafc;
 }

@@ -1,90 +1,119 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import {
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Typography,
-  Box,
-  Collapse,
-  Badge,
-} from '@mui/material';
-import {
-  ExpandLess,
-  ExpandMore,
-  Dashboard,
-  AccountTree,
-  Receipt,
-  Description,
-  People,
-  LocalShipping,
-  Assessment,
-  Inventory,
-  Settings,
-  List as ListIcon,
-  Add,
-  EditNote,
-  Book,
-  Balance,
-  ShoppingCart,
-  RequestQuote,
-  PersonOutline,
-  Assignment,
-  Business,
-  TrendingUp,
-  AccountBalance,
-  MonetizationOn,
-  BarChart,
-  Category,
-  SwapHoriz,
-  Summarize,
-  Group,
-  Tune,
-  Backup,
-  Security,
-} from '@mui/icons-material';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box';
+import Collapse from '@mui/material/Collapse';
+import Badge from '@mui/material/Badge';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import AccountTree from '@mui/icons-material/AccountTree';
+import Receipt from '@mui/icons-material/Receipt';
+import Description from '@mui/icons-material/Description';
+import People from '@mui/icons-material/People';
+import LocalShipping from '@mui/icons-material/LocalShipping';
+import Assessment from '@mui/icons-material/Assessment';
+import Inventory from '@mui/icons-material/Inventory';
+import Settings from '@mui/icons-material/Settings';
+import ListIcon from '@mui/icons-material/List';
+import Add from '@mui/icons-material/Add';
+import EditNote from '@mui/icons-material/EditNote';
+import Book from '@mui/icons-material/Book';
+import Balance from '@mui/icons-material/Balance';
+import ShoppingCart from '@mui/icons-material/ShoppingCart';
+import RequestQuote from '@mui/icons-material/RequestQuote';
+import PersonOutline from '@mui/icons-material/PersonOutline';
+import Assignment from '@mui/icons-material/Assignment';
+import Business from '@mui/icons-material/Business';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import AccountBalance from '@mui/icons-material/AccountBalance';
+import MonetizationOn from '@mui/icons-material/MonetizationOn';
+import BarChart from '@mui/icons-material/BarChart';
+import Category from '@mui/icons-material/Category';
+import SwapHoriz from '@mui/icons-material/SwapHoriz';
+import Summarize from '@mui/icons-material/Summarize';
+import Group from '@mui/icons-material/Group';
+import Tune from '@mui/icons-material/Tune';
+import Backup from '@mui/icons-material/Backup';
+import Security from '@mui/icons-material/Security';
 import useAppStore from '../../store/useAppStore';
 import { navigationItems } from '../../data/navigation';
 import type { NavigationItem } from '../../types';
 import { useHasPermission } from '../../hooks/useHasPermission';
-import { useAuth } from '../../contexts/AuthContext';
 
 export const DRAWER_WIDTH = 280;
 export const DRAWER_COLLAPSED_WIDTH = 64;
 
-const iconMap: Record<string, React.ReactElement> = {
-  Dashboard: <Dashboard />,
-  AccountTree: <AccountTree />,
-  Receipt: <Receipt />,
-  Description: <Description />,
-  People: <People />,
-  LocalShipping: <LocalShipping />,
-  Assessment: <Assessment />,
-  Inventory: <Inventory />,
-  Settings: <Settings />,
-  List: <ListIcon />,
-  Add: <Add />,
-  EditNote: <EditNote />,
-  Book: <Book />,
-  Balance: <Balance />,
-  ShoppingCart: <ShoppingCart />,
-  RequestQuote: <RequestQuote />,
-  PersonOutline: <PersonOutline />,
-  Assignment: <Assignment />,
-  Business: <Business />,
-  TrendingUp: <TrendingUp />,
-  AccountBalance: <AccountBalance />,
-  MonetizationOn: <MonetizationOn />,
-  BarChart: <BarChart />,
-  Category: <Category />,
-  SwapHoriz: <SwapHoriz />,
-  Summarize: <Summarize />,
-  Group: <Group />,
-  Tune: <Tune />,
-  Backup: <Backup />,
-  Security: <Security />,
+const getIcon = (iconName: string) => {
+  switch (iconName) {
+    case 'Dashboard':
+      return <DashboardIcon />;
+    case 'AccountTree':
+      return <AccountTree />;
+    case 'Receipt':
+      return <Receipt />;
+    case 'Description':
+      return <Description />;
+    case 'People':
+      return <People />;
+    case 'LocalShipping':
+      return <LocalShipping />;
+    case 'Assessment':
+      return <Assessment />;
+    case 'Inventory':
+      return <Inventory />;
+    case 'Settings':
+      return <Settings />;
+    case 'List':
+      return <ListIcon />;
+    case 'Add':
+      return <Add />;
+    case 'EditNote':
+      return <EditNote />;
+    case 'Book':
+      return <Book />;
+    case 'Balance':
+      return <Balance />;
+    case 'ShoppingCart':
+      return <ShoppingCart />;
+    case 'RequestQuote':
+      return <RequestQuote />;
+    case 'PersonOutline':
+      return <PersonOutline />;
+    case 'Assignment':
+      return <Assignment />;
+    case 'Business':
+      return <Business />;
+    case 'TrendingUp':
+      return <TrendingUp />;
+    case 'AccountBalance':
+      return <AccountBalance />;
+    case 'MonetizationOn':
+      return <MonetizationOn />;
+    case 'BarChart':
+      return <BarChart />;
+    case 'Category':
+      return <Category />;
+    case 'SwapHoriz':
+      return <SwapHoriz />;
+    case 'Summarize':
+      return <Summarize />;
+    case 'Group':
+      return <Group />;
+    case 'Tune':
+      return <Tune />;
+    case 'Backup':
+      return <Backup />;
+    case 'Security':
+      return <Security />;
+    default:
+      return <DashboardIcon />;
+  }
 };
 
 interface SidebarProps {
@@ -97,7 +126,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isRtl = language === 'ar';
-  const { user } = useAuth();
+  // const { user } = useAuth();
   const hasPermission = useHasPermission();
   
   // Force component update when language changes
@@ -212,11 +241,11 @@ const Sidebar: React.FC<SidebarProps> = () => {
               }}
             >
               {item.badge ? (
-                <Badge badgeContent={item.badge} color="error">
-                  {iconMap[item.icon] || <Dashboard />}
+                <Badge badgeContent={item.badge?.text} color="error">
+                  {getIcon(item.icon || 'Dashboard')}
                 </Badge>
               ) : (
-                iconMap[item.icon] || <Dashboard />
+                getIcon(item.icon || 'Dashboard')
               )}
             </ListItemIcon>
             <ListItemText

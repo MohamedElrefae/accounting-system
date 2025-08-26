@@ -184,25 +184,34 @@ export class ArabicTextEngine {
     currency: string = 'EGP',
     options: ArabicTextOptions = {}
   ): string {
-    if (amount === null || amount === undefined || isNaN(amount)) return '٠٫٠٠ ج.م';
+    if (amount === null || amount === undefined || isNaN(amount)) {
+      return currency === 'none' ? '۰ګ۰۰' : '۰ګ۰۰ ج.م'
+    }
     
     const formatter = new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
-    });
+    })
     
-    const formatted = formatter.format(Math.abs(amount));
-    const currencySymbol = currency === 'EGP' ? 'ج.م' : currency;
+    const formatted = formatter.format(Math.abs(amount))
     
-    let result = `${formatted} ${currencySymbol}`;
-    if (amount < 0) result = `-${result}`;
+    let result: string
+    if (currency === 'none') {
+      // No currency symbol, just the number
+      result = formatted
+    } else {
+      const currencySymbol = currency === 'EGP' ? 'ج.م' : currency
+      result = `${formatted} ${currencySymbol}`
+    }
+    
+    if (amount < 0) result = `-${result}`
     
     // Convert to Arabic numerals if needed
     if (options.useArabicNumerals !== false && !options.forExport) {
-      result = this.convertNumerals(result, true);
+      result = this.convertNumerals(result, true)
     }
     
-    return result;
+    return result
   }
 
   /**

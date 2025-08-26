@@ -9,7 +9,7 @@ const useAppStore = create<AppStore>()(
       language: 'en',
       theme: 'dark',
       sidebarCollapsed: false,
-      notifications: true,
+      notifications: [],
       companyName: 'Accounting Pro',
       user: null,
 

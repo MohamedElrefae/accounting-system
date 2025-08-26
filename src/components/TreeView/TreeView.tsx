@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { ChevronRight, Edit2, Plus, Trash2, Play, Pause, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import './TreeView.css';
+import ui from '../Common/CommonUI.module.css';
 
 interface TreeNode {
   id: string;
@@ -140,15 +141,15 @@ const TreeView: React.FC<TreeViewProps> = ({
           
           <div className="tree-node-spacer"></div>
           
-          <div className="tree-node-code">
-            <span className="code-badge">{node.code}</span>
+          <div className={`tree-node-code contrast-code-${document.documentElement.getAttribute('data-theme') || 'light'}`}>
+            {node.code}
           </div>
           
           <div className="tree-node-name" onClick={() => onSelect && onSelect(node)} style={{ cursor: onSelect ? 'pointer' : 'default' }}>
             {node.name_ar}
-            {!node.is_active && <span className="status-inactive-text">(معطل)</span>}
+            {!node.is_active && <span className={`status-inactive-text ${ui.inactiveText}`}>(معطل)</span>}
             {mayHaveChildren && (
-              <span style={{ marginRight: 8, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              <span className={ui.textSecondarySmall} style={{ marginRight: 8 }}>
                 {hasLoadedChildren ? (getChildrenCount ? getChildrenCount(node) ?? '' : '') : '…'}
               </span>
             )}
@@ -159,7 +160,7 @@ const TreeView: React.FC<TreeViewProps> = ({
           </div>
           
           <div className="tree-node-level">
-            <span className="level-badge">{node.level}</span>
+            <span className={`level-badge ${ui.badgeLevel}`}>{node.level}</span>
           </div>
           
           <div className="tree-node-actions">

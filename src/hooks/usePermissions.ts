@@ -2,12 +2,6 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
-interface Permission {
-  id: number;
-  name: string;
-  name_ar: string;
-  category: string;
-}
 
 export function usePermissions() {
   const { user } = useAuth();

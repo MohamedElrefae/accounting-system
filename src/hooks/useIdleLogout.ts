@@ -28,7 +28,7 @@ export const useIdleLogout = (options: UseIdleLogoutOptions = {}) => {
     ]
   } = options;
 
-  const { user, logout } = useAuth();
+  const { user, signOut } = useAuth();
   const { showToast } = useToast();
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -48,11 +48,11 @@ export const useIdleLogout = (options: UseIdleLogoutOptions = {}) => {
   const handleLogout = useCallback(async () => {
     console.log('[useIdleLogout] Auto-logging out due to inactivity');
     try {
-      await logout();
+      await signOut();
     } catch (error) {
       console.error('[useIdleLogout] Error during auto-logout:', error);
     }
-  }, [logout]);
+  }, [signOut]);
 
   const showWarning = useCallback(() => {
     const minutes = Math.max(1, Math.round(warningTime / 60000));

@@ -1,0 +1,97 @@
+/* ملف إضافي لضمان التباين الأقصى في شجرة الحسابات */
+
+/* تحسينات جذرية للألوان - أولوية عالية */
+.tree-node-code,
+.table-code-cell {
+  font-weight: 800 !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  position: relative !important;
+  z-index: 10 !important;
+  border: 3px solid !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* إجبار الألوان المتباينة بقوة */
+html[data-theme='dark'] .tree-node-code,
+html[data-theme='dark'] .table-code-cell {
+  background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+  color: #000000 !important;
+  border-color: #CBD5E1 !important;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8) !important;
+}
+
+html[data-theme='light'] .tree-node-code,
+html[data-theme='light'] .table-code-cell {
+  background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%) !important;
+  color: #FFFFFF !important;
+  border-color: #475569 !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8) !important;
+}
+
+/* تحسينات للنص في الوضع المظلم */
+html[data-theme='dark'] .tree-node-name,
+html[data-theme='dark'] .accounts-table td {
+  color: #F1F5F9 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* تحسينات للنص في الوضع الفاتح */
+html[data-theme='light'] .tree-node-name,
+html[data-theme='light'] .accounts-table td {
+  color: #1E293B !important;
+}
+
+/* تحسين رؤية الحدود */
+html[data-theme='dark'] .tree-node,
+html[data-theme='dark'] .accounts-table tr {
+  border-bottom-color: #475569 !important;
+}
+
+/* تحسين خلفية الصفوف المتناوبة في الوضع المظلم */
+html[data-theme='dark'] .accounts-table tbody tr:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.02) !important;
+}
+
+html[data-theme='dark'] .accounts-table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* تحسين حالة التمرير */
+html[data-theme='dark'] .tree-node:hover,
+html[data-theme='dark'] .accounts-table tbody tr:hover {
+  background: rgba(96, 165, 250, 0.1) !important;
+}
+
+/* تأكيد لون الكود في جميع الحالات */
+.tree-node-code,
+.table-code-cell {
+  position: relative;
+  z-index: 1;
+}
+
+.tree-node-code::before,
+.table-code-cell::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(135deg, 
+    rgba(96, 165, 250, 0.1), 
+    rgba(59, 130, 246, 0.1)
+  );
+  border-radius: inherit;
+  z-index: -1;
+}
+
+/* تحسين حالة التركيز */
+.tree-node-code:focus,
+.table-code-cell:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* تأكيد على قابلية القراءة في جميع المتصفحات */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

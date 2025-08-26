@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Box, Tabs, Tab, Card, CardContent, Typography, Grid, TextField, Button, Avatar, Stack, Alert, Divider, Switch, FormControlLabel, CircularProgress, List, ListItem, ListItemText } from '@mui/material';
+import { Box, Tabs, Tab, Card, CardContent, Typography, TextField, Button, Avatar, Stack, Alert, Divider, Switch, FormControlLabel, CircularProgress, List, ListItem, ListItemText } from '@mui/material';
+import Grid from '@mui/material/Grid';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useToast } from '../../contexts/ToastContext';
@@ -162,7 +163,7 @@ const Profile: React.FC = () => {
         updated_at: new Date().toISOString(),
       };
       
-      const { data, error: upErr } = await supabase
+const { error: upErr } = await supabase
         .from('user_profiles')
         .update(update)
         .eq('id', user.id)
@@ -286,7 +287,7 @@ const Profile: React.FC = () => {
         <Card>
           <CardContent>
             <Grid container spacing={3}>
-              <Grid item xs={12} md={3}>
+<Grid size={{ xs: 12, md: 3 }}>
                 <Stack alignItems="center" spacing={2}>
                   <Avatar src={avatarUrl || undefined} sx={{ width: 120, height: 120 }} />
                   <Button component="label" variant="outlined" disabled={uploading}>
@@ -295,24 +296,24 @@ const Profile: React.FC = () => {
                   </Button>
                 </Stack>
               </Grid>
-              <Grid item xs={12} md={9}>
+<Grid size={{ xs: 12 }}>
                 <Grid container spacing={2}>
-                  <Grid item xs={12} md={6}>
+<Grid size={{ xs: 12, md: 6 }}>
                     <TextField fullWidth label="الاسم الأول" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
                   </Grid>
-                  <Grid item xs={12} md={6}>
+<Grid size={{ xs: 12, md: 6 }}>
                     <TextField fullWidth label="اسم العائلة" value={lastName} onChange={(e) => setLastName(e.target.value)} />
                   </Grid>
-                  <Grid item xs={12}>
+<Grid size={{ xs: 12 }}>
                     <TextField fullWidth label="الاسم الكامل بالعربية" value={fullNameAr} onChange={(e) => setFullNameAr(e.target.value)} />
                   </Grid>
-                  <Grid item xs={12} md={6}>
+<Grid size={{ xs: 12, md: 6 }}>
                     <TextField fullWidth label="القسم" value={department} onChange={(e) => setDepartment(e.target.value)} />
                   </Grid>
-                  <Grid item xs={12} md={6}>
+<Grid size={{ xs: 12, md: 6 }}>
                     <TextField fullWidth label="الهاتف" value={phone} onChange={(e) => setPhone(e.target.value)} />
                   </Grid>
-                  <Grid item xs={12}>
+                  <Grid size={{ xs: 12 }}>
                     <TextField fullWidth multiline minRows={3} label="نبذة" value={bio} onChange={(e) => setBio(e.target.value)} />
                   </Grid>
                 </Grid>
@@ -330,13 +331,13 @@ const Profile: React.FC = () => {
           <CardContent>
             <Typography variant="h6" sx={{ mb: 2 }}>تغيير كلمة المرور</Typography>
             <Grid container spacing={2}>
-              <Grid item xs={12} md={4}>
+<Grid size={{ xs: 12, md: 4 }}>
                 <TextField fullWidth label="كلمة المرور الجديدة" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
               </Grid>
-              <Grid item xs={12} md={4}>
+<Grid size={{ xs: 12, md: 4 }}>
                 <TextField fullWidth label="تأكيد كلمة المرور" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <Button variant="outlined" onClick={changePassword} sx={{ height: '100%' }} disabled={saving}>تغيير</Button>
               </Grid>
             </Grid>
@@ -345,10 +346,10 @@ const Profile: React.FC = () => {
 
             <Typography variant="h6" sx={{ mb: 2 }}>تغيير البريد الإلكتروني</Typography>
             <Grid container spacing={2}>
-              <Grid item xs={12} md={8}>
+<Grid size={{ xs: 12, md: 8 }}>
                 <TextField fullWidth label="البريد الإلكتروني الجديد" type="email" value={emailChange} onChange={(e) => setEmailChange(e.target.value)} />
               </Grid>
-              <Grid item xs={12} md={4}>
+<Grid size={{ xs: 12, md: 4 }}>
                 <Button variant="outlined" onClick={changeEmail} sx={{ height: '100%' }} disabled={saving}>تغيير</Button>
               </Grid>
             </Grid>
