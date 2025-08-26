@@ -11,7 +11,9 @@ create or replace function public.get_general_ledger_report(
   p_org_id uuid default null,
   p_project_id uuid default null,
   p_include_opening boolean default true,
-  p_posted_only boolean default false
+  p_posted_only boolean default false,
+  p_limit integer default null,
+  p_offset integer default null
 )
 returns table (
   transaction_id uuid,
@@ -37,7 +39,8 @@ returns table (
   closing_debit numeric,
   closing_credit numeric,
   org_id uuid,
-  project_id uuid
+  project_id uuid,
+  total_rows bigint
 )
 language sql
 security definer
@@ -128,6 +131,14 @@ as $$
       )::numeric as period_total
     from period_with_accounts pwa
     left join opening o on o.account_id = pwa.account_id
+  ),
+  numbered as (
+    select
+      wc.*,
+      row_number() over (partition by wc.account_id order by wc.entry_date, wc.entry_number, wc.transaction_id) as rn_per_account,
+      row_number() over (order by wc.account_code, wc.entry_date, wc.entry_number, wc.transaction_id) as rn_global,
+      count(*) over () as total_rows
+    from with_calcs wc
   )
   select
     transaction_id,
@@ -153,9 +164,12 @@ as $$
     case when (opening_balance + period_total) > 0 then (opening_balance + period_total) else 0 end as closing_debit,
     case when (opening_balance + period_total) < 0 then abs(opening_balance + period_total) else 0 end as closing_credit,
     org_id,
-    project_id
-  from with_calcs
-  order by account_code, entry_date, entry_number, transaction_id;
+    project_id,
+    total_rows
+  from numbered n
+  where (p_limit is null or n.rn_global > coalesce(p_offset, 0))
+    and (p_limit is null or n.rn_global <= coalesce(p_offset, 0) + p_limit)
+  order by n.rn_global;
 $$;
 
 -- Grants

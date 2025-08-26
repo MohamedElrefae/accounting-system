@@ -6,13 +6,15 @@ import type { UniversalTableData } from '../../utils/UniversalExportManager'
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
 
+type ViewMode = 'overview' | 'details'
+
 const GeneralLedger: React.FC = () => {
   // Filters
   const [filters, setFilters] = useState<GLFilters>({
     dateFrom: todayISO(),
     dateTo: todayISO(),
     includeOpening: true,
-    postedOnly: false,
+    postedOnly: true,
   })
 
   const [accountId, setAccountId] = useState<string>('')
@@ -22,6 +24,36 @@ const GeneralLedger: React.FC = () => {
   const [data, setData] = useState<GLRow[]>([])
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
+  const [view, setView] = useState<ViewMode>('overview')
+  const [pageSize, setPageSize] = useState<number>(25)
+  const [currentPage, setCurrentPage] = useState<number>(1)
+  const [totalRows, setTotalRows] = useState<number>(0)
+
+  // Initialize from query parameters once on mount
+  useEffect(() => {
+    try {
+      const qp = new URLSearchParams(window.location.search);
+      const qAccountId = qp.get('accountId') || '';
+      const qOrgId = qp.get('orgId') || '';
+      const qProjectId = qp.get('projectId') || '';
+      const qPostedOnly = qp.get('postedOnly');
+      const qIncludeOpening = qp.get('includeOpening');
+      const qDateFrom = qp.get('dateFrom');
+      const qDateTo = qp.get('dateTo');
+
+      if (qAccountId) setAccountId(qAccountId);
+      if (qOrgId) setOrgId(qOrgId);
+      if (qProjectId) setProjectId(qProjectId);
+
+      setFilters(prev => ({
+        ...prev,
+        postedOnly: qPostedOnly === null ? prev.postedOnly : qPostedOnly === 'true',
+        includeOpening: qIncludeOpening === null ? prev.includeOpening : qIncludeOpening !== 'false',
+        dateFrom: qDateFrom || prev.dateFrom,
+        dateTo: qDateTo || prev.dateTo,
+      }));
+    } catch {}
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -36,8 +68,15 @@ const GeneralLedger: React.FC = () => {
           projectId: projectId || null,
           includeOpening: filters.includeOpening,
           postedOnly: filters.postedOnly,
+          limit: pageSize,
+          offset: (currentPage - 1) * pageSize,
         })
         setData(rows)
+        if (rows && rows.length > 0 && typeof rows[0].total_rows === 'number') {
+          setTotalRows(rows[0].total_rows as number)
+        } else {
+          setTotalRows(rows.length)
+        }
       } catch (e: any) {
         setError(e?.message || 'Failed to load general ledger')
       } finally {
@@ -45,7 +84,7 @@ const GeneralLedger: React.FC = () => {
       }
     }
     load()
-  }, [filters.dateFrom, filters.dateTo, filters.includeOpening, filters.postedOnly, accountId, orgId, projectId])
+  }, [filters.dateFrom, filters.dateTo, filters.includeOpening, filters.postedOnly, accountId, orgId, projectId, pageSize, currentPage])
 
   // Summary totals
   const summary = useMemo(() => {
@@ -90,6 +129,8 @@ const GeneralLedger: React.FC = () => {
     }
   }, [data, filters])
 
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -107,6 +148,11 @@ const GeneralLedger: React.FC = () => {
             layout="horizontal"
           />
         </div>
+      </div>
+
+      <div className={styles.tabs}>
+        <button className={`${styles.tab} ${view === 'overview' ? styles.tabActive : ''}`} onClick={() => setView('overview')}>ملخص الحسابات</button>
+        <button className={`${styles.tab} ${view === 'details' ? styles.tabActive : ''}`} onClick={() => setView('details')}>تفاصيل القيود</button>
       </div>
 
       <div className={styles.filters}>
@@ -181,7 +227,43 @@ const GeneralLedger: React.FC = () => {
         </div>
       </div>
 
-      <div className={styles.summary}>
+      {view === 'overview' && (
+        <div className={styles.summary}>
+          <div className={styles.card}>
+            <div className={styles.cardLabel}>رصيد افتتاحي مدين</div>
+            <div className={styles.cardValue}>{summary.openingDebit.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</div>
+          </div>
+          <div className={styles.card}>
+            <div className={styles.cardLabel}>رصيد افتتاحي دائن</div>
+            <div className={styles.cardValue}>{summary.openingCredit.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</div>
+          </div>
+          <div className={styles.card}>
+            <div className={styles.cardLabel}>إجمالي مدين الفترة</div>
+            <div className={styles.cardValue}>{summary.periodDebit.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</div>
+          </div>
+          <div className={styles.card}>
+            <div className={styles.cardLabel}>إجمالي دائن الفترة</div>
+            <div className={styles.cardValue}>{summary.periodCredit.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</div>
+          </div>
+          <div className={styles.card}>
+            <div className={styles.cardLabel}>رصيد ختامي مدين</div>
+            <div className={styles.cardValue}>{summary.closingDebit.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</div>
+          </div>
+          <div className={styles.card}>
+            <div className={styles.cardLabel}>رصيد ختامي دائن</div>
+            <div className={styles.cardValue}>{summary.closingCredit.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</div>
+          </div>
+        </div>
+      )}
+
+      {view === 'details' && (
+        <div className={styles.summary}>
+          <div className={styles.card}>
+            <div className={styles.cardLabel}>عدد السجلات</div>
+            <div className={styles.cardValue}>{totalRows.toLocaleString('ar-EG')}</div>
+          </div>
+        </div>
+      )
         <div className={styles.card}>
           <div className={styles.cardLabel}>رصيد افتتاحي مدين</div>
           <div className={styles.cardValue}>{summary.openingDebit.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</div>
@@ -247,7 +329,23 @@ const GeneralLedger: React.FC = () => {
         )}
       </div>
 
-      <div className={styles.footer}>
+      <div className={styles.pagination}>
+        <div>
+          الصفحة {currentPage} من {totalPages} — إجمالي السجلات: {totalRows.toLocaleString('ar-EG')}
+        </div>
+        <div className={styles.pageControls}>
+          <button className={styles.pageBtn} onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>الأولى</button>
+          <button className={styles.pageBtn} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>السابق</button>
+          <button className={styles.pageBtn} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>التالي</button>
+          <button className={styles.pageBtn} onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>الأخيرة</button>
+          <select className={styles.pageSize} value={pageSize} onChange={e => { setPageSize(parseInt(e.target.value)); setCurrentPage(1) }}>
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+          </select>
+        </div>
+      </div>
         {/* Reserved for pagination / future actions (no inline styles) */}
       </div>
     </div>

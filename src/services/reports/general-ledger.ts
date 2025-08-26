@@ -8,6 +8,8 @@ export interface GLFilters {
   projectId?: string | null
   includeOpening?: boolean
   postedOnly?: boolean
+  limit?: number | null
+  offset?: number | null
 }
 
 export interface GLRow {
@@ -35,6 +37,7 @@ export interface GLRow {
   closing_credit: number
   org_id: string | null
   project_id: string | null
+  total_rows?: number
 }
 
 export async function fetchGeneralLedgerReport(filters: GLFilters): Promise<GLRow[]> {
@@ -45,7 +48,9 @@ export async function fetchGeneralLedgerReport(filters: GLFilters): Promise<GLRo
     p_org_id: filters.orgId ?? null,
     p_project_id: filters.projectId ?? null,
     p_include_opening: filters.includeOpening ?? true,
-    p_posted_only: filters.postedOnly ?? false,
+    p_posted_only: filters.postedOnly ?? true,
+    p_limit: filters.limit ?? null,
+    p_offset: filters.offset ?? null,
   })
 
   if (error) throw error
