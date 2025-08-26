@@ -94,6 +94,14 @@ export const navigationItems: NavigationItem[] = [
         path: "/reports/trial-balance"
       },
       {
+        id: "general-ledger",
+        label: "General Ledger",
+        titleEn: "General Ledger",
+        titleAr: "دفتر الأستاذ",
+        icon: "book",
+        path: "/reports/general-ledger"
+      },
+      {
         id: "profit-loss",
         label: "Profit & Loss", 
         titleEn: "Profit & Loss",

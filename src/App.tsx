@@ -9,6 +9,7 @@ const AccountsTreeLazy = React.lazy(() => import('./pages/MainData/AccountsTree'
 const TestRTL = React.lazy(() => import('./pages/TestRTL'));
 const ExportTestPage = React.lazy(() => import('./pages/ExportTestPage'));
 const TransactionsPage = React.lazy(() => import('./pages/Transactions/Transactions'));
+const GeneralLedgerPage = React.lazy(() => import('./pages/Reports/GeneralLedger'));
 import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
 import { ForgotPassword } from './components/auth/ForgotPassword';
@@ -153,11 +154,18 @@ const App: React.FC = () => {
             <Route path="/suppliers" element={<PlaceholderPage title="Suppliers List" />} />
             <Route path="/suppliers/statements" element={<PlaceholderPage title="Supplier Statements" />} />
             
-            {/* Financial Reports */}
+{/* Financial Reports */}
             <Route path="/reports/trial-balance" element={
               <ProtectedRoute>
                 <React.Suspense fallback={<>Loading...</>}>
                   {React.createElement(React.lazy(() => import('./pages/Reports/TrialBalance')))}
+                </React.Suspense>
+              </ProtectedRoute>
+            } />
+            <Route path="/reports/general-ledger" element={
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <GeneralLedgerPage />
                 </React.Suspense>
               </ProtectedRoute>
             } />
