@@ -357,31 +357,6 @@ const GeneralLedger: React.FC = () => {
           </div>
         </div>
       )
-        <div className={styles.card}>
-          <div className={styles.cardLabel}>رصيد افتتاحي مدين</div>
-          <div className={styles.cardValue}>{summary.openingDebit.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</div>
-        </div>
-        <div className={styles.card}>
-          <div className={styles.cardLabel}>رصيد افتتاحي دائن</div>
-          <div className={styles.cardValue}>{summary.openingCredit.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</div>
-        </div>
-        <div className={styles.card}>
-          <div className={styles.cardLabel}>إجمالي مدين الفترة</div>
-          <div className={styles.cardValue}>{summary.periodDebit.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</div>
-        </div>
-        <div className={styles.card}>
-          <div className={styles.cardLabel}>إجمالي دائن الفترة</div>
-          <div className={styles.cardValue}>{summary.periodCredit.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</div>
-        </div>
-        <div className={styles.card}>
-          <div className={styles.cardLabel}>رصيد ختامي مدين</div>
-          <div className={styles.cardValue}>{summary.closingDebit.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</div>
-        </div>
-        <div className={styles.card}>
-          <div className={styles.cardLabel}>رصيد ختامي دائن</div>
-          <div className={styles.cardValue}>{summary.closingCredit.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</div>
-        </div>
-      </div>
 
       {view === 'details' && (
       <div className={styles.tableWrap}>
