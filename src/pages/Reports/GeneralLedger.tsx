@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import styles from './GeneralLedger.module.css'
 import { fetchGeneralLedgerReport, type GLFilters, type GLRow } from '../../services/reports/general-ledger'
 import ExportButtons from '../../components/Common/ExportButtons'
+import { listReportPresets, saveReportPreset, deleteReportPreset, type ReportPreset } from '../../services/user-presets'
 import { fetchGLAccountSummary, type GLAccountSummaryRow } from '../../services/reports/gl-account-summary'
 import { fetchOrganizations, fetchProjects, fetchAccountsMinimal, type LookupOption } from '../../services/lookups'
 import type { UniversalTableData } from '../../utils/UniversalExportManager'
@@ -35,6 +36,25 @@ const GeneralLedger: React.FC = () => {
   const [orgOptions, setOrgOptions] = useState<LookupOption[]>([])
   const [projectOptions, setProjectOptions] = useState<LookupOption[]>([])
   const [accountOptions, setAccountOptions] = useState<LookupOption[]>([])
+
+  // Presets and columns
+  const reportKey = 'general-ledger'
+  const [presets, setPresets] = useState<ReportPreset[]>([])
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('')
+  const [newPresetName, setNewPresetName] = useState<string>('')
+  const [columnMenuOpen, setColumnMenuOpen] = useState<boolean>(false)
+  const detailColumnOptions = [
+    { key: 'entry_number', label: 'رقم القيد' },
+    { key: 'entry_date', label: 'التاريخ' },
+    { key: 'account_code', label: 'رمز الحساب' },
+    { key: 'account_name_ar', label: 'اسم الحساب' },
+    { key: 'description', label: 'الوصف' },
+    { key: 'debit', label: 'مدين' },
+    { key: 'credit', label: 'دائن' },
+    { key: 'running_debit', label: 'رصيد جاري مدين' },
+    { key: 'running_credit', label: 'رصيد جاري دائن' },
+  ] as const
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(detailColumnOptions.map(c => c.key))
 
   // Initialize from query parameters once on mount
   useEffect(() => {
@@ -73,6 +93,18 @@ const GeneralLedger: React.FC = () => {
       setOrgOptions(orgs)
       setProjectOptions(projects)
       setAccountOptions(accounts)
+    })()
+  }, [])
+
+  // Load presets
+  useEffect(() => {
+    (async () => {
+      try {
+        const items = await listReportPresets(reportKey)
+        setPresets(items)
+      } catch (e) {
+        // ignore
+      }
     })()
   }, [])
 
@@ -149,7 +181,9 @@ const GeneralLedger: React.FC = () => {
   // Export data
   const exportData: UniversalTableData = useMemo(() => {
     return {
-      columns: [
+      columns: detailColumnOptions
+        .filter(c => visibleColumns.includes(c.key))
+        .map(c => ({ key: c.key, header: c.label, type: ['debit','credit','running_debit','running_credit'].includes(c.key) ? 'currency' : (c.key === 'entry_date' ? 'date' : 'text'), align: 'right' as const })),
         { key: 'entry_number', header: 'رقم القيد', type: 'text', align: 'right' },
         { key: 'entry_date', header: 'التاريخ', type: 'date', align: 'right' },
         { key: 'account_code', header: 'رمز الحساب', type: 'text', align: 'right' },
@@ -170,7 +204,7 @@ const GeneralLedger: React.FC = () => {
         credit: Number(r.credit || 0),
         running_debit: Number(r.running_debit || 0),
         running_credit: Number(r.running_credit || 0),
-      })),
+      })).map(row => Object.fromEntries(Object.entries(row).filter(([k]) => visibleColumns.includes(k as string)))),
       metadata: {
         generatedAt: new Date(),
         filters
@@ -183,8 +217,82 @@ const GeneralLedger: React.FC = () => {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
+        <div className={styles.presetBar}>
+          <select className={styles.presetSelect} value={selectedPresetId} onChange={async (e) => {
+            const id = e.target.value
+            setSelectedPresetId(id)
+            const p = presets.find(x => x.id === id)
+            if (p) {
+              const f = p.filters || {}
+              setAccountId(f.accountId || '')
+              setOrgId(f.orgId || '')
+              setProjectId(f.projectId || '')
+              setFilters(prev => ({
+                ...prev,
+                dateFrom: f.dateFrom || prev.dateFrom,
+                dateTo: f.dateTo || prev.dateTo,
+                includeOpening: typeof f.includeOpening === 'boolean' ? f.includeOpening : prev.includeOpening,
+                postedOnly: typeof f.postedOnly === 'boolean' ? f.postedOnly : prev.postedOnly,
+              }))
+              if (Array.isArray(p.columns)) setVisibleColumns(p.columns as string[])
+            }
+          }}>
+            <option value=''>اختر تهيئة محفوظة</option>
+            {presets.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
+          </select>
+          <input className={styles.presetInput} placeholder='اسم التهيئة' value={newPresetName} onChange={e => setNewPresetName(e.target.value)} />
+          <button className={styles.presetButton} onClick={async () => {
+            if (!newPresetName.trim()) return
+            const saved = await saveReportPreset({
+              reportKey,
+              name: newPresetName.trim(),
+              filters: {
+                dateFrom: filters.dateFrom,
+                dateTo: filters.dateTo,
+                includeOpening: filters.includeOpening,
+                postedOnly: filters.postedOnly,
+                orgId,
+                projectId,
+                accountId,
+              },
+              columns: visibleColumns,
+            })
+            setNewPresetName('')
+            const items = await listReportPresets(reportKey)
+            setPresets(items)
+            setSelectedPresetId(saved.id)
+          }}>حفظ</button>
+          <button className={styles.presetButton} onClick={async () => {
+            if (!selectedPresetId) return
+            await deleteReportPreset(selectedPresetId)
+            setSelectedPresetId('')
+            const items = await listReportPresets(reportKey)
+            setPresets(items)
+          }}>حذف</button>
+        </div>
         <h2 className={styles.title}>دفتر الأستاذ العام</h2>
         <div className={styles.actions}>
+          <div className={styles.columnPanel}>
+            <button className={styles.presetButton} onClick={() => setColumnMenuOpen(v => !v)}>اختيار الأعمدة</button>
+            {columnMenuOpen && (
+              <div className={styles.columnDropdown}>
+                <div className={styles.columnList}>
+                  {detailColumnOptions.map(opt => (
+                    <label key={opt.key} className={styles.columnItem}>
+                      <input
+                        type='checkbox'
+                        checked={visibleColumns.includes(opt.key)}
+                        onChange={(e) => {
+                          setVisibleColumns(prev => e.target.checked ? [...prev, opt.key] : prev.filter(k => k !== opt.key))
+                        }}
+                      />
+                      <span>{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           <ExportButtons
             data={exportData}
             config={{
@@ -368,29 +476,23 @@ const GeneralLedger: React.FC = () => {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>رقم القيد</th>
-                <th>التاريخ</th>
-                <th>رمز الحساب</th>
-                <th>اسم الحساب</th>
-                <th>الوصف</th>
-                <th>مدين</th>
-                <th>دائن</th>
-                <th>رصيد جاري مدين</th>
-                <th>رصيد جاري دائن</th>
+                {detailColumnOptions.filter(c => visibleColumns.includes(c.key)).map(c => (
+                  <th key={c.key}>{c.label}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {data.map((r) => (
                 <tr key={`${r.transaction_id}-${r.account_id}-${r.entry_date}`}>
-                  <td>{r.entry_number}</td>
-                  <td>{r.entry_date}</td>
-                  <td>{r.account_code}</td>
-                  <td>{r.account_name_ar ?? r.account_name_en ?? ''}</td>
-                  <td>{r.description ?? ''}</td>
-                  <td>{Number(r.debit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
-                  <td>{Number(r.credit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
-                  <td>{Number(r.running_debit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
-                  <td>{Number(r.running_credit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
+                  {visibleColumns.includes('entry_number') && (<td>{r.entry_number}</td>)}
+                  {visibleColumns.includes('entry_date') && (<td>{r.entry_date}</td>)}
+                  {visibleColumns.includes('account_code') && (<td>{r.account_code}</td>)}
+                  {visibleColumns.includes('account_name_ar') && (<td>{r.account_name_ar ?? r.account_name_en ?? ''}</td>)}
+                  {visibleColumns.includes('description') && (<td>{r.description ?? ''}</td>)}
+                  {visibleColumns.includes('debit') && (<td>{Number(r.debit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>)}
+                  {visibleColumns.includes('credit') && (<td>{Number(r.credit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>)}
+                  {visibleColumns.includes('running_debit') && (<td>{Number(r.running_debit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>)}
+                  {visibleColumns.includes('running_credit') && (<td>{Number(r.running_credit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>)}
                 </tr>
               ))}
             </tbody>

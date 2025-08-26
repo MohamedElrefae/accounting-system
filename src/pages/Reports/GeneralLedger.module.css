@@ -28,6 +28,61 @@
   gap: 8px;
 }
 
+.presetBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.presetSelect, .presetInput {
+  height: 32px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-primary);
+  padding: 4px 8px;
+}
+
+.presetButton {
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.columnPanel {
+  position: relative;
+}
+
+.columnDropdown {
+  position: absolute;
+  top: 36px;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  z-index: 2;
+}
+
+.columnList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+  gap: 6px 16px;
+}
+
+.columnItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .tabs {
   display: flex;
   gap: 8px;
