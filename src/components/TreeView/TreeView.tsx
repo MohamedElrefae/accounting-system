@@ -31,6 +31,9 @@ interface TreeViewProps {
   onToggleExpand?: (node: TreeNode) => void | Promise<void>;
   canHaveChildren?: (node: TreeNode) => boolean;
   getChildrenCount?: (node: TreeNode) => number | null | undefined;
+  // New: allow parent to control deletion disabled state and tooltip reason
+  isDeleteDisabled?: (node: TreeNode) => boolean;
+  getDeleteDisabledReason?: (node: TreeNode) => string | undefined;
   maxLevel?: number;
 }
 
@@ -44,6 +47,8 @@ const TreeView: React.FC<TreeViewProps> = ({
   onToggleExpand,
   canHaveChildren,
   getChildrenCount,
+  isDeleteDisabled,
+  getDeleteDisabledReason,
   maxLevel = 4 
 }) => {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
@@ -281,7 +286,7 @@ const TreeView: React.FC<TreeViewProps> = ({
               onClick={() => handleButtonWithStates(
                 `delete-${node.id}`,
                 async () => {
-                  if (window.confirm(`هل أنت متأكد من حذف "${node.name_ar}"؟`)) {
+                  if (window.confirm(`هل أنت متأكد من حذف \"${node.name_ar}\"؟`)) {
                     onDelete && onDelete(node);
                   }
                 },
@@ -295,8 +300,15 @@ const TreeView: React.FC<TreeViewProps> = ({
               } ${
                 getButtonState(`delete-${node.id}`).error ? 'error' : ''
               }`}
-              disabled={getButtonState(`delete-${node.id}`).loading || hasLoadedChildren}
-              title={hasLoadedChildren ? 'لا يمكن حذف حساب له فروع' : 'حذف'}
+              disabled={
+                getButtonState(`delete-${node.id}`).loading ||
+                (typeof isDeleteDisabled === 'function' ? isDeleteDisabled(node) : hasLoadedChildren)
+              }
+              title={
+                typeof getDeleteDisabledReason === 'function'
+                  ? getDeleteDisabledReason(node) || 'حذف'
+                  : (hasLoadedChildren ? 'لا يمكن حذف حساب له فروع' : 'حذف')
+              }
             >
               <div className="btn-content">
                 <div className={`btn-icon ${

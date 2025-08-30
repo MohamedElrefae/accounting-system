@@ -1,0 +1,718 @@
+/* ============================================================================
+   STANDARD FINANCIAL STATEMENTS STYLING (replicated from original app)
+   ============================================================================ */
+
+/* Root Variables - Theme Aware */
+:root {
+  --primary-color: var(--accent);
+  --secondary-color: var(--accent);
+  --accent-color: var(--error);
+  --success-color: var(--success);
+  --warning-color: var(--warning);
+  --background-color: var(--background);
+  --surface-color: var(--surface);
+  --text-primary: var(--text);
+  --text-secondary: var(--muted_text);
+  --border-color: var(--border);
+  --border-strong: var(--border);
+  --shadow-light: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-medium: 0 4px 8px rgba(0, 0, 0, 0.1);
+  --shadow-strong: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* MAIN CONTAINER */
+.standard-financial-statements {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  background: var(--background-color);
+  min-height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  direction: rtl;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+/* Financial Report Content Wrapper */
+.financial-report-content {
+  background: var(--surface);
+  border-radius: 8px;
+  box-shadow: var(--shadow-light);
+  direction: rtl;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--text);
+}
+
+/* STATEMENT HEADER */
+.statement-header {
+  text-align: center;
+  margin-bottom: 3rem;
+  padding: 2rem;
+  background: linear-gradient(135deg, var(--accent), var(--accent));
+  color: var(--on-accent);
+  border-radius: 12px;
+  box-shadow: var(--shadow-strong);
+}
+.company-name {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0 0 1rem 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+.statement-title {
+  font-size: 2rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+  opacity: 0.95;
+}
+.statement-period {
+  font-size: 1.2rem;
+  font-weight: 400;
+  margin: 0;
+  opacity: 0.9;
+}
+
+/* STATEMENT CONTENT */
+.statement-content {
+  background: var(--surface-color);
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: var(--shadow-medium);
+  border: 1px solid var(--border-color);
+}
+
+/* TRIAL BALANCE STYLING */
+.trial-balance-container {
+  background: var(--background-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-light);
+}
+.trial-balance-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: var(--accent);
+  color: var(--on-accent);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-weight: 700;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.account-column { flex: 2; text-align: center; font-size: 1.1rem; font-weight: 700; }
+.amounts-columns { display: flex; flex: 1; justify-content: space-between; }
+.debit-column, .credit-column { flex: 1; text-align: center; font-size: 1.1rem; font-weight: 700; }
+
+.financial-group { margin-bottom: 1.5rem; background: var(--surface); border-radius: 8px; border: 1px solid var(--border-color); overflow: hidden; }
+
+/* Collapsible Group Header */
+.group-header { background: var(--field_bg); padding: 0.75rem 1rem; border-bottom: 2px solid var(--border-color); }
+.group-header.collapsible-header { 
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: var(--hover-bg);
+  transition: background-color 0.2s ease;
+  cursor: pointer;
+}
+.group-header.collapsible-header:hover {
+  background: var(--selected_bg);
+}
+
+.group-toggle-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  background: var(--field_bg);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+.group-toggle-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--surface);
+  transform: scale(1.05);
+}
+.group-toggle-button:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.group-title { font-size: 1.1rem; font-weight: 600; color: var(--heading); margin: 0; text-align: center; flex: 1; }
+.group-title.clickable {
+  cursor: pointer;
+  transition: color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.group-title.clickable:hover {
+  color: var(--accent);
+}
+
+.account-count {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.group-totals-preview {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+  flex-shrink: 0;
+}
+.preview-debit, .preview-credit {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+  min-width: 100px;
+  text-align: right;
+}
+.preview-amount {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+  min-width: 120px;
+  text-align: right;
+}
+
+/* Group Content Animation */
+.group-content {
+  padding: 0.5rem 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+  max-height: none;
+  overflow: visible;
+}
+.group-subtotal { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: var(--selected_bg); border-top: 1px solid var(--border-color); font-weight: 600; }
+.subtotal-label { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+.subtotal-amounts { display: flex; gap: 2rem; }
+.subtotal-debit, .subtotal-credit, .subtotal-balance { font-size: 0.95rem; font-weight: 600; font-family: 'Courier New', monospace; color: var(--text); }
+
+.account-line { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 1rem; border-bottom: 1px solid var(--border-color); transition: background-color 0.2s ease; background: var(--surface); }
+.account-line:hover { background-color: var(--hover-bg); }
+.account-line:last-child { border-bottom: none; }
+.account-info { display: flex; align-items: center; gap: 1rem; flex: 1; }
+.account-code { font-family: 'Courier New', monospace; font-weight: 600; color: var(--accent); min-width: 80px; font-size: 0.9rem; }
+.account-name { color: var(--text); font-weight: 500; flex: 1; }
+.account-amounts { display: flex; gap: 2rem; align-items: center; }
+.debit-amount, .credit-amount, .balance-amount { font-family: 'Courier New', monospace; font-weight: 600; font-size: 0.95rem; min-width: 120px; text-align: right; color: var(--text); }
+
+.trial-balance-totals { display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding: 1rem; background: var(--accent); color: var(--on-accent); border-radius: 8px; font-size: 1.1rem; font-weight: 700; box-shadow: var(--shadow-light); }
+.totals-label { font-size: 1.1rem; font-weight: 700; }
+.totals-amounts { display: flex; gap: 2rem; }
+.total-debits, .total-credits, .total-balance { font-size: 1.1rem; font-weight: 700; font-family: 'Courier New', monospace; }
+
+.balance-status { display: inline-block; padding: 0.75rem 1.5rem; border-radius: 25px; font-weight: 600; font-size: 1rem; box-shadow: var(--shadow-light); }
+.balance-status.balanced { background: var(--success); color: var(--on-success); }
+.balance-status.unbalanced { background: var(--error); color: var(--on-error); }
+.trial-balance-check { margin-top: 1.5rem; text-align: center; }
+
+/* PRINT OPTIMIZATION */
+@media print {
+  .export-controls { display: none; }
+  .standard-financial-statements { background: white; color: black; box-shadow: none; padding: 1rem; max-width: none; }
+  .statement-header { background: white; color: black; border: 2px solid black; box-shadow: none; }
+  .statement-content { background: white; border: 1px solid black; box-shadow: none; }
+  .financial-group { background: white; border: 1px solid black; box-shadow: none; break-inside: avoid; }
+  .group-subtotal, .trial-balance-totals { background: white; color: black; border: 2px solid black; box-shadow: none; }
+  .account-line { border-bottom: 1px solid #ccc; background: white; }
+  .account-line.level-0, .account-line.level-1 { background: #f0f0f0; }
+  @page { size: A4; margin: 15mm; }
+}
+
+/* EXPORT CONTROLS (legacy) */
+.export-controls {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+  padding: 0.5rem 0;
+}
+
+.export-pdf-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  background: var(--success);
+  color: var(--on-success, white);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.export-pdf-btn:hover {
+  background: var(--success-hover, var(--success));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  filter: brightness(0.95);
+}
+
+.export-pdf-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.export-icon { font-size: 1.1rem; }
+
+/* PROFIT & LOSS STATEMENT STYLING */
+.profit-loss-container {
+  background: var(--background-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-light);
+}
+
+.profit-loss-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: var(--success);
+  color: var(--on-success);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-weight: 700;
+  box-shadow: var(--shadow-light);
+}
+
+.profit-loss-header .account-column {
+  flex: 2;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.profit-loss-header .amounts-columns {
+  display: flex;
+  flex: 1;
+  justify-content: center;
+}
+
+.amount-column {
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* P&L Account lines */
+.profit-loss-container .account-amounts {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.profit-loss-container .amount {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  font-size: 0.95rem;
+  min-width: 120px;
+  text-align: right;
+  color: var(--text-primary);
+}
+
+/* P&L Calculations Section */
+.profit-loss-calculations {
+  margin-top: 2rem;
+  border: 2px solid var(--border-strong);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-color);
+}
+
+.calculation-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 600;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.calculation-line:last-child {
+  border-bottom: none;
+}
+
+.calculation-line.gross-profit {
+  background: var(--surface);
+  border-bottom: 2px solid var(--border-color);
+  color: var(--text);
+}
+
+.calculation-line.gross-profit .calc-label,
+.calculation-line.gross-profit .calc-amount {
+  color: var(--text);
+}
+
+.calculation-line.operating-income {
+  background: var(--surface);
+  border-bottom: 2px solid var(--border-color);
+  color: var(--text);
+}
+
+.calculation-line.operating-income .calc-label,
+.calculation-line.operating-income .calc-amount {
+  color: var(--text);
+}
+
+.calculation-line.net-income {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.calculation-line.net-income .calc-label,
+.calculation-line.net-income .calc-amount {
+  color: var(--on-accent) !important;
+}
+
+/* Higher specificity rules for better override */
+.profit-loss-calculations .calculation-line {
+  color: var(--text) !important;
+}
+
+.profit-loss-calculations .calculation-line.gross-profit,
+.profit-loss-calculations .calculation-line.operating-income {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+}
+
+.profit-loss-calculations .calculation-line.gross-profit .calc-label,
+.profit-loss-calculations .calculation-line.gross-profit .calc-amount,
+.profit-loss-calculations .calculation-line.operating-income .calc-label,
+.profit-loss-calculations .calculation-line.operating-income .calc-amount {
+  color: var(--text) !important;
+}
+
+.profit-loss-calculations .calculation-line.net-income {
+  background: var(--accent) !important;
+  color: var(--on-accent) !important;
+}
+
+.profit-loss-calculations .calculation-line.net-income .calc-label,
+.profit-loss-calculations .calculation-line.net-income .calc-amount {
+  color: var(--on-accent) !important;
+}
+
+.calc-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.calc-amounts {
+  display: flex;
+  align-items: center;
+}
+
+.calc-amount {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  font-size: 1rem;
+  min-width: 150px;
+  text-align: right;
+  color: var(--text);
+}
+
+.calc-amount.profit {
+  color: var(--success-color);
+}
+
+.calc-amount.loss {
+  color: var(--accent-color);
+}
+
+/* Financial Ratios Section */
+.profit-loss-ratios {
+  margin-top: 1.5rem;
+  background: var(--surface-color);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.ratio-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--surface);
+}
+
+.ratio-line:last-child {
+  border-bottom: none;
+}
+
+.ratio-label {
+  font-size: 0.9rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.ratio-value {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text);
+  background: var(--hover-bg);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  min-width: 60px;
+  text-align: center;
+}
+
+/* P&L Subtotal styling */
+.profit-loss-container .subtotal-amounts {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.subtotal-amount {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text);
+  min-width: 120px;
+  text-align: right;
+}
+
+/* BALANCE SHEET STATEMENT STYLING */
+.balance-sheet-container {
+  background: var(--background-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-light);
+}
+
+.balance-sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: var(--success);
+  color: var(--on-success);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-weight: 700;
+  box-shadow: var(--shadow-light);
+}
+
+.balance-sheet-header .account-column {
+  flex: 2;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.balance-sheet-header .amounts-columns {
+  display: flex;
+  flex: 1;
+  justify-content: center;
+}
+
+/* Balance Sheet Account lines */
+.balance-sheet-container .account-amounts {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.balance-sheet-container .amount {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  font-size: 0.95rem;
+  min-width: 120px;
+  text-align: right;
+  color: var(--text-primary);
+}
+
+/* Balance Sheet Calculations Section */
+.balance-sheet-calculations {
+  margin-top: 2rem;
+  border: 2px solid var(--border-strong);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-color);
+}
+
+.balance-sheet-calculations .calculation-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 600;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.balance-sheet-calculations .calculation-line:last-child {
+  border-bottom: none;
+}
+
+.balance-sheet-calculations .calculation-line.total-assets {
+  background: var(--surface);
+  border-bottom: 2px solid var(--border-color);
+  color: var(--text);
+}
+
+.balance-sheet-calculations .calculation-line.total-liabilities-equity {
+  background: var(--surface);
+  border-bottom: 2px solid var(--border-color);
+  color: var(--text);
+}
+
+.balance-sheet-calculations .calculation-line.balance-check {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.balance-sheet-calculations .calculation-line.balance-check .calc-label,
+.balance-sheet-calculations .calculation-line.balance-check .calc-amount {
+  color: var(--on-accent) !important;
+}
+
+/* Balance Sheet Ratios Section */
+.balance-sheet-ratios {
+  margin-top: 1.5rem;
+  background: var(--surface-color);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.balance-sheet-ratios .ratio-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--surface);
+}
+
+.balance-sheet-ratios .ratio-line:last-child {
+  border-bottom: none;
+}
+
+/* Balance Sheet Subtotal styling */
+.balance-sheet-container .subtotal-amounts {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Higher specificity rules for Balance Sheet */
+.balance-sheet-calculations .calculation-line {
+  color: var(--text) !important;
+}
+
+.balance-sheet-calculations .calculation-line.total-assets,
+.balance-sheet-calculations .calculation-line.total-liabilities-equity {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+}
+
+.balance-sheet-calculations .calculation-line.total-assets .calc-label,
+.balance-sheet-calculations .calculation-line.total-assets .calc-amount,
+.balance-sheet-calculations .calculation-line.total-liabilities-equity .calc-label,
+.balance-sheet-calculations .calculation-line.total-liabilities-equity .calc-amount {
+  color: var(--text) !important;
+}
+
+.balance-sheet-calculations .calculation-line.balance-check {
+  background: var(--accent) !important;
+  color: var(--on-accent) !important;
+}
+
+.balance-sheet-calculations .calculation-line.balance-check .calc-label,
+.balance-sheet-calculations .calculation-line.balance-check .calc-amount {
+  color: var(--on-accent) !important;
+}
+
+/* Print styles for P&L */
+@media print {
+  .profit-loss-calculations {
+    background: white;
+    border: 2px solid black;
+  }
+  
+  .calculation-line {
+    background: white !important;
+    color: black !important;
+    border-bottom: 1px solid black;
+  }
+  
+  .calculation-line.net-income {
+    background: #f0f0f0 !important;
+    color: black !important;
+    border: 2px solid black;
+  }
+  
+  .profit-loss-ratios {
+    background: white;
+    border: 1px solid black;
+  }
+  
+  .ratio-line {
+    background: white;
+    border-bottom: 1px solid #ccc;
+  }
+  
+  /* Balance Sheet print styles */
+  .balance-sheet-calculations {
+    background: white;
+    border: 2px solid black;
+  }
+  
+  .balance-sheet-calculations .calculation-line {
+    background: white !important;
+    color: black !important;
+    border-bottom: 1px solid black;
+  }
+  
+  .balance-sheet-calculations .calculation-line.balance-check {
+    background: #f0f0f0 !important;
+    color: black !important;
+    border: 2px solid black;
+  }
+  
+  .balance-sheet-ratios {
+    background: white;
+    border: 1px solid black;
+  }
+  
+  .balance-sheet-ratios .ratio-line {
+    background: white;
+    border-bottom: 1px solid #ccc;
+  }
+}
+

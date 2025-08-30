@@ -70,6 +70,8 @@ const TransactionsPage: React.FC = () => {
   })
   const [debitFilterId, setDebitFilterId] = useState<string>('')
   const [creditFilterId, setCreditFilterId] = useState<string>('')
+  const [orgFilterId, setOrgFilterId] = useState<string>('')
+  const [projectFilterId, setProjectFilterId] = useState<string>('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
@@ -147,6 +149,12 @@ const TransactionsPage: React.FC = () => {
     load()
   }, [location.pathname])
 
+  // When opening the CRUD form, refresh accounts to pick up newly added accounts from the tree
+  useEffect(() => {
+    if (!formOpen) return
+    getAccounts().then(setAccounts).catch(() => {})
+  }, [formOpen])
+
   async function reload() {
     const { rows, total } = await getTransactions({
       filters: {
@@ -159,6 +167,8 @@ const TransactionsPage: React.FC = () => {
         amountTo: filters.amountTo ? parseFloat(filters.amountTo) : undefined,
         debitAccountId: debitFilterId || undefined,
         creditAccountId: creditFilterId || undefined,
+        orgId: orgFilterId || undefined,
+        projectId: projectFilterId || undefined,
       },
       page,
       pageSize,
@@ -196,8 +206,8 @@ const TransactionsPage: React.FC = () => {
       debit_account_label: accLabel(t.debit_account_id),
       credit_account_label: accLabel(t.credit_account_id),
       amount: t.amount,
-      organization_name: (t as any).organization_name || '—',
-      project_name: (t as any).project_name || '—',
+      organization_name: organizations.find(o => o.id === (t.org_id || ''))?.name || '—',
+      project_name: projects.find(p => p.id === (t.project_id || ''))?.name || '—',
       reference_number: t.reference_number || '—',
       notes: t.notes || '—',
       created_by_name: t.created_by ? (userNames[t.created_by] || t.created_by.substring(0, 8)) : '—',
@@ -217,6 +227,8 @@ const TransactionsPage: React.FC = () => {
       { key: 'debit_account', header: 'الحساب المدين', type: 'text' },
       { key: 'credit_account', header: 'الحساب الدائن', type: 'text' },
       { key: 'amount', header: 'المبلغ', type: 'currency' },
+      { key: 'organization_name', header: 'المؤسسة', type: 'text' },
+      { key: 'project_name', header: 'المشروع', type: 'text' },
       { key: 'reference_number', header: 'المرجع', type: 'text' },
       { key: 'notes', header: 'الملاحظات', type: 'text' },
       { key: 'created_by', header: 'أنشئت بواسطة', type: 'text' },
@@ -236,6 +248,8 @@ const TransactionsPage: React.FC = () => {
       debit_account: accLabel(t.debit_account_id),
       credit_account: accLabel(t.credit_account_id),
       amount: t.amount,
+      organization_name: organizations.find(o => o.id === (t.org_id || ''))?.name || '',
+      project_name: projects.find(p => p.id === (t.project_id || ''))?.name || '',
       reference_number: t.reference_number || '',
       notes: t.notes || '',
       created_by: t.created_by ? (userNames[t.created_by] || t.created_by) : '',
@@ -292,6 +306,13 @@ const TransactionsPage: React.FC = () => {
     }
   }, [editingTx, organizations, projects])
 
+  // Helper to enrich a transaction with display fields so UI reflects org/project immediately
+  const enrichTx = (tx: TransactionRecord) => {
+    const orgName = organizations.find(o => o.id === (tx.org_id || ''))?.name || null
+    const projectName = projects.find(p => p.id === (tx.project_id || ''))?.name || null
+    return { ...(tx as any), organization_name: orgName, project_name: projectName } as any
+  }
+
   // Unified form handlers
   const handleFormSubmit = async (data: any) => {
     _setFormErrors({})
@@ -311,8 +332,12 @@ const TransactionsPage: React.FC = () => {
           org_id: data.organization_id || null,
           project_id: data.project_id || null,
         })
-        setTransactions(prev => prev.map(t => t.id === updated.id ? updated : t))
+        // Ensure display fields (organization_name/project_name) are updated locally
+        const updatedEnriched = enrichTx(updated)
+        setTransactions(prev => prev.map(t => t.id === updated.id ? updatedEnriched : t))
         showToast('تم تحديث المعاملة', { severity: 'success' })
+        // Ensure server truth is reflected (joins, computed fields)
+        await reload()
       } else {
         // Create new transaction with optimistic update
         const tempId = `temp-${Date.now()}`
@@ -335,7 +360,9 @@ const TransactionsPage: React.FC = () => {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }
-        setTransactions(prev => [temp, ...prev])
+        // Enrich optimistic row for immediate display
+        const tempEnriched = enrichTx(temp)
+        setTransactions(prev => [tempEnriched as any, ...prev])
 
         const rec = await createTransaction({
           entry_number: data.entry_number,
@@ -349,9 +376,12 @@ const TransactionsPage: React.FC = () => {
           org_id: data.organization_id || undefined,
           project_id: data.project_id || undefined,
         })
-        // Replace temp with real
-        setTransactions(prev => prev.map(t => t.id === tempId ? rec : t))
+        // Replace temp with real and enrich for display
+        const recEnriched = enrichTx(rec)
+        setTransactions(prev => prev.map(t => t.id === tempId ? (recEnriched as any) : t))
         showToast('تم إنشاء المعاملة', { severity: 'success' })
+        // Refresh to load full server-side record
+        await reload()
       }
 
       setEditingTx(null)
@@ -359,7 +389,7 @@ const TransactionsPage: React.FC = () => {
     } catch (e: any) {
       // Rollback optimistic update if it was a create
       if (!editingTx) {
-        setTransactions(prev => prev.filter(t => !t.id.startsWith('temp-')))
+        setTransactions(prev => prev.filter(t => !(typeof t.id === 'string' && t.id.startsWith('temp-'))))
       }
       const msg = e?.message || 'خطأ في حفظ المعاملة'
       _setFormErrors({ general: msg })
@@ -436,7 +466,7 @@ const TransactionsPage: React.FC = () => {
     }
   }
 
-  useEffect(() => { reload().catch(() => {}) }, [searchTerm, filters.dateFrom, filters.dateTo, filters.amountFrom, filters.amountTo, debitFilterId, creditFilterId, page, pageSize, mode])
+  useEffect(() => { reload().catch(() => {}) }, [searchTerm, filters.dateFrom, filters.dateTo, filters.amountFrom, filters.amountTo, debitFilterId, creditFilterId, orgFilterId, projectFilterId, page, pageSize, mode])
 
   if (loading) return <div className="loading-container"><div className="loading-spinner" />جاري التحميل...</div>
   if (error) return <div className="error-container">خطأ: {error}</div>
@@ -445,7 +475,7 @@ const TransactionsPage: React.FC = () => {
     <div className="transactions-container" dir="rtl">
       <div className="transactions-header">
         <h1 className="transactions-title">المعاملات</h1>
-        <div className="transactions-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div className="transactions-actions">
           {mode === 'my' && (
             <WithPermission perm="transactions.create">
               <button className="ultimate-btn ultimate-btn-add" onClick={openNewTransactionForm}>
@@ -467,18 +497,15 @@ const TransactionsPage: React.FC = () => {
               <div className="btn-content"><span className="btn-text">سجل الأخطاء</span></div>
             </button>
           </WithPermission>
+          <button className="ultimate-btn ultimate-btn-warning" onClick={() => setShowDiag(v => !v)}>
+            <div className="btn-content"><span className="btn-text">{showDiag ? 'إخفاء الصلاحيات' : 'عرض الصلاحيات'}</span></div>
+          </button>
         </div>
       </div>
 
-      {/* Diagnostics toggle */}
-      <div style={{ padding: '0 1.5rem 0.5rem', display: 'flex', justifyContent: 'flex-end' }}>
-        <button className="ultimate-btn ultimate-btn-warning" onClick={() => setShowDiag(v => !v)}>
-          <div className="btn-content"><span className="btn-text">{showDiag ? 'إخفاء الصلاحيات' : 'عرض الصلاحيات'}</span></div>
-        </button>
-      </div>
       {showDiag && (
-        <div style={{ padding: '0 1.5rem 1rem' }}>
-          <div style={{ border: '1px dashed rgba(0,0,0,0.2)', borderRadius: 8, padding: '0.75rem', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <div className="diag-panel">
+          <div className="diag-perms-box">
             {['transactions.create','transactions.update','transactions.delete','transactions.post','transactions.manage'].map(key => (
               <PermissionBadge key={key} allowed={hasPerm(key)} label={key} />
             ))}
@@ -486,50 +513,243 @@ const TransactionsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Quick filters */}
-      <div className="controls-container">
-        <input className="search-input" placeholder="بحث..." value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setPage(1) }} />
-        <input className="filter-input" type="date" value={filters.dateFrom} onChange={e => { setFilters({ ...filters, dateFrom: e.target.value }); setPage(1) }} />
-        <input className="filter-input" type="date" value={filters.dateTo} onChange={e => { setFilters({ ...filters, dateTo: e.target.value }); setPage(1) }} />
-        <select className="filter-select" value={filters.isPosted} onChange={e => { setFilters({ ...filters, isPosted: e.target.value }); setPage(1) }}>
+      {/* Compact unified filters row - inspired by General Ledger */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        padding: '8px 0',
+        flexWrap: 'wrap',
+        borderBottom: '1px solid var(--border)',
+        fontSize: '12px',
+        backgroundColor: 'var(--surface)'
+      }}>
+        {/* Search */}
+        <input
+          placeholder="بحث..."
+          value={searchTerm}
+          onChange={e => { setSearchTerm(e.target.value); setPage(1) }}
+          style={{
+            width: '120px',
+            fontSize: '12px',
+            padding: '4px 8px',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            backgroundColor: 'var(--field_bg)',
+            color: 'var(--text)'
+          }}
+        />
+        
+        {/* Date range */}
+        <input
+          type="date"
+          value={filters.dateFrom}
+          onChange={e => { setFilters({ ...filters, dateFrom: e.target.value }); setPage(1) }}
+          style={{
+            width: '130px',
+            fontSize: '12px',
+            padding: '4px 8px',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            backgroundColor: 'var(--field_bg)',
+            color: 'var(--text)'
+          }}
+        />
+        <input
+          type="date"
+          value={filters.dateTo}
+          onChange={e => { setFilters({ ...filters, dateTo: e.target.value }); setPage(1) }}
+          style={{
+            width: '130px',
+            fontSize: '12px',
+            padding: '4px 8px',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            backgroundColor: 'var(--field_bg)',
+            color: 'var(--text)'
+          }}
+        />
+        
+        {/* Status filter */}
+        <select
+          value={filters.isPosted}
+          onChange={e => { setFilters({ ...filters, isPosted: e.target.value }); setPage(1) }}
+          style={{
+            fontSize: '12px',
+            padding: '4px 8px',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            backgroundColor: 'var(--field_bg)',
+            color: 'var(--text)',
+            minWidth: '90px'
+          }}
+        >
           <option value="">الحالة</option>
           <option value="posted">مرحلة</option>
           <option value="unposted">غير مرحلة</option>
         </select>
-        <Autocomplete
-          options={accounts.filter(a => a.is_postable)}
-          getOptionLabel={(a) => `${a.code} - ${a.name}`}
-          value={accounts.find(a => a.id === debitFilterId) || null}
-onChange={(_e, val) => { setDebitFilterId(val?.id || ''); setPage(1) }}
-          renderInput={(params) => <TextField {...params} label="تصفية: الحساب المدين" />}
-          sx={{ minWidth: 260 }}
+        
+        {/* Organization filter */}
+        <select
+          value={orgFilterId}
+          onChange={e => { setOrgFilterId(e.target.value); setPage(1) }}
+          style={{
+            fontSize: '12px',
+            padding: '4px 8px',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            backgroundColor: 'var(--field_bg)',
+            color: 'var(--text)',
+            maxWidth: '180px'
+          }}
+        >
+          <option value="">جميع المؤسسات</option>
+          {organizations.map(o => (
+            <option key={o.id} value={o.id}>
+              {`${o.code} - ${o.name}`.substring(0, 40)}
+            </option>
+          ))}
+        </select>
+        
+        {/* Project filter */}
+        <select
+          value={projectFilterId}
+          onChange={e => { setProjectFilterId(e.target.value); setPage(1) }}
+          style={{
+            fontSize: '12px',
+            padding: '4px 8px',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            backgroundColor: 'var(--field_bg)',
+            color: 'var(--text)',
+            maxWidth: '180px'
+          }}
+        >
+          <option value="">جميع المشاريع</option>
+          {projects.map(p => (
+            <option key={p.id} value={p.id}>
+              {`${p.code} - ${p.name}`.substring(0, 40)}
+            </option>
+          ))}
+        </select>
+        
+        {/* Debit account filter */}
+        <select
+          value={debitFilterId}
+          onChange={e => { setDebitFilterId(e.target.value); setPage(1) }}
+          style={{
+            fontSize: '12px',
+            padding: '4px 8px',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            backgroundColor: 'var(--field_bg)',
+            color: 'var(--text)',
+            maxWidth: '200px'
+          }}
+        >
+          <option value="">جميع الحسابات المدينة</option>
+          {accounts.filter(a => a.is_postable).map(a => (
+            <option key={a.id} value={a.id}>
+              {`${a.code} - ${a.name}`.substring(0, 45)}
+            </option>
+          ))}
+        </select>
+        
+        {/* Credit account filter */}
+        <select
+          value={creditFilterId}
+          onChange={e => { setCreditFilterId(e.target.value); setPage(1) }}
+          style={{
+            fontSize: '12px',
+            padding: '4px 8px',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            backgroundColor: 'var(--field_bg)',
+            color: 'var(--text)',
+            maxWidth: '200px'
+          }}
+        >
+          <option value="">جميع الحسابات الدائنة</option>
+          {accounts.filter(a => a.is_postable).map(a => (
+            <option key={a.id} value={a.id}>
+              {`${a.code} - ${a.name}`.substring(0, 45)}
+            </option>
+          ))}
+        </select>
+        
+        {/* Amount range filters */}
+        <input
+          type="number"
+          placeholder="من مبلغ"
+          value={filters.amountFrom}
+          onChange={e => { setFilters({ ...filters, amountFrom: e.target.value }); setPage(1) }}
+          style={{
+            width: '90px',
+            fontSize: '12px',
+            padding: '4px 8px',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            backgroundColor: 'var(--field_bg)',
+            color: 'var(--text)'
+          }}
         />
-        <Autocomplete
-          options={accounts.filter(a => a.is_postable)}
-          getOptionLabel={(a) => `${a.code} - ${a.name}`}
-          value={accounts.find(a => a.id === creditFilterId) || null}
-onChange={(_e, val) => { setCreditFilterId(val?.id || ''); setPage(1) }}
-          renderInput={(params) => <TextField {...params} label="تصفية: الحساب الدائن" />}
-          sx={{ minWidth: 260 }}
+        <input
+          type="number"
+          placeholder="إلى مبلغ"
+          value={filters.amountTo}
+          onChange={e => { setFilters({ ...filters, amountTo: e.target.value }); setPage(1) }}
+          style={{
+            width: '90px',
+            fontSize: '12px',
+            padding: '4px 8px',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            backgroundColor: 'var(--field_bg)',
+            color: 'var(--text)'
+          }}
         />
-        <input className="filter-input" type="number" placeholder="من مبلغ" value={filters.amountFrom} onChange={e => { setFilters({ ...filters, amountFrom: e.target.value }); setPage(1) }} />
-        <input className="filter-input" type="number" placeholder="إلى مبلغ" value={filters.amountTo} onChange={e => { setFilters({ ...filters, amountTo: e.target.value }); setPage(1) }} />
-        <button className="ultimate-btn" onClick={() => {
-          setSearchTerm('')
-          setFilters({ dateFrom: '', dateTo: '', isPosted: '', amountFrom: '', amountTo: '' })
-          setDebitFilterId('')
-          setCreditFilterId('')
-          setPage(1)
-        }}>
-          <div className="btn-content"><span className="btn-text">مسح الفلاتر</span></div>
+        
+        {/* Clear filters button */}
+        <button
+          onClick={() => {
+            setSearchTerm('')
+            setFilters({ dateFrom: '', dateTo: '', isPosted: '', amountFrom: '', amountTo: '' })
+            setDebitFilterId('')
+            setCreditFilterId('')
+            setOrgFilterId('')
+            setProjectFilterId('')
+            setPage(1)
+          }}
+          style={{
+            fontSize: '20px',
+            padding: '6px 12px',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            backgroundColor: 'var(--warning)',
+            color: '#000000',
+            cursor: 'pointer',
+            minWidth: '40px',
+            minHeight: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          title="مسح جميع الفلاتر"
+        >
+          🔄
         </button>
       </div>
 
       {/* Table */}
       <div className="transactions-content">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px' }}>
-          <div>عدد السجلات: {totalCount}</div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div className="transactions-tablebar">
+          <div className="transactions-toolbar">
+            <span className="transactions-count">عدد السجلات: {totalCount}</span>
+            <button className="ultimate-btn" onClick={() => reload().catch(() => {})}>
+              <div className="btn-content"><span className="btn-text">تحديث</span></div>
+            </button>
+          </div>
+          <div className="transactions-pagination">
             <button className="ultimate-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}><div className="btn-content"><span className="btn-text">السابق</span></div></button>
             <span>صفحة {page} من {Math.max(1, Math.ceil(totalCount / pageSize))}</span>
             <button className="ultimate-btn" onClick={() => setPage(p => Math.min(Math.ceil(totalCount / pageSize) || 1, p + 1))} disabled={page >= Math.ceil(totalCount / pageSize)}><div className="btn-content"><span className="btn-text">التالي</span></div></button>
@@ -599,12 +819,6 @@ onChange={(_e, val) => { setCreditFilterId(val?.id || ''); setPage(1) }}
         />
       </div>
 
-      {/* Debug information */}
-      {process.env.NODE_ENV === 'development' && (
-        <div style={{ position: 'fixed', top: 10, left: 10, background: 'red', color: 'white', padding: '5px', zIndex: 9999 }}>
-          formOpen: {formOpen.toString()}, accounts: {accounts.length}, editingTx: {editingTx ? 'yes' : 'no'}
-        </div>
-      )}
       
       {/* Unified Transaction Form Panel */}
       <DraggableResizablePanel
@@ -630,6 +844,15 @@ onChange={(_e, val) => { setCreditFilterId(val?.id || ''); setPage(1) }}
           setPanelDocked(false)
         }}
       >
+          <div className="panel-actions">
+            <button
+              className="ultimate-btn"
+              title="تحديث قائمة الحسابات"
+              onClick={() => getAccounts().then(setAccounts).catch(() => {})}
+            >
+              <div className="btn-content"><span className="btn-text">تحديث الحسابات</span></div>
+            </button>
+          </div>
           <UnifiedCRUDForm
             ref={formRef}
             config={transactionFormConfig}
@@ -648,9 +871,9 @@ onChange={(_e, val) => { setCreditFilterId(val?.id || ''); setPage(1) }}
       {/* Admin: Client Error Logs Viewer */}
       {showLogs && (
         <div className="transaction-modal" onClick={() => setShowLogs(false)}>
-          <div className="transaction-modal-content" style={{ width: 'min(1200px, 95vw)', maxHeight: '90vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <h3 className="modal-title" style={{ margin: 0 }}>سجل أخطاء العميل</h3>
+          <div className="transaction-modal-content transaction-modal-content--wide" onClick={e => e.stopPropagation()}>
+            <div className="modal-header-row">
+              <h3 className="modal-title">سجل أخطاء العميل</h3>
               <button className="ultimate-btn ultimate-btn-delete" onClick={() => setShowLogs(false)}>
                 <div className="btn-content"><span className="btn-text">إغلاق</span></div>
               </button>

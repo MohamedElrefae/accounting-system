@@ -136,9 +136,33 @@
 /* Search Container */
 .searchContainer {
   position: relative;
-  padding: 16px 20px;
+  padding: 16px 20px 8px 20px;
   border-bottom: 1px solid var(--border);
   background: var(--field_bg);
+}
+
+/* Actions Row below search input */
+.actionsRow {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.actionButton {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.actionButton:hover {
+  background: var(--hover-bg);
+  border-color: var(--accent);
 }
 
 .searchIcon {
@@ -187,7 +211,10 @@
 
 /* Individual Option */
 .option {
-  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
   cursor: pointer;
   transition: all 0.2s ease;
   color: var(--text);
@@ -206,7 +233,6 @@
   background: var(--hover-bg);
   color: var(--text);
   border-left: 3px solid var(--accent);
-  padding-left: 17px;
 }
 
 .optionHighlighted {
@@ -214,7 +240,6 @@
   color: var(--text);
   border-left: 3px solid var(--accent);
   font-weight: 600;
-  padding-left: 17px;
 }
 
 .optionSelected {
@@ -222,7 +247,6 @@
   color: var(--text);
   font-weight: 700;
   border-left: 4px solid var(--accent);
-  padding-left: 16px;
   position: relative;
 }
 
@@ -240,6 +264,42 @@
   color: var(--success);
   font-weight: bold;
   font-size: 16px;
+}
+
+/* Caret for tree expand/collapse */
+.caret {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--muted_text);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.caretClosed {
+  transform: rotate(-90deg);
+  transition: transform 0.2s ease;
+}
+
+.caretOpen {
+  transform: rotate(0deg);
+  transition: transform 0.2s ease;
+}
+
+.caretPlaceholder {
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.optionLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* No Options Message */

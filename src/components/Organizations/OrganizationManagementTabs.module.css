@@ -1,0 +1,10 @@
+/* Wrapper with tab header; uses unified theme tokens */
+.container { height: 100vh; display: flex; flex-direction: column; background: var(--background); color: var(--text); }
+.header { background: var(--surface); border-bottom: 1px solid var(--border); }
+.headerContent { max-width: 1600px; margin: 0 auto; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+.headerContent h1 { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--heading); }
+.tabs { display: flex; gap: 0.5rem; }
+.tab { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.9rem; background: var(--field_bg); color: var(--text); border: 1px solid var(--border); border-radius: 999px; cursor: pointer; }
+.tab:hover { background: var(--hover-bg); }
+.active { background: var(--accent); color: var(--button_text); border-color: transparent; }
+.content { flex: 1; overflow: auto; }

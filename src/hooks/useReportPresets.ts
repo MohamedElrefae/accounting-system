@@ -69,7 +69,7 @@ export function useReportPresets(reportKey: string): UseReportPresets {
       columns: params.columns ?? [],
       id: params.id ?? null,
     })
-    const items = await reloadPresets()
+    await reloadPresets()
     setSelectedPresetId(saved.id)
     saveLastPresetId(reportKey, saved.id)
     return saved

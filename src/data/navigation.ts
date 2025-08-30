@@ -102,6 +102,14 @@ export const navigationItems: NavigationItem[] = [
         path: "/reports/general-ledger"
       },
       {
+        id: "account-explorer",
+        label: "Account Explorer (Tree)",
+        titleEn: "Account Explorer (Tree)",
+        titleAr: "مستكشف الحسابات (شجري)",
+        icon: "tree-structure",
+        path: "/reports/account-explorer"
+      },
+      {
         id: "profit-loss",
         label: "Profit & Loss", 
         titleEn: "Profit & Loss",
@@ -143,12 +151,20 @@ export const navigationItems: NavigationItem[] = [
         path: "/settings/roles"
       },
       {
-        id: "company-settings",
-        label: "Company Settings",
-        titleEn: "Company Settings",
-        titleAr: "إعدادات الشركة",
-        icon: "building",
-        path: "/settings/company"
+        id: "org-management",
+        label: "Organization Management",
+        titleEn: "Organization Management",
+        titleAr: "إدارة المؤسسة",
+        icon: "settings",
+        path: "/settings/organization-management"
+      },
+      {
+        id: "account-prefix-mapping",
+        label: "Account Prefix Mapping",
+        titleEn: "Account Prefix Mapping",
+        titleAr: "تصنيف رموز الحسابات",
+        icon: "settings",
+        path: "/settings/account-prefix-mapping"
       },
       {
         id: "diagnostics",

@@ -116,11 +116,66 @@ export const createTransactionFormConfig = (
   
   // Convert accounts to select options with search capability
   const postableAccounts = accounts.filter(a => a.is_postable);
-  const accountOptions = postableAccounts.map(account => ({
-    value: account.id,
-    label: `${account.code} - ${account.name}`,
-    searchText: `${account.code} ${account.name}`.toLowerCase()
-  }));
+  // Build hierarchical (level-based) options with real tree nodes and level headers
+  const byParent: Record<string, Account[]> = {};
+  const allById: Record<string, Account> = {};
+  const roots: Account[] = [];
+  for (const a of accounts) allById[a.id] = a;
+  for (const a of accounts) {
+    if (a.parent_id && allById[a.parent_id]) {
+      if (!byParent[a.parent_id]) byParent[a.parent_id] = [];
+      byParent[a.parent_id].push(a);
+    } else {
+      roots.push(a);
+    }
+  }
+  const sortByCode = (list: Account[]) => list.sort((x, y) => x.code.localeCompare(y.code));
+  sortByCode(roots);
+  for (const key of Object.keys(byParent)) sortByCode(byParent[key]);
+
+  const levelLabel = (lvl?: number) => {
+    switch (lvl) {
+      case 1: return '— المستوى 1 —';
+      case 2: return '— المستوى 2 —';
+      case 3: return '— المستوى 3 —';
+      case 4: return '— المستوى 4 —';
+      default: return '— مستويات أخرى —';
+    }
+  };
+
+  const makeNode = (acc: Account): any => {
+    const children = (byParent[acc.id] || []).map(makeNode);
+    return {
+      value: acc.id,
+      label: acc.is_postable
+        ? `${acc.code} - ${acc.name} • قابل للترحيل`
+        : `${acc.code} - ${acc.name} (غير قابل للترحيل)`,
+      searchText: `${acc.code} ${acc.name}`.toLowerCase(),
+      disabled: !acc.is_postable,
+      title: acc.is_postable ? 'هذا الحساب قابل للترحيل' : 'هذا الحساب غير قابل للترحيل — اختر حساباً تفصيلياً',
+      children: children.length ? children : undefined
+    };
+  };
+
+  const byLevel: Record<number, Account[]> = {};
+  for (const a of roots) {
+    const lvl = a.level || 1;
+    if (!byLevel[lvl]) byLevel[lvl] = [];
+    byLevel[lvl].push(a);
+  }
+  const allAccountOptions: any[] = [];
+  for (const lvl of [1, 2, 3, 4]) {
+    const list = byLevel[lvl] || [];
+    if (list.length === 0) continue;
+    allAccountOptions.push({
+      value: `__level_${lvl}`,
+      label: levelLabel(lvl),
+      searchText: levelLabel(lvl),
+      disabled: true as const,
+      title: undefined as string | undefined,
+      children: list.map(makeNode)
+    });
+  }
 
   // Convert projects to select options
   const projectOptions = projects.map(project => ({
@@ -136,10 +191,7 @@ export const createTransactionFormConfig = (
     searchText: `${org.code} ${org.name} ${org.description || ''}`.toLowerCase()
   }));
   
-  // Find default organization (MAIN)
-  const defaultOrg = organizations.find(org => org.code === 'MAIN');
-  // Find default project (GENERAL)
-  const defaultProject = projects.find(project => project.code === 'GENERAL');
+  // Defaults can be applied in future if needed (kept intentionally minimal to avoid unused variables)
 
   const fields: FormField[] = [
     {
@@ -184,9 +236,17 @@ export const createTransactionFormConfig = (
       type: 'searchable-select' as any,
       label: 'الحساب المدين',
       required: true,
-      options: [{ value: '', label: 'اختر الحساب المدين...', searchText: '' }, ...accountOptions],
+      options: [{ value: '', label: 'اختر الحساب المدين...', searchText: '' }, ...allAccountOptions],
       icon: <Building2 size={16} />,
-      validation: (value: string) => validateAccountSelection(value, 'debit_account_id', 'الحساب المدين'),
+      validation: (value: string) => {
+        const base = validateAccountSelection(value, 'debit_account_id', 'الحساب المدين');
+        if (base) return base;
+        const selected = accounts.find(a => a.id === value);
+        if (selected && !selected.is_postable) {
+          return { field: 'debit_account_id', message: 'هذا الحساب غير قابل للترحيل — اختر حساباً تفصيلياً' };
+        }
+        return null;
+      },
       helpText: 'الحساب الذي سيخصم منه المبلغ',
       searchable: true,
       clearable: true,
@@ -199,9 +259,17 @@ export const createTransactionFormConfig = (
       type: 'searchable-select' as any,
       label: 'الحساب الدائن',
       required: true,
-      options: [{ value: '', label: 'اختر الحساب الدائن...', searchText: '' }, ...accountOptions],
+      options: [{ value: '', label: 'اختر الحساب الدائن...', searchText: '' }, ...allAccountOptions],
       icon: <Building2 size={16} />,
-      validation: (value: string) => validateAccountSelection(value, 'credit_account_id', 'الحساب الدائن'),
+      validation: (value: string) => {
+        const base = validateAccountSelection(value, 'credit_account_id', 'الحساب الدائن');
+        if (base) return base;
+        const selected = accounts.find(a => a.id === value);
+        if (selected && !selected.is_postable) {
+          return { field: 'credit_account_id', message: 'هذا الحساب غير قابل للترحيل — اختر حساباً تفصيلياً' };
+        }
+        return null;
+      },
       helpText: 'الحساب الذي سيضاف إليه المبلغ',
       searchable: true,
       clearable: true,

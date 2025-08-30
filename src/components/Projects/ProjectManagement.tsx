@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FolderOpen, Plus, Edit, Trash2, Building, Calendar, DollarSign, Clock } from 'lucide-react';
+import { FolderOpen, Plus, Edit, Trash2, Building, Calendar, DollarSign } from 'lucide-react';
 import { getActiveProjects, createProject, updateProject, deleteProject, type Project } from '../../services/projects';
 import { getOrganizations, type Organization } from '../../services/organization';
 import { useToast } from '../../contexts/ToastContext';
@@ -78,11 +78,11 @@ const ProjectManagement: React.FC = () => {
       code: project.code,
       name: project.name,
       description: project.description || '',
-      organization_id: project.organization_id || '',
+      organization_id: (project as any).organization_id || '',
       status: project.status,
       start_date: project.start_date || '',
       end_date: project.end_date || '',
-      budget: project.budget || 0
+      budget: (project as any).budget_amount ?? (project as any).budget ?? 0
     });
     setDialogOpen(true);
   };
@@ -211,10 +211,10 @@ const ProjectManagement: React.FC = () => {
                     </div>
                   </div>
                   
-                  {project.organization_id && (
+                  {(project as any).organization_id && (
                     <div className={styles.organizationInfo}>
                       <Building className={styles.organizationIcon} size={16} />
-                      <span>{getOrganizationName(project.organization_id)}</span>
+                      <span>{getOrganizationName((project as any).organization_id)}</span>
                     </div>
                   )}
                   

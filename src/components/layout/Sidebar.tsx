@@ -131,7 +131,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
   
   // Force component update when language changes
   React.useEffect(() => {
-    console.log('[Sidebar] Language changed to:', language, 'isRtl:', isRtl);
+    // Component will re-render when language or isRtl changes
   }, [language, isRtl]);
 
 

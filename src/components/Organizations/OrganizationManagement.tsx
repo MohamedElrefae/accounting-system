@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit, Trash2, CheckCircle, XCircle, MapPin, Phone, Mail, FileText } from 'lucide-react';
+import { Building2, Plus, Edit, Trash2, MapPin, Phone, Mail, FileText } from 'lucide-react';
 import { getOrganizations, createOrganization, updateOrganization, deleteOrganization, type Organization } from '../../services/organization';
 import { useToast } from '../../contexts/ToastContext';
 import styles from './OrganizationManagement.module.css';

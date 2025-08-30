@@ -8,6 +8,8 @@ import { useToast } from '../../contexts/ToastContext';
 import UnifiedCRUDForm, { type UnifiedCRUDFormHandle } from '../../components/Common/UnifiedCRUDForm';
 import { createAccountFormConfig } from '../../components/Accounts/AccountFormConfig';
 import DraggableResizablePanel from '../../components/Common/DraggableResizablePanel';
+import { getOrganizations } from '../../services/organization';
+import { useHasPermission } from '../../hooks/useHasPermission';
 
 interface AccountItem {
   id: string;
@@ -30,14 +32,13 @@ interface AncestorItem {
   path_text: string;
 }
 
-function getOrgId(): string {
+function getInitialOrgId(): string | '' {
   try {
     const v = localStorage.getItem('org_id');
     if (v && v.length > 0) return v;
   } catch {}
-  return '4cbba543-eb9c-4f32-9c77-155201f7e145';
+  return '';
 }
-const ORG_ID = getOrgId();
 
 // Enum mapping functions to convert frontend values to database enum types
 function mapAccountTypeToDbEnum(frontendType: string): string {
@@ -67,6 +68,10 @@ const AccountsTreePage: React.FC = () => {
   const [projects, setProjects] = useState<{ id: string; code: string; name: string; name_ar?: string }[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [balanceMode, setBalanceMode] = useState<'posted' | 'all'>('posted');
+
+  // Organizations selector
+  const [organizations, setOrganizations] = useState<{ id: string; code: string; name: string }[]>([]);
+  const [orgId, setOrgId] = useState<string>(getInitialOrgId());
 
   // Edit/Add dialog state (must be before unifiedConfig)
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -156,6 +161,8 @@ const AccountsTreePage: React.FC = () => {
     return () => window.removeEventListener('keydown', handler);
   }, [dialogOpen]);
 
+  const hasAccountsUpdate = useHasPermission('accounts.update');
+
   const unifiedConfig = useMemo(() => {
     const existing = (dialogMode === 'edit' && draft?.id)
       ? {
@@ -168,43 +175,100 @@ const AccountsTreePage: React.FC = () => {
           statement_type: '',
           parent_id: (draft.parent_id as string) || null,
           is_active: (draft.status || 'active') === 'active',
-          allow_transactions: ((draft.level as number) || 1) >= 3,
+          allow_transactions: (typeof (draft as any).allow_transactions === 'boolean')
+            ? (draft as any).allow_transactions
+            : (((draft.level as number) || 1) >= 3),
         }
       : undefined;
-    return createAccountFormConfig(dialogMode === 'edit', parentAccountsLite, existing as any, true);
-  }, [dialogMode, draft, parentAccountsLite]);
+    return createAccountFormConfig(dialogMode === 'edit', parentAccountsLite, existing as any, true, !!hasAccountsUpdate);
+  }, [dialogMode, draft, parentAccountsLite, hasAccountsUpdate]);
 
   const { showToast } = useToast();
 
+  // Cache for delete-eligibility info to reduce RPC traffic
+  const [deleteFlags, setDeleteFlags] = useState<Record<string, { has_transactions: boolean; is_standard: boolean }>>({});
+
+  async function fetchCanDeleteFlags(accountIds: string[]) {
+    if (!orgId || accountIds.length === 0) return;
+    // Filter out ids we already have
+    const pending = accountIds.filter(id => !deleteFlags[id]);
+    if (pending.length === 0) return;
+
+    const updates: Record<string, { has_transactions: boolean; is_standard: boolean }> = {};
+
+    // Process in small parallel batches to reduce latency but avoid hammering the backend
+    const BATCH_SIZE = 6;
+    for (let i = 0; i < pending.length; i += BATCH_SIZE) {
+      const slice = pending.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(slice.map(async (id) => {
+        try {
+          const { data, error } = await supabase.rpc('can_delete_account', {
+            p_org_id: orgId,
+            p_account_id: id,
+          });
+          if (!error && Array.isArray(data) && data.length > 0) {
+            const row = data[0] as any;
+            return [id, { has_transactions: !!row.has_transactions, is_standard: !!row.is_standard }] as const;
+          }
+        } catch {}
+        return [id, null] as const;
+      }));
+
+      for (const [id, val] of results) {
+        if (val) updates[id] = val;
+      }
+    }
+
+    if (Object.keys(updates).length) {
+      setDeleteFlags(prev => ({ ...prev, ...updates }));
+      // Also merge onto accounts so UI logic sees them immediately
+      setAccounts(prev => prev.map(a => updates[a.id] ? { ...(a as any), ...updates[a.id] } : a));
+    }
+  }
+
   useEffect(() => {
-    loadRoots().catch(() => {});
+    // Load organizations first
+    (async () => {
+      try {
+        const orgs = await getOrganizations();
+        setOrganizations(orgs.map(o => ({ id: o.id, code: o.code, name: o.name })));
+        if (!getInitialOrgId() && orgs.length > 0) {
+          const first = orgs[0].id;
+          setOrgId(first);
+          try { localStorage.setItem('org_id', first); } catch {}
+        }
+      } catch {}
+    })();
     loadProjects().catch(() => {});
   }, []);
 
   useEffect(() => {
-    // When project changes or search cleared, reload roots
+    // When org or project changes or search cleared, reload roots
+    if (!orgId) return;
     if (!searchTerm) {
       loadRoots().catch(() => {});
     } else {
       performSearch().catch(() => {});
     }
-  }, [selectedProject]);
+  }, [orgId, selectedProject]);
 
   useEffect(() => {
     // server-driven search
+    if (!orgId) return;
     if (!searchTerm) {
       loadRoots().catch(() => {});
     } else {
       performSearch().catch(() => {});
     }
-  }, [searchTerm]);
+  }, [searchTerm, orgId]);
 
   async function loadRoots() {
     setLoading(true);
+    if (!orgId) { setLoading(false); return; }
     let query = supabase
       .from('v_accounts_tree_ui')
       .select('*')
-      .eq('org_id', ORG_ID)
+      .eq('org_id', orgId)
       .is('parent_id', null)
       .order('code', { ascending: true });
     if (selectedProject) {
@@ -212,8 +276,11 @@ const AccountsTreePage: React.FC = () => {
     }
     const { data, error } = await query;
     if (!error) {
-      setAccounts((data || []).map(mapRow));
+      const rows = (data || []).map(mapRow);
+      setAccounts(rows);
       setExpanded(new Set());
+      // Hydrate delete flags for visible roots
+      fetchCanDeleteFlags(rows.map(r => r.id)).catch(() => {});
     }
     setLoading(false);
   }
@@ -222,7 +289,7 @@ const AccountsTreePage: React.FC = () => {
     let query = supabase
       .from('v_accounts_tree_ui')
       .select('*')
-      .eq('org_id', ORG_ID)
+      .eq('org_id', orgId)
       .eq('parent_id', parentId)
       .order('code', { ascending: true });
     if (selectedProject) query = query.eq('project_id', selectedProject);
@@ -264,22 +331,35 @@ const AccountsTreePage: React.FC = () => {
       }
       return merged;
     });
+    // Hydrate delete flags for loaded children
+    fetchCanDeleteFlags(children.map(c => c.id)).catch(() => {});
     newSet.add(node.id);
     setExpanded(newSet);
   }
 
   async function handleSelectAccount(node: AccountItem) {
-    const { data, error } = await supabase.rpc('get_account_ancestors', {
-      p_org_id: ORG_ID,
+      const { data, error } = await supabase.rpc('get_account_ancestors', {
+        p_org_id: orgId,
       p_account_id: node.id,
     });
     if (!error) setBreadcrumbs((data || []) as AncestorItem[]);
   }
 
   // Shared action handlers for both views (Tree and Table)
-  const handleEdit = (node: AccountItem) => {
+  const handleEdit = async (node: AccountItem) => {
     setDialogMode('edit');
-    setDraft({ ...node });
+    // fetch freshest allow_transactions from accounts table
+    try {
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('id, allow_transactions')
+        .eq('id', node.id)
+        .single();
+      const allow = !error && data ? !!(data as any).allow_transactions : undefined;
+      setDraft({ ...node, ...(allow !== undefined ? { allow_transactions: allow } : {}) });
+    } catch {
+      setDraft({ ...node });
+    }
     setDialogOpen(true);
   };
 
@@ -296,12 +376,26 @@ const AccountsTreePage: React.FC = () => {
       account_type: parent.account_type || ''
     });
     setDialogOpen(true);
+
+    // Ask server for a unique next code suggestion (respects org-wide uniqueness)
+    try {
+      const { data, error } = await supabase.rpc('get_next_account_code', {
+        p_org_id: orgId,
+        p_parent_code: parent.code,
+        p_style: 'auto'
+      });
+      if (!error && data) {
+        setDraft(prev => ({ ...prev, code: String(data) }));
+      }
+    } catch {
+      // Non-fatal: fall back to local suggestion inside the form
+    }
   };
 
   const handleToggleStatus = async (node: AccountItem) => {
     try {
       const { error } = await supabase.rpc('toggle_account_status', {
-        p_org_id: ORG_ID,
+        p_org_id: orgId,
         p_account_id: node.id,
       });
       if (error) throw error;
@@ -317,15 +411,22 @@ const AccountsTreePage: React.FC = () => {
     if (!window.confirm(`هل أنت متأكد من حذف "${node.name_ar || node.name}"؟`)) return;
     try {
       const { error } = await supabase.rpc('account_delete', {
-        p_org_id: ORG_ID,
+        p_org_id: orgId,
         p_account_id: node.id,
       });
       if (error) throw error;
+      // account_delete returns void; if it didn't throw, consider it success
       setAccounts(prev => prev.filter(a => a.id !== node.id));
       showToast('تم حذف الحساب', { severity: 'success' });
-    } catch (e) {
-      console.error('account_delete failed', e);
-      showToast('فشل حذف الحساب', { severity: 'error' });
+    } catch (e: any) {
+      const msg = e?.message || e?.error_description || e?.hint || e?.details || '';
+      console.error('account_delete failed', e, msg);
+      // Provide more helpful messages for common scenarios
+      const friendly =
+        msg?.toLowerCase().includes('children') ? 'لا يمكن حذف الحساب لوجود حسابات فرعية.' :
+        (msg?.toLowerCase().includes('foreign key') || msg?.toLowerCase().includes('related') || msg?.toLowerCase().includes('referenced')) ? 'لا يمكن حذف الحساب لوجود حركات أو بيانات مرتبطة.' :
+        '';
+      showToast(`فشل حذف الحساب${friendly ? `: ${friendly}` : (msg ? `: ${msg}` : '')}`, { severity: 'error' });
     }
   };
 
@@ -350,7 +451,7 @@ const AccountsTreePage: React.FC = () => {
     let query = supabase
       .from('v_accounts_tree_ui')
       .select('*')
-      .eq('org_id', ORG_ID)
+      .eq('org_id', orgId)
       .or(`code.ilike.%${searchTerm}%,name.ilike.%${searchTerm}%,name_ar.ilike.%${searchTerm}%`)
       .order('path_text', { ascending: true })
       .limit(200);
@@ -363,7 +464,7 @@ const AccountsTreePage: React.FC = () => {
     const ancestorSets: AccountItem[][] = [];
     for (const m of matches) {
       const { data: anc, error: ancErr } = await supabase.rpc('get_account_ancestors', {
-        p_org_id: ORG_ID,
+        p_org_id: orgId,
         p_account_id: m.id,
       });
       if (!ancErr) {
@@ -396,11 +497,14 @@ const AccountsTreePage: React.FC = () => {
     ]);
     setAccounts(combined);
 
+    // Hydrate delete flags for the combined visible list
+    fetchCanDeleteFlags(combined.map(c => c.id)).catch(() => {});
+
     // Expand all ancestor paths of matches
     const toExpand = new Set<string>();
     for (const m of matches) {
       const { data: anc } = await supabase.rpc('get_account_ancestors', {
-        p_org_id: ORG_ID,
+        p_org_id: orgId,
         p_account_id: m.id,
       });
       (anc || []).forEach((r: any) => toExpand.add(r.id));
@@ -532,6 +636,13 @@ const AccountsTreePage: React.FC = () => {
         </div>
 
         <div className="view-mode-toggle">
+          {/* Organization selector */}
+          <select value={orgId} onChange={(e) => { setOrgId(e.target.value); try { localStorage.setItem('org_id', e.target.value); } catch {} }} className="filter-select">
+            <option value="">اختر المؤسسة</option>
+            {organizations.map(o => (
+              <option key={o.id} value={o.id}>{o.code} - {o.name}</option>
+            ))}
+          </select>
           <button className={`view-mode-btn ${viewMode === 'tree' ? 'active' : ''}`} onClick={() => setViewMode('tree')}>عرض شجرة</button>
           <button className={`view-mode-btn ${viewMode === 'table' ? 'active' : ''}`} onClick={() => setViewMode('table')}>عرض جدول</button>
         </div>
@@ -559,6 +670,28 @@ const AccountsTreePage: React.FC = () => {
               return !!(item.has_active_children || item.has_children);
             }}
             getChildrenCount={(node) => accounts.filter(a => a.parent_id === (node as any).id).length}
+            isDeleteDisabled={(node) => {
+              const id = (node as any).id as string;
+              const item = accounts.find(a => a.id === id);
+              if (!item) return true;
+              // Disable if parent (has children) – immediate and cheap
+              if (item.has_children || item.has_active_children) return true;
+              // Optional: disable if we already know it has transactions or is standard (cached on item via any extensions)
+              const anyFlags = (item as any);
+              if (anyFlags?.has_transactions === true) return true;
+              if (anyFlags?.is_standard === true) return true;
+              return false;
+            }}
+            getDeleteDisabledReason={(node) => {
+              const id = (node as any).id as string;
+              const item = accounts.find(a => a.id === id);
+              if (!item) return 'غير متاح';
+              if (item.has_children || item.has_active_children) return 'لا يمكن حذف حساب له فروع';
+              const anyFlags = (item as any);
+              if (anyFlags?.is_standard) return 'حساب قياسي (افتراضي) لا يمكن حذفه';
+              if (anyFlags?.has_transactions) return 'لا يمكن حذف حساب لديه حركات';
+              return 'حذف';
+            }}
             maxLevel={4}
           />
         ) : (
@@ -603,9 +736,27 @@ const AccountsTreePage: React.FC = () => {
                           <button className={`ultimate-btn ${isActive ? 'ultimate-btn-disable' : 'ultimate-btn-enable'}`} title={isActive ? 'تعطيل' : 'تفعيل'} onClick={() => handleToggleStatus(item)}>
                             <div className="btn-content"><span className="btn-text">{isActive ? 'تعطيل' : 'تفعيل'}</span></div>
                           </button>
-                          <button className="ultimate-btn ultimate-btn-delete" title="حذف" onClick={() => handleDelete(item)}>
-                            <div className="btn-content"><span className="btn-text">حذف</span></div>
-                          </button>
+                          {(() => {
+                            const anyFlags = (item as any);
+                            const disabled = !!(item.has_children || item.has_active_children || anyFlags?.has_transactions || anyFlags?.is_standard);
+                            const reason = item.has_children || item.has_active_children
+                              ? 'لا يمكن حذف حساب له فروع'
+                              : anyFlags?.is_standard
+                                ? 'حساب قياسي (افتراضي) لا يمكن حذفه'
+                                : anyFlags?.has_transactions
+                                  ? 'لا يمكن حذف حساب لديه حركات'
+                                  : 'حذف';
+                            return (
+                              <button
+                                className="ultimate-btn ultimate-btn-delete"
+                                title={reason}
+                                disabled={disabled}
+                                onClick={() => !disabled && handleDelete(item)}
+                              >
+                                <div className="btn-content"><span className="btn-text">حذف</span></div>
+                              </button>
+                            );
+                          })()}
                         </div>
                       </td>
                     </tr>
@@ -669,16 +820,19 @@ const AccountsTreePage: React.FC = () => {
               ref={formRef}
               config={unifiedConfig}
               initialData={{
-              code: draft.code || '',
-              name_ar: (draft.name_ar || draft.name || '') as string,
-              name_en: (draft as any).name || '',
-              account_type: (draft.account_type || '') as string,
-              statement_type: '',
-              parent_id: (draft.parent_id as string) || '',
-              is_active: ((draft.status || 'active') === 'active'),
-              allow_transactions: ((draft.level as number) || 1) >= 3,
-              level: (draft.level as number) ?? 1,
-            }}
+                code: draft.code || '',
+                name_ar: (draft.name_ar || draft.name || '') as string,
+                name_en: (draft as any).name || '',
+                account_type: (draft.account_type || '') as string,
+                statement_type: '',
+                parent_id: (draft.parent_id as string) || '',
+                is_active: ((draft.status || 'active') === 'active'),
+                allow_transactions: (typeof (draft as any).allow_transactions === 'boolean')
+                  ? (draft as any).allow_transactions
+                  : (((draft.level as number) || 1) >= 3),
+                level: (draft.level as number) ?? 1,
+                is_standard: (draft as any).is_standard ?? false,
+              }}
             isLoading={saving}
             onSubmit={async (form) => {
               setSaving(true);
@@ -691,7 +845,7 @@ const AccountsTreePage: React.FC = () => {
                   // Prepare account update data
                   
                   const { data, error } = await supabase.rpc('account_update', {
-                    p_org_id: ORG_ID,
+                    p_org_id: orgId,
                     p_id: draft.id,
                     p_code: form.code,
                     p_name: form.name_en || form.name_ar,
@@ -711,6 +865,17 @@ const AccountsTreePage: React.FC = () => {
                   
                   const updated = data as any;
                   
+                  // Immediately enforce user's allow_transactions choice with a direct update
+                  try {
+                    const { error: allowErr } = await supabase
+                      .from('accounts')
+                      .update({ allow_transactions: !!form.allow_transactions })
+                      .eq('id', draft.id)
+                      .eq('org_id', orgId);
+                    if (allowErr) console.warn('allow_transactions update warning:', allowErr);
+                  } catch {}
+                  
+                  // Update core fields in local state
                   setAccounts(prev => prev.map(a => (a.id === draft.id ? {
                     ...a,
                     code: updated.code || form.code,
@@ -720,6 +885,17 @@ const AccountsTreePage: React.FC = () => {
                     status: updated.status || (form.is_active ? 'active' : 'inactive'),
                     account_type: updated.category || updated.account_type || accountType,
                   } : a)));
+
+                  // Handle is_standard update separately (if permission and value changed)
+                  if (hasAccountsUpdate && (form.is_standard ?? false) !== ((draft as any).is_standard ?? false)) {
+                    const { error: stdErr } = await supabase
+                      .from('accounts')
+                      .update({ is_standard: !!form.is_standard })
+                      .eq('id', draft.id)
+                      .eq('org_id', orgId);
+                    if (stdErr) throw stdErr;
+                    setAccounts(prev => prev.map(a => a.id === draft.id ? { ...(a as any), is_standard: !!form.is_standard } : a));
+                  }
                   
                   showToast('تم تحديث الحساب بنجاح', { severity: 'success' });
                 } else {
@@ -728,7 +904,7 @@ const AccountsTreePage: React.FC = () => {
                   const status = mapStatusToDbEnum(form.is_active);
                   
                   const { data, error } = await supabase.rpc('account_insert_child', {
-                    p_org_id: ORG_ID,
+                    p_org_id: orgId,
                     p_parent_id: form.parent_id || null,
                     p_code: form.code,
                     p_name: form.name_en || form.name_ar,
@@ -739,7 +915,29 @@ const AccountsTreePage: React.FC = () => {
                   });
                   if (error) throw error;
                   const inserted = data as any;
-                  if (inserted) setAccounts(prev => [...prev, inserted]);
+                  if (inserted) {
+                    // Enforce allow_transactions per user choice after insert
+                    try {
+                      const { error: allowErr } = await supabase
+                        .from('accounts')
+                        .update({ allow_transactions: !!form.allow_transactions })
+                        .eq('id', inserted.id)
+                        .eq('org_id', orgId);
+                      if (allowErr) console.warn('allow_transactions update warning (insert):', allowErr);
+                    } catch {}
+                    setAccounts(prev => [...prev, inserted]);
+                    // If creator has permission and requested standard, set it now
+                    if (hasAccountsUpdate && (form.is_standard ?? false)) {
+                      const { error: stdErr } = await supabase
+                        .from('accounts')
+                        .update({ is_standard: true })
+                        .eq('id', inserted.id)
+                        .eq('org_id', orgId);
+                      if (!stdErr) {
+                        setAccounts(prev => prev.map(a => a.id === inserted.id ? { ...(a as any), is_standard: true } : a));
+                      }
+                    }
+                  }
                   showToast('تم إضافة الحساب', { severity: 'success' });
                 }
                 setDialogOpen(false);

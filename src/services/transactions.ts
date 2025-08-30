@@ -6,6 +6,9 @@ export interface Account {
   code: string
   name: string
   is_postable: boolean
+  category?: string
+  parent_id?: string | null
+  level?: number
 }
 
 export interface Project {
@@ -170,14 +173,24 @@ export function parseDate(dateInput: string | Date): Date {
 }
 
 export async function getAccounts(): Promise<Account[]> {
-  const { data, error } = await supabase
+  // Try to scope by current org to match the tree-of-accounts view
+  let orgId: string | null = null
+  try { orgId = localStorage.getItem('org_id'); } catch {}
+
+  let query = supabase
     .from('accounts')
-    .select('id, code, name, is_postable')
+    .select('id, code, name, is_postable, category, parent_id, level, org_id')
     .eq('status', 'active')
     .order('code', { ascending: true })
 
+  if (orgId) {
+    query = query.eq('org_id', orgId)
+  }
+
+  const { data, error } = await query
   if (error) throw error
-  return (data as Account[]) || []
+  // Strip org_id before returning
+  return ((data as any[]) || []).map(row => ({ id: row.id, code: row.code, name: row.name, is_postable: row.is_postable, category: row.category, parent_id: row.parent_id, level: row.level })) as Account[]
 }
 
 export async function getCurrentUserId(): Promise<string | null> {

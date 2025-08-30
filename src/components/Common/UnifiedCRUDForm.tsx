@@ -216,8 +216,10 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
         const fieldsAutoFilled: string[] = [];
         
         Object.entries(autoFilledData).forEach(([key, value]) => {
-          if (!formData[key] || formData[key] === '' || formData[key] === null) {
-            fieldsToFill[key] = value;
+          const current = (formData as any)[key];
+          const isUnset = current === undefined || current === null || (typeof current === 'string' && current === '');
+          if (isUnset) {
+            (fieldsToFill as any)[key] = value;
             fieldsAutoFilled.push(key);
           }
         });

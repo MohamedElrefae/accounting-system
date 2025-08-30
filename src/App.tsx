@@ -9,7 +9,10 @@ const AccountsTreeLazy = React.lazy(() => import('./pages/MainData/AccountsTree'
 const TestRTL = React.lazy(() => import('./pages/TestRTL'));
 const ExportTestPage = React.lazy(() => import('./pages/ExportTestPage'));
 const TransactionsPage = React.lazy(() => import('./pages/Transactions/Transactions'));
-const GeneralLedgerPage = React.lazy(() => import('./pages/Reports/GeneralLedger'));
+const GeneralLedgerPage = React.lazy(() => import('./pages/Reports/GeneralLedger'))
+const AccountExplorerPage = React.lazy(() => import('./pages/Reports/AccountExplorer'))
+const ProfitLossPage = React.lazy(() => import('./pages/Reports/ProfitLoss'))
+const BalanceSheetPage = React.lazy(() => import('./pages/Reports/BalanceSheet'))
 import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
 import { ForgotPassword } from './components/auth/ForgotPassword';
@@ -19,9 +22,8 @@ const UserManagement = React.lazy(() => import('./pages/admin/UserManagement'));
 const RoleManagement = React.lazy(() => import('./pages/admin/RoleManagement'));
 const Diagnostics = React.lazy(() => import('./pages/admin/Diagnostics'));
 const Profile = React.lazy(() => import('./pages/admin/Profile'));
-const CompanySettings = React.lazy(() => import('./components/Settings/CompanySettings'));
-const OrganizationManagement = React.lazy(() => import('./components/Organizations/OrganizationManagement'));
 const ProjectManagement = React.lazy(() => import('./components/Projects/ProjectManagement'));
+const OrgManagementTabs = React.lazy(() => import('./components/Organizations/OrganizationManagementTabs'));
 import { useHasPermission } from './hooks/useHasPermission';
 
 // Placeholder components for other pages
@@ -34,7 +36,6 @@ const PlaceholderPage: React.FC<{ title: string }> = ({ title }) => (
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
-  console.log('[ProtectedRoute]', { user: !!user, loading });
   
   if (loading) {
     return (
@@ -45,11 +46,9 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   }
   
   if (!user) {
-    console.log('[ProtectedRoute] No user, redirecting to login');
     return <Navigate to="/login" replace />;
   }
   
-  console.log('[ProtectedRoute] User found, rendering children');
   return <>{children}</>;
 };
 
@@ -69,12 +68,12 @@ const App: React.FC = () => {
   useEffect(() => {
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = language;
-    console.log('[App] Document direction set to:', document.documentElement.dir);
   }, [language]);
 
   return (
-    <Router>
-      <Routes>
+    <>
+      <Router>
+        <Routes>
         {/* Theme Demo Route */}
         {/* <Route path="/theme-demo" element={<ThemeDemo />} /> */}
         {/* <Route path="/database-test" element={<DatabaseTest />} /> */}
@@ -104,7 +103,7 @@ const App: React.FC = () => {
           <Route path="/main-data/accounts-tree" element={<React.Suspense fallback={<>Loading...</>}><AccountsTreeLazy /></React.Suspense>} />
           <Route path="/main-data/organizations" element={
             <React.Suspense fallback={<div>Loading...</div>}>
-              <OrganizationManagement />
+              <OrgManagementTabs />
             </React.Suspense>
           } />
           <Route path="/main-data/projects" element={
@@ -158,7 +157,7 @@ const App: React.FC = () => {
             <Route path="/reports/trial-balance" element={
               <ProtectedRoute>
                 <React.Suspense fallback={<>Loading...</>}>
-                  {React.createElement(React.lazy(() => import('./pages/Reports/TrialBalance')))}
+                  {React.createElement(React.lazy(() => import('./pages/Reports/TrialBalanceOriginal')))}
                 </React.Suspense>
               </ProtectedRoute>
             } />
@@ -169,8 +168,27 @@ const App: React.FC = () => {
                 </React.Suspense>
               </ProtectedRoute>
             } />
-            <Route path="/reports/profit-loss" element={<PlaceholderPage title="Profit & Loss Report" />} />
-            <Route path="/reports/balance-sheet" element={<PlaceholderPage title="Balance Sheet" />} />
+            <Route path="/reports/account-explorer" element={
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <AccountExplorerPage />
+                </React.Suspense>
+              </ProtectedRoute>
+            } />
+            <Route path="/reports/profit-loss" element={
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <ProfitLossPage />
+                </React.Suspense>
+              </ProtectedRoute>
+            } />
+            <Route path="/reports/balance-sheet" element={
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <BalanceSheetPage />
+                </React.Suspense>
+              </ProtectedRoute>
+            } />
             <Route path="/reports/cash-flow" element={<PlaceholderPage title="Cash Flow Report" />} />
             <Route path="/reports/custom" element={<PlaceholderPage title="Custom Reports" />} />
             
@@ -180,14 +198,15 @@ const App: React.FC = () => {
             <Route path="/inventory/reports" element={<PlaceholderPage title="Stock Reports" />} />
             
             {/* Settings */}
-            <Route path="/settings/company" element={
-              <React.Suspense fallback={<div>Loading...</div>}>
-                <CompanySettings />
-              </React.Suspense>
-            } />
+            <Route path="/settings/company" element={<Navigate to="/settings/organization-management" replace />} />
             <Route path="/settings/diagnostics" element={
               <React.Suspense fallback={<div>Loading...</div>}>
                 <Diagnostics />
+              </React.Suspense>
+            } />
+            <Route path="/settings/account-prefix-mapping" element={
+              <React.Suspense fallback={<div>Loading...</div>}>
+                {React.createElement(React.lazy(() => import('./pages/admin/AccountPrefixMapping')))}
               </React.Suspense>
             } />
             <Route path="/settings/users" element={
@@ -200,6 +219,12 @@ const App: React.FC = () => {
                 <RoleManagement />
               </React.Suspense>
             } />
+            <Route path="/settings/organization-management" element={
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <OrgManagementTabs />
+              </React.Suspense>
+            } />
+            <Route path="/settings/org-members" element={<Navigate to="/settings/organization-management" replace />} />
             <Route path="/settings/profile" element={
               <React.Suspense fallback={<div>Loading...</div>}>
                 <Profile />
@@ -215,8 +240,9 @@ const App: React.FC = () => {
               </React.Suspense>
             } />
           </Route>
-      </Routes>
-    </Router>
+        </Routes>
+      </Router>
+    </>
   );
 };
 

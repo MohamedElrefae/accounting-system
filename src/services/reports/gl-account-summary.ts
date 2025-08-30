@@ -41,3 +41,34 @@ export async function fetchGLAccountSummary(filters: GLAccountSummaryFilters): P
   if (error) throw error
   return (data as GLAccountSummaryRow[]) ?? []
 }
+
+export interface GLTotals {
+  opening_debit: number
+  opening_credit: number
+  period_debits: number
+  period_credits: number
+  closing_debit: number
+  closing_credit: number
+  transaction_count: number
+}
+
+export async function fetchGLTotals(filters: Omit<GLAccountSummaryFilters, 'limit' | 'offset'>): Promise<GLTotals> {
+  const { data, error } = await supabase.rpc('get_gl_totals', {
+    p_date_from: filters.dateFrom ?? null,
+    p_date_to: filters.dateTo ?? null,
+    p_org_id: filters.orgId ?? null,
+    p_project_id: filters.projectId ?? null,
+    p_posted_only: filters.postedOnly ?? true,
+  })
+  if (error) throw error
+  const rows = (data as GLTotals[]) ?? []
+  return rows[0] || {
+    opening_debit: 0,
+    opening_credit: 0,
+    period_debits: 0,
+    period_credits: 0,
+    closing_debit: 0,
+    closing_credit: 0,
+    transaction_count: 0,
+  }
+}

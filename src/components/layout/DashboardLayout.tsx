@@ -14,9 +14,6 @@ const DashboardLayout: React.FC = () => {
   
   // Force complete remount when language changes
   React.useEffect(() => {
-    console.log('[DashboardLayout] Language changed to:', language, 'isRtl:', isRtl);
-    console.log('[DashboardLayout] Forcing complete remount...');
-    
     // Force unmount and remount
     setMounted(false);
     
@@ -36,8 +33,6 @@ const DashboardLayout: React.FC = () => {
   const handleMenuClick = () => {
     toggleSidebar?.();
   };
-
-  console.log('[DashboardLayout] Rendering with isRtl:', isRtl, 'language:', language, 'mounted:', mounted);
 
   // Don't render during remount transition
   if (!mounted) {

@@ -1,0 +1,526 @@
+/* Balance Sheet Report Styles - Exact Copy from P&L for Full Screen Layout */
+.container {
+  padding: 20px;
+  background: var(--background);
+  min-height: 100vh;
+  direction: rtl;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.contentCard {
+  background: white;
+  border: 1px solid #e2e6ed;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+}
+
+.reportHeader {
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  color: white;
+  padding: 24px 20px 18px 20px;
+  border-radius: 12px 12px 0 0;
+  text-align: center;
+  margin-bottom: 0;
+}
+
+.reportHeader h2 {
+  margin: 0 0 6px 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.statementTitle {
+  margin: 0 0 6px 0;
+  font-size: 18px;
+  font-weight: 600;
+  opacity: 0.95;
+}
+
+.statementMeta {
+  margin: 0 auto;
+  font-size: 13px;
+  opacity: 0.95;
+  color: #ede9fe;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* Balance status banner inside header */
+.statusBanner {
+  margin: 10px auto 0 auto;
+  display: inline-block;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.statusBalanced {
+  background: #dcfdf4;
+  color: #065f46;
+  border: 1px solid #86efac;
+}
+.statusUnbalanced {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+/* Professional Filter Bar - Full Screen with Dark Theme Support */
+.professionalFilterBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px 36px;
+  margin: 0 -20px 24px -20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(12px);
+  width: calc(100% + 40px);
+  box-sizing: border-box;
+  min-height: 96px;
+  gap: 28px;
+}
+
+/* Filter Bar Sections */
+.filterSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.centerSection {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: center;
+  flex: 2;
+  min-width: 0;
+}
+
+.actionSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+/* Feature Toggles Container */
+.featureToggles {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  background: var(--hover-bg);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filterGroup.primary {
+  flex: 1;
+  justify-content: flex-start;
+}
+
+.filterGroup.secondary {
+  justify-content: flex-end;
+}
+
+/* Filter Input Styles - Dark Theme Compatible */
+.filterInput {
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  background: var(--field_bg);
+  color: var(--text);
+  transition: all 0.2s ease;
+  min-width: 140px;
+  height: 48px;
+  box-sizing: border-box;
+}
+
+.filterInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(32, 118, 255, 0.1);
+}
+
+.filterInput:hover {
+  border-color: var(--accent);
+}
+
+.filterSelect {
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  background: var(--field_bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 160px;
+  height: 48px;
+  box-sizing: border-box;
+}
+
+.filterSelect:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(32, 118, 255, 0.1);
+}
+
+.filterSelect:hover {
+  border-color: var(--accent);
+}
+
+/* Icon Toggle Buttons */
+.iconToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.iconToggle:hover {
+  border-color: #7c3aed;
+  color: #7c3aed;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
+}
+
+.iconToggle.active {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  border-color: #6d28d9;
+  color: white;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
+}
+
+.iconToggle.active:hover {
+  background: linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%);
+  transform: translateY(-1px);
+}
+
+/* Feature Toggle Buttons with Icon + Text */
+.featureToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--field_bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  min-height: 48px;
+  position: relative;
+  overflow: hidden;
+}
+
+.featureToggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.15);
+  background: var(--surface);
+}
+
+.featureToggle.active {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent) 100%);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);
+  font-weight: 600;
+}
+
+.featureToggle.active:hover {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent) 100%);
+  transform: translateY(-1px);
+  opacity: 0.9;
+}
+
+.featureToggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.featureToggle:disabled:hover {
+  transform: none;
+  border-color: var(--border);
+  color: var(--text);
+  background: var(--field_bg);
+}
+
+/* Toggle text styling */
+.toggleText {
+  font-size: 12px;
+  font-weight: inherit;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.featureToggle.active .toggleText {
+  opacity: 1;
+  font-weight: 600;
+}
+
+/* Icon within feature toggle */
+.featureToggle .MuiSvgIcon-root {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* Active state indicator for feature toggles */
+.featureToggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.featureToggle.active::after {
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 0 3px rgba(255, 255, 255, 0.3);
+}
+
+/* Group Controls */
+.groupControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  background: var(--field_bg);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.groupControlButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--field_bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.groupControlButton:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.15);
+  background: var(--surface);
+}
+
+.groupControlButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Action Buttons */
+.actionButton {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-radius: 10px;
+  border: none;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  min-height: 48px;
+}
+
+.actionButton.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 2px 8px var(--accent-shadow, rgba(14, 165, 233, 0.2));
+}
+
+.actionButton.primary:hover {
+  background: var(--accent-hover, var(--accent));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px var(--accent-shadow, rgba(14, 165, 233, 0.3));
+  filter: brightness(0.95);
+}
+
+.actionButton.secondary {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.actionButton.secondary:hover {
+  background: var(--hover-bg);
+  border-color: var(--border-hover, var(--accent));
+  transform: translateY(-1px);
+  color: var(--accent);
+}
+
+.actionButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.actionButton:disabled:hover {
+  transform: none;
+}
+
+/* Export Buttons */
+.exportGroup {
+  display: flex;
+  gap: 4px;
+}
+
+.exportButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: white;
+  color: #64748b;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.exportButton:hover {
+  border-color: #7c3aed;
+  color: #7c3aed;
+  background: #faf7ff;
+}
+
+.exportButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Language Toggle */
+.languageToggle {
+  display: flex;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.languageOption {
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.languageOption.active {
+  background: #7c3aed;
+  color: white;
+}
+
+.languageOption:hover:not(.active) {
+  background: #faf7ff;
+  color: #7c3aed;
+}
+
+/* Error Alert */
+.errorAlert {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+/* Responsive behavior */
+@media (max-width: 768px) {
+  .container {
+    padding: 12px;
+  }
+  
+  .professionalFilterBar {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+  
+  .filterGroup {
+    justify-content: center;
+  }
+  
+  .filterGroup.primary,
+  .filterGroup.secondary {
+    justify-content: center;
+  }
+}
+
+/* Print styles */
+@media print {
+  .noPrint {
+    display: none !important;
+  }
+  
+  .container {
+    padding: 0;
+    background: white;
+    max-width: none;
+  }
+  
+  .reportHeader {
+    background: white !important;
+    color: black !important;
+    border: 1px solid #ccc;
+  }
+}

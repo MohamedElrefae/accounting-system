@@ -299,8 +299,15 @@ export class UniversalExportManager {
       const preRows = Array.isArray(data.metadata?.prependRows) ? (data.metadata!.prependRows as any[][]) : [];
       const preRowsCount = preRows.length;
       
-      // Prepare worksheet data
-      const      // Header styling (bold + shaded background)
+      // Prepare worksheet data (prependRows, headers, then rows)
+      const aoa: any[][] = [
+        ...preRows,
+        headers,
+        ...dataRows,
+      ];
+      const worksheet = XLSXUtils.aoa_to_sheet(aoa);
+
+      // Header styling (bold + shaded background)
       try {
         for (let c = 0; c < data.columns.length; c++) {
           const cellRef = XLSXUtils.encode_cell({ r: preRowsCount, c });
@@ -326,7 +333,7 @@ export class UniversalExportManager {
       const columnWidths = data.columns.map(col => ({
         wch: col.width ? col.width / 8 : 15
       }));
-      worksheet['!cols'] = columnWidths;
+      (worksheet as any)['!cols'] = columnWidths;
       
       // Apply RTL formatting to the worksheet if needed
       if (options.rtlLayout) {

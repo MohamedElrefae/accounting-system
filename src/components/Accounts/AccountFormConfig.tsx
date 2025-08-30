@@ -16,10 +16,10 @@ const isValidAccountCode = (code: string) => {
 const validateAccountCode = (code: string): ValidationError | null => {
   if (!code || !code.trim()) return { field: 'code', message: 'كود الحساب مطلوب' };
   if (!isValidAccountCode(code)) {
-    return { field: 'code', message: 'كود الحساب غير صحيح - يجب أن يكون بصيغة: 1 أو 1-1 أو 1-1-1 أو 1-1-1-1' };
+    return { field: 'code', message: 'كود الحساب غير صحيح - يُسمح بصيغ مثل: 1 أو 5-1 أو 1100' };
   }
   const segments = code.split('-');
-  if (segments.length > 4) return { field: 'code', message: 'كود الحساب لا يمكن أن يتجاوز 4 مستويات' };
+  if (segments.length > 4) return { field: 'code', message: 'كود الحساب لا يمكن أن يتجاوز 4 أجزاء مفصولة بشرطة' };
   for (const s of segments) {
     if (!/^\d{1,4}$/.test(s)) return { field: 'code', message: 'كل جزء من كود الحساب يجب أن يكون رقماً من 1-4 أرقام' };
   }
@@ -55,34 +55,73 @@ const generateSubAccountCode = (accounts: AccountLite[], parentId: string | null
   const parent = accounts.find(a => a.id === parentId);
   if (!parent) return '1';
   const siblings = accounts.filter(a => a.parent_id === parentId);
-  const maxChild = Math.max(...siblings.map(s => parseInt((s.code.split('-').pop() || '0'), 10)), 0);
+
+  if (siblings.length === 0) {
+    // Default to numeric style when no siblings exist (e.g., parent 5 -> 51)
+    return `${parent.code}1`;
+  }
+
+  const dashSibs = siblings.filter(s => s.code.includes('-') && s.code.startsWith(parent.code + '-'));
+  const numericSibs = siblings.filter(s => !s.code.includes('-') && s.code.startsWith(parent.code));
+
+  if (numericSibs.length > dashSibs.length) {
+    // Numeric style, e.g., 51, 52 or 5100, 5200
+    const rawSuffixes = numericSibs
+      .map(s => s.code.substring(parent.code.length))
+      .filter(s => /^\d+$/.test(s));
+
+    const maxLen = rawSuffixes.length ? Math.max(...rawSuffixes.map(s => s.length || 1)) : 1;
+    const trailingZeroPow10 = (s: string) => {
+      const m = s.match(/0+$/);
+      return m ? m[0].length : 0;
+    };
+    const stepPow = rawSuffixes.length ? Math.max(...rawSuffixes.map(trailingZeroPow10)) : 0;
+    const step = Math.pow(10, stepPow);
+    const maxSuffix = rawSuffixes.length ? Math.max(...rawSuffixes.map(s => parseInt(s || '0', 10))) : 0;
+    const next = maxSuffix + (step || 1);
+    const nextStr = String(next).padStart(maxLen, '0');
+    return `${parent.code}${nextStr}`;
+  }
+
+  // Dash style, e.g., 5-1, 5-2
+  const nums = dashSibs.map(s => parseInt((s.code.split('-').pop() || '0'), 10));
+  const maxChild = nums.length ? Math.max(...nums) : 0;
   return `${parent.code}-${maxChild + 1}`;
 };
 
 const createAccountAutoFillLogic = (parentAccounts: AccountLite[]) => (formData: any) => {
   const auto: Partial<AccountLite & { level_display?: string; name_en?: string; name_ar?: string; code?: string; allow_transactions?: boolean }> = {};
-  if (formData.code) {
-    const lvl = calculateLevelFromCode(formData.code);
-    auto.level = lvl;
-    auto.allow_transactions = lvl >= 3;
-    auto.level_display = `المستوى ${lvl} - ${getLevelDescription(lvl)}`;
-  }
+
+  // Parent-driven level (authoritative)
   if (formData.parent_id && formData.parent_id !== '') {
     const parent = parentAccounts.find(a => a.id === formData.parent_id);
     if (parent) {
+      auto.level = parent.level + 1;
+      if (formData.allow_transactions === undefined) {
+        auto.allow_transactions = (auto.level || 1) >= 3;
+      }
+      auto.level_display = `المستوى ${auto.level} - ${getLevelDescription(auto.level || 1)}`;
+
       if (!formData.code || formData.code === '') {
         const suggested = generateSubAccountCode(parentAccounts, formData.parent_id);
         auto.code = suggested;
-        auto.level = calculateLevelFromCode(suggested);
-        auto.allow_transactions = (auto.level || 0) >= 3;
-        auto.level_display = `المستوى ${auto.level} - ${getLevelDescription(auto.level || 1)}`;
       }
+
       auto.account_type = parent.account_type;
       auto.statement_type = parent.statement_type;
       if (!formData.name_ar || formData.name_ar === '') auto.name_ar = `حساب فرعي جديد لـ ${parent.name_ar}`;
       if (!formData.name_en || formData.name_en === '') auto.name_en = `New Sub-account for ${parent.name_en || parent.name_ar}`;
     }
+  } else if (formData.code) {
+    // Root-level only: if no parent selected, derive a display-only level from code formatting (optional)
+    const lvl = calculateLevelFromCode(formData.code);
+    auto.level = Math.min(lvl, 4);
+    if (formData.allow_transactions === undefined) {
+      auto.allow_transactions = (auto.level || 1) >= 3;
+    }
+    auto.level_display = `المستوى ${auto.level} - ${getLevelDescription(auto.level || 1)}`;
   }
+
   if (formData.is_active === undefined) auto.is_active = true;
   return auto;
 };
@@ -91,11 +130,12 @@ export const createAccountFormConfig = (
   isEditing: boolean,
   parentAccounts: AccountLite[],
   existingAccount?: AccountLite | null,
-  hideStatementType: boolean = false
+  hideStatementType: boolean = false,
+  showStandardToggle: boolean = false
 ): FormConfig => {
 
   const fields: FormField[] = [
-    { id: 'code', type: 'text', label: 'كود الحساب', placeholder: 'مثال: 1-1-1 أو 101', required: true, icon: <Hash size={16} />, validation: validateAccountCode, helpText: 'كود فريد للحساب (1 للمستوى الأول، 1-1 للثاني، وهكذا)', autoComplete: 'off' },
+    { id: 'code', type: 'text', label: 'كود الحساب', placeholder: 'مثال: 1-1 أو 1100', required: true, icon: <Hash size={16} />, validation: validateAccountCode, helpText: 'كود فريد للحساب. في حال اختيار حساب أب، المستوى يُحدد من الأب تلقائياً. يسمح بالتقسيم 5-1 أو أكواد رقمية مثل 1100', autoComplete: 'off' },
     { id: 'name_ar', type: 'text', label: 'اسم الحساب بالعربية', placeholder: 'اسم الحساب باللغة العربية', required: true, icon: <FileText size={16} />, validation: validateArabicName, helpText: 'اسم الحساب الرئيسي باللغة العربية' },
     { id: 'name_en', type: 'text', label: 'اسم الحساب بالإنجليزية', placeholder: 'Account name in English (optional)', icon: <Globe size={16} />, helpText: 'اسم الحساب بالإنجليزية (اختياري)' },
     // Show the editable selector ONLY when there is no parent selected
@@ -145,8 +185,18 @@ export const createAccountFormConfig = (
       { value: '', label: '-- لا يوجد حساب أب (حساب رئيسي) --' },
       ...parentAccounts.map(acc => ({ value: acc.id, label: `${acc.code} - ${acc.name_ar}` }))
     ], helpText: 'اختر الحساب الأب إذا كان هذا حساباً فرعياً' },
-    { id: 'level_display', type: 'text', label: 'مستوى الحساب', disabled: true, icon: <Activity size={16} />, helpText: 'يتم حساب المستوى تلقائياً بناءً على كود الحساب', conditionalLogic: (formData) => {
-      const lvl = formData.level || calculateLevelFromCode(formData.code || '');
+    { id: 'level_display', type: 'text', label: 'مستوى الحساب', disabled: true, icon: <Activity size={16} />, helpText: 'يتم تحديد المستوى تلقائياً من هيكل الشجرة (الأب ← الابن).', conditionalLogic: (formData) => {
+      let lvl = 1;
+      if (formData.parent_id) {
+        const parent = parentAccounts.find(a => a.id === formData.parent_id);
+        if (parent) lvl = parent.level + 1;
+      }
+      if (!formData.parent_id && formData.code) {
+        // Fallback for root-only items when no parent selected
+        const byCode = calculateLevelFromCode(formData.code || '');
+        if (byCode > 0) lvl = Math.min(byCode, 4);
+      }
+      formData.level = lvl;
       const expected = `المستوى ${lvl} - ${getLevelDescription(lvl)}`;
       if (formData.level_display !== expected) formData.level_display = expected;
       return true;
@@ -154,6 +204,11 @@ export const createAccountFormConfig = (
     { id: 'is_active', type: 'checkbox', label: 'حساب نشط' },
     { id: 'allow_transactions', type: 'checkbox', label: 'يسمح بالمعاملات', helpText: 'عادة ما تسمح الحسابات من المستوى 3 وما فوق بالمعاملات' }
   ];
+
+  // Admin-only: show is_standard toggle when allowed by caller
+  if (showStandardToggle) {
+    fields.push({ id: 'is_standard', type: 'checkbox', label: 'حساب قياسي (غير قابل للحذف)', helpText: 'تمييز هذا الحساب كحساب قياسي سيمنع حذفه' });
+  }
 
   return {
     title: isEditing ? '✏️ تعديل الحساب' : '➕ إضافة حساب جديد',
@@ -164,29 +219,17 @@ export const createAccountFormConfig = (
     cancelLabel: '❌ إلغاء',
     customValidator: (data: any): ValidationResult => {
       const errors: ValidationError[] = [];
-      // Normalize level from code
-      if (data.code) {
-        const lvl = calculateLevelFromCode(data.code);
-        if (lvl > 4) errors.push({ field: 'code', message: 'كود الحساب لا يمكن أن يتجاوز المستوى 4' });
-        // keep in sync
-        data.level = lvl;
-      }
-      // Parent consistency
+      // Normalize level from selected parent first
       if (data.parent_id) {
         const parent = parentAccounts.find(a => a.id === data.parent_id);
-        if (parent) {
-          if (data.account_type && parent.account_type && data.account_type.toLowerCase() !== parent.account_type.toLowerCase()) {
-            errors.push({ field: 'account_type', message: 'نوع الحساب يجب أن يتطابق مع نوع الحساب الأب' });
-          }
-          // Enforce child level = parent level + 1
-          const lvl = calculateLevelFromCode(data.code || '');
-          if (lvl && (lvl !== parent.level + 1)) {
-            errors.push({ field: 'code', message: 'المستوى يجب أن يكون أعلى بمستوى واحد من الحساب الأب' });
-          }
-        }
+        if (parent) data.level = parent.level + 1; else data.level = 1;
+      } else {
+        data.level = 1;
       }
+      // Allow both hyphenated (5-1) and compact (1100) codes
       if (data.code && !isValidAccountCode(data.code)) errors.push({ field: 'code', message: 'كود الحساب غير صحيح' });
       if (!data.name_ar) errors.push({ field: 'name_ar', message: 'اسم الحساب بالعربية مطلوب' });
+      // Do not override allow_transactions here; respect user choice and DB value
       return { isValid: errors.length === 0, errors };
     },
     autoFillLogic: createAccountAutoFillLogic(parentAccounts),

@@ -6,6 +6,9 @@ export interface SearchableSelectOption {
   value: string;
   label: string;
   searchText?: string;
+  disabled?: boolean;
+  title?: string;
+  children?: SearchableSelectOption[];
 }
 
 interface SearchableSelectProps {
@@ -36,19 +39,80 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const storageKey = React.useMemo(() => id ? `searchableSelect.expanded.${id}` : null, [id]);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const optionsRef = useRef<HTMLDivElement>(null);
 
-  // Filter options based on search term
-  const filteredOptions = options.filter(option => {
-    if (!searchTerm) return true;
-    const searchText = option.searchText || option.label;
-    return searchText.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+  // Build visible flat list from tree with expand/collapse
+  type FlatRow = SearchableSelectOption & { __depth: number; __isParent: boolean };
+
+  const normalize = (opts: SearchableSelectOption[]): SearchableSelectOption[] => opts || [];
+
+  const matches = (opt: SearchableSelectOption, term: string) => {
+    if (!term) return true;
+    const text = (opt.searchText || opt.label || '').toLowerCase();
+    return text.includes(term.toLowerCase());
+  };
+
+  const buildVisible = (
+    opts: SearchableSelectOption[],
+    depth: number,
+    out: FlatRow[],
+    parentExpanded: boolean,
+    term: string
+  ) => {
+    for (const opt of normalize(opts)) {
+      const hasChildren = !!(opt.children && opt.children.length);
+      const isExpanded = expanded.has(opt.value);
+
+      const includeThis = term ? matches(opt, term) : true;
+      // When searching, we show all nodes that match or have matching descendants (handled by recursion)
+      if (!term) {
+        out.push({ ...opt, __depth: depth, __isParent: hasChildren });
+      } else if (includeThis) {
+        out.push({ ...opt, __depth: depth, __isParent: hasChildren });
+      }
+
+      // Decide whether to include children
+      if (hasChildren) {
+        const childList: FlatRow[] = [];
+        buildVisible(opt.children!, depth + 1, childList, isExpanded, term);
+        if (term) {
+          // In search mode, include children rows that matched themselves or had matching descendants
+          if (childList.length > 0) {
+            // Ensure parent row exists (already pushed if includeThis true). If not, push parent now for context.
+            if (!(!term || includeThis)) {
+              out.push({ ...opt, __depth: depth, __isParent: hasChildren });
+            }
+            out.push(...childList);
+          }
+        } else if (isExpanded) {
+          out.push(...childList);
+        }
+      }
+    }
+  };
+
+  const visibleFlatOptions: FlatRow[] = React.useMemo(() => {
+    const list: FlatRow[] = [];
+    buildVisible(options, 0, list, true, searchTerm);
+    return list;
+  }, [options, expanded, searchTerm]);
+
+  // Collect all nodes that have children (parents)
+  const collectAllParents = (opts: SearchableSelectOption[], out: Set<string>) => {
+    for (const opt of opts || []) {
+      if (opt.children && opt.children.length) {
+        out.add(opt.value);
+        collectAllParents(opt.children, out);
+      }
+    }
+  };
 
   // Get current selected option
-  const selectedOption = options.find(option => option.value === value);
+  const selectedOption = visibleFlatOptions.find(option => option.value === value) || options.find(o => o.value === value);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -91,7 +155,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
       case 'ArrowDown':
         e.preventDefault();
         setHighlightedIndex(prev => 
-          prev < filteredOptions.length - 1 ? prev + 1 : prev
+          prev < visibleFlatOptions.length - 1 ? prev + 1 : prev
         );
         break;
       case 'ArrowUp':
@@ -100,8 +164,32 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
         break;
       case 'Enter':
         e.preventDefault();
-        if (highlightedIndex >= 0 && filteredOptions[highlightedIndex]) {
-          handleSelect(filteredOptions[highlightedIndex].value);
+        if (highlightedIndex >= 0 && visibleFlatOptions[highlightedIndex]) {
+          const row = visibleFlatOptions[highlightedIndex];
+          if (row.__isParent && row.children && row.children.length && (row.disabled || !row.value || row.value.startsWith('__'))) {
+            // Toggle expand for non-selectable parent or header
+            toggleExpand(row.value);
+          } else if (!row.disabled) {
+            handleSelect(row.value);
+          }
+        }
+        break;
+      case 'ArrowLeft': // Collapse
+        e.preventDefault();
+        if (highlightedIndex >= 0) {
+          const row = visibleFlatOptions[highlightedIndex];
+          if (row.__isParent && expanded.has(row.value)) {
+            toggleExpand(row.value);
+          }
+        }
+        break;
+      case 'ArrowRight': // Expand
+        e.preventDefault();
+        if (highlightedIndex >= 0) {
+          const row = visibleFlatOptions[highlightedIndex];
+          if (row.__isParent && row.children && row.children.length && !expanded.has(row.value)) {
+            toggleExpand(row.value);
+          }
         }
         break;
       case 'Tab':
@@ -136,6 +224,67 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
       setHighlightedIndex(0);
     }
   };
+
+  // Find ancestry path of current value in the tree
+  const findPath = (opts: SearchableSelectOption[], target: string, trail: string[] = []): string[] | null => {
+    for (const opt of opts || []) {
+      const nextTrail = [...trail, opt.value];
+      if (opt.value === target) return nextTrail;
+      if (opt.children && opt.children.length) {
+        const res = findPath(opt.children, target, nextTrail);
+        if (res) return res;
+      }
+    }
+    return null;
+  };
+
+  // On open (and when not searching), expand only the ancestry of the selected value
+  // If no selection, restore persisted expansion (if available)
+  useEffect(() => {
+    if (isOpen && !searchTerm) {
+      if (!value) {
+        if (storageKey) {
+          try {
+            const raw = localStorage.getItem(storageKey);
+            if (raw) {
+              const arr = JSON.parse(raw);
+              if (Array.isArray(arr)) setExpanded(new Set(arr));
+              else setExpanded(new Set());
+            } else {
+              setExpanded(new Set());
+            }
+          } catch {
+            setExpanded(new Set());
+          }
+        } else {
+          setExpanded(new Set());
+        }
+        return;
+      }
+      const path = findPath(options, value) || [];
+      // Exclude the selected leaf itself; expand ancestors only
+      const ancestors = path.slice(0, Math.max(0, path.length - 1));
+      setExpanded(new Set(ancestors));
+    }
+  }, [isOpen, value, options, searchTerm, storageKey]);
+
+  const toggleExpand = (val: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(val)) next.delete(val); else next.add(val);
+      return next;
+    });
+  };
+
+  // Persist expand/collapse state when closing dropdown (if no active search)
+  useEffect(() => {
+    if (!isOpen && storageKey && !searchTerm) {
+      try {
+        const arr = Array.from(expanded);
+        localStorage.setItem(storageKey, JSON.stringify(arr));
+      } catch {}
+    }
+  }, [isOpen, storageKey, expanded, searchTerm]);
 
   // Scroll highlighted option into view
   useEffect(() => {
@@ -218,26 +367,72 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
                 }
               }}
             />
+            <div className={styles.actionsRow}>
+              <button
+                type="button"
+                className={styles.actionButton}
+                onClick={() => {
+                  const all = new Set<string>();
+                  collectAllParents(options, all);
+                  setExpanded(all);
+                }}
+                aria-label="توسيع الكل"
+              >
+                توسيع الكل
+              </button>
+              <button
+                type="button"
+                className={styles.actionButton}
+                onClick={() => {
+                  if (!value) { setExpanded(new Set()); return; }
+                  const path = findPath(options, value) || [];
+                  const ancestors = new Set(path.slice(0, Math.max(0, path.length - 1)));
+                  setExpanded(ancestors);
+                }}
+                aria-label="طيّ الكل"
+              >
+                طيّ الكل
+              </button>
+            </div>
           </div>
 
           {/* Options */}
           <div ref={optionsRef} className={styles.optionsList}>
-            {filteredOptions.length === 0 ? (
+            {visibleFlatOptions.length === 0 ? (
               <div className={styles.noOptions}>لا توجد خيارات متاحة</div>
             ) : (
-              filteredOptions.map((option, index) => (
+              visibleFlatOptions.map((option, index) => (
                 <div
-                  key={option.value}
+                  key={option.value + ':' + index}
                   className={[
                     styles.option,
                     option.value === value ? styles.optionSelected : '',
-                    index === highlightedIndex ? styles.optionHighlighted : ''
+                    index === highlightedIndex ? styles.optionHighlighted : '',
+                    option.disabled ? styles.optionDisabled : ''
                   ].filter(Boolean).join(' ')}
-                  onClick={() => handleSelect(option.value)}
+                  onClick={(e) => {
+                    // If clicking caret, handled below
+                    if (!option.disabled) handleSelect(option.value);
+                  }}
                   role="option"
                   aria-selected={option.value === value}
+                  aria-disabled={option.disabled || undefined}
+                  title={option.title}
+                  style={{ paddingRight: `calc(20px + ${option.__depth * 16}px)` }}
                 >
-                  {option.label}
+                  {option.__isParent && option.children && option.children.length ? (
+                    <button
+                      type="button"
+                      className={styles.caret}
+                      aria-label={expanded.has(option.value) ? 'طي' : 'توسيع'}
+                      onClick={(e) => { e.stopPropagation(); toggleExpand(option.value); }}
+                    >
+                      <ChevronDown size={14} className={expanded.has(option.value) ? styles.caretOpen : styles.caretClosed} />
+                    </button>
+                  ) : (
+                    <span className={styles.caretPlaceholder} />
+                  )}
+                  <span className={styles.optionLabel}>{option.label}</span>
                 </div>
               ))
             )}

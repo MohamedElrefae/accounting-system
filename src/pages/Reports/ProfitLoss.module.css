@@ -1,0 +1,599 @@
+/* Styles tailored to match the original app's Profit & Loss look exactly - Theme Aware */
+.container {
+  padding: 20px;
+  background: var(--background);
+  min-height: 100vh;
+  direction: rtl;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.contentCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.reportHeader {
+  background: var(--success);
+  color: var(--on-success);
+  padding: 24px 20px 18px 20px;
+  border-radius: 12px 12px 0 0;
+  text-align: center;
+  margin-bottom: 0;
+}
+
+.reportHeader h2 {
+  margin: 0 0 6px 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.statementTitle {
+  margin: 0 0 6px 0;
+  font-size: 18px;
+  font-weight: 600;
+  opacity: 0.95;
+}
+
+.statementMeta {
+  margin: 0 auto;
+  font-size: 13px;
+  opacity: 0.95;
+  color: var(--on-success);
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* Centered, larger status inside header */
+.statusBanner {
+  margin: 10px auto 0 auto;
+  display: inline-block;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.statusProfit {
+  background: var(--success);
+  color: var(--on-success);
+  border: 1px solid var(--success);
+}
+.statusLoss {
+  background: var(--error);
+  color: var(--on-error);
+  border: 1px solid var(--error);
+}
+.statusBreakeven {
+  background: var(--warning);
+  color: var(--on-warning);
+  border: 1px solid var(--warning);
+}
+
+/* Deprecated: period info is now inside reportHeader (.statementMeta) to match previous app */
+.periodInfo { display: none; }
+
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  background: var(--surface);
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+/* Professional Filter Bar - Full Screen with Dark Theme Support */
+.professionalFilterBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px 36px;
+  margin: 0 -20px 24px -20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(12px);
+  width: calc(100% + 40px);
+  box-sizing: border-box;
+  min-height: 96px;
+  gap: 28px;
+}
+
+/* Filter Bar Sections */
+.filterSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.centerSection {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: center;
+  flex: 2;
+  min-width: 0;
+}
+
+.actionSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+/* Feature Toggles Container */
+.featureToggles {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  background: var(--hover-bg);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+}
+
+.filterGroup.primary {
+  flex: 1;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.filterGroup.secondary {
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+/* Filter Input Styles - Dark Theme Compatible */
+.filterInput {
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  background: var(--field_bg);
+  color: var(--text);
+  transition: all 0.2s ease;
+  min-width: 140px;
+  height: 48px;
+  box-sizing: border-box;
+}
+
+.filterInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(32, 118, 255, 0.1);
+}
+
+.filterInput:hover {
+  border-color: var(--accent);
+}
+
+.filterSelect {
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  background: var(--field_bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 160px;
+  height: 48px;
+  box-sizing: border-box;
+}
+
+.filterSelect:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(32, 118, 255, 0.1);
+}
+
+.filterSelect:hover {
+  border-color: var(--accent);
+}
+
+/* Icon Toggle Buttons */
+.iconToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--field_bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.iconToggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.15);
+  background: var(--surface);
+}
+
+.iconToggle.active {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent) 100%);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);
+}
+
+.iconToggle.active:hover {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent) 100%);
+  transform: translateY(-1px);
+  opacity: 0.9;
+}
+
+/* Feature Toggle Buttons with Icon + Text */
+.featureToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--field_bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  min-height: 48px;
+  position: relative;
+  overflow: hidden;
+}
+
+.featureToggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.15);
+  background: var(--surface);
+}
+
+.featureToggle.active {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent) 100%);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);
+  font-weight: 600;
+}
+
+.featureToggle.active:hover {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent) 100%);
+  transform: translateY(-1px);
+  opacity: 0.9;
+}
+
+.featureToggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.featureToggle:disabled:hover {
+  transform: none;
+  border-color: var(--border);
+  color: var(--text);
+  background: var(--field_bg);
+}
+
+/* Toggle text styling */
+.toggleText {
+  font-size: 12px;
+  font-weight: inherit;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.featureToggle.active .toggleText {
+  opacity: 1;
+  font-weight: 600;
+}
+
+/* Icon within feature toggle */
+.featureToggle .MuiSvgIcon-root {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* Active state indicator for feature toggles */
+.featureToggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.featureToggle.active::after {
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 0 3px rgba(255, 255, 255, 0.3);
+}
+
+/* Group Controls */
+.groupControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  background: var(--field_bg);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.groupControlButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--field_bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.groupControlButton:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.15);
+  background: var(--surface);
+}
+
+.groupControlButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Action Buttons */
+.actionButton {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-radius: 10px;
+  border: none;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  min-height: 48px;
+}
+
+.actionButton.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 2px 8px var(--accent-shadow, rgba(14, 165, 233, 0.2));
+}
+
+.actionButton.primary:hover {
+  background: var(--accent-hover, var(--accent));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px var(--accent-shadow, rgba(14, 165, 233, 0.3));
+  filter: brightness(0.95);
+}
+
+.actionButton.secondary {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.actionButton.secondary:hover {
+  background: var(--hover-bg);
+  border-color: var(--border-hover, var(--accent));
+  transform: translateY(-1px);
+  color: var(--accent);
+}
+
+.actionButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.actionButton:disabled:hover {
+  transform: none;
+}
+
+/* Export Group */
+.exportGroup {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 6px;
+  background: var(--field_bg);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.exportButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--field_bg);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.exportButton:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--surface);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.1);
+}
+
+.exportButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.exportButton:disabled:hover {
+  transform: none;
+  border-color: var(--border);
+  color: var(--text);
+  background: var(--field_bg);
+}
+
+/* Language Toggle */
+.languageToggle {
+  display: flex;
+  background: var(--field_bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  padding: 4px;
+}
+
+.languageOption {
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 6px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.languageOption.active {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 2px 6px rgba(14, 165, 233, 0.2);
+}
+
+.languageOption:hover:not(.active) {
+  background: var(--hover-bg);
+  color: var(--accent);
+}
+
+/* Error Alert */
+.errorAlert {
+  background: var(--error-bg, #fef2f2);
+  border: 1px solid var(--error-border, #fecaca);
+  color: var(--error-text, #991b1b);
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+/* Responsive behavior */
+@media (max-width: 1024px) {
+  .professionalFilterBar {
+    padding: 20px 24px;
+    gap: 20px;
+  }
+  
+  .centerSection {
+    flex: 1;
+  }
+  
+  .featureToggles {
+    gap: 6px;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 12px;
+  }
+  
+  .professionalFilterBar {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+    padding: 16px 20px;
+    margin: 0 -12px 16px -12px;
+    width: calc(100% + 24px);
+  }
+  
+  .filterSection,
+  .centerSection,
+  .actionSection {
+    justify-content: center;
+    flex: none;
+  }
+  
+  .featureToggles {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .featureToggle .toggleText {
+    display: none;
+  }
+}
+
+/* Print styles */
+@media print {
+  .noPrint {
+    display: none !important;
+  }
+  
+  .container {
+    padding: 0;
+    background: white;
+    max-width: none;
+  }
+  
+  .reportHeader {
+    background: white !important;
+    color: black !important;
+    border: 1px solid #ccc;
+  }
+}

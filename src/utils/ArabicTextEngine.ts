@@ -206,8 +206,8 @@ export class ArabicTextEngine {
     
     if (amount < 0) result = `-${result}`
     
-    // Convert to Arabic numerals if needed
-    if (options.useArabicNumerals !== false && !options.forExport) {
+    // Always convert to Arabic numerals unless explicitly disabled
+    if (options.useArabicNumerals !== false) {
       result = this.convertNumerals(result, true)
     }
     

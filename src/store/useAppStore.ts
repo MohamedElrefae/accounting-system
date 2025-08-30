@@ -35,11 +35,8 @@ const useAppStore = create<AppStore>()(
         const { language } = get();
         const newLanguage = language === 'en' ? 'ar' : 'en';
         
-        console.log('[Store] toggleLanguage called - Current:', language, 'New:', newLanguage);
-        
         // Force a complete state update to ensure re-renders
         set((state) => {
-          console.log('[Store] Setting new state with language:', newLanguage);
           return {
             ...state,
             language: newLanguage
@@ -49,8 +46,6 @@ const useAppStore = create<AppStore>()(
         // Update document direction
         document.documentElement.dir = newLanguage === 'ar' ? 'rtl' : 'ltr';
         document.documentElement.lang = newLanguage;
-        
-        console.log('[Store] Document direction updated to:', document.documentElement.dir);
       },
 
       toggleSidebar: () => {

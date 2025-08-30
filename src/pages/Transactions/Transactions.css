@@ -15,6 +15,13 @@
 .input-field, .select-field, .textarea-field { padding: 0.75rem 1rem; border: 1px solid rgba(0,0,0,0.2); border-radius: 8px; background: var(--surface, #0f0f0f); color: var(--text-primary, #eaeaea); }
 
 .transactions-content { flex-grow: 1; overflow: hidden; padding: 1rem; width: 100%; display: flex; flex-direction: column; }
+
+/* Themed toolbar and pagination (no inline styles) */
+.transactions-tablebar { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.1)); background: var(--surface, #0f0f0f); border-radius: 8px; }
+.transactions-toolbar { display: inline-flex; align-items: center; gap: 8px; }
+.transactions-count { color: var(--text-secondary, #a3a3a3); font-weight: 600; }
+.transactions-pagination { display: inline-flex; align-items: center; gap: 8px; }
+
 .transactions-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .transactions-table th, .transactions-table td { padding: 1rem; text-align: right; border-bottom: 1px solid rgba(0,0,0,0.1); }
 .transactions-table th { font-weight: 600; position: sticky; top: 0; z-index: 10; }
@@ -34,7 +41,9 @@
 
 /* Modal aligned to theme */
 .transaction-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; }
-.transaction-modal-content { background: var(--surface, #0f0f0f); border: 1px solid rgba(0,0,0,0.2); border-radius: 10px; width: min(680px, 95vw); padding: 1rem; display: grid; gap: 0.75rem; }
+.transaction-modal-content { background: var(--surface, #0f0f0f); border: 1px solid rgba(0,0,0,0.2); border-radius: 10px; width: min(680px, 95vw); padding: 1rem; display: grid; gap: 0.75rem; max-height: 80vh; overflow: auto; }
+.transaction-modal-content--wide { width: min(1200px, 95vw); max-height: 90vh; }
+.modal-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .modal-title { margin: 0 0 0.5rem 0; font-weight: 700; }
 .textarea-field { min-height: 80px; }
 .textarea-field.notes { min-height: 60px; }
@@ -44,4 +53,13 @@
 .error-container { color: #ff6b6b; padding: 1rem; }
 .loading-spinner { width: 24px; height: 24px; border: 3px solid #333; border-top-color: #999; border-radius: 50%; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Diagnostics and panel helpers */
+.diag-toggle { padding: 0 1.5rem 0.5rem; display: flex; justify-content: flex-end; }
+.diag-panel { padding: 0 1.5rem 1rem; }
+.diag-perms-box { border: 1px dashed rgba(0,0,0,0.2); border-radius: 8px; padding: 0.75rem; display: flex; gap: 16px; flex-wrap: wrap; }
+.panel-actions { padding: 0 1rem 0.5rem; }
+
+/* Dev debug chip (dev only) */
+.dev-debug-chip { position: fixed; top: 10px; left: 10px; background: #ef4444; color: #fff; padding: 5px 8px; border-radius: 6px; z-index: 9999; font-size: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.25); }
 
