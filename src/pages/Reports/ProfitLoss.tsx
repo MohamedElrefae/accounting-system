@@ -131,6 +131,8 @@ export default function ProfitLoss() {
   async function loadProjects() {
     const { data } = await supabase.from('projects').select('id, code, name').eq('status', 'active').order('code')
     setProjects(data || [])
+    
+    
     try { 
       const cfg = await getCompanyConfig()
       setCompanyName(cfg.company_name || '')
@@ -342,7 +344,480 @@ export default function ProfitLoss() {
   }
 
   function printReport() {
-    window.print()
+    const printContent = document.getElementById('financial-report-content')
+    if (!printContent) return
+
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+
+    // Prepare report data
+    const currentDate = new Date().toLocaleDateString('ar-EG')
+    const projectName = projectId ? projects.find(p => p.id === projectId)?.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
+    
+    // Build professional commercial report HTML
+    const reportHTML = `
+      <!DOCTYPE html>
+      <html dir="rtl" lang="ar">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>${uiLang === 'ar' ? 'قائمة الدخل' : 'Profit & Loss Statement'}</title>
+          <style>
+            /* Commercial Accounting Report Styles */
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            
+            body { 
+              font-family: 'Arial', 'Tahoma', sans-serif;
+              direction: rtl;
+              background: white;
+              color: black;
+              font-size: 12px;
+              line-height: 1.3;
+              padding: 15mm;
+            }
+            
+            /* Report Header - Commercial Standard */
+            .print-header {
+              text-align: center;
+              margin-bottom: 25px;
+              border: 2px solid black;
+              padding: 15px;
+            }
+            
+            .company-name {
+              font-size: 20px;
+              font-weight: bold;
+              margin-bottom: 8px;
+              color: black;
+              text-transform: uppercase;
+            }
+            
+            .report-title {
+              font-size: 18px;
+              font-weight: bold;
+              margin-bottom: 8px;
+              color: black;
+              text-decoration: underline;
+            }
+            
+            .report-period {
+              font-size: 14px;
+              font-weight: bold;
+              margin-bottom: 10px;
+              color: black;
+            }
+            
+            .report-filters {
+              font-size: 11px;
+              color: black;
+              border-top: 1px solid black;
+              padding-top: 8px;
+              display: flex;
+              justify-content: space-between;
+              flex-wrap: wrap;
+            }
+            
+            .filter-item {
+              margin: 2px 10px;
+              font-weight: normal;
+            }
+            
+            /* Performance Status Banner */
+            .performance-status {
+              margin: 10px 0;
+              padding: 8px 15px;
+              border: 2px solid black;
+              text-align: center;
+              font-weight: bold;
+              font-size: 14px;
+            }
+            
+            .performance-status.profit {
+              background: #f0f8f0;
+              color: #006600;
+              border-color: #006600;
+            }
+            
+            .performance-status.loss {
+              background: #fff0f0;
+              color: #cc0000;
+              border-color: #cc0000;
+            }
+            
+            .performance-status.breakeven {
+              background: #f8f8f0;
+              color: #666600;
+              border-color: #666600;
+            }
+            
+            /* Table Structure */
+            .report-content {
+              margin-top: 20px;
+            }
+            
+            .profit-loss-table {
+              width: 100%;
+              border-collapse: collapse;
+              border: 2px solid black;
+              background: white;
+              margin-bottom: 20px;
+            }
+            
+            .table-header {
+              background: white;
+              border-bottom: 2px solid black;
+              font-weight: bold;
+              color: black;
+            }
+            
+            .table-header th {
+              padding: 10px 8px;
+              text-align: center;
+              font-size: 13px;
+              border-right: 1px solid black;
+              font-weight: bold;
+            }
+            
+            .table-header th:last-child {
+              border-right: none;
+            }
+            
+            .section-group {
+              border-bottom: 1px solid #666;
+            }
+            
+            .section-header-row {
+              background: #f5f5f5;
+              font-weight: bold;
+              font-size: 13px;
+              border-bottom: 2px solid black;
+            }
+            
+            .section-header-row td {
+              padding: 8px;
+              color: black;
+              font-weight: bold;
+              text-align: center;
+              border-right: 1px solid black;
+            }
+            
+            .section-header-row td:last-child {
+              border-right: none;
+            }
+            
+            .account-row {
+              border-bottom: 1px solid #ccc;
+              background: white;
+            }
+            
+            .account-row:hover {
+              background: white;
+            }
+            
+            .account-row td {
+              padding: 6px 8px;
+              color: black;
+              font-size: 11px;
+              border-right: 1px solid #ccc;
+            }
+            
+            .account-row td:last-child {
+              border-right: none;
+            }
+            
+            .account-code {
+              font-family: 'Courier New', monospace;
+              font-weight: bold;
+              text-align: center;
+              width: 100px;
+            }
+            
+            .account-name {
+              text-align: right;
+              font-weight: normal;
+            }
+            
+            .amount {
+              font-family: 'Courier New', monospace;
+              font-weight: bold;
+              text-align: right;
+              width: 120px;
+            }
+            
+            .section-subtotal {
+              background: #f0f0f0;
+              font-weight: bold;
+              font-size: 12px;
+              border-top: 1px solid black;
+              border-bottom: 2px solid black;
+            }
+            
+            .section-subtotal td {
+              padding: 8px;
+              color: black;
+              font-weight: bold;
+              border-right: 1px solid black;
+            }
+            
+            .section-subtotal td:last-child {
+              border-right: none;
+            }
+            
+            /* Calculations Section */
+            .calculations-section {
+              margin-top: 20px;
+              border: 2px solid black;
+              background: white;
+            }
+            
+            .calculations-header {
+              background: #e8e8e8;
+              color: black;
+              padding: 10px;
+              text-align: center;
+              font-weight: bold;
+              font-size: 14px;
+              border-bottom: 2px solid black;
+            }
+            
+            .calculation-row {
+              display: flex;
+              padding: 8px 12px;
+              border-bottom: 1px solid #ccc;
+              font-weight: bold;
+              font-size: 13px;
+            }
+            
+            .calculation-row.major {
+              background: #f5f5f5;
+              border-bottom: 2px solid black;
+              font-size: 14px;
+            }
+            
+            .calculation-row.final {
+              background: #e0e0e0;
+              border-top: 2px solid black;
+              border-bottom: 2px solid black;
+              font-size: 15px;
+            }
+            
+            .calc-label {
+              flex: 1;
+              color: black;
+              font-weight: bold;
+            }
+            
+            .calc-amount {
+              width: 120px;
+              text-align: right;
+              font-family: 'Courier New', monospace;
+              color: black;
+              font-weight: bold;
+            }
+            
+            .calc-amount.profit {
+              color: #006600;
+            }
+            
+            .calc-amount.loss {
+              color: #cc0000;
+            }
+            
+            /* Financial Ratios Section */
+            .ratios-section {
+              margin-top: 20px;
+              border: 2px solid black;
+              background: white;
+            }
+            
+            .ratios-header {
+              background: #e8e8e8;
+              color: black;
+              padding: 10px;
+              text-align: center;
+              font-weight: bold;
+              font-size: 14px;
+              border-bottom: 2px solid black;
+            }
+            
+            .ratio-row {
+              display: flex;
+              padding: 6px 12px;
+              border-bottom: 1px solid #ccc;
+              font-size: 12px;
+            }
+            
+            .ratio-row:last-child {
+              border-bottom: none;
+            }
+            
+            .ratio-label {
+              flex: 1;
+              color: black;
+              font-weight: normal;
+            }
+            
+            .ratio-value {
+              width: 80px;
+              text-align: right;
+              font-family: 'Courier New', monospace;
+              color: black;
+              font-weight: bold;
+            }
+            
+            /* Print-specific */
+            @media print {
+              body { padding: 10mm; }
+              .section-group { break-inside: avoid; }
+              @page { 
+                size: A4; 
+                margin: 15mm;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <!-- Professional Commercial Report Header -->
+          <div class="print-header">
+            <div class="company-name">${companyName || (uiLang === 'ar' ? 'الشركة التجارية' : 'Commercial Company')}</div>
+            <div class="report-title">${uiLang === 'ar' ? 'قائمة الدخل (الأرباح والخسائر)' : 'Profit & Loss Statement'}</div>
+            <div class="report-period">${uiLang === 'ar' ? 'من' : 'From'}: ${dateFrom} ${uiLang === 'ar' ? 'إلى' : 'To'}: ${dateTo}</div>
+            <div class="report-filters">
+              <span class="filter-item">${uiLang === 'ar' ? 'المشروع' : 'Project'}: ${projectName}</span>
+              <span class="filter-item">${uiLang === 'ar' ? 'تاريخ الطباعة' : 'Print Date'}: ${currentDate}</span>
+              ${postedOnly ? `<span class="filter-item">${uiLang === 'ar' ? 'قيود معتمدة فقط' : 'Posted Only'}</span>` : ''}
+              ${detailedView ? `<span class="filter-item">${uiLang === 'ar' ? 'عرض تفصيلي' : 'Detailed View'}</span>` : ''}
+            </div>
+          </div>
+          
+          ${performanceStatus ? `
+            <div class="performance-status ${performanceStatus.status}">
+              ${uiLang === 'ar' ? performanceStatus.textAr : performanceStatus.textEn}
+            </div>
+          ` : ''}
+          
+          <!-- Report Content -->
+          <div class="report-content">
+            ${generatePrintContent()}
+          </div>
+        </body>
+      </html>
+    `
+    
+    printWindow.document.write(reportHTML)
+    printWindow.document.close()
+    
+    // Wait for content to load, then print
+    setTimeout(() => {
+      printWindow.focus()
+      printWindow.print()
+      printWindow.close()
+    }, 500)
+  }
+  
+  // Generate print content with proper commercial formatting
+  function generatePrintContent(): string {
+    if (!summary) return '<p>لا توجد بيانات للعرض</p>'
+    
+    let html = ''
+    
+    // Profit & Loss Table
+    html += `
+      <table class="profit-loss-table">
+        <thead class="table-header">
+          <tr>
+            <th style="width: 100px;">${uiLang === 'ar' ? 'رمز الحساب' : 'Account Code'}</th>
+            <th style="width: 300px;">${uiLang === 'ar' ? 'اسم الحساب / البيان' : 'Account Name / Description'}</th>
+            <th style="width: 120px;">${uiLang === 'ar' ? 'المبلغ' : 'Amount'}</th>
+          </tr>
+        </thead>
+        <tbody>
+    `
+    
+    // Generate grouped content
+    grouped.forEach(group => {
+      // Section Header
+      html += `
+        <tr class="section-header-row">
+          <td colspan="3">${uiLang === 'ar' ? group.titleAr : group.titleEn}</td>
+        </tr>
+      `
+      
+      // Section Accounts (if detailed view)
+      if (detailedView) {
+        group.rows.forEach(row => {
+          const accountName = uiLang === 'ar' ? (row.account_name_ar || row.account_name_en) : (row.account_name_en || row.account_name_ar)
+          
+          html += `
+            <tr class="account-row">
+              <td class="account-code">${row.account_code}</td>
+              <td class="account-name">${accountName}</td>
+              <td class="amount">${formatArabicCurrency(Math.abs(row.amount), numbersOnly ? 'none' : 'EGP')}</td>
+            </tr>
+          `
+        })
+      }
+      
+      // Section Subtotal
+      html += `
+        <tr class="section-subtotal">
+          <td colspan="2">${uiLang === 'ar' ? `إجمالي ${group.titleAr}` : `Total ${group.titleEn}`}</td>
+          <td class="amount">${formatArabicCurrency(Math.abs(group.total), numbersOnly ? 'none' : 'EGP')}</td>
+        </tr>
+      `
+    })
+    
+    html += `
+        </tbody>
+      </table>
+    `
+    
+    // Calculations Section
+    html += `
+      <div class="calculations-section">
+        <div class="calculations-header">${uiLang === 'ar' ? 'الحسابات والمؤشرات المالية' : 'Financial Calculations & Metrics'}</div>
+        <div class="calculation-row major">
+          <div class="calc-label">${uiLang === 'ar' ? 'إجمالي الربح' : 'Gross Profit'}</div>
+          <div class="calc-amount ${summary.gross_profit >= 0 ? 'profit' : 'loss'}">
+            ${formatArabicCurrency(summary.gross_profit, numbersOnly ? 'none' : 'EGP')}
+          </div>
+        </div>
+        <div class="calculation-row major">
+          <div class="calc-label">${uiLang === 'ar' ? 'الدخل التشغيلي' : 'Operating Income'}</div>
+          <div class="calc-amount ${summary.operating_income >= 0 ? 'profit' : 'loss'}">
+            ${formatArabicCurrency(summary.operating_income, numbersOnly ? 'none' : 'EGP')}
+          </div>
+        </div>
+        <div class="calculation-row final">
+          <div class="calc-label">${uiLang === 'ar' ? 'صافي الدخل' : 'Net Income'}</div>
+          <div class="calc-amount ${summary.net_income >= 0 ? 'profit' : 'loss'}">
+            ${formatArabicCurrency(summary.net_income, numbersOnly ? 'none' : 'EGP')}
+          </div>
+        </div>
+      </div>
+    `
+    
+    // Financial Ratios Section
+    html += `
+      <div class="ratios-section">
+        <div class="ratios-header">${uiLang === 'ar' ? 'نسب الربحية' : 'Profitability Ratios'}</div>
+        <div class="ratio-row">
+          <div class="ratio-label">${uiLang === 'ar' ? 'هامش الربح الإجمالي' : 'Gross Margin'}</div>
+          <div class="ratio-value">${formatArabicCurrency(parseFloat(summary.gross_margin_percent.toFixed(2)), 'none')}%</div>
+        </div>
+        <div class="ratio-row">
+          <div class="ratio-label">${uiLang === 'ar' ? 'هامش الربح التشغيلي' : 'Operating Margin'}</div>
+          <div class="ratio-value">${formatArabicCurrency(parseFloat(summary.operating_margin_percent.toFixed(2)), 'none')}%</div>
+        </div>
+        <div class="ratio-row">
+          <div class="ratio-label">${uiLang === 'ar' ? 'هامش الربح الصافي' : 'Net Margin'}</div>
+          <div class="ratio-value">${formatArabicCurrency(parseFloat(summary.net_margin_percent.toFixed(2)), 'none')}%</div>
+        </div>
+      </div>
+    `
+    
+    return html
   }
 
   // Toggle group collapse/expand

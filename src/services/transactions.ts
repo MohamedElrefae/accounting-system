@@ -36,6 +36,7 @@ export interface TransactionRecord {
   credit_account_id: string
   amount: number
   notes: string | null
+  classification_id?: string | null
   is_posted: boolean
   posted_at: string | null
   posted_by: string | null
@@ -211,6 +212,7 @@ export interface ListTransactionsFilters {
   creditAccountId?: string
   projectId?: string
   orgId?: string
+  classificationId?: string
 }
 
 export interface ListTransactionsOptions {
@@ -232,13 +234,14 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
   const from = (page - 1) * pageSize
   const to = from + pageSize - 1
 
-  // Dynamic query with organization and project joins
+  // Dynamic query with organization, project, and classification joins
   let query = supabase
     .from('transactions')
     .select(`
       *,
       organizations!left(name),
-      projects!left(name)
+      projects!left(name),
+      transaction_classification!left(code, name)
     `, { count: 'exact' })
     .order('entry_date', { ascending: false })
 
@@ -272,6 +275,7 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
     if (f.creditAccountId) query = query.eq('credit_account_id', f.creditAccountId)
     if (f.projectId) query = query.eq('project_id', f.projectId)
     if (f.orgId) query = query.eq('org_id', f.orgId)
+    if (f.classificationId) query = query.eq('classification_id', f.classificationId)
   }
 
   const { data, error, count } = await query.range(from, to)
@@ -296,6 +300,7 @@ export interface CreateTransactionInput {
   credit_account_id: string
   amount: number
   notes?: string
+  classification_id?: string
   project_id?: string
   org_id?: string
 }
@@ -335,6 +340,7 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
     credit_account_id: input.credit_account_id,
     amount: input.amount,
     notes: input.notes || null,
+    classification_id: input.classification_id || null,
     project_id: input.project_id || null,
     org_id: input.org_id || null,
     created_by: uid ?? null,

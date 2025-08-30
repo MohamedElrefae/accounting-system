@@ -111,6 +111,11 @@ const App: React.FC = () => {
               <ProjectManagement />
             </React.Suspense>
           } />
+          <Route path="/main-data/transaction-classification" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/MainData/TransactionClassification')))}
+            </React.Suspense>
+          } />
 
           {/* Transactions - Single row entry */}
           <Route path="/transactions/my" element={
@@ -186,6 +191,13 @@ const App: React.FC = () => {
               <ProtectedRoute>
                 <React.Suspense fallback={<div>Loading...</div>}>
                   <BalanceSheetPage />
+                </React.Suspense>
+              </ProtectedRoute>
+            } />
+            <Route path="/reports/main-data/transaction-classification" element={
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  {React.createElement(React.lazy(() => import('./pages/Reports/TransactionClassificationReports')))}
                 </React.Suspense>
               </ProtectedRoute>
             } />

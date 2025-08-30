@@ -20,7 +20,6 @@ import ExpandMore from '@mui/icons-material/ExpandMore'
 import ExpandLess from '@mui/icons-material/ExpandLess'
 import UnfoldMore from '@mui/icons-material/UnfoldMore'
 import UnfoldLess from '@mui/icons-material/UnfoldLess'
-import ReportFilterBar from '../../components/Reports/ReportFilterBar'
 import { fetchTransactionsDateRange } from '../../services/reports/account-explorer'
 
 interface TBRow {
@@ -57,7 +56,7 @@ export default function TrialBalanceOriginal() {
   const [companyName, setCompanyName] = useState<string>('')
   const [activeGroupsOnly, setActiveGroupsOnly] = useState<boolean>(false)
   const [prefixRules, setPrefixRules] = useState<PrefixRule[]>([])
-  const [breakPerGroup, _setBreakPerGroup] = useState<boolean>(false)
+  const [_breakPerGroup, _setBreakPerGroup] = useState<boolean>(false)
   const [postedOnly, setPostedOnly] = useState<boolean>(false)
   // Numbers-only setting (hide currency symbol)
   const [numbersOnly, setNumbersOnly] = useState<boolean>(true)

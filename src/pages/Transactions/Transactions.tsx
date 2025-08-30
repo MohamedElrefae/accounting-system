@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { getAccounts, getTransactions, createTransaction, deleteTransaction, postTransaction, updateTransaction, getTransactionAudit, getCurrentUserId, getProjects, type Account, type TransactionRecord, type TransactionAudit, type Project } from '../../services/transactions'
 import { getOrganizations } from '../../services/organization'
+import { getAllTransactionClassifications, type TransactionClassification } from '../../services/transaction-classification'
 import type { Organization } from '../../types'
 import { useHasPermission } from '../../hooks/useHasPermission'
 import './Transactions.css'
@@ -16,8 +17,6 @@ import { logClientError } from '../../services/telemetry'
 import UnifiedCRUDForm, { type UnifiedCRUDFormHandle } from '../../components/Common/UnifiedCRUDForm'
 import DraggableResizablePanel from '../../components/Common/DraggableResizablePanel'
 import { createTransactionFormConfig } from '../../components/Transactions/TransactionFormConfig'
-import { TextField } from '@mui/material'
-import { Autocomplete } from '@mui/material'
 import ResizableTable from '../../components/Common/ResizableTable'
 import ColumnConfiguration from '../../components/Common/ColumnConfiguration'
 import type { ColumnConfig } from '../../components/Common/ColumnConfiguration'
@@ -36,6 +35,7 @@ const TransactionsPage: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [organizations, setOrganizations] = useState<Organization[]>([])
+  const [classifications, setClassifications] = useState<TransactionClassification[]>([])
   const [transactions, setTransactions] = useState<TransactionRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -72,6 +72,7 @@ const TransactionsPage: React.FC = () => {
   const [creditFilterId, setCreditFilterId] = useState<string>('')
   const [orgFilterId, setOrgFilterId] = useState<string>('')
   const [projectFilterId, setProjectFilterId] = useState<string>('')
+  const [classificationFilterId, setClassificationFilterId] = useState<string>('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
@@ -101,6 +102,7 @@ const TransactionsPage: React.FC = () => {
     { key: 'debit_account_label', label: 'الحساب المدين', visible: true, width: 200, minWidth: 150, maxWidth: 300, type: 'text', resizable: true },
     { key: 'credit_account_label', label: 'الحساب الدائن', visible: true, width: 200, minWidth: 150, maxWidth: 300, type: 'text', resizable: true },
     { key: 'amount', label: 'المبلغ', visible: true, width: 140, minWidth: 120, maxWidth: 200, type: 'currency', resizable: true },
+    { key: 'classification_name', label: 'التصنيف', visible: true, width: 160, minWidth: 120, maxWidth: 220, type: 'text', resizable: true },
     { key: 'organization_name', label: 'المؤسسة', visible: true, width: 180, minWidth: 150, maxWidth: 250, type: 'text', resizable: true },
     { key: 'project_name', label: 'المشروع', visible: true, width: 180, minWidth: 150, maxWidth: 250, type: 'text', resizable: true },
     { key: 'reference_number', label: 'المرجع', visible: false, width: 120, minWidth: 100, maxWidth: 180, type: 'text', resizable: true },
@@ -129,15 +131,17 @@ const TransactionsPage: React.FC = () => {
     async function load() {
       setLoading(true)
       try {
-        const [accs, projectsList, orgsList, uid] = await Promise.all([
+        const [accs, projectsList, orgsList, classificationsList, uid] = await Promise.all([
           getAccounts(),
           getProjects().catch(() => []), // Don't fail if projects service isn't available
           getOrganizations().catch(() => []), // Don't fail if organizations service isn't available
+          getAllTransactionClassifications().catch(() => []), // Don't fail if classifications service isn't available
           getCurrentUserId(),
         ])
         setAccounts(accs)
         setProjects(projectsList)
         setOrganizations(orgsList)
+        setClassifications(classificationsList)
         setCurrentUserId(uid)
         await reload()
       } catch (e: any) {
@@ -169,6 +173,7 @@ const TransactionsPage: React.FC = () => {
         creditAccountId: creditFilterId || undefined,
         orgId: orgFilterId || undefined,
         projectId: projectFilterId || undefined,
+        classificationId: classificationFilterId || undefined,
       },
       page,
       pageSize,
@@ -199,13 +204,14 @@ const TransactionsPage: React.FC = () => {
       return a ? `${a.code} - ${a.name}` : id
     }
 
-    return paged.map((t) => ({
+    return paged.map((t: any) => ({
       entry_number: t.entry_number,
       entry_date: t.entry_date, // Keep raw date for DateFormatter
       description: t.description,
       debit_account_label: accLabel(t.debit_account_id),
       credit_account_label: accLabel(t.credit_account_id),
       amount: t.amount,
+      classification_name: t.transaction_classification?.name || '—',
       organization_name: organizations.find(o => o.id === (t.org_id || ''))?.name || '—',
       project_name: projects.find(p => p.id === (t.project_id || ''))?.name || '—',
       reference_number: t.reference_number || '—',
@@ -227,6 +233,7 @@ const TransactionsPage: React.FC = () => {
       { key: 'debit_account', header: 'الحساب المدين', type: 'text' },
       { key: 'credit_account', header: 'الحساب الدائن', type: 'text' },
       { key: 'amount', header: 'المبلغ', type: 'currency' },
+      { key: 'classification_name', header: 'التصنيف', type: 'text' },
       { key: 'organization_name', header: 'المؤسسة', type: 'text' },
       { key: 'project_name', header: 'المشروع', type: 'text' },
       { key: 'reference_number', header: 'المرجع', type: 'text' },
@@ -241,13 +248,14 @@ const TransactionsPage: React.FC = () => {
       const a = accounts.find(x => x.id === id)
       return a ? `${a.code} - ${a.name}` : id
     }
-    const rows = filtered.map((t) => ({
+    const rows = filtered.map((t: any) => ({
       entry_number: t.entry_number,
       entry_date: t.entry_date,
       description: t.description,
       debit_account: accLabel(t.debit_account_id),
       credit_account: accLabel(t.credit_account_id),
       amount: t.amount,
+      classification_name: t.transaction_classification?.name || '',
       organization_name: organizations.find(o => o.id === (t.org_id || ''))?.name || '',
       project_name: projects.find(p => p.id === (t.project_id || ''))?.name || '',
       reference_number: t.reference_number || '',
@@ -267,9 +275,10 @@ const TransactionsPage: React.FC = () => {
       accounts,
       projects,
       organizations,
+      classifications,
       editingTx || undefined
     )
-  }, [editingTx, accounts, projects, organizations])
+  }, [editingTx, accounts, projects, organizations, classifications])
   
   // Get initial data for the form
   const getInitialFormData = useMemo(() => {
@@ -283,6 +292,7 @@ const TransactionsPage: React.FC = () => {
         amount: editingTx.amount,
         reference_number: editingTx.reference_number || '',
         notes: editingTx.notes || '',
+        classification_id: editingTx.classification_id || '',
         organization_id: editingTx.org_id || '',
         project_id: editingTx.project_id || ''
       }
@@ -329,6 +339,7 @@ const TransactionsPage: React.FC = () => {
           credit_account_id: data.credit_account_id,
           amount: parseFloat(data.amount),
           notes: data.notes || null,
+          classification_id: data.classification_id || null,
           org_id: data.organization_id || null,
           project_id: data.project_id || null,
         })
@@ -373,6 +384,7 @@ const TransactionsPage: React.FC = () => {
           credit_account_id: data.credit_account_id,
           amount: parseFloat(data.amount),
           notes: data.notes || undefined,
+          classification_id: data.classification_id || undefined,
           org_id: data.organization_id || undefined,
           project_id: data.project_id || undefined,
         })
@@ -466,7 +478,7 @@ const TransactionsPage: React.FC = () => {
     }
   }
 
-  useEffect(() => { reload().catch(() => {}) }, [searchTerm, filters.dateFrom, filters.dateTo, filters.amountFrom, filters.amountTo, debitFilterId, creditFilterId, orgFilterId, projectFilterId, page, pageSize, mode])
+  useEffect(() => { reload().catch(() => {}) }, [searchTerm, filters.dateFrom, filters.dateTo, filters.amountFrom, filters.amountTo, debitFilterId, creditFilterId, orgFilterId, projectFilterId, classificationFilterId, page, pageSize, mode])
 
   if (loading) return <div className="loading-container"><div className="loading-spinner" />جاري التحميل...</div>
   if (error) return <div className="error-container">خطأ: {error}</div>
@@ -677,6 +689,28 @@ const TransactionsPage: React.FC = () => {
           ))}
         </select>
         
+        {/* Classification filter */}
+        <select
+          value={classificationFilterId}
+          onChange={e => { setClassificationFilterId(e.target.value); setPage(1) }}
+          style={{
+            fontSize: '12px',
+            padding: '4px 8px',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            backgroundColor: 'var(--field_bg)',
+            color: 'var(--text)',
+            maxWidth: '180px'
+          }}
+        >
+          <option value="">جميع التصنيفات</option>
+          {classifications.map(c => (
+            <option key={c.id} value={c.id}>
+              {`${c.code} - ${c.name}`.substring(0, 40)}
+            </option>
+          ))}
+        </select>
+        
         {/* Amount range filters */}
         <input
           type="number"
@@ -718,6 +752,7 @@ const TransactionsPage: React.FC = () => {
             setCreditFilterId('')
             setOrgFilterId('')
             setProjectFilterId('')
+            setClassificationFilterId('')
             setPage(1)
           }}
           style={{

@@ -41,6 +41,8 @@ import Group from '@mui/icons-material/Group';
 import Tune from '@mui/icons-material/Tune';
 import Backup from '@mui/icons-material/Backup';
 import Security from '@mui/icons-material/Security';
+import Database from '@mui/icons-material/Storage';
+import Tag from '@mui/icons-material/LocalOffer';
 import useAppStore from '../../store/useAppStore';
 import { navigationItems } from '../../data/navigation';
 import type { NavigationItem } from '../../types';
@@ -111,6 +113,10 @@ const getIcon = (iconName: string) => {
       return <Backup />;
     case 'Security':
       return <Security />;
+    case 'database':
+      return <Database />;
+    case 'tag':
+      return <Tag />;
     default:
       return <DashboardIcon />;
   }
@@ -126,7 +132,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isRtl = language === 'ar';
-  // const { user } = useAuth();
   const hasPermission = useHasPermission();
   
   // Force component update when language changes
@@ -137,15 +142,42 @@ const Sidebar: React.FC<SidebarProps> = () => {
 
   const toggleExpanded = (itemId: string) => {
     setExpandedItems((prev) => {
-      // Accordion behavior: only one item can be expanded at a time
       if (prev.includes(itemId)) {
-        // If clicking on already expanded item, collapse it
-        return [];
+        // If clicking on already expanded item, collapse it and all its children
+        const toRemove = new Set([itemId]);
+        // Find all descendant items that should also be collapsed
+        const findDescendants = (_parentId: string, items: NavigationItem[]) => {
+          items.forEach(item => {
+            if (prev.includes(item.id)) {
+              toRemove.add(item.id);
+            }
+            if (item.children) {
+              findDescendants(item.id, item.children);
+            }
+          });
+        };
+        const parentItem = findNavigationItem(itemId, navigationItems);
+        if (parentItem?.children) {
+          findDescendants(itemId, parentItem.children);
+        }
+        return prev.filter(id => !toRemove.has(id));
       } else {
-        // If clicking on collapsed item, expand it and collapse others
-        return [itemId];
+        // If clicking on collapsed item, expand it (keep others expanded too for nested support)
+        return [...prev, itemId];
       }
     });
+  };
+
+  // Helper function to find a navigation item by ID
+  const findNavigationItem = (itemId: string, items: NavigationItem[]): NavigationItem | null => {
+    for (const item of items) {
+      if (item.id === itemId) return item;
+      if (item.children) {
+        const found = findNavigationItem(itemId, item.children);
+        if (found) return found;
+      }
+    }
+    return null;
   };
 
   const handleNavigation = (path: string) => {

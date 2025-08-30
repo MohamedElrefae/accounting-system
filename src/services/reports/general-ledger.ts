@@ -10,6 +10,7 @@ export interface GLFilters {
   postedOnly?: boolean
   limit?: number | null
   offset?: number | null
+  classificationId?: string | null
 }
 
 export interface GLRow {
@@ -51,6 +52,7 @@ export async function fetchGeneralLedgerReport(filters: GLFilters): Promise<GLRo
     p_posted_only: filters.postedOnly ?? true,
     p_limit: filters.limit ?? null,
     p_offset: filters.offset ?? null,
+    p_classification_id: filters.classificationId === '__unclassified__' ? null : (filters.classificationId ?? null),
   })
 
   if (error) throw error

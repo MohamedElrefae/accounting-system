@@ -161,7 +161,8 @@ const AccountsTreePage: React.FC = () => {
     return () => window.removeEventListener('keydown', handler);
   }, [dialogOpen]);
 
-  const hasAccountsUpdate = useHasPermission('accounts.update');
+  const hasPermission = useHasPermission();
+  const hasAccountsUpdate = hasPermission('accounts.update');
 
   const unifiedConfig = useMemo(() => {
     const existing = (dialogMode === 'edit' && draft?.id)

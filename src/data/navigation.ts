@@ -39,6 +39,14 @@ export const navigationItems: NavigationItem[] = [
         titleAr: "إدارة المشاريع",
         icon: "folder",
         path: "/main-data/projects"
+      },
+      {
+        id: "transaction-classification",
+        label: "Transaction Classification",
+        titleEn: "Transaction Classification",
+        titleAr: "تصنيفات المعاملات",
+        icon: "tag",
+        path: "/main-data/transaction-classification"
       }
     ]
   },
@@ -124,6 +132,23 @@ export const navigationItems: NavigationItem[] = [
         titleAr: "الميزانية العمومية", 
         icon: "file-text",
         path: "/reports/balance-sheet"
+      },
+      {
+        id: "main-data-reports",
+        label: "Main Data Reports",
+        titleEn: "Main Data Reports",
+        titleAr: "تقارير البيانات الأساسية",
+        icon: "database",
+        children: [
+          {
+            id: "transaction-classification-reports",
+            label: "Transaction Classification Reports",
+            titleEn: "Transaction Classification Reports",
+            titleAr: "تقارير تصنيفات المعاملات",
+            icon: "tag",
+            path: "/reports/main-data/transaction-classification"
+          }
+        ]
       }
     ]
   },

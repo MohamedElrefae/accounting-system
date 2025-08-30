@@ -436,6 +436,21 @@
   transform: none;
 }
 
+/* Expandable Row Styles */
+.rowExpanded {
+  background: var(--accent_bg) !important;
+  border-left: 3px solid var(--accent) !important;
+}
+
+.drilldownRow {
+  background: var(--field_bg) !important;
+}
+
+.drilldownRow > td {
+  padding: 0 !important;
+  border: none !important;
+}
+
 /* Export Group */
 .exportGroup {
   display: flex;

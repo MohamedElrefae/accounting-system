@@ -82,6 +82,7 @@ const GeneralLedger: React.FC = () => {
   const [accountId, setAccountId] = useState<string>('')
   const [orgId, setOrgId] = useState<string>('')
   const [projectId, setProjectId] = useState<string>('')
+  const [classificationId, setClassificationId] = useState<string>('')
 
   const [data, setData] = useState<GLRow[]>([])
   const [summaryRows, setSummaryRows] = useState<GLAccountSummaryRow[]>([])
@@ -119,6 +120,7 @@ const GeneralLedger: React.FC = () => {
   const [_orgOptions, _setOrgOptions] = useState<LookupOption[]>([])
   const [_projectOptions, _setProjectOptions] = useState<LookupOption[]>([])
   const [accountOptions, setAccountOptions] = useState<LookupOption[]>([])
+  const [classificationOptions, setClassificationOptions] = useState<LookupOption[]>([])
   
   // Advanced features
   const [searchTerm, setSearchTerm] = useState<string>('')
@@ -1185,6 +1187,16 @@ const GeneralLedger: React.FC = () => {
       _setOrgOptions(orgs)
       _setProjectOptions(projects)
       setAccountOptions(accounts)
+      
+      // Load classifications
+      try {
+        const { supabase } = await import('../../utils/supabase')
+        const { data: classData } = await supabase
+          .from('transaction_classifications')
+          .select('id, name')
+          .order('name')
+        setClassificationOptions((classData || []).map(c => ({ id: c.id, name: c.name, name_ar: c.name, code: '' })))
+      } catch {}
     })()
   }, [])
 
@@ -1229,6 +1241,7 @@ const GeneralLedger: React.FC = () => {
           postedOnly: filters.postedOnly,
           limit: pageSize,
           offset: (currentPage - 1) * pageSize,
+          classificationId: classificationId || null,
         })
         setData(rows)
         if (rows && rows.length > 0 && typeof rows[0].total_rows === 'number') {
@@ -1243,11 +1256,10 @@ const GeneralLedger: React.FC = () => {
       }
     }
     load()
-  }, [filters.dateFrom, filters.dateTo, filters.includeOpening, filters.postedOnly, accountId, orgId, projectId, pageSize, currentPage])
+  }, [filters.dateFrom, filters.dateTo, filters.includeOpening, filters.postedOnly, accountId, orgId, projectId, pageSize, currentPage, classificationId])
 
   // Load account summary when on overview - smart pagination approach
-  const [allSummaryRows, setAllSummaryRows] = useState<GLAccountSummaryRow[]>([])
-  const [totalSummaryRows, setTotalSummaryRows] = useState<number>(0)
+  // Removed unused summary state variables
   
   useEffect(() => {
     if (view !== 'overview') return
@@ -1264,13 +1276,12 @@ const GeneralLedger: React.FC = () => {
           postedOnly: filters.postedOnly,
           limit: initialLimit,
           offset: 0, // Always start from beginning for smart pagination
+          classificationId: classificationId || null,
         })
         
         // If we got fewer rows than the limit, we have all the data
         if (rows.length < initialLimit) {
-          setAllSummaryRows(rows)
-          setSummaryRows(rows) // For compatibility with existing logic
-          setTotalSummaryRows(rows.length)
+          setSummaryRows(rows)
         } else {
           // We might have more data, so fetch all of it
           let allRows = [...rows]
@@ -1286,6 +1297,7 @@ const GeneralLedger: React.FC = () => {
               postedOnly: filters.postedOnly,
               limit: batchSize,
               offset,
+              classificationId: classificationId || null,
             })
             
             if (moreRows.length === 0) break
@@ -1295,16 +1307,14 @@ const GeneralLedger: React.FC = () => {
             offset += batchSize
           }
           
-          setAllSummaryRows(allRows)
-          setSummaryRows(allRows) // For compatibility with existing logic  
-          setTotalSummaryRows(allRows.length)
+          setSummaryRows(allRows)
         }
       } finally {
         setLoadingSummary(false)
       }
     }
     loadSummary()
-  }, [view, filters.dateFrom, filters.dateTo, filters.postedOnly, orgId, projectId])
+  }, [view, filters.dateFrom, filters.dateTo, filters.postedOnly, orgId, projectId, classificationId])
 
   // Helper: derive previous period range matching the current window length
   const prevRange = useMemo(() => {
@@ -1334,6 +1344,7 @@ const GeneralLedger: React.FC = () => {
             postedOnly: filters.postedOnly,
             limit: 10000, // large cap for summary
             offset: 0,
+            classificationId: classificationId || null,
           }),
           fetchGLAccountSummary({
             dateFrom: prevRange.prevFrom,
@@ -1343,6 +1354,7 @@ const GeneralLedger: React.FC = () => {
             postedOnly: filters.postedOnly,
             limit: 10000,
             offset: 0,
+            classificationId: classificationId || null,
           }),
         ])
         const sumCurr = currRows.reduce((s, r) => s + Number(r.period_debits || 0) - Number(r.period_credits || 0), 0)
@@ -1626,6 +1638,7 @@ const GeneralLedger: React.FC = () => {
         postedOnly: filters.postedOnly,
         limit,
         offset: state.offset,
+        classificationId: classificationId || null,
       })
 
       let rows = res
@@ -1660,6 +1673,7 @@ const GeneralLedger: React.FC = () => {
             postedOnly: filters.postedOnly,
             limit,
             offset: 0,
+            classificationId: classificationId || null,
           })
           rows = childRows
           newState.childIndex = idx + 1
@@ -1890,6 +1904,16 @@ const GeneralLedger: React.FC = () => {
           onChange={e => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
           style={{width: '130px', fontSize: '12px'}}
         />
+        
+        {/* Classification filter - for both views */}
+        <select className={styles.select} value={classificationId} onChange={e => setClassificationId(e.target.value)} style={{maxWidth: '180px', fontSize: '12px'}}>
+          <option value=''>جميع التصنيفات</option>
+          {classificationOptions.map(o => (
+            <option key={o.id} value={o.id}>
+              {(o.name_ar || o.name).substring(0, 30)}
+            </option>
+          ))}
+        </select>
         
         {/* Account filter - only for details view */}
         {view === 'details' && (

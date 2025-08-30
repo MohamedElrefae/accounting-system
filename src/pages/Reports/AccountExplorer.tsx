@@ -51,7 +51,7 @@ const AccountExplorerPage: React.FC = () => {
   const [nodes, setNodes] = useState<AccountExplorerRow[]>([]);
   const [orgId, setOrgId] = useState<string>(getInitialOrgId());
   const [glTotals, setGlTotals] = useState<GLTotals | null>(null);
-  const [isTotalsLoading, setIsTotalsLoading] = useState<boolean>(false);
+  const [, setIsTotalsLoading] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<ViewMode>('tree');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string>('');
@@ -124,7 +124,7 @@ const AccountExplorerPage: React.FC = () => {
     (async () => {
       try {
         const config = await getCompanyConfig()
-        setCompanyName(config?.company_name_ar || config?.company_name || '')
+        setCompanyName(config?.company_name || '')
       } catch {}
     })()
   }, [])

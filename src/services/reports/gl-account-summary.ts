@@ -8,6 +8,7 @@ export interface GLAccountSummaryFilters {
   postedOnly?: boolean
   limit?: number | null
   offset?: number | null
+  classificationId?: string | null
 }
 
 export interface GLAccountSummaryRow {
@@ -37,6 +38,7 @@ export async function fetchGLAccountSummary(filters: GLAccountSummaryFilters): P
     p_posted_only: filters.postedOnly ?? true,
     p_limit: filters.limit ?? null,
     p_offset: filters.offset ?? null,
+    p_classification_id: filters.classificationId ?? null,
   })
   if (error) throw error
   return (data as GLAccountSummaryRow[]) ?? []

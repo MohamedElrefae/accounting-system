@@ -1,7 +1,8 @@
-import { Hash, FileText, Calendar, DollarSign, Receipt, MessageSquare, Building2, FolderOpen } from 'lucide-react';
+import { Hash, FileText, Calendar, DollarSign, Receipt, MessageSquare, Building2, FolderOpen, Tag } from 'lucide-react';
 import type { FormConfig, FormField } from '../Common/UnifiedCRUDForm';
 import type { Account, TransactionRecord, Project } from '../../services/transactions';
 import type { Organization } from '../../types';
+import type { TransactionClassification } from '../../services/transaction-classification';
 
 import { getCurrentDate, DATE_FORMATS } from '../../utils/dateHelpers';
 
@@ -15,7 +16,7 @@ const validateEntryNumber = (entryNumber: string): ValidationError | null => {
     return { field: 'entry_number', message: 'رقم القيد مطلوب' };
   }
   // Format validation: JE-YYYYMM-####
-  const pattern = /^JE-\\d{6}-\\d{4}$/;
+  const pattern = /^JE-\d{6}-\d{4}$/;
   if (!pattern.test(entryNumber)) {
     return { field: 'entry_number', message: 'رقم القيد يجب أن يكون بصيغة: JE-YYYYMM-####' };
   }
@@ -111,11 +112,10 @@ export const createTransactionFormConfig = (
   accounts: Account[],
   projects: Project[] = [],
   organizations: Organization[] = [],
+  classifications: TransactionClassification[] = [],
   existingTransaction?: TransactionRecord | null
 ): FormConfig => {
   
-  // Convert accounts to select options with search capability
-  const postableAccounts = accounts.filter(a => a.is_postable);
   // Build hierarchical (level-based) options with real tree nodes and level headers
   const byParent: Record<string, Account[]> = {};
   const allById: Record<string, Account> = {};
@@ -189,6 +189,13 @@ export const createTransactionFormConfig = (
     value: org.id,
     label: `${org.code} - ${org.name}`,
     searchText: `${org.code} ${org.name} ${org.description || ''}`.toLowerCase()
+  }));
+
+  // Convert classifications to select options
+  const classificationOptions = classifications.map(classification => ({
+    value: classification.id,
+    label: `${classification.code} - ${classification.name}`,
+    searchText: `${classification.code} ${classification.name}`.toLowerCase()
   }));
   
   // Defaults can be applied in future if needed (kept intentionally minimal to avoid unused variables)
@@ -331,6 +338,20 @@ export const createTransactionFormConfig = (
       position: { row: 5, col: 2 }
     },
     {
+      id: 'classification_id',
+      type: 'searchable-select' as any,
+      label: 'تصنيف المعاملة',
+      required: false,
+      options: [{ value: '', label: 'بدون تصنيف', searchText: '' }, ...classificationOptions],
+      icon: <Tag size={16} />,
+      helpText: 'تصنيف نوع المعاملة (اختياري)',
+      searchable: true,
+      clearable: true,
+      placeholder: 'ابحث عن تصنيف المعاملة...',
+      colSpan: 1,
+      position: { row: 6, col: 1 }
+    },
+    {
       id: 'notes',
       type: 'text',
       label: 'ملاحظات',
@@ -339,7 +360,7 @@ export const createTransactionFormConfig = (
       icon: <MessageSquare size={16} />,
       helpText: 'أي ملاحظات إضافية حول المعاملة',
       colSpan: 1,
-      position: { row: 6, col: 1 }
+      position: { row: 6, col: 2 }
     }
   ];
 

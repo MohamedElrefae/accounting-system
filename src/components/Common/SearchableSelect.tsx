@@ -60,7 +60,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
     opts: SearchableSelectOption[],
     depth: number,
     out: FlatRow[],
-    parentExpanded: boolean,
+    _parentExpanded: boolean, // Not used but part of the signature
     term: string
   ) => {
     for (const opt of normalize(opts)) {
@@ -410,7 +410,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
                     index === highlightedIndex ? styles.optionHighlighted : '',
                     option.disabled ? styles.optionDisabled : ''
                   ].filter(Boolean).join(' ')}
-                  onClick={(e) => {
+                  onClick={(_e) => {
                     // If clicking caret, handled below
                     if (!option.disabled) handleSelect(option.value);
                   }}
