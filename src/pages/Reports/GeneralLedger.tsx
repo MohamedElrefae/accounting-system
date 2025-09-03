@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import styles from './GeneralLedger.module.css'
 import { fetchGeneralLedgerReport, type GLFilters, type GLRow } from '../../services/reports/general-ledger'
+import { fetchTransactionsDateRange } from '../../services/reports/common'
 import ExportButtons from '../../components/Common/ExportButtons'
 import PresetBar from '../../components/Common/PresetBar'
 import { fetchGLAccountSummary, type GLAccountSummaryRow } from '../../services/reports/gl-account-summary'
-import { fetchTransactionsDateRange } from '../../services/reports/account-explorer'
 import { fetchOrganizations, fetchProjects, fetchAccountsMinimal, type LookupOption } from '../../services/lookups'
 import type { UniversalTableData } from '../../utils/UniversalExportManager'
 import { exportToExcel, exportToCSV } from '../../utils/UniversalExportManager'
@@ -44,21 +44,6 @@ interface SavedFilterSet {
   dateTo: string
 }
 
-interface AnalyticsData {
-  generatedAt: Date
-  period: { from: string; to: string }
-  kpi: {
-    totalDebits: number
-    totalCredits: number
-    activeTransactions: number
-  }
-  comparison?: {
-    prev: number
-    curr: number
-    variance: number
-    pct: number | null
-  }
-}
 
 // Debounced hook for search
 const useDebounced = (value: string, delay: number) => {
@@ -106,10 +91,10 @@ const GeneralLedger: React.FC = () => {
         const n = parseInt(s, 10)
         if (!isNaN(n) && n > 0 && n <= 100000) setPageSize(n)
       }
-    } catch {}
+    } catch { /* noop */ }
   }, [])
   useEffect(() => {
-    try { localStorage.setItem('gl_pageSize', String(pageSize)) } catch {}
+    try { localStorage.setItem('gl_pageSize', String(pageSize)) } catch { /* noop */ }
   }, [pageSize])
   // Drill-down expanded row must be declared before effects that persist it
   const [expandedAccountId, setExpandedAccountId] = useState<string | null>(null)
@@ -148,11 +133,9 @@ const GeneralLedger: React.FC = () => {
     minBalance: '',
     maxBalance: ''
   })
-  const [_dateRangePresets, _setDateRangePresets] = useState<string>('')
   const [accountTypeFilter, setAccountTypeFilter] = useState<'all' | 'postable' | 'summary'>('all')
   const [balanceTypeFilter, setBalanceTypeFilter] = useState<'all' | 'debit' | 'credit' | 'zero'>('all')
   const [showAnalytics, setShowAnalytics] = useState<boolean>(false)
-  const [_analyticsData, _setAnalyticsData] = useState<AnalyticsData | null>(null)
 
   // Company for header
   const [companyName, setCompanyName] = useState<string>('')
@@ -243,7 +226,7 @@ const GeneralLedger: React.FC = () => {
         if (r && r.min_date && r.max_date) {
           setFilters(prev => ({ ...prev, dateFrom: r.min_date || prev.dateFrom, dateTo: r.max_date || prev.dateTo }))
         }
-      } catch {}
+      } catch { /* noop */ }
     })()
   }, [orgId, projectId, filters.postedOnly])
 
@@ -378,7 +361,7 @@ const GeneralLedger: React.FC = () => {
           .filter(c => visibleOverviewColumns.includes(c.key))
           .map(c => ({ key: c.key, header: c.label, type: (['opening_debit','opening_credit','period_debits','period_credits','closing_debit','closing_credit'].includes(c.key) ? 'currency' : 'text') as 'currency' | 'text', currency: (['opening_debit','opening_credit','period_debits','period_credits','closing_debit','closing_credit'].includes(c.key) ? (numbersOnly ? 'none' : 'EGP') : undefined) }))
         const columns = createStandardColumns(cols)
-        const tableRows = all.map(r => ({
+        const rows = all.map(r => ({
           account_code: r.account_code,
           account_name: r.account_name_ar || r.account_name_en || '',
           opening_debit: Number(r.opening_debit || 0),
@@ -388,11 +371,11 @@ const GeneralLedger: React.FC = () => {
           closing_debit: Number(r.closing_debit || 0),
           closing_credit: Number(r.closing_credit || 0),
           transaction_count: r.transaction_count,
-        })).map(row => Object.fromEntries(Object.entries(row).filter(([k]) => visibleOverviewColumns.includes(k as string)))) as any[]
+        }))
 
-        const data = prepareTableData(columns, tableRows)
+        const data = prepareTableData(columns, rows)
         // Prepend compare summary if enabled
-        const prependRows: any[][] = []
+        const prependRows: (string | number)[][] = []
         if (compareMode && compareTotals) {
           prependRows.push(['الفترة السابقة (صافي)', Number(compareTotals.prev || 0)])
           prependRows.push(['الفترة الحالية (صافي)', Number(compareTotals.curr || 0)])
@@ -400,9 +383,9 @@ const GeneralLedger: React.FC = () => {
           prependRows.push(['% التغير', compareTotals.pct == null ? '' : `${(compareTotals.pct * 100).toFixed(2)}%`])
           prependRows.push([''])
         }
-        const finalData = { ...data, metadata: { ...(data as any).metadata, prependRows: prependRows.length ? prependRows : undefined } }
-        if (format === 'excel') await exportToExcel(finalData as any, commonConfig)
-        else await exportToCSV(finalData as any, commonConfig)
+        const finalData: UniversalTableData = { ...data, metadata: { ...(data.metadata || {}), prependRows: prependRows.length ? prependRows : undefined } }
+        if (format === 'excel') await exportToExcel(finalData, commonConfig)
+        else await exportToCSV(finalData, commonConfig)
         return
       }
 
@@ -430,7 +413,7 @@ const GeneralLedger: React.FC = () => {
         .filter(c => visibleColumns.includes(c.key))
         .map(c => ({ key: c.key, header: c.label, type: (['debit','credit','running_debit','running_credit'].includes(c.key) ? 'currency' : (c.key === 'entry_date' ? 'date' : 'text')) as 'currency' | 'date' | 'text', currency: (['debit','credit','running_debit','running_credit'].includes(c.key) ? (numbersOnly ? 'none' : 'EGP') : undefined) }))
       const columns = createStandardColumns(cols)
-      const tableRows = all.map(r => ({
+      const rows = all.map(r => ({
         entry_number: r.entry_number ?? '',
         entry_date: r.entry_date,
         account_code: r.account_code,
@@ -440,13 +423,10 @@ const GeneralLedger: React.FC = () => {
         credit: Number(r.credit || 0),
         running_debit: Number(r.running_debit || 0),
         running_credit: Number(r.running_credit || 0),
-      })).map(row => Object.fromEntries(Object.entries(row).filter(([k]) => visibleColumns.includes(k as string)))) as any[]
-      const data = prepareTableData(columns, tableRows)
-      const prependRows: any[][] = []
+      }))
+      const data = prepareTableData(columns, rows)
+      const prependRows: (string | number)[][] = []
       // Enrich metadata with account and mode context for details exports
-      const acc = accountOptions.find(a => a.id === accountId)
-      const accHasChildren = acc?.code ? accountOptions.some(o => o.id !== acc?.id && o.code && o.code.startsWith(acc.code || '')) : false
-      const accIsPostable = !accHasChildren
       if (compareMode && compareTotals) {
         prependRows.push(['الفترة السابقة (صافي)', Number(compareTotals.prev || 0)])
         prependRows.push(['الفترة الحالية (صافي)', Number(compareTotals.curr || 0)])
@@ -454,9 +434,9 @@ const GeneralLedger: React.FC = () => {
         prependRows.push(['% التغير', compareTotals.pct == null ? '' : `${(compareTotals.pct * 100).toFixed(2)}%`])
         prependRows.push([''])
       }
-      const finalData = { ...data, metadata: { ...(data as any).metadata, prependRows: prependRows.length ? prependRows : undefined, context: { account: acc ? { id: acc.id, code: acc.code, name: acc.name_ar || acc.name, category: acc.category, normal_balance: acc.normal_balance, postable: accIsPostable } : null, includeChildrenInDrilldown } } }
-      if (format === 'excel') await exportToExcel(finalData as any, commonConfig)
-      else await exportToCSV(finalData as any, commonConfig)
+      const finalData: UniversalTableData = { ...data, metadata: { ...(data.metadata || {}), prependRows: prependRows.length ? prependRows : undefined } }
+      if (format === 'excel') await exportToExcel(finalData, commonConfig)
+      else await exportToCSV(finalData, commonConfig)
     } catch (e) {
       console.error('Full export failed', e)
     } finally {
@@ -919,34 +899,25 @@ const GeneralLedger: React.FC = () => {
               cellContent = row.account_code || '—'
               break
             case 'account_name':
-              const hasChildren = summaryRows.some(s => s.account_id !== row.account_id && s.account_code && row.account_code && s.account_code.startsWith(row.account_code))
-              const isPostable = !hasChildren
-              const badge = isPostable ? ' (قابل للترحيل)' : ' (تجميعي)'
-              cellContent = `${row.account_name_ar || row.account_name_en || ''}${badge}`
+              cellContent = `${row.account_name_ar || row.account_name_en || ''}${(!summaryRows.some(s => s.account_id !== row.account_id && s.account_code && row.account_code && s.account_code.startsWith(row.account_code)) ? ' (قابل للترحيل)' : ' (تجميعي)')}`
               break
             case 'opening_debit':
-              const openingDebit = Number(row.opening_debit || 0)
-              cellContent = openingDebit !== 0 ? formatPrintCurrency(openingDebit, numbersOnly ? 'none' : 'EGP') : '—'
+              cellContent = (Number(row.opening_debit || 0) !== 0) ? formatPrintCurrency(Number(row.opening_debit || 0), numbersOnly ? 'none' : 'EGP') : '—'
               break
             case 'opening_credit':
-              const openingCredit = Number(row.opening_credit || 0)
-              cellContent = openingCredit !== 0 ? formatPrintCurrency(openingCredit, numbersOnly ? 'none' : 'EGP') : '—'
+              cellContent = (Number(row.opening_credit || 0) !== 0) ? formatPrintCurrency(Number(row.opening_credit || 0), numbersOnly ? 'none' : 'EGP') : '—'
               break
             case 'period_debits':
-              const periodDebits = Number(row.period_debits || 0)
-              cellContent = periodDebits !== 0 ? formatPrintCurrency(periodDebits, numbersOnly ? 'none' : 'EGP') : '—'
+              cellContent = (Number(row.period_debits || 0) !== 0) ? formatPrintCurrency(Number(row.period_debits || 0), numbersOnly ? 'none' : 'EGP') : '—'
               break
             case 'period_credits':
-              const periodCredits = Number(row.period_credits || 0)
-              cellContent = periodCredits !== 0 ? formatPrintCurrency(periodCredits, numbersOnly ? 'none' : 'EGP') : '—'
+              cellContent = (Number(row.period_credits || 0) !== 0) ? formatPrintCurrency(Number(row.period_credits || 0), numbersOnly ? 'none' : 'EGP') : '—'
               break
             case 'closing_debit':
-              const closingDebit = Number(row.closing_debit || 0)
-              cellContent = closingDebit !== 0 ? formatPrintCurrency(closingDebit, numbersOnly ? 'none' : 'EGP') : '—'
+              cellContent = (Number(row.closing_debit || 0) !== 0) ? formatPrintCurrency(Number(row.closing_debit || 0), numbersOnly ? 'none' : 'EGP') : '—'
               break
             case 'closing_credit':
-              const closingCredit = Number(row.closing_credit || 0)
-              cellContent = closingCredit !== 0 ? formatPrintCurrency(closingCredit, numbersOnly ? 'none' : 'EGP') : '—'
+              cellContent = (Number(row.closing_credit || 0) !== 0) ? formatPrintCurrency(Number(row.closing_credit || 0), numbersOnly ? 'none' : 'EGP') : '—'
               break
             case 'transaction_count':
               cellContent = String(row.transaction_count || 0)
@@ -1019,20 +990,16 @@ const GeneralLedger: React.FC = () => {
               cellContent = row.description || '—'
               break
             case 'debit':
-              const debit = Number(row.debit || 0)
-              cellContent = debit !== 0 ? formatPrintCurrency(debit, numbersOnly ? 'none' : 'EGP') : '—'
+              cellContent = (Number(row.debit || 0) !== 0) ? formatPrintCurrency(Number(row.debit || 0), numbersOnly ? 'none' : 'EGP') : '—'
               break
             case 'credit':
-              const credit = Number(row.credit || 0)
-              cellContent = credit !== 0 ? formatPrintCurrency(credit, numbersOnly ? 'none' : 'EGP') : '—'
+              cellContent = (Number(row.credit || 0) !== 0) ? formatPrintCurrency(Number(row.credit || 0), numbersOnly ? 'none' : 'EGP') : '—'
               break
             case 'running_debit':
-              const runningDebit = Number(row.running_debit || 0)
-              cellContent = runningDebit !== 0 ? formatPrintCurrency(runningDebit, numbersOnly ? 'none' : 'EGP') : '—'
+              cellContent = (Number(row.running_debit || 0) !== 0) ? formatPrintCurrency(Number(row.running_debit || 0), numbersOnly ? 'none' : 'EGP') : '—'
               break
             case 'running_credit':
-              const runningCredit = Number(row.running_credit || 0)
-              cellContent = runningCredit !== 0 ? formatPrintCurrency(runningCredit, numbersOnly ? 'none' : 'EGP') : '—'
+              cellContent = (Number(row.running_credit || 0) !== 0) ? formatPrintCurrency(Number(row.running_credit || 0), numbersOnly ? 'none' : 'EGP') : '—'
               break
           }
           
@@ -1111,8 +1078,8 @@ const GeneralLedger: React.FC = () => {
             el.style.fontSize = '14px'
             el.style.lineHeight = '1.5'
             el.style.color = '#000000'
-            ;(el.style as any).WebkitFontSmoothing = 'antialiased'
-            ;(el.style as any).MozOsxFontSmoothing = 'grayscale'
+            el.style.setProperty('-webkit-font-smoothing', 'antialiased')
+            el.style.setProperty('-moz-osx-font-smoothing', 'grayscale')
             // Show the report header for PDF capture
             const header = el.querySelector('[class*="reportHeader"]') as HTMLElement
             if (header) {
@@ -1173,7 +1140,7 @@ const GeneralLedger: React.FC = () => {
         dateFrom: qDateFrom || prev.dateFrom,
         dateTo: qDateTo || prev.dateTo,
       }));
-    } catch {}
+    } catch { /* noop */ }
   }, []);
 
   // Load dropdown lookups
@@ -1196,14 +1163,23 @@ const GeneralLedger: React.FC = () => {
           .select('id, name')
           .order('name')
         setClassificationOptions((classData || []).map(c => ({ id: c.id, name: c.name, name_ar: c.name, code: '' })))
-      } catch {}
+      } catch { /* noop */ }
     })()
   }, [])
 
   // Load presets and auto-apply last used
   useEffect(() => {
     loadPresetsAndApplyLast((p) => {
-      const f: any = p.filters || {}
+      type GLPresetFilters = Partial<GLFilters> & {
+        accountId?: string
+        orgId?: string
+        projectId?: string
+        hideZeroAccounts?: boolean
+        activityOnly?: boolean
+      }
+      type ColumnsPreset = { details?: string[]; overview?: string[] } | string[] | undefined
+
+      const f = ((p as { filters?: GLPresetFilters }).filters) ?? {}
       setAccountId(f.accountId || '')
       setOrgId(f.orgId || '')
       setProjectId(f.projectId || '')
@@ -1216,14 +1192,15 @@ const GeneralLedger: React.FC = () => {
       }))
       if (typeof f.hideZeroAccounts === 'boolean') setHideZeroAccounts(f.hideZeroAccounts)
       if (typeof f.activityOnly === 'boolean') setActivityOnly(f.activityOnly)
-      const cols: any = (p as any).columns
+
+      const cols = (p as { columns?: ColumnsPreset }).columns
       if (Array.isArray(cols)) {
-        setVisibleColumns(cols as string[])
+        setVisibleColumns(cols)
       } else if (cols && typeof cols === 'object') {
         if (Array.isArray(cols.details)) setVisibleColumns(cols.details)
         if (Array.isArray(cols.overview)) setVisibleOverviewColumns(cols.overview)
       }
-    }).catch(() => {})
+    }).catch(() => { /* noop */ })
   }, [loadPresetsAndApplyLast])
 
   useEffect(() => {
@@ -1249,8 +1226,9 @@ const GeneralLedger: React.FC = () => {
         } else {
           setTotalRows(rows.length)
         }
-      } catch (e: any) {
-        setError(e?.message || 'Failed to load general ledger')
+      } catch (e: unknown) {
+        const msg = (e && typeof e === 'object' && 'message' in e) ? String((e as { message?: unknown }).message) : undefined
+        setError(msg || 'Failed to load general ledger')
       } finally {
         setLoading(false)
       }
@@ -1412,11 +1390,11 @@ const GeneralLedger: React.FC = () => {
       credit: Number(r.credit || 0),
       running_debit: Number(r.running_debit || 0),
       running_credit: Number(r.running_credit || 0),
-    })).map(row => Object.fromEntries(Object.entries(row).filter(([k]) => visibleColumns.includes(k as string)))) as any[]
+    }))
 
     // Build prepend summary rows if compareMode is enabled and totals are available
-    const prependRows: any[][] = []
-    const pad = (cells: any[]) => {
+    const prependRows: (string | number)[][] = []
+    const pad = (cells: (string | number)[]) => {
       const arr = [...cells]
       while (arr.length < columns.length) arr.push('')
       return arr
@@ -1564,15 +1542,11 @@ const GeneralLedger: React.FC = () => {
       account_type: (!summaryRows.some(s => s.account_id !== r.account_id && s.account_code && r.account_code && s.account_code.startsWith(r.account_code))) ? 'قابل للترحيل' : 'تجميعي',
     }) )
 
-    const rows = rowsBase.map(row => {
-      const filtered: any = Object.fromEntries(Object.entries(row).filter(([k]) => visibleOverviewColumns.includes(k as string)))
-      filtered.account_type = row.account_type
-      return filtered
-    }) as any[]
+    const rows = rowsBase
 
     // Prepend compare summary rows when compare mode is enabled
-    const prependRows: any[][] = []
-    const pad = (cells: any[]) => {
+    const prependRows: (string | number)[][] = []
+    const pad = (cells: (string | number)[]) => {
       const arr = [...cells]
       while (arr.length < exportColumns.length) arr.push('')
       return arr
@@ -1642,7 +1616,7 @@ const GeneralLedger: React.FC = () => {
       })
 
       let rows = res
-      let newState = { ...state }
+      const newState = { ...state }
 
       // If no rows and option enabled, try children accounts with activity (merge results)
       if ((!rows || rows.length === 0) && includeChildrenInDrilldown) {
@@ -1733,7 +1707,14 @@ const GeneralLedger: React.FC = () => {
             newPresetName={newPresetName}
             onChangePreset={async (id) => {
               await selectPresetAndApply(String(id), (p) => {
-                const f: any = p.filters || {}
+                type GLPresetFilters = Partial<GLFilters> & {
+                  accountId?: string
+                  orgId?: string
+                  projectId?: string
+                }
+                type ColumnsPreset = { details?: string[]; overview?: string[] } | string[] | undefined
+
+                const f = ((p as { filters?: GLPresetFilters }).filters) ?? {}
                 setAccountId(f.accountId || '')
                 setOrgId(f.orgId || '')
                 setProjectId(f.projectId || '')
@@ -1744,8 +1725,8 @@ const GeneralLedger: React.FC = () => {
                   includeOpening: typeof f.includeOpening === 'boolean' ? f.includeOpening : prev.includeOpening,
                   postedOnly: typeof f.postedOnly === 'boolean' ? f.postedOnly : prev.postedOnly,
                 }))
-                const cols: any = (p as any).columns
-                if (Array.isArray(cols)) setVisibleColumns(cols as string[])
+                const cols = (p as { columns?: ColumnsPreset }).columns
+                if (Array.isArray(cols)) setVisibleColumns(cols)
                 else if (cols && typeof cols === 'object') {
                   if (Array.isArray(cols.details)) setVisibleColumns(cols.details)
                   if (Array.isArray(cols.overview)) setVisibleOverviewColumns(cols.overview)
@@ -1994,29 +1975,6 @@ const GeneralLedger: React.FC = () => {
           🔄
         </button>
         
-        {/* View as Tree (Account Explorer) */}
-        <button
-          className={styles.presetButton}
-          onClick={() => {
-            try {
-              const params = new URLSearchParams();
-              if (orgId) params.set('orgId', orgId);
-              if (projectId) params.set('projectId', projectId);
-              if (filters.postedOnly) params.set('postedOnly', String(filters.postedOnly));
-              if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
-              if (filters.dateTo) params.set('dateTo', filters.dateTo);
-              // Hint mode for explorer (optional)
-              params.set('mode', filters.dateFrom ? 'range' : 'asof');
-              window.location.assign(`/reports/account-explorer?${params.toString()}`);
-            } catch {
-              window.location.assign('/reports/account-explorer');
-            }
-          }}
-          title="عرض كشجرة"
-          style={{fontSize: '30px', padding: '9px 14px', minWidth: '54px', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}
-        >
-          🌲
-        </button>
 
         {/* Full export buttons - smaller */}
         <button className={styles.presetButton} disabled={isExportingFull} onClick={() => handleFullExport('excel')} title="تصدير كل الصفوف (Excel)" style={{fontSize: '30px', padding: '9px 14px', minWidth: '54px', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
