@@ -6,17 +6,20 @@ import { AuthProvider } from './contexts/AuthContext'
 import { CustomThemeProvider } from './contexts/ThemeContext'
 import { ToastProvider } from './contexts/ToastContext'
 import { UserProfileProvider } from './contexts/UserProfileContext'
+import { FontPreferencesProvider } from './contexts/FontPreferencesContext'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
-      <CustomThemeProvider>
-        <ToastProvider>
-          <UserProfileProvider>
-            <App />
-          </UserProfileProvider>
-        </ToastProvider>
-      </CustomThemeProvider>
+      <FontPreferencesProvider>
+        <CustomThemeProvider>
+          <ToastProvider>
+            <UserProfileProvider>
+              <App />
+            </UserProfileProvider>
+          </ToastProvider>
+        </CustomThemeProvider>
+      </FontPreferencesProvider>
     </AuthProvider>
   </StrictMode>,
 )

@@ -9,6 +9,54 @@
 
 .controls-container { padding: 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid rgba(0,0,0,0.1); flex-wrap: wrap; }
 
+/* New: Filters row (moved from inline styles) */
+.transactions-filters-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  background-color: var(--surface);
+}
+
+/* Inputs/selects used in filters row */
+.filter-input,
+.filter-select {
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background-color: var(--field_bg);
+  color: var(--text);
+}
+
+/* Specific widths */
+.filter-input--search { width: 120px; }
+.filter-input--date { width: 130px; }
+.filter-input--amount { width: 90px; }
+
+/* Select width constraints */
+.filter-select--status { min-width: 90px; }
+.filter-select--org { max-width: 180px; }
+.filter-select--project { max-width: 180px; }
+.filter-select--account { max-width: 200px; }
+.filter-select--classification { max-width: 180px; }
+.filter-select--expenses { max-width: 220px; }
+
+/* Clear filters button sizing (uses ultimate button theme) */
+.filter-clear-btn {
+  font-size: 20px;
+  padding: 6px 12px;
+  min-width: 40px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+}
+
 .search-input { padding: 0.75rem 1rem; border: 1px solid rgba(0,0,0,0.2); border-radius: 8px; width: 300px; }
 .filter-input, .filter-select { padding: 0.75rem 1rem; border: 1px solid rgba(0,0,0,0.2); border-radius: 8px; min-width: 150px; }
 

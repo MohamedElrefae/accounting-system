@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import styles from './UnifiedCRUDForm.module.css';
-import SearchableSelect from './SearchableSelect';
+import SearchableSelect, { type SearchableSelectOption } from './SearchableSelect';
 import FormLayoutControls from './FormLayoutControls';
 
 // Lightweight validation types to keep this component standalone
@@ -42,8 +42,10 @@ export interface FormField {
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
-  options?: { value: string; label: string; searchText?: string }[];
-  validation?: (value: any) => ValidationError | null;
+  options?: SearchableSelectOption[];
+  // Dynamically compute options based on current form data (overrides static options when provided)
+  optionsProvider?: (formData: Record<string, unknown>) => SearchableSelectOption[];
+  validation?: (value: unknown) => ValidationError | null;
   autoComplete?: string;
   min?: number;
   max?: number;
@@ -52,13 +54,17 @@ export interface FormField {
   helpText?: string;
   icon?: React.ReactNode;
   dependsOn?: string; // Field ID that this field depends on
-  conditionalLogic?: (formData: any) => boolean; // Show/hide field based on other fields
+  // Reset this field when any of these fields change
+  dependsOnAny?: string[];
+  conditionalLogic?: (formData: Record<string, unknown>) => boolean; // Show/hide field based on other fields
   isClearable?: boolean; // For select fields
-  defaultValue?: any; // Default value for any field type
+  defaultValue?: unknown; // Default value for any field type
   searchable?: boolean; // For searchable-select fields
   clearable?: boolean; // For searchable-select fields
   colSpan?: number; // Column span for layout
   position?: { row: number; col: number }; // Field position in custom layout
+  /** Optional hierarchical options for opening a drilldown modal to select from a tree */
+  drilldownOptions?: SearchableSelectOption[];
 }
 
 // Form Configuration
@@ -69,8 +75,8 @@ export type FormConfig = {
   fields: FormField[];
   submitLabel?: string;
   cancelLabel?: string;
-  customValidator?: (data: any) => ValidationResult;
-  autoFillLogic?: (data: any) => Partial<any>;
+  customValidator?: (data: Record<string, unknown>) => ValidationResult;
+  autoFillLogic?: (data: Record<string, unknown>) => Record<string, unknown>;
   layout?: {
     columns?: number; // Number of columns (1, 2, or 3)
     columnBreakpoints?: { field: string; newColumn?: boolean; fullWidth?: boolean }[];
@@ -81,9 +87,15 @@ export type FormConfig = {
 // Props Interface
 export interface UnifiedCRUDFormProps {
   config: FormConfig;
-  initialData?: any;
+  initialData?: Record<string, unknown>;
+  /**
+   * Controls whether the form should reset when initialData changes.
+   * Default is true (current behavior). Set to false to preserve current entries
+   * across parent re-renders (useful to prevent clearing user selections).
+   */
+  resetOnInitialDataChange?: boolean;
   isLoading?: boolean;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: Record<string, unknown>) => Promise<void>;
   onCancel: () => void;
   showAutoFillNotification?: boolean;
 }
@@ -96,6 +108,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   const {
     config,
     initialData = {},
+    resetOnInitialDataChange = true,
     isLoading = false,
     onSubmit,
     onCancel,
@@ -103,7 +116,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   } = props;
   const { showToast } = useToast();
   // State Management
-  const [formData, setFormData] = useState<any>(initialData);
+  const [formData, setFormData] = useState<Record<string, unknown>>(initialData);
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   // removed unused fieldStates to satisfy noUnusedLocals
   const [autoFilledFields, setAutoFilledFields] = useState<string[]>([]);
@@ -115,7 +128,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     return `unifiedForm:${base}:`;
   }, [config.formId, config.title]);
 
-  const [_showOnlyInvalid, _setShowOnlyInvalid] = useState<boolean>(() => {
+  const [_showOnlyInvalid] = useState<boolean>(() => {
     try { return localStorage.getItem(storageKeyPrefix + '_showOnlyInvalid') === 'true'; } catch { return false; }
   });
   // Layout controls: columns and full-width overrides
@@ -176,34 +189,44 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
           }
         }
       }
-    } catch (error) {
+    } catch {
       // Silently handle layout loading errors
+      void 0;
     }
   }, [config.title, config.fields]);
 
   // Initialize form data
   useEffect(() => {
+    // Only reset when explicitly allowed (default true to preserve existing consumers)
+    if (resetOnInitialDataChange) {
+      setFormData(initialData);
+      setValidationErrors([]);
+      setAutoFilledFields([]);
+      setTouchedFields(new Set());
+    }
+  }, [initialData, resetOnInitialDataChange]);
+
+  // On first mount, always seed the form data from initialData
+  useEffect(() => {
     setFormData(initialData);
-    setValidationErrors([]);
-    setAutoFilledFields([]);
-    setTouchedFields(new Set());
-  }, [initialData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Persist preferences
   useEffect(() => {
-    try { localStorage.setItem(storageKeyPrefix + '_showOnlyInvalid', _showOnlyInvalid ? 'true' : 'false'); } catch {}
+    try { localStorage.setItem(storageKeyPrefix + '_showOnlyInvalid', _showOnlyInvalid ? 'true' : 'false'); } catch { void 0; }
   }, [_showOnlyInvalid, storageKeyPrefix]);
   useEffect(() => {
-    try { localStorage.setItem(storageKeyPrefix + 'columns', String(columnOverride)); } catch {}
+    try { localStorage.setItem(storageKeyPrefix + 'columns', String(columnOverride)); } catch { void 0; }
   }, [columnOverride, storageKeyPrefix]);
   useEffect(() => {
-    try { localStorage.setItem(storageKeyPrefix + 'fullWidth', JSON.stringify(Array.from(fullWidthOverrides))); } catch {}
+    try { localStorage.setItem(storageKeyPrefix + 'fullWidth', JSON.stringify(Array.from(fullWidthOverrides))); } catch { void 0; }
   }, [fullWidthOverrides, storageKeyPrefix]);
   useEffect(() => {
-    try { localStorage.setItem(storageKeyPrefix + 'fieldOrder', JSON.stringify(fieldOrder)); } catch {}
+    try { localStorage.setItem(storageKeyPrefix + 'fieldOrder', JSON.stringify(fieldOrder)); } catch { void 0; }
   }, [fieldOrder, storageKeyPrefix]);
   useEffect(() => {
-    try { localStorage.setItem(storageKeyPrefix + 'visibleFields', JSON.stringify(Array.from(visibleFields))); } catch {}
+    try { localStorage.setItem(storageKeyPrefix + 'visibleFields', JSON.stringify(Array.from(visibleFields))); } catch { void 0; }
   }, [visibleFields, storageKeyPrefix]);
 
   // Auto-fill logic - runs when formData changes or initially when config has auto-fill
@@ -212,20 +235,20 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       const autoFilledData = config.autoFillLogic(formData);
       if (Object.keys(autoFilledData).length > 0) {
         // Only apply auto-fill if the field is empty or undefined
-        const fieldsToFill: any = {};
+        const fieldsToFill: Record<string, unknown> = {};
         const fieldsAutoFilled: string[] = [];
         
         Object.entries(autoFilledData).forEach(([key, value]) => {
-          const current = (formData as any)[key];
+          const current = (formData as Record<string, unknown>)[key];
           const isUnset = current === undefined || current === null || (typeof current === 'string' && current === '');
           if (isUnset) {
-            (fieldsToFill as any)[key] = value;
+            (fieldsToFill as Record<string, unknown>)[key] = value as unknown;
             fieldsAutoFilled.push(key);
           }
         });
         
         if (Object.keys(fieldsToFill).length > 0) {
-          setFormData((prev: any) => ({ ...prev, ...fieldsToFill }));
+          setFormData((prev) => ({ ...prev, ...fieldsToFill }));
           setAutoFilledFields(prev => Array.from(new Set([...prev, ...fieldsAutoFilled])));
         }
       }
@@ -238,8 +261,8 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   };
 
   // Get field value
-  const getFieldValue = (fieldId: string): any => {
-    return formData[fieldId] || '';
+  const getFieldValue = (fieldId: string): unknown => {
+    return formData[fieldId] ?? '';
   };
 
   // Check if field is required
@@ -261,7 +284,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   };
 
   // Handle field change
-  const handleFieldChange = (fieldId: string, value: any, field: FormField) => {
+  const handleFieldChange = (fieldId: string, value: unknown, field: FormField) => {
     const updatedFormData = { ...formData, [fieldId]: value };
     setFormData(updatedFormData);
 
@@ -285,9 +308,11 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
 
     // Handle dependent fields
     config.fields.forEach((f: FormField) => {
-      if (f.dependsOn === fieldId) {
+      const depends = f.dependsOn === fieldId;
+      const dependsAny = Array.isArray(f.dependsOnAny) && f.dependsOnAny.includes(fieldId);
+      if (depends || dependsAny) {
         // Reset dependent field value if needed
-        if (updatedFormData[f.id]) {
+        if (updatedFormData[f.id] !== undefined) {
           updatedFormData[f.id] = '';
         }
       }
@@ -361,17 +386,18 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       if (firstInvalid) {
         scrollToField(firstInvalid);
       }
-      try { showToast?.(`يوجد ${validation.errors.length} خطأ — تم الانتقال لأول حقل غير صالح`, { severity: 'error' }); } catch {}
+      try { showToast?.(`يوجد ${validation.errors.length} خطأ — تم الانتقال لأول حقل غير صالح`, { severity: 'error' }); } catch { void 0; }
       return;
     }
 
     setIsSubmitting(true);
     try {
       await onSubmit(formData);
-    } catch (error: any) {
+    } catch (err: unknown) {
       // If submitter throws fieldErrors, surface them
-      if (error && Array.isArray(error.fieldErrors)) {
-        setValidationErrors(error.fieldErrors);
+      const maybe = err as { fieldErrors?: unknown } | null;
+      if (maybe && Array.isArray(maybe.fieldErrors)) {
+        setValidationErrors(maybe.fieldErrors as ValidationError[]);
         const allFieldIds = config.fields.map((f: FormField) => f.id);
         setTouchedFields(new Set(allFieldIds));
       }
@@ -385,9 +411,9 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     try {
       const fieldIds = new Set(config.fields.map(f => f.id).concat(['is_active','allow_transactions','level','parent_id']));
       for (const key of fieldIds) {
-        const cur = (formData as any)[key];
-        const init = (initialData as any)[key];
-        const norm = (v: any) => typeof v === 'string' ? v.trim() : v;
+        const cur = (formData as Record<string, unknown>)[key];
+        const init = (initialData as Record<string, unknown>)[key];
+        const norm = (v: unknown) => typeof v === 'string' ? v.trim() : v;
         if (norm(cur) !== norm(init)) return true;
       }
       return false;
@@ -493,6 +519,9 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     const isTouched = touchedFields.has(field.id);
     const showError = error && isTouched;
     const showSuccess = isTouched && !error;
+
+    // Resolve options: prefer dynamic optionsProvider when present
+    const fieldOptions = field.optionsProvider ? (field.optionsProvider(formData) || []) : (field.options || []);
     
     // Check if this field should span full width
     // const isFullWidth = _breakpoint?.fullWidth;
@@ -508,14 +537,14 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
         <select
           id={field.id}
           name={field.id}
-          value={value}
+          value={value as string}
           onChange={(e) => handleFieldChange(field.id, e.target.value, field)}
           disabled={field.disabled || isLoading}
           required={isFieldRequired(field)}
           className={[inputClasses, styles.inputSelect, (field.disabled || isLoading) ? styles.inputDisabled : ''].filter(Boolean).join(' ')}
         >
           <option value="">{field.placeholder || `اختر ${field.label}`}</option>
-          {field.options?.map(option => (
+          {fieldOptions.map(option => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
@@ -528,14 +557,17 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       return (
         <SearchableSelect
           id={field.id}
-          value={value}
-          options={field.options || []}
+          value={value as string}
+          options={fieldOptions}
           onChange={(selectedValue) => handleFieldChange(field.id, selectedValue, field)}
           placeholder={field.placeholder}
           disabled={field.disabled || isLoading}
           clearable={field.isClearable !== false}
           required={isFieldRequired(field)}
           error={!!showError}
+          // Drilldown modal support (if provided by field)
+          showDrilldownModal={!!field.drilldownOptions}
+          treeOptions={field.drilldownOptions}
         />
       );
     }
@@ -547,7 +579,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
             type="checkbox"
             id={field.id}
             name={field.id}
-            checked={!!value}
+            checked={Boolean(value)}
             onChange={(e) => handleFieldChange(field.id, e.target.checked, field)}
             disabled={field.disabled || isLoading}
             style={{
@@ -574,7 +606,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
         <textarea
           id={field.id}
           name={field.id}
-          value={value}
+          value={typeof value === 'string' ? value : ''}
           onChange={(e) => handleFieldChange(field.id, e.target.value, field)}
           placeholder={field.placeholder}
           disabled={field.disabled || isLoading}
@@ -599,7 +631,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
             type={showPasswordFields[field.id] ? 'text' : 'password'}
             id={field.id}
             name={field.id}
-            value={value}
+            value={typeof value === 'string' ? value : ''}
             onChange={(e) => handleFieldChange(field.id, e.target.value, field)}
             placeholder={field.placeholder}
             disabled={field.disabled || isLoading}
@@ -624,9 +656,9 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
         type={field.type}
         id={field.id}
         name={field.id}
-        value={value}
+        value={typeof value === 'number' || typeof value === 'string' ? value : ''}
         onChange={(e) => {
-          const inputValue = field.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value;
+          const inputValue = field.type === 'number' ? (e.target.value === '' ? '' : (Number.isNaN(Number(e.target.value)) ? '' : Number(e.target.value))) : e.target.value;
           handleFieldChange(field.id, inputValue, field);
         }}
         placeholder={field.placeholder}
@@ -718,7 +750,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
               };
               localStorage.setItem(`form-layout-${config.title || 'default'}`, JSON.stringify(layoutConfig));
               showToast?.('تم حفظ إعدادات التخطيط بنجاح', { severity: 'success' });
-            } catch (error) {
+            } catch {
               showToast?.('فشل في حفظ إعدادات التخطيط', { severity: 'error' });
             }
           }}
@@ -729,8 +761,9 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
             try {
               localStorage.removeItem(`form-layout-${config.title || 'default'}`);
               showToast?.('تم إعادة تعيين إعدادات التخطيط', { severity: 'info' });
-            } catch (error) {
+            } catch {
               // Silently handle error - user already gets toast notification
+              void 0;
             }
           }}
           isOpen={layoutControlsOpen}

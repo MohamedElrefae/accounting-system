@@ -37,6 +37,9 @@ export interface TransactionRecord {
   amount: number
   notes: string | null
   classification_id?: string | null
+  expenses_category_id?: string | null
+  work_item_id?: string | null
+  cost_center_id?: string | null
   is_posted: boolean
   posted_at: string | null
   posted_by: string | null
@@ -175,12 +178,12 @@ export function parseDate(dateInput: string | Date): Date {
 
 export async function getAccounts(): Promise<Account[]> {
   // Try to scope by current org to match the tree-of-accounts view
-  let orgId: string | null = null
-  try { orgId = localStorage.getItem('org_id'); } catch {}
+  const { getActiveOrgId } = await import('../utils/org')
+  const orgId: string | null = getActiveOrgId()
 
   let query = supabase
     .from('accounts')
-    .select('id, code, name, is_postable, category, parent_id, level, org_id')
+    .select('id, code, name, is_postable, allow_transactions, category, parent_id, level, org_id')
     .eq('status', 'active')
     .order('code', { ascending: true })
 
@@ -191,7 +194,7 @@ export async function getAccounts(): Promise<Account[]> {
   const { data, error } = await query
   if (error) throw error
   // Strip org_id before returning
-  return ((data as any[]) || []).map(row => ({ id: row.id, code: row.code, name: row.name, is_postable: row.is_postable, category: row.category, parent_id: row.parent_id, level: row.level })) as Account[]
+  return ((data as any[]) || []).map(row => ({ id: row.id, code: row.code, name: row.name, is_postable: (row.is_postable ?? row.allow_transactions ?? false), category: row.category, parent_id: row.parent_id, level: row.level })) as Account[]
 }
 
 export async function getCurrentUserId(): Promise<string | null> {
@@ -213,6 +216,9 @@ export interface ListTransactionsFilters {
   projectId?: string
   orgId?: string
   classificationId?: string
+  expensesCategoryId?: string
+  workItemId?: string
+  costCenterId?: string
 }
 
 export interface ListTransactionsOptions {
@@ -226,7 +232,7 @@ export interface PagedResult<T> {
   total: number
 }
 
-export async function getTransactions(options?: ListTransactionsOptions): Promise<PagedResult<TransactionRecord & { organization_name?: string; project_name?: string }>> {
+export async function getTransactions(options?: ListTransactionsOptions): Promise<PagedResult<TransactionRecord & { organization_name?: string; project_name?: string; cost_center_code?: string; cost_center_name?: string }>> {
   const scope = options?.filters?.scope ?? 'all'
   const pendingOnly = options?.filters?.pendingOnly ?? false
   const page = options?.page ?? 1
@@ -234,14 +240,15 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
   const from = (page - 1) * pageSize
   const to = from + pageSize - 1
 
-  // Dynamic query with organization, project, and classification joins
+  // Dynamic query with organization, project, classification, and cost center joins
   let query = supabase
     .from('transactions')
     .select(`
       *,
       organizations!left(name),
       projects!left(name),
-      transaction_classification!left(code, name)
+      transaction_classification!left(code, name),
+      cost_centers!left(code, name)
     `, { count: 'exact' })
     .order('entry_date', { ascending: false })
 
@@ -276,19 +283,24 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
     if (f.projectId) query = query.eq('project_id', f.projectId)
     if (f.orgId) query = query.eq('org_id', f.orgId)
     if (f.classificationId) query = query.eq('classification_id', f.classificationId)
+    if (f.expensesCategoryId) query = query.eq('expenses_category_id', f.expensesCategoryId)
+    if (f.workItemId) query = query.eq('work_item_id', f.workItemId)
+    if (f.costCenterId) query = query.eq('cost_center_id', f.costCenterId)
   }
 
   const { data, error, count } = await query.range(from, to)
   if (error) throw error
   
-  // Transform the data to include organization and project names
+  // Transform the data to include organization, project, and cost center information
   const transformedData = (data || []).map((row: any) => ({
     ...row,
     organization_name: row.organizations?.name || null,
-    project_name: row.projects?.name || null
+    project_name: row.projects?.name || null,
+    cost_center_code: row.cost_centers?.code || null,
+    cost_center_name: row.cost_centers?.name || null
   }))
   
-  return { rows: transformedData as (TransactionRecord & { organization_name?: string; project_name?: string })[], total: count ?? 0 }
+  return { rows: transformedData as (TransactionRecord & { organization_name?: string; project_name?: string; cost_center_code?: string; cost_center_name?: string })[], total: count ?? 0 }
 }
 
 export interface CreateTransactionInput {
@@ -301,6 +313,9 @@ export interface CreateTransactionInput {
   amount: number
   notes?: string
   classification_id?: string
+  expenses_category_id?: string
+  work_item_id?: string
+  cost_center_id?: string
   project_id?: string
   org_id?: string
 }
@@ -341,6 +356,9 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
     amount: input.amount,
     notes: input.notes || null,
     classification_id: input.classification_id || null,
+    expenses_category_id: input.expenses_category_id || null,
+    work_item_id: input.work_item_id || null,
+    cost_center_id: input.cost_center_id || null,
     project_id: input.project_id || null,
     org_id: input.org_id || null,
     created_by: uid ?? null,
@@ -381,14 +399,70 @@ export async function deleteTransaction(id: string): Promise<void> {
   if (error) throw error
 }
 
-export async function updateTransaction(id: string, updates: Partial<Omit<TransactionRecord, 'id' | 'created_at' | 'updated_at' | 'created_by' | 'posted_at' | 'posted_by'>>): Promise<TransactionRecord> {
-  const payload: any = { ...updates, updated_at: new Date().toISOString() }
+export async function updateTransaction(
+  id: string,
+  updates: Partial<Omit<TransactionRecord, 'id' | 'created_at' | 'updated_at' | 'created_by' | 'posted_at' | 'posted_by'>>
+): Promise<TransactionRecord> {
+  // Whitelist columns we allow to update
+  const allowedKeys = new Set([
+    'entry_number',
+    'entry_date',
+    'description',
+    'reference_number',
+    'debit_account_id',
+    'credit_account_id',
+    'amount',
+    'notes',
+    'classification_id',
+    'expenses_category_id',
+    'work_item_id',
+    'cost_center_id',
+    'project_id',
+    'org_id',
+  ])
+
+  // Build a sanitized payload:
+  // - drop unknown keys
+  // - convert '' to null for nullable fields
+  // - format date
+  // - coerce amount to number
+  const payload: Record<string, any> = { updated_at: new Date().toISOString() }
+
+  for (const [key, rawValue] of Object.entries(updates || {})) {
+    if (!allowedKeys.has(key)) continue
+
+    let value: any = rawValue
+
+    // Normalize empty strings to null for string-like fields
+    if (typeof value === 'string' && value.trim() === '') {
+      value = null
+    }
+
+    // Date normalization
+    if (key === 'entry_date' && value) {
+      try {
+        value = formatDateForSupabase(value as any)
+      } catch {
+        // If format fails, leave as-is; DB will validate
+      }
+    }
+
+    // Numeric normalization
+    if (key === 'amount' && value != null) {
+      const n = typeof value === 'number' ? value : parseFloat(String(value))
+      if (!isNaN(n)) value = n
+    }
+
+    payload[key] = value
+  }
+
   const { data, error } = await supabase
     .from('transactions')
     .update(payload)
     .eq('id', id)
     .select('*')
     .single()
+
   if (error) throw error
   return data as TransactionRecord
 }

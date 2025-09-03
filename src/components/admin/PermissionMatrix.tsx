@@ -159,11 +159,18 @@ export const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
       const stateMap = new Map<string, PermissionState>();
 
       // Process role permissions
+      type RolePermRow = {
+        roles?: {
+          name?: string;
+          name_ar?: string;
+          role_permissions?: { permissions?: { name?: string } }[];
+        };
+      };
       if (rolePerms) {
-        rolePerms.forEach((userRole: any) => {
+        (rolePerms as RolePermRow[]).forEach((userRole) => {
           const roleName = String(userRole.roles?.name_ar || userRole.roles?.name || '');
           if (userRole.roles?.role_permissions) {
-            userRole.roles.role_permissions.forEach((rp: any) => {
+            userRole.roles.role_permissions.forEach((rp) => {
               const permName = rp.permissions?.name;
               if (permName) {
                 const existing = stateMap.get(permName) || {
@@ -184,7 +191,8 @@ export const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
 
       // Process direct permissions
       if (userPerms) {
-        userPerms.forEach((up: any) => {
+        type UserPermRow = { granted?: boolean; permissions?: { name?: string } };
+        (userPerms as UserPermRow[]).forEach((up) => {
           const permName = up.permissions?.name;
           if (permName) {
             const existing = stateMap.get(permName) || {
@@ -603,7 +611,7 @@ export const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
                                       checked={isEffective}
                                       onChange={() => handlePermissionToggle(permission.name)}
                                       disabled={isSuperAdmin}
-                                      color={getPermissionChipColor(permission.name) as any}
+                                      color={getPermissionChipColor(permission.name)}
                                     />
                                     <Box sx={{ flex: 1 }}>
                                       <Stack direction="row" alignItems="center" spacing={1}>

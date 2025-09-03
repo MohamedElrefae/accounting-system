@@ -203,6 +203,42 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ]
   },
   {
+    key: 'expenses_categories',
+    name: 'Expenses Categories',
+    nameAr: 'فئات المصروفات',
+    icon: 'Category',
+    permissions: [
+      {
+        name: 'expenses_categories.view',
+        nameAr: 'عرض فئات المصروفات',
+        description: 'View expenses categories',
+        descriptionAr: 'عرض فئات المصروفات',
+        category: 'expenses_categories'
+      },
+      {
+        name: 'expenses_categories.create',
+        nameAr: 'إنشاء فئة مصروفات',
+        description: 'Create new expenses categories',
+        descriptionAr: 'إنشاء فئات مصروفات جديدة',
+        category: 'expenses_categories'
+      },
+      {
+        name: 'expenses_categories.update',
+        nameAr: 'تعديل فئات المصروفات',
+        description: 'Update expenses categories',
+        descriptionAr: 'تعديل فئات المصروفات',
+        category: 'expenses_categories'
+      },
+      {
+        name: 'expenses_categories.delete',
+        nameAr: 'حذف فئات المصروفات',
+        description: 'Delete expenses categories',
+        descriptionAr: 'حذف فئات المصروفات',
+        category: 'expenses_categories'
+      }
+    ]
+  },
+  {
     key: 'reports',
     name: 'Reports',
     nameAr: 'التقارير',

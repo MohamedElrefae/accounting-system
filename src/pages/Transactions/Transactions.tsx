@@ -1,9 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { getAccounts, getTransactions, createTransaction, deleteTransaction, postTransaction, updateTransaction, getTransactionAudit, getCurrentUserId, getProjects, type Account, type TransactionRecord, type TransactionAudit, type Project } from '../../services/transactions'
+import { listWorkItemsAll } from '../../services/work-items'
+import type { WorkItemRow } from '../../types/work-items'
 import { getOrganizations } from '../../services/organization'
 import { getAllTransactionClassifications, type TransactionClassification } from '../../services/transaction-classification'
+import { getExpensesCategoriesList } from '../../services/expenses-categories'
 import type { Organization } from '../../types'
+import type { ExpensesCategoryRow } from '../../types/expenses-categories'
 import { useHasPermission } from '../../hooks/useHasPermission'
 import './Transactions.css'
 import { useToast } from '../../contexts/ToastContext'
@@ -17,10 +21,12 @@ import { logClientError } from '../../services/telemetry'
 import UnifiedCRUDForm, { type UnifiedCRUDFormHandle } from '../../components/Common/UnifiedCRUDForm'
 import DraggableResizablePanel from '../../components/Common/DraggableResizablePanel'
 import { createTransactionFormConfig } from '../../components/Transactions/TransactionFormConfig'
+import { getCostCentersForSelector } from '../../services/cost-centers'
 import ResizableTable from '../../components/Common/ResizableTable'
 import ColumnConfiguration from '../../components/Common/ColumnConfiguration'
 import type { ColumnConfig } from '../../components/Common/ColumnConfiguration'
 import useColumnPreferences from '../../hooks/useColumnPreferences'
+import SearchableSelect, { type SearchableSelectOption } from '../../components/Common/SearchableSelect'
 
 
 interface FilterState {
@@ -39,6 +45,9 @@ const TransactionsPage: React.FC = () => {
   const [transactions, setTransactions] = useState<TransactionRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [categories, setCategories] = useState<ExpensesCategoryRow[]>([])
+  const [workItems, setWorkItems] = useState<WorkItemRow[]>([])
+  const [costCenters, setCostCenters] = useState<Array<{ id: string; code: string; name: string; name_ar?: string | null; project_id?: string | null; level: number }>>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [_formErrors, _setFormErrors] = useState<Record<string, string>>({})
@@ -73,6 +82,9 @@ const TransactionsPage: React.FC = () => {
   const [orgFilterId, setOrgFilterId] = useState<string>('')
   const [projectFilterId, setProjectFilterId] = useState<string>('')
   const [classificationFilterId, setClassificationFilterId] = useState<string>('')
+  const [expensesCategoryFilterId, setExpensesCategoryFilterId] = useState<string>('')
+  const [workItemFilterId, setWorkItemFilterId] = useState<string>('')
+  const [costCenterFilterId, setCostCenterFilterId] = useState<string>('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
@@ -82,6 +94,18 @@ const TransactionsPage: React.FC = () => {
   const [columnConfigOpen, setColumnConfigOpen] = useState(false)
 
   const location = useLocation()
+  // Apply workItemId from URL query (drill-through)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(location.search)
+      const wid = params.get('workItemId') || ''
+      if (wid && wid !== workItemFilterId) {
+        setWorkItemFilterId(wid)
+        setPage(1)
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search])
   const hasPerm = useHasPermission()
   const { showToast } = useToast()
   const [showDiag, setShowDiag] = useState(false)
@@ -103,8 +127,11 @@ const TransactionsPage: React.FC = () => {
     { key: 'credit_account_label', label: 'الحساب الدائن', visible: true, width: 200, minWidth: 150, maxWidth: 300, type: 'text', resizable: true },
     { key: 'amount', label: 'المبلغ', visible: true, width: 140, minWidth: 120, maxWidth: 200, type: 'currency', resizable: true },
     { key: 'classification_name', label: 'التصنيف', visible: true, width: 160, minWidth: 120, maxWidth: 220, type: 'text', resizable: true },
+    { key: 'expenses_category_label', label: 'فئة المصروف', visible: true, width: 200, minWidth: 140, maxWidth: 280, type: 'text', resizable: true },
+    { key: 'work_item_label', label: 'عنصر العمل', visible: true, width: 200, minWidth: 140, maxWidth: 280, type: 'text', resizable: true },
     { key: 'organization_name', label: 'المؤسسة', visible: true, width: 180, minWidth: 150, maxWidth: 250, type: 'text', resizable: true },
     { key: 'project_name', label: 'المشروع', visible: true, width: 180, minWidth: 150, maxWidth: 250, type: 'text', resizable: true },
+    { key: 'cost_center_label', label: 'مركز التكلفة', visible: true, width: 180, minWidth: 150, maxWidth: 250, type: 'text', resizable: true },
     { key: 'reference_number', label: 'المرجع', visible: false, width: 120, minWidth: 100, maxWidth: 180, type: 'text', resizable: true },
     { key: 'notes', label: 'الملاحظات', visible: false, width: 200, minWidth: 150, maxWidth: 300, type: 'text', resizable: true },
     { key: 'created_by_name', label: 'أنشئت بواسطة', visible: false, width: 140, minWidth: 120, maxWidth: 200, type: 'text', resizable: true },
@@ -157,7 +184,17 @@ const TransactionsPage: React.FC = () => {
   useEffect(() => {
     if (!formOpen) return
     getAccounts().then(setAccounts).catch(() => {})
-  }, [formOpen])
+    // Load expenses categories for the org used in the form (editing's org or default MAIN or first org)
+    const orgIdForForm = editingTx?.org_id || organizations.find(org => org.code === 'MAIN')?.id || organizations[0]?.id || ''
+    if (orgIdForForm) {
+      getExpensesCategoriesList(orgIdForForm).then(setCategories).catch(() => setCategories([]))
+      // Load cost centers for the selected organization
+      getCostCentersForSelector(orgIdForForm).then(setCostCenters).catch(() => setCostCenters([]))
+    } else {
+      setCategories([])
+      setCostCenters([])
+    }
+  }, [formOpen, editingTx, organizations])
 
   async function reload() {
     const { rows, total } = await getTransactions({
@@ -174,12 +211,50 @@ const TransactionsPage: React.FC = () => {
         orgId: orgFilterId || undefined,
         projectId: projectFilterId || undefined,
         classificationId: classificationFilterId || undefined,
+        expensesCategoryId: expensesCategoryFilterId || undefined,
+        workItemId: workItemFilterId || undefined,
+        costCenterId: costCenterFilterId || undefined,
       },
       page,
       pageSize,
     })
     setTransactions(rows)
     setTotalCount(total)
+
+    // Load expenses categories for all orgs present in the page results (union)
+    try {
+      const orgIds = Array.from(new Set((rows || []).map(r => r.org_id).filter(Boolean))) as string[]
+      if (orgIds.length > 0) {
+        const lists = await Promise.all(orgIds.map(id => getExpensesCategoriesList(id).catch(() => [])))
+        const merged: Record<string, ExpensesCategoryRow> = {}
+        for (const list of lists) {
+          for (const r of list) merged[r.id] = r
+        }
+        setCategories(Object.values(merged))
+      } else {
+        setCategories([])
+      }
+    } catch {
+      // non-fatal
+    }
+
+    // Load work items for all orgs present (all items incl. overrides) for id->label mapping
+    try {
+      const orgIds = Array.from(new Set((rows || []).map(r => r.org_id).filter(Boolean))) as string[]
+      if (orgIds.length > 0) {
+        const lists = await Promise.all(orgIds.map(id => listWorkItemsAll(id).catch(() => [])))
+        const merged: Record<string, WorkItemRow> = {}
+        for (const list of lists) {
+          for (const r of list) merged[r.id] = r
+        }
+        setWorkItems(Object.values(merged))
+      } else {
+        setWorkItems([])
+      }
+    } catch {
+      // non-fatal
+    }
+
     // resolve creator/poster names
     const ids: string[] = []
     rows.forEach(t => { if (t.created_by) ids.push(t.created_by); if (t.posted_by) ids.push(t.posted_by!) })
@@ -196,6 +271,48 @@ const TransactionsPage: React.FC = () => {
   // Pagination handled server-side; local page shows fetched rows
   const paged = transactions
 
+  // Build account options for filters: all accounts (including non-postable) + drilldown tree
+  const accountFlatAllOptions: SearchableSelectOption[] = useMemo(() => {
+    return accounts
+      .slice()
+      .sort((a, b) => a.code.localeCompare(b.code))
+      .map(a => ({
+        value: a.id,
+        label: `${a.code} - ${a.name}`,
+        searchText: `${a.code} ${a.name}`.toLowerCase(),
+        disabled: false,
+      }))
+  }, [accounts])
+  const accountTreeOptionsAll: SearchableSelectOption[] = useMemo(() => {
+    // Build by parent map
+    const byId: Record<string, Account> = {}
+    const byParent: Record<string, Account[]> = {}
+    const roots: Account[] = []
+    for (const a of accounts) byId[a.id] = a
+    for (const a of accounts) {
+      if (a.parent_id && byId[a.parent_id]) {
+        if (!byParent[a.parent_id]) byParent[a.parent_id] = []
+        byParent[a.parent_id].push(a)
+      } else {
+        roots.push(a)
+      }
+    }
+    const sortByCode = (list: Account[]) => list.sort((x, y) => x.code.localeCompare(y.code))
+    sortByCode(roots)
+    for (const k of Object.keys(byParent)) sortByCode(byParent[k])
+    const makeNode = (acc: Account): SearchableSelectOption => {
+      const children = (byParent[acc.id] || []).map(makeNode)
+      return {
+        value: acc.id,
+        label: `${acc.code} - ${acc.name}`,
+        searchText: `${acc.code} ${acc.name}`.toLowerCase(),
+        disabled: false, // allow selecting all accounts in filters, incl. non-postable
+        children: children.length ? children : undefined,
+      }
+    }
+    return roots.map(makeNode)
+  }, [accounts])
+
   // Prepare table data for ResizableTable
   const tableData = useMemo(() => {
     const accLabel = (id?: string | null) => {
@@ -204,6 +321,9 @@ const TransactionsPage: React.FC = () => {
       return a ? `${a.code} - ${a.name}` : id
     }
 
+    const catMap: Record<string, string> = {}
+    for (const c of categories) { catMap[c.id] = `${c.code} - ${c.description}` }
+
     return paged.map((t: any) => ({
       entry_number: t.entry_number,
       entry_date: t.entry_date, // Keep raw date for DateFormatter
@@ -211,9 +331,12 @@ const TransactionsPage: React.FC = () => {
       debit_account_label: accLabel(t.debit_account_id),
       credit_account_label: accLabel(t.credit_account_id),
       amount: t.amount,
+      expenses_category_label: t.expenses_category_id ? (catMap[t.expenses_category_id] || '—') : '—',
+      work_item_label: (() => { const wi = workItems.find(w => w.id === (t.work_item_id || '')); return wi ? `${wi.code} - ${wi.name}` : '—' })(),
       classification_name: t.transaction_classification?.name || '—',
       organization_name: organizations.find(o => o.id === (t.org_id || ''))?.name || '—',
       project_name: projects.find(p => p.id === (t.project_id || ''))?.name || '—',
+      cost_center_label: t.cost_center_code && t.cost_center_name ? `${t.cost_center_code} - ${t.cost_center_name}` : '—',
       reference_number: t.reference_number || '—',
       notes: t.notes || '—',
       created_by_name: t.created_by ? (userNames[t.created_by] || t.created_by.substring(0, 8)) : '—',
@@ -234,8 +357,11 @@ const TransactionsPage: React.FC = () => {
       { key: 'credit_account', header: 'الحساب الدائن', type: 'text' },
       { key: 'amount', header: 'المبلغ', type: 'currency' },
       { key: 'classification_name', header: 'التصنيف', type: 'text' },
+      { key: 'expenses_category', header: 'فئة المصروف', type: 'text' },
+      { key: 'work_item', header: 'عنصر العمل', type: 'text' },
       { key: 'organization_name', header: 'المؤسسة', type: 'text' },
       { key: 'project_name', header: 'المشروع', type: 'text' },
+      { key: 'cost_center', header: 'مركز التكلفة', type: 'text' },
       { key: 'reference_number', header: 'المرجع', type: 'text' },
       { key: 'notes', header: 'الملاحظات', type: 'text' },
       { key: 'created_by', header: 'أنشئت بواسطة', type: 'text' },
@@ -248,6 +374,8 @@ const TransactionsPage: React.FC = () => {
       const a = accounts.find(x => x.id === id)
       return a ? `${a.code} - ${a.name}` : id
     }
+    const catMap: Record<string, string> = {}
+    for (const c of categories) { catMap[c.id] = `${c.code} - ${c.description}` }
     const rows = filtered.map((t: any) => ({
       entry_number: t.entry_number,
       entry_date: t.entry_date,
@@ -255,9 +383,12 @@ const TransactionsPage: React.FC = () => {
       debit_account: accLabel(t.debit_account_id),
       credit_account: accLabel(t.credit_account_id),
       amount: t.amount,
+      expenses_category: t.expenses_category_id ? (catMap[t.expenses_category_id] || '') : '',
+      work_item: (() => { const wi = workItems.find(w => w.id === (t.work_item_id || '')); return wi ? `${wi.code} - ${wi.name}` : '' })(),
       classification_name: t.transaction_classification?.name || '',
       organization_name: organizations.find(o => o.id === (t.org_id || ''))?.name || '',
       project_name: projects.find(p => p.id === (t.project_id || ''))?.name || '',
+      cost_center: t.cost_center_code && t.cost_center_name ? `${t.cost_center_code} - ${t.cost_center_name}` : '',
       reference_number: t.reference_number || '',
       notes: t.notes || '',
       created_by: t.created_by ? (userNames[t.created_by] || t.created_by) : '',
@@ -276,45 +407,58 @@ const TransactionsPage: React.FC = () => {
       projects,
       organizations,
       classifications,
-      editingTx || undefined
+      editingTx || undefined,
+      categories,
+      // Prefer work items for current org (MAIN or edit org)
+      workItems,
+      costCenters
     )
-  }, [editingTx, accounts, projects, organizations, classifications])
+  }, [editingTx, accounts, projects, organizations, classifications, categories, workItems, costCenters])
   
-  // Get initial data for the form
-  const getInitialFormData = useMemo(() => {
-    if (editingTx) {
-      return {
-        entry_number: editingTx.entry_number,
-        entry_date: editingTx.entry_date,
-        description: editingTx.description,
-        debit_account_id: editingTx.debit_account_id,
-        credit_account_id: editingTx.credit_account_id,
-        amount: editingTx.amount,
-        reference_number: editingTx.reference_number || '',
-        notes: editingTx.notes || '',
-        classification_id: editingTx.classification_id || '',
-        organization_id: editingTx.org_id || '',
-        project_id: editingTx.project_id || ''
-      }
-    } else {
-      // Get default organization (MAIN) and project (GENERAL)
-      const defaultOrg = organizations.find(org => org.code === 'MAIN');
-      const defaultProject = projects.find(project => project.code === 'GENERAL');
-      
-      return {
-        entry_number: 'سيتم توليده تلقائياً',
-        entry_date: new Date().toISOString().split('T')[0],
-        description: '',
-        debit_account_id: '',
-        credit_account_id: '',
-        amount: 0,
-        reference_number: '',
-        notes: '',
-        organization_id: defaultOrg?.id || '',
-        project_id: defaultProject?.id || ''
-      }
+  // Snapshot initial form data at open time to prevent clearing user selections
+  const initialFormDataRef = React.useRef<any | null>(null)
+  
+  const buildInitialFormDataForEdit = (tx: TransactionRecord) => ({
+    entry_number: tx.entry_number,
+    entry_date: tx.entry_date,
+    description: tx.description,
+    debit_account_id: tx.debit_account_id,
+    credit_account_id: tx.credit_account_id,
+    amount: tx.amount,
+    reference_number: tx.reference_number || '',
+    notes: tx.notes || '',
+    classification_id: tx.classification_id || '',
+    expenses_category_id: (tx as any).expenses_category_id || '',
+    work_item_id: (tx as any).work_item_id || '',
+    cost_center_id: tx.cost_center_id || '',
+    organization_id: tx.org_id || '',
+    project_id: tx.project_id || ''
+  })
+
+  const buildInitialFormDataForCreate = () => {
+    // Default organization (MAIN) and project (GENERAL)
+    const defaultOrg = organizations.find(org => org.code === 'MAIN');
+    const defaultProject = projects.find(project => project.code === 'GENERAL');
+    // Restore last selected debit/credit if available
+    let lastDebit = ''
+    let lastCredit = ''
+    try {
+      lastDebit = localStorage.getItem('tx_last_debit_account_id') || ''
+      lastCredit = localStorage.getItem('tx_last_credit_account_id') || ''
+    } catch {}
+    return {
+      entry_number: 'سيتم توليده تلقائياً',
+      entry_date: new Date().toISOString().split('T')[0],
+      description: '',
+      debit_account_id: lastDebit,
+      credit_account_id: lastCredit,
+      amount: 0,
+      reference_number: '',
+      notes: '',
+      organization_id: defaultOrg?.id || '',
+      project_id: defaultProject?.id || ''
     }
-  }, [editingTx, organizations, projects])
+  }
 
   // Helper to enrich a transaction with display fields so UI reflects org/project immediately
   const enrichTx = (tx: TransactionRecord) => {
@@ -331,7 +475,7 @@ const TransactionsPage: React.FC = () => {
 
       if (editingTx) {
         // Update existing transaction
-        const updated = await updateTransaction(editingTx.id, {
+        const attemptedUpdate = {
           entry_date: data.entry_date,
           description: data.description,
           reference_number: data.reference_number || null,
@@ -340,9 +484,13 @@ const TransactionsPage: React.FC = () => {
           amount: parseFloat(data.amount),
           notes: data.notes || null,
           classification_id: data.classification_id || null,
+          expenses_category_id: data.expenses_category_id || null,
+          work_item_id: data.work_item_id || null,
+          cost_center_id: data.cost_center_id || null,
           org_id: data.organization_id || null,
           project_id: data.project_id || null,
-        })
+        } as const
+        const updated = await updateTransaction(editingTx.id, attemptedUpdate as any)
         // Ensure display fields (organization_name/project_name) are updated locally
         const updatedEnriched = enrichTx(updated)
         setTransactions(prev => prev.map(t => t.id === updated.id ? updatedEnriched : t))
@@ -350,6 +498,11 @@ const TransactionsPage: React.FC = () => {
         // Ensure server truth is reflected (joins, computed fields)
         await reload()
       } else {
+        // Persist last selected debit/credit for convenience in next entries
+        try {
+          localStorage.setItem('tx_last_debit_account_id', String(data.debit_account_id || ''))
+          localStorage.setItem('tx_last_credit_account_id', String(data.credit_account_id || ''))
+        } catch {}
         // Create new transaction with optimistic update
         const tempId = `temp-${Date.now()}`
         const temp: TransactionRecord = {
@@ -385,6 +538,9 @@ const TransactionsPage: React.FC = () => {
           amount: parseFloat(data.amount),
           notes: data.notes || undefined,
           classification_id: data.classification_id || undefined,
+          expenses_category_id: data.expenses_category_id || undefined,
+          work_item_id: data.work_item_id || undefined,
+          cost_center_id: data.cost_center_id || undefined,
           org_id: data.organization_id || undefined,
           project_id: data.project_id || undefined,
         })
@@ -411,7 +567,21 @@ const TransactionsPage: React.FC = () => {
       logClientError({
         context: editingTx ? 'transactions.update' : 'transactions.create',
         message: msg,
-        extra: editingTx ? { id: editingTx.id } : data
+        extra: editingTx ? { id: editingTx.id, attempted: {
+          entry_date: data.entry_date,
+          description: data.description,
+          reference_number: data.reference_number || null,
+          debit_account_id: data.debit_account_id,
+          credit_account_id: data.credit_account_id,
+          amount: parseFloat(data.amount),
+          notes: data.notes || null,
+          classification_id: data.classification_id || null,
+          expenses_category_id: data.expenses_category_id || null,
+          work_item_id: data.work_item_id || null,
+          cost_center_id: data.cost_center_id || null,
+          org_id: data.organization_id || null,
+          project_id: data.project_id || null,
+        }} : data
       })
     } finally {
       setIsSaving(false)
@@ -426,6 +596,8 @@ const TransactionsPage: React.FC = () => {
 
   const openNewTransactionForm = () => {
     setEditingTx(null)
+    // Snapshot initial data for a new record, including last selected debit/credit
+    initialFormDataRef.current = buildInitialFormDataForCreate()
     setFormOpen(true)
   }
 
@@ -478,7 +650,7 @@ const TransactionsPage: React.FC = () => {
     }
   }
 
-  useEffect(() => { reload().catch(() => {}) }, [searchTerm, filters.dateFrom, filters.dateTo, filters.amountFrom, filters.amountTo, debitFilterId, creditFilterId, orgFilterId, projectFilterId, classificationFilterId, page, pageSize, mode])
+  useEffect(() => { reload().catch(() => {}) }, [searchTerm, filters.dateFrom, filters.dateTo, filters.amountFrom, filters.amountTo, debitFilterId, creditFilterId, orgFilterId, projectFilterId, classificationFilterId, expensesCategoryFilterId, workItemFilterId, costCenterFilterId, page, pageSize, mode])
 
   if (loading) return <div className="loading-container"><div className="loading-spinner" />جاري التحميل...</div>
   if (error) return <div className="error-container">خطأ: {error}</div>
@@ -526,30 +698,13 @@ const TransactionsPage: React.FC = () => {
       )}
 
       {/* Compact unified filters row - inspired by General Ledger */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '8px 0',
-        flexWrap: 'wrap',
-        borderBottom: '1px solid var(--border)',
-        fontSize: '12px',
-        backgroundColor: 'var(--surface)'
-      }}>
+      <div className="transactions-filters-row">
         {/* Search */}
         <input
           placeholder="بحث..."
           value={searchTerm}
           onChange={e => { setSearchTerm(e.target.value); setPage(1) }}
-          style={{
-            width: '120px',
-            fontSize: '12px',
-            padding: '4px 8px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            backgroundColor: 'var(--field_bg)',
-            color: 'var(--text)'
-          }}
+          className="filter-input filter-input--search"
         />
         
         {/* Date range */}
@@ -557,44 +712,20 @@ const TransactionsPage: React.FC = () => {
           type="date"
           value={filters.dateFrom}
           onChange={e => { setFilters({ ...filters, dateFrom: e.target.value }); setPage(1) }}
-          style={{
-            width: '130px',
-            fontSize: '12px',
-            padding: '4px 8px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            backgroundColor: 'var(--field_bg)',
-            color: 'var(--text)'
-          }}
+          className="filter-input filter-input--date"
         />
         <input
           type="date"
           value={filters.dateTo}
           onChange={e => { setFilters({ ...filters, dateTo: e.target.value }); setPage(1) }}
-          style={{
-            width: '130px',
-            fontSize: '12px',
-            padding: '4px 8px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            backgroundColor: 'var(--field_bg)',
-            color: 'var(--text)'
-          }}
+          className="filter-input filter-input--date"
         />
         
         {/* Status filter */}
         <select
           value={filters.isPosted}
           onChange={e => { setFilters({ ...filters, isPosted: e.target.value }); setPage(1) }}
-          style={{
-            fontSize: '12px',
-            padding: '4px 8px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            backgroundColor: 'var(--field_bg)',
-            color: 'var(--text)',
-            minWidth: '90px'
-          }}
+          className="filter-select filter-select--status"
         >
           <option value="">الحالة</option>
           <option value="posted">مرحلة</option>
@@ -605,15 +736,7 @@ const TransactionsPage: React.FC = () => {
         <select
           value={orgFilterId}
           onChange={e => { setOrgFilterId(e.target.value); setPage(1) }}
-          style={{
-            fontSize: '12px',
-            padding: '4px 8px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            backgroundColor: 'var(--field_bg)',
-            color: 'var(--text)',
-            maxWidth: '180px'
-          }}
+          className="filter-select filter-select--org"
         >
           <option value="">جميع المؤسسات</option>
           {organizations.map(o => (
@@ -627,15 +750,7 @@ const TransactionsPage: React.FC = () => {
         <select
           value={projectFilterId}
           onChange={e => { setProjectFilterId(e.target.value); setPage(1) }}
-          style={{
-            fontSize: '12px',
-            padding: '4px 8px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            backgroundColor: 'var(--field_bg)',
-            color: 'var(--text)',
-            maxWidth: '180px'
-          }}
+          className="filter-select filter-select--project"
         >
           <option value="">جميع المشاريع</option>
           {projects.map(p => (
@@ -645,63 +760,39 @@ const TransactionsPage: React.FC = () => {
           ))}
         </select>
         
-        {/* Debit account filter */}
-        <select
-          value={debitFilterId}
-          onChange={e => { setDebitFilterId(e.target.value); setPage(1) }}
-          style={{
-            fontSize: '12px',
-            padding: '4px 8px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            backgroundColor: 'var(--field_bg)',
-            color: 'var(--text)',
-            maxWidth: '200px'
-          }}
-        >
-          <option value="">جميع الحسابات المدينة</option>
-          {accounts.filter(a => a.is_postable).map(a => (
-            <option key={a.id} value={a.id}>
-              {`${a.code} - ${a.name}`.substring(0, 45)}
-            </option>
-          ))}
-        </select>
+        {/* Debit account filter (all accounts, searchable, with drilldown) */}
+        <div style={{ minWidth: 280 }}>
+          <SearchableSelect
+            id="transactions.filter.debit"
+            value={debitFilterId}
+            options={[{ value: '', label: 'جميع الحسابات المدينة', searchText: '' }, ...accountFlatAllOptions]}
+            onChange={(v) => { setDebitFilterId(v); setPage(1) }}
+            placeholder="جميع الحسابات المدينة"
+            clearable={true}
+            showDrilldownModal={true}
+            treeOptions={accountTreeOptionsAll}
+          />
+        </div>
         
-        {/* Credit account filter */}
-        <select
-          value={creditFilterId}
-          onChange={e => { setCreditFilterId(e.target.value); setPage(1) }}
-          style={{
-            fontSize: '12px',
-            padding: '4px 8px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            backgroundColor: 'var(--field_bg)',
-            color: 'var(--text)',
-            maxWidth: '200px'
-          }}
-        >
-          <option value="">جميع الحسابات الدائنة</option>
-          {accounts.filter(a => a.is_postable).map(a => (
-            <option key={a.id} value={a.id}>
-              {`${a.code} - ${a.name}`.substring(0, 45)}
-            </option>
-          ))}
-        </select>
+        {/* Credit account filter (all accounts, searchable, with drilldown) */}
+        <div style={{ minWidth: 280 }}>
+          <SearchableSelect
+            id="transactions.filter.credit"
+            value={creditFilterId}
+            options={[{ value: '', label: 'جميع الحسابات الدائنة', searchText: '' }, ...accountFlatAllOptions]}
+            onChange={(v) => { setCreditFilterId(v); setPage(1) }}
+            placeholder="جميع الحسابات الدائنة"
+            clearable={true}
+            showDrilldownModal={true}
+            treeOptions={accountTreeOptionsAll}
+          />
+        </div>
         
         {/* Classification filter */}
         <select
           value={classificationFilterId}
           onChange={e => { setClassificationFilterId(e.target.value); setPage(1) }}
-          style={{
-            fontSize: '12px',
-            padding: '4px 8px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            backgroundColor: 'var(--field_bg)',
-            color: 'var(--text)',
-            maxWidth: '180px'
-          }}
+          className="filter-select filter-select--classification"
         >
           <option value="">جميع التصنيفات</option>
           {classifications.map(c => (
@@ -710,6 +801,57 @@ const TransactionsPage: React.FC = () => {
             </option>
           ))}
         </select>
+
+        {/* Expenses category filter */}
+        <select
+          value={expensesCategoryFilterId}
+          onChange={e => { setExpensesCategoryFilterId(e.target.value); setPage(1) }}
+          className="filter-select filter-select--expenses"
+        >
+          <option value="">جميع فئات المصروف</option>
+          {categories
+            .slice()
+            .sort((a, b) => `${a.code} - ${a.description}`.localeCompare(`${b.code} - ${b.description}`))
+            .map(cat => (
+              <option key={cat.id} value={cat.id}>
+                {`${cat.code} - ${cat.description}`.substring(0, 52)}
+              </option>
+            ))}
+        </select>
+
+        {/* Work Item filter */}
+        <select
+          value={workItemFilterId}
+          onChange={e => { setWorkItemFilterId(e.target.value); setPage(1) }}
+          className="filter-select filter-select--workitem"
+        >
+          <option value="">جميع عناصر العمل</option>
+          {workItems
+            .slice()
+            .sort((a, b) => `${a.code} - ${a.name}`.localeCompare(`${b.code} - ${b.name}`))
+            .map(w => (
+              <option key={w.id} value={w.id}>
+                {`${w.code} - ${w.name}`.substring(0, 52)}
+              </option>
+            ))}
+        </select>
+
+        {/* Cost Center filter */}
+        <select
+          value={costCenterFilterId}
+          onChange={e => { setCostCenterFilterId(e.target.value); setPage(1) }}
+          className="filter-select filter-select--costcenter"
+        >
+          <option value="">جميع مراكز التكلفة</option>
+          {costCenters
+            .slice()
+            .sort((a, b) => `${a.code} - ${a.name}`.localeCompare(`${b.code} - ${b.name}`))
+            .map(cc => (
+              <option key={cc.id} value={cc.id}>
+                {`${cc.code} - ${cc.name}`.substring(0, 52)}
+              </option>
+            ))}
+        </select>
         
         {/* Amount range filters */}
         <input
@@ -717,30 +859,14 @@ const TransactionsPage: React.FC = () => {
           placeholder="من مبلغ"
           value={filters.amountFrom}
           onChange={e => { setFilters({ ...filters, amountFrom: e.target.value }); setPage(1) }}
-          style={{
-            width: '90px',
-            fontSize: '12px',
-            padding: '4px 8px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            backgroundColor: 'var(--field_bg)',
-            color: 'var(--text)'
-          }}
+          className="filter-input filter-input--amount"
         />
         <input
           type="number"
           placeholder="إلى مبلغ"
           value={filters.amountTo}
           onChange={e => { setFilters({ ...filters, amountTo: e.target.value }); setPage(1) }}
-          style={{
-            width: '90px',
-            fontSize: '12px',
-            padding: '4px 8px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            backgroundColor: 'var(--field_bg)',
-            color: 'var(--text)'
-          }}
+          className="filter-input filter-input--amount"
         />
         
         {/* Clear filters button */}
@@ -753,22 +879,11 @@ const TransactionsPage: React.FC = () => {
             setOrgFilterId('')
             setProjectFilterId('')
             setClassificationFilterId('')
+            setExpensesCategoryFilterId('')
+            setCostCenterFilterId('')
             setPage(1)
           }}
-          style={{
-            fontSize: '20px',
-            padding: '6px 12px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            backgroundColor: 'var(--warning)',
-            color: '#000000',
-            cursor: 'pointer',
-            minWidth: '40px',
-            minHeight: '32px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
+          className="ultimate-btn ultimate-btn-warning filter-clear-btn"
           title="مسح جميع الفلاتر"
         >
           🔄
@@ -828,6 +943,8 @@ const TransactionsPage: React.FC = () => {
                   {mode === 'my' && !row.original.is_posted && hasPerm('transactions.update') && row.original.created_by === currentUserId && (
                     <button className="ultimate-btn ultimate-btn-edit" onClick={() => {
                       setEditingTx(row.original)
+                      // Snapshot initial data for edit
+                      initialFormDataRef.current = buildInitialFormDataForEdit(row.original)
                       setFormOpen(true)
                     }}><div className="btn-content"><span className="btn-text">تعديل</span></div></button>
                   )}
@@ -835,6 +952,8 @@ const TransactionsPage: React.FC = () => {
                   {mode === 'all' && !row.original.is_posted && hasPerm('transactions.manage') && (
                     <button className="ultimate-btn ultimate-btn-edit" onClick={() => {
                       setEditingTx(row.original)
+                      // Snapshot initial data for edit
+                      initialFormDataRef.current = buildInitialFormDataForEdit(row.original)
                       setFormOpen(true)
                     }}><div className="btn-content"><span className="btn-text">تعديل</span></div></button>
                   )}
@@ -887,11 +1006,21 @@ const TransactionsPage: React.FC = () => {
             >
               <div className="btn-content"><span className="btn-text">تحديث الحسابات</span></div>
             </button>
+            <button
+              className="ultimate-btn ultimate-btn-add"
+              title="فتح شجرة الحسابات في تبويب جديد"
+              onClick={() => {
+                try { window.open('/main-data/accounts-tree', '_blank', 'noopener'); } catch {}
+              }}
+            >
+              <div className="btn-content"><span className="btn-text">+ شجرة الحسابات</span></div>
+            </button>
           </div>
           <UnifiedCRUDForm
             ref={formRef}
             config={transactionFormConfig}
-            initialData={getInitialFormData}
+            initialData={initialFormDataRef.current || (editingTx ? buildInitialFormDataForEdit(editingTx) : buildInitialFormDataForCreate())}
+            resetOnInitialDataChange={false}
             onSubmit={handleFormSubmit}
             onCancel={handleFormCancel}
             isLoading={isSaving}
@@ -900,7 +1029,17 @@ const TransactionsPage: React.FC = () => {
       
       {/* Details Drawer */}
       {detailsOpen && detailsFor && (
-        <TransactionView transaction={detailsFor} audit={audit} userNames={userNames} onClose={() => setDetailsOpen(false)} />
+        <TransactionView
+          transaction={detailsFor}
+          audit={audit}
+          userNames={userNames}
+          categoryLabel={(detailsFor as any).expenses_category_id ? (() => {
+            const m: Record<string,string> = {}
+            for (const c of categories) { m[c.id] = `${c.code} - ${c.description}` }
+            return m[(detailsFor as any).expenses_category_id] || '—'
+          })() : '—'}
+          onClose={() => setDetailsOpen(false)}
+        />
       )}
 
       {/* Admin: Client Error Logs Viewer */}

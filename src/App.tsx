@@ -6,13 +6,19 @@ import useAppStore from './store/useAppStore';
 import DashboardLayout from './components/layout/DashboardLayout';
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const AccountsTreeLazy = React.lazy(() => import('./pages/MainData/AccountsTree'));
+const ExpensesCategoriesPage = React.lazy(() => import('./pages/MainData/ExpensesCategories'));
+const WorkItemsPage = React.lazy(() => import('./pages/MainData/WorkItems'));
+const CostCentersPage = React.lazy(() => import('./pages/MainData/CostCenters'));
 const TestRTL = React.lazy(() => import('./pages/TestRTL'));
 const ExportTestPage = React.lazy(() => import('./pages/ExportTestPage'));
 const TransactionsPage = React.lazy(() => import('./pages/Transactions/Transactions'));
 const GeneralLedgerPage = React.lazy(() => import('./pages/Reports/GeneralLedger'))
-const AccountExplorerPage = React.lazy(() => import('./pages/Reports/AccountExplorer'))
 const ProfitLossPage = React.lazy(() => import('./pages/Reports/ProfitLoss'))
 const BalanceSheetPage = React.lazy(() => import('./pages/Reports/BalanceSheet'))
+const WorkItemUsagePage = React.lazy(() => import('./pages/Reports/WorkItemUsage'))
+const TrialBalanceAllLevelsPage = React.lazy(() => import('./pages/Reports/TrialBalanceAllLevels'))
+const AccountExplorerReportPage = React.lazy(() => import('./pages/Reports/AccountExplorer'))
+const CustomReportsPage = React.lazy(() => import('./pages/CustomReports'))
 import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
 import { ForgotPassword } from './components/auth/ForgotPassword';
@@ -24,6 +30,7 @@ const Diagnostics = React.lazy(() => import('./pages/admin/Diagnostics'));
 const Profile = React.lazy(() => import('./pages/admin/Profile'));
 const ProjectManagement = React.lazy(() => import('./components/Projects/ProjectManagement'));
 const OrgManagementTabs = React.lazy(() => import('./components/Organizations/OrganizationManagementTabs'));
+const FontSettings = React.lazy(() => import('./components/Settings/FontSettings'));
 import { useHasPermission } from './hooks/useHasPermission';
 
 // Placeholder components for other pages
@@ -55,7 +62,15 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 const RequirePermission: React.FC<{ perm: string; children: React.ReactNode; fallback?: React.ReactNode }> = ({ perm, children, fallback }) => {
   const hasPerm = useHasPermission();
   if (!hasPerm(perm)) {
-    return fallback ?? <Navigate to="/transactions/my" replace />;
+    // Do not redirect by default; show an inline access denied to avoid confusing route jumps
+    return (
+      fallback ?? (
+        <div style={{ padding: '2rem' }}>
+          <h2>Access denied</h2>
+          <p>You don't have permission to view this page.</p>
+        </div>
+      )
+    );
   }
   return <>{children}</>;
 };
@@ -101,6 +116,23 @@ const App: React.FC = () => {
           
           {/* Main Data */}
           <Route path="/main-data/accounts-tree" element={<React.Suspense fallback={<>Loading...</>}><AccountsTreeLazy /></React.Suspense>} />
+          <Route path="/main-data/expenses-categories" element={
+            <RequirePermission perm="expenses_categories.view">
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <ExpensesCategoriesPage />
+              </React.Suspense>
+            </RequirePermission>
+          } />
+          <Route path="/main-data/work-items" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <WorkItemsPage />
+            </React.Suspense>
+          } />
+          <Route path="/main-data/cost-centers" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <CostCentersPage />
+            </React.Suspense>
+          } />
           <Route path="/main-data/organizations" element={
             <React.Suspense fallback={<div>Loading...</div>}>
               <OrgManagementTabs />
@@ -166,6 +198,13 @@ const App: React.FC = () => {
                 </React.Suspense>
               </ProtectedRoute>
             } />
+            <Route path="/reports/trial-balance-all-levels" element={
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <TrialBalanceAllLevelsPage />
+                </React.Suspense>
+              </ProtectedRoute>
+            } />
             <Route path="/reports/general-ledger" element={
               <ProtectedRoute>
                 <React.Suspense fallback={<div>Loading...</div>}>
@@ -176,7 +215,7 @@ const App: React.FC = () => {
             <Route path="/reports/account-explorer" element={
               <ProtectedRoute>
                 <React.Suspense fallback={<div>Loading...</div>}>
-                  <AccountExplorerPage />
+                  <AccountExplorerReportPage />
                 </React.Suspense>
               </ProtectedRoute>
             } />
@@ -201,8 +240,19 @@ const App: React.FC = () => {
                 </React.Suspense>
               </ProtectedRoute>
             } />
+            <Route path="/reports/main-data/work-item-usage" element={
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <WorkItemUsagePage />
+                </React.Suspense>
+              </ProtectedRoute>
+            } />
             <Route path="/reports/cash-flow" element={<PlaceholderPage title="Cash Flow Report" />} />
-            <Route path="/reports/custom" element={<PlaceholderPage title="Custom Reports" />} />
+            <Route path="/reports/custom" element={
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <CustomReportsPage />
+                </React.Suspense>
+            } />
             
             {/* Inventory */}
             <Route path="/inventory/items" element={<PlaceholderPage title="Items Management" />} />
@@ -240,6 +290,11 @@ const App: React.FC = () => {
             <Route path="/settings/profile" element={
               <React.Suspense fallback={<div>Loading...</div>}>
                 <Profile />
+              </React.Suspense>
+            } />
+            <Route path="/settings/font-preferences" element={
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <FontSettings />
               </React.Suspense>
             } />
             <Route path="/settings/preferences" element={<PlaceholderPage title="Preferences" />} />

@@ -35,11 +35,12 @@ import {
 import { supabase } from '../../utils/supabase';
 import { audit } from '../../utils/audit';
 import { useAuth } from '../../contexts/AuthContext';
+import type { Role } from './UserFormConfig';
 
 interface InviteUserDialogProps {
   open: boolean;
   onClose: () => void;
-  roles: any[];
+  roles: Role[];
   onInvitationsSent: () => void;
 }
 
@@ -52,6 +53,10 @@ interface Invitation {
   error_message?: string;
   invitation_token?: string;
 }
+
+type InvitationResult = { success: boolean; email: string; invitation_link?: string; invitation_id?: number; error?: string };
+
+type RecentInvitation = { email: string; effective_status?: string; role_name_ar?: string };
 
 export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
   open,
@@ -73,8 +78,8 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
   ]);
   const [bulkEmails, setBulkEmails] = useState('');
   const [bulkMode, setBulkMode] = useState(false);
-  const [results, setResults] = useState<any[]>([]);
-  const [recentInvites, setRecentInvites] = useState<any[]>([]);
+  const [results, setResults] = useState<InvitationResult[]>([]);
+  const [recentInvites, setRecentInvites] = useState<RecentInvitation[]>([]);
 
   // Load recent invitations for context
   useEffect(() => {
@@ -85,7 +90,9 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
           .select('*')
           .limit(10);
         if (!error) setRecentInvites(data || []);
-      } catch {}
+      } catch {
+        console.warn('Failed to load recent invitations');
+      }
     };
     if (open) loadRecent();
   }, [open]);
@@ -126,7 +133,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
     }
   };
 
-  const updateInvitation = (index: number, field: keyof Invitation, value: any) => {
+  const updateInvitation = (index: number, field: keyof Invitation, value: string | boolean) => {
     const updated = [...invitations];
     updated[index] = { ...updated[index], [field]: value };
     setInvitations(updated);
@@ -143,7 +150,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   };
 
-  const sendInvitation = async (invitation: Invitation): Promise<any> => {
+  const sendInvitation = async (invitation: Invitation): Promise<InvitationResult> => {
     try {
       const invitationToken = generateInvitationToken();
       const invitationLink = `${window.location.origin}/register?token=${invitationToken}`;
@@ -199,11 +206,11 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
         invitation_link: invitationLink,
         invitation_id: invitationData.id
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
         email: invitation.email,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   };
@@ -248,7 +255,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
 
       // Pre-check: prevent inviting existing users or duplicate pending invitations
       const checked: Invitation[] = [];
-      const precheckResults: any[] = [];
+      const precheckResults: InvitationResult[] = [];
       for (const inv of invitationsToSend) {
         // 1) existing user by user_profiles email
         const { data: existing } = await supabase
@@ -256,7 +263,8 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
           .select('id')
           .ilike('email', inv.email)
           .maybeSingle?.() ?? await supabase.from('user_profiles').select('id').ilike('email', inv.email).limit(1);
-        if (Array.isArray(existing) ? existing.length > 0 : !!(existing as any)?.id) {
+        const hasExisting = Array.isArray(existing) ? existing.length > 0 : !!(existing && (existing as { id?: string }).id);
+        if (hasExisting) {
           precheckResults.push({ success: false, email: inv.email, error: 'المستخدم موجود بالفعل' });
           continue;
         }
@@ -277,23 +285,23 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
       }
 
       // Send invitations
-      const results = [
+      const resultsAll: InvitationResult[] = [
         ...precheckResults,
         ...(await Promise.all(checked.map(invitation => sendInvitation(invitation))))
       ];
 
-      setResults(results);
+      setResults(resultsAll);
 
       // Log via secure RPC only if authenticated
       if (currentUser?.id) {
         await audit(supabase, 'user.invite', 'user', null, {
           invited_emails: invitationsToSend.map(inv => inv.email),
-          successful: results.filter(r => r.success).length,
-          failed: results.filter(r => !r.success).length
+          successful: resultsAll.filter(r => r.success).length,
+          failed: resultsAll.filter(r => !r.success).length
         });
       }
 
-      const successCount = results.filter(r => r.success).length;
+      const successCount = resultsAll.filter(r => r.success).length;
       if (successCount > 0) {
         onInvitationsSent();
         setTimeout(() => {
@@ -301,9 +309,10 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
         }, 3000); // Auto-close after 3 seconds on success
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error sending invitations:', error);
-      setError(error.message || 'فشل إرسال الدعوات');
+      const msg = error instanceof Error ? error.message : String(error);
+      setError(msg || 'فشل إرسال الدعوات');
     } finally {
       setSending(false);
     }
@@ -379,7 +388,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
                           {result.invitation_link && (
                             <IconButton 
                               size="small" 
-                              onClick={() => copyInvitationLink(result.invitation_link)}
+                              onClick={() => copyInvitationLink(result.invitation_link!)}
                               title="نسخ رابط الدعوة"
                             >
                               <ContentCopyIcon fontSize="small" />
@@ -504,7 +513,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
                             <Stack direction="row" spacing={1} alignItems="center">
                               <span>{role.name_ar}</span>
                               <Chip 
-                                label={role.name_en} 
+                                label={(role as any).name_en ?? (role as any).name_ar ?? (role as any).name ?? ''}
                                 size="small" 
                                 variant="outlined"
                               />

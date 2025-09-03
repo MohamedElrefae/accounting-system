@@ -43,6 +43,7 @@ import Backup from '@mui/icons-material/Backup';
 import Security from '@mui/icons-material/Security';
 import Database from '@mui/icons-material/Storage';
 import Tag from '@mui/icons-material/LocalOffer';
+import FormatSize from '@mui/icons-material/FormatSize';
 import useAppStore from '../../store/useAppStore';
 import { navigationItems } from '../../data/navigation';
 import type { NavigationItem } from '../../types';
@@ -117,6 +118,8 @@ const getIcon = (iconName: string) => {
       return <Database />;
     case 'tag':
       return <Tag />;
+    case 'type':
+      return <FormatSize />;
     default:
       return <DashboardIcon />;
   }
@@ -140,34 +143,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
   }, [language, isRtl]);
 
 
-  const toggleExpanded = (itemId: string) => {
-    setExpandedItems((prev) => {
-      if (prev.includes(itemId)) {
-        // If clicking on already expanded item, collapse it and all its children
-        const toRemove = new Set([itemId]);
-        // Find all descendant items that should also be collapsed
-        const findDescendants = (_parentId: string, items: NavigationItem[]) => {
-          items.forEach(item => {
-            if (prev.includes(item.id)) {
-              toRemove.add(item.id);
-            }
-            if (item.children) {
-              findDescendants(item.id, item.children);
-            }
-          });
-        };
-        const parentItem = findNavigationItem(itemId, navigationItems);
-        if (parentItem?.children) {
-          findDescendants(itemId, parentItem.children);
-        }
-        return prev.filter(id => !toRemove.has(id));
-      } else {
-        // If clicking on collapsed item, expand it (keep others expanded too for nested support)
-        return [...prev, itemId];
-      }
-    });
-  };
-
   // Helper function to find a navigation item by ID
   const findNavigationItem = (itemId: string, items: NavigationItem[]): NavigationItem | null => {
     for (const item of items) {
@@ -178,6 +153,78 @@ const Sidebar: React.FC<SidebarProps> = () => {
       }
     }
     return null;
+  };
+
+  // Find path from top-level to target item id (array of ids). Returns null if not found
+  const findPathToItem = (
+    items: NavigationItem[],
+    targetId: string,
+    path: string[] = []
+  ): string[] | null => {
+    for (const item of items) {
+      const newPath = [...path, item.id];
+      if (item.id === targetId) return newPath;
+      if (item.children) {
+        const childPath = findPathToItem(item.children, targetId, newPath);
+        if (childPath) return childPath;
+      }
+    }
+    return null;
+  };
+
+  // Get all descendant ids for the given item (excluding the item itself)
+  const getDescendantIds = (item?: NavigationItem): string[] => {
+    if (!item || !item.children) return [];
+    const ids: string[] = [];
+    const walk = (nodes: NavigationItem[]) => {
+      for (const node of nodes) {
+        ids.push(node.id);
+        if (node.children) walk(node.children);
+      }
+    };
+    walk(item.children);
+    return ids;
+  };
+
+  const toggleExpanded = (itemId: string) => {
+    // Enforce accordion behavior only at top-level.
+    // Multiple submenus under the currently expanded top-level are allowed.
+    setExpandedItems((prev) => {
+      const path = findPathToItem(navigationItems, itemId) || [itemId];
+      const topLevelId = path[0];
+      const isTopLevel = path.length === 1;
+
+      if (isTopLevel) {
+        if (prev.includes(itemId)) {
+          // Collapse this top-level and all its descendants
+          const item = findNavigationItem(itemId, navigationItems);
+          const toRemove = new Set<string>([itemId, ...getDescendantIds(item || undefined)]);
+          return prev.filter((id) => !toRemove.has(id));
+        }
+        // Expand this top-level; collapse all other top-level sections and their descendants
+        const keepWithinThisTop = prev.filter((id) => {
+          const p = findPathToItem(navigationItems, id);
+          return p && p[0] === itemId;
+        });
+        // Ensure the top-level id itself is included
+        return Array.from(new Set<string>([...keepWithinThisTop, itemId]));
+      } else {
+        // Child or deeper item under some top-level
+        const currentItem = findNavigationItem(itemId, navigationItems);
+        if (prev.includes(itemId)) {
+          // Collapse this item and all its descendants only
+          const toRemove = new Set<string>([itemId, ...getDescendantIds(currentItem || undefined)]);
+          return prev.filter((id) => !toRemove.has(id));
+        }
+        // Expand this item while keeping only ids under the same top-level section
+        const keepWithinSameTop = prev.filter((id) => {
+          const p = findPathToItem(navigationItems, id);
+          return p && p[0] === topLevelId;
+        });
+        // Make sure the top-level is expanded and include this item
+        return Array.from(new Set<string>([...keepWithinSameTop, topLevelId, itemId]));
+      }
+    });
   };
 
   const handleNavigation = (path: string) => {

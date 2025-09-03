@@ -4,12 +4,14 @@ import { createStandardColumns, prepareTableData } from '../../hooks/useUniversa
 import TreeView from '../../components/TreeView/TreeView';
 import './AccountsTree.css';
 import { supabase } from '../../utils/supabase';
+import CurrencyFormatter from '../../components/Common/CurrencyFormatter';
 import { useToast } from '../../contexts/ToastContext';
 import UnifiedCRUDForm, { type UnifiedCRUDFormHandle } from '../../components/Common/UnifiedCRUDForm';
 import { createAccountFormConfig } from '../../components/Accounts/AccountFormConfig';
 import DraggableResizablePanel from '../../components/Common/DraggableResizablePanel';
 import { getOrganizations } from '../../services/organization';
 import { useHasPermission } from '../../hooks/useHasPermission';
+import { debugAccountRollups, testRollupModes, testViewDirectly, manualRollupsCalculation } from '../../utils/debug-rollups';
 
 interface AccountItem {
   id: string;
@@ -34,7 +36,10 @@ interface AncestorItem {
 
 function getInitialOrgId(): string | '' {
   try {
-    const v = localStorage.getItem('org_id');
+    // Centralized helper
+    // Using dynamic import to avoid SSR issues or test environments
+    const { getActiveOrgId } = require('../../utils/org');
+    const v = getActiveOrgId?.();
     if (v && v.length > 0) return v;
   } catch {}
   return '';
@@ -67,7 +72,8 @@ const AccountsTreePage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [projects, setProjects] = useState<{ id: string; code: string; name: string; name_ar?: string }[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>('');
-  const [balanceMode, setBalanceMode] = useState<'posted' | 'all'>('posted');
+  const [balanceMode, setBalanceMode] = useState<'posted' | 'all'>('all');
+  const [rollups, setRollups] = useState<Record<string, { has_transactions: boolean; net_amount: number }>>({});
 
   // Organizations selector
   const [organizations, setOrganizations] = useState<{ id: string; code: string; name: string }[]>([]);
@@ -236,7 +242,7 @@ const AccountsTreePage: React.FC = () => {
         if (!getInitialOrgId() && orgs.length > 0) {
           const first = orgs[0].id;
           setOrgId(first);
-          try { localStorage.setItem('org_id', first); } catch {}
+          try { const { setActiveOrgId } = require('../../utils/org'); setActiveOrgId?.(first); } catch {}
         }
       } catch {}
     })();
@@ -251,7 +257,7 @@ const AccountsTreePage: React.FC = () => {
     } else {
       performSearch().catch(() => {});
     }
-  }, [orgId, selectedProject]);
+  }, [orgId, selectedProject, balanceMode]);
 
   useEffect(() => {
     // server-driven search
@@ -261,7 +267,7 @@ const AccountsTreePage: React.FC = () => {
     } else {
       performSearch().catch(() => {});
     }
-  }, [searchTerm, orgId]);
+  }, [searchTerm, orgId, balanceMode]);
 
   async function loadRoots() {
     setLoading(true);
@@ -282,6 +288,8 @@ const AccountsTreePage: React.FC = () => {
       setExpanded(new Set());
       // Hydrate delete flags for visible roots
       fetchCanDeleteFlags(rows.map(r => r.id)).catch(() => {});
+      // Hydrate rollups for visible roots
+      fetchAccountRollups(rows.map(r => r.id)).catch(() => {});
     }
     setLoading(false);
   }
@@ -296,7 +304,10 @@ const AccountsTreePage: React.FC = () => {
     if (selectedProject) query = query.eq('project_id', selectedProject);
     const { data, error } = await query;
     if (error) return [] as AccountItem[];
-    return (data || []).map(mapRow);
+    const mapped = (data || []).map(mapRow);
+    // fetch rollups for these children
+    fetchAccountRollups(mapped.map(r => r.id)).catch(() => {});
+    return mapped;
   }
 
   function mapRow(row: any): AccountItem {
@@ -311,7 +322,7 @@ const AccountsTreePage: React.FC = () => {
       account_type: row.category || undefined,
       has_children: row.has_children,
       has_active_children: row.has_active_children,
-    };
+    } as any;
   }
 
 
@@ -500,6 +511,8 @@ const AccountsTreePage: React.FC = () => {
 
     // Hydrate delete flags for the combined visible list
     fetchCanDeleteFlags(combined.map(c => c.id)).catch(() => {});
+    // Hydrate rollups for combined list
+    fetchAccountRollups(combined.map(c => c.id)).catch(() => {});
 
     // Expand all ancestor paths of matches
     const toExpand = new Set<string>();
@@ -511,6 +524,103 @@ const AccountsTreePage: React.FC = () => {
       (anc || []).forEach((r: any) => toExpand.add(r.id));
     }
     setExpanded(toExpand);
+  }
+
+  async function fetchAccountRollups(accountIds: string[]) {
+    if (!orgId || accountIds.length === 0) return;
+    const unique = Array.from(new Set(accountIds));
+    
+    console.log('Fetching rollups for accounts:', unique, 'orgId:', orgId, 'project:', selectedProject, 'balanceMode:', balanceMode);
+    
+    let rollupData: any[] = [];
+    let dataSource = 'unknown';
+    
+    // Try RPC function first (if available)
+    try {
+      const includeUnposted = balanceMode === 'all';
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_accounts_activity_rollups', {
+        p_org_id: orgId,
+        p_include_unposted: includeUnposted
+      });
+      
+      if (!rpcError && rpcData) {
+        rollupData = rpcData;
+        dataSource = 'RPC';
+        console.log('✅ Successfully fetched from RPC:', rollupData.length, 'records');
+      } else {
+        console.warn('⚠️ RPC failed or returned no data, trying view fallback. Error:', rpcError);
+        throw new Error('RPC not available or failed');
+      }
+    } catch (rpcErr) {
+      // Fallback to view-based query
+      console.log('📋 Falling back to view-based query...');
+      
+      try {
+        let viewQuery = supabase
+          .from('v_accounts_activity_rollups')
+          .select('id, org_id, has_transactions, net_amount, total_debit_amount, total_credit_amount, child_count')
+          .eq('org_id', orgId);
+        
+        // Note: The view doesn't support project filtering directly since it aggregates all accounts
+        // Project filtering would need to be done at the account level, not transaction level
+        const { data: viewData, error: viewError } = await viewQuery;
+        
+        if (viewError) {
+          console.error('❌ Error fetching from view:', viewError);
+          return;
+        }
+        
+        rollupData = viewData || [];
+        dataSource = 'VIEW';
+        console.log('✅ Successfully fetched from view:', rollupData.length, 'records');
+      } catch (viewErr) {
+        console.error('❌ Both RPC and view failed:', viewErr);
+        return;
+      }
+    }
+    
+    console.log('📊 Raw rollup data from', dataSource, ':', rollupData.slice(0, 3));
+    
+    if (!rollupData || rollupData.length === 0) {
+      console.warn('⚠️ No rollups data found for org:', orgId);
+      // Set default values for accounts that have no rollups
+      const defaultMap: Record<string, { has_transactions: boolean; net_amount: number }> = {};
+      unique.forEach(id => {
+        defaultMap[id] = { has_transactions: false, net_amount: 0 };
+      });
+      setRollups(prev => ({ ...prev, ...defaultMap }));
+      return;
+    }
+    
+    // Filter data to only the accounts we requested
+    const filteredData = rollupData.filter((r: any) => unique.includes(r.id));
+    console.log('🔍 Filtered to requested accounts:', filteredData.length, 'of', rollupData.length);
+    
+    const map: Record<string, { has_transactions: boolean; net_amount: number }> = {};
+    filteredData.forEach((r: any) => {
+      const hasTransactions = !!r.has_transactions;
+      const netAmount = Number(r.net_amount || 0);
+      map[r.id] = { 
+        has_transactions: hasTransactions, 
+        net_amount: netAmount 
+      };
+      console.log(`📈 Account ${r.id}: has_transactions=${hasTransactions}, net_amount=${netAmount}`);
+    });
+    
+    // Add default values for accounts not found in the rollups
+    unique.forEach(id => {
+      if (!map[id]) {
+        map[id] = { has_transactions: false, net_amount: 0 };
+        console.log(`🔄 Account ${id}: defaulted to no transactions`);
+      }
+    });
+    
+    console.log('✅ Final processed rollups map:', map);
+    
+    if (Object.keys(map).length) {
+      setRollups(prev => ({ ...prev, ...map }));
+      setAccounts(prev => prev.map(a => map[a.id] ? { ...(a as any), ...map[a.id] } : a));
+    }
   }
 
   const filteredAndSorted = useMemo(() => {
@@ -543,12 +653,16 @@ const AccountsTreePage: React.FC = () => {
       { key: 'name', header: 'الاسم', type: 'text' },
       { key: 'level', header: 'المستوى', type: 'number' },
       { key: 'status', header: 'الحالة', type: 'text' },
+      { key: 'has_transactions', header: 'به معاملات', type: 'boolean' },
+      { key: 'net_amount', header: 'صافي', type: 'number' },
     ]);
     const rows = filteredAndSorted.map((r) => ({
       code: r.code,
       name: r.name_ar || r.name,
       level: r.level,
       status: r.status,
+      has_transactions: !!(rollups[r.id]?.has_transactions),
+      net_amount: rollups[r.id]?.net_amount ?? 0,
     }));
     return prepareTableData(columns, rows);
   }, [filteredAndSorted]);
@@ -577,6 +691,62 @@ const AccountsTreePage: React.FC = () => {
             size="small"
             layout="horizontal"
           />
+          {/* Debug button - remove after testing */}
+          <button 
+            className="ultimate-btn ultimate-btn-edit" 
+            title="Debug Rollups" 
+            onClick={async () => {
+              if (!orgId) {
+                showToast('يرجى اختيار منظمة أولاً', { severity: 'warning' });
+                return;
+              }
+              try {
+                console.log('=== ENHANCED ROLLUPS DEBUG START ===');
+                const debugInfo = await debugAccountRollups(orgId);
+                console.log('🔍 Basic Debug Results:', debugInfo);
+                
+                // Test view directly with visible accounts
+                const visibleAccountIds = accounts.slice(0, 5).map(a => a.id);
+                console.log('\n--- Testing View Directly ---');
+                const viewResults = await testViewDirectly(orgId, visibleAccountIds);
+                
+                // Manual calculation for comparison
+                if (visibleAccountIds.length > 0) {
+                  console.log('\n--- Manual Calculation ---');
+                  const manualResults = await manualRollupsCalculation(orgId, visibleAccountIds);
+                  
+                  // Compare results
+                  if (viewResults && manualResults) {
+                    console.log('\n--- Results Comparison ---');
+                    visibleAccountIds.forEach(id => {
+                      const viewData = viewResults.find(v => v.id === id);
+                      const manualData = manualResults[id];
+                      console.log(`Account ${id}:`);
+                      console.log('  View:', { has_transactions: viewData?.has_transactions, net_amount: viewData?.net_amount });
+                      console.log('  Manual:', { has_transactions: manualData?.has_transactions, net_amount: manualData?.net_amount });
+                      console.log('  Match:', viewData?.has_transactions === manualData?.has_transactions && Number(viewData?.net_amount || 0) === (manualData?.net_amount || 0));
+                    });
+                  }
+                }
+                
+                // Also test RPC modes if available
+                try {
+                  console.log('\n--- RPC Mode Testing ---');
+                  await testRollupModes(orgId);
+                } catch (rpcErr) {
+                  console.log('⚠️ RPC test skipped (function may not exist yet)');
+                }
+                
+                console.log('=== ENHANCED ROLLUPS DEBUG END ===');
+                showToast(`Enhanced debug complete. Found ${debugInfo.accountsWithTransactions} accounts with transactions. Check console for detailed analysis.`, { severity: 'info' });
+              } catch (err) {
+                console.error('Debug failed:', err);
+                showToast('Debug failed - check console', { severity: 'error' });
+              }
+            }}
+          >
+            <div className="btn-content"><span className="btn-text">🔍 Debug</span></div>
+          </button>
         </div>
       </div>
 
@@ -638,7 +808,7 @@ const AccountsTreePage: React.FC = () => {
 
         <div className="view-mode-toggle">
           {/* Organization selector */}
-          <select value={orgId} onChange={(e) => { setOrgId(e.target.value); try { localStorage.setItem('org_id', e.target.value); } catch {} }} className="filter-select">
+          <select value={orgId} onChange={(e) => { setOrgId(e.target.value); try { const { setActiveOrgId } = require('../../utils/org'); setActiveOrgId?.(e.target.value); } catch {} }} className="filter-select">
             <option value="">اختر المؤسسة</option>
             {organizations.map(o => (
               <option key={o.id} value={o.id}>{o.code} - {o.name}</option>
@@ -710,8 +880,10 @@ const AccountsTreePage: React.FC = () => {
                   <th>الكود</th>
                   <th>اسم الحساب</th>
                   <th>نوع الحساب</th>
-                  <th>المستوى</th>
-                  <th>الإجراءات</th>
+                          <th>المستوى</th>
+                          <th style={{width: '120px'}}>به معاملات</th>
+                          <th style={{width: '150px'}}>الصافي</th>
+                          <th>الإجراءات</th>
                 </tr>
               </thead>
               <tbody>
@@ -724,6 +896,8 @@ const AccountsTreePage: React.FC = () => {
                       <td>{item.name_ar || item.name}</td>
                       <td className="table-center">{item.account_type || '—'}</td>
                       <td className="table-center">{item.level}</td>
+                      <td className="table-center"><input type="checkbox" readOnly checked={!!(rollups[item.id]?.has_transactions)} /></td>
+                      <td className="table-center"><CurrencyFormatter amount={rollups[item.id]?.net_amount ?? 0} /></td>
                       <td>
                         <div className="tree-node-actions">
                           <button className="ultimate-btn ultimate-btn-edit" title="تعديل" onClick={() => handleEdit(item)}> 
@@ -840,8 +1014,8 @@ const AccountsTreePage: React.FC = () => {
               try {
                 if (dialogMode === 'edit' && draft.id) {
                   // Map frontend enum values to database enum types
-                  const accountType = mapAccountTypeToDbEnum(form.account_type);
-                  const status = mapStatusToDbEnum(form.is_active);
+                  const accountType = mapAccountTypeToDbEnum(String((form as any).account_type || ''));
+                  const status = mapStatusToDbEnum(!!(form as any).is_active);
                   
                   // Prepare account update data
                   
@@ -901,8 +1075,8 @@ const AccountsTreePage: React.FC = () => {
                   showToast('تم تحديث الحساب بنجاح', { severity: 'success' });
                 } else {
                   // Map frontend enum values to database enum types
-                  const accountType = mapAccountTypeToDbEnum(form.account_type);
-                  const status = mapStatusToDbEnum(form.is_active);
+                  const accountType = mapAccountTypeToDbEnum(String((form as any).account_type || ''));
+                  const status = mapStatusToDbEnum(!!(form as any).is_active);
                   
                   const { data, error } = await supabase.rpc('account_insert_child', {
                     p_org_id: orgId,

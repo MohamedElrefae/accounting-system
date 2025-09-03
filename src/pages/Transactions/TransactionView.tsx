@@ -6,9 +6,10 @@ interface Props {
   audit: TransactionAudit[]
   userNames: Record<string, string>
   onClose: () => void
+  categoryLabel?: string
 }
 
-const TransactionView: React.FC<Props> = ({ transaction, audit, userNames, onClose }) => {
+const TransactionView: React.FC<Props> = ({ transaction, audit, userNames, onClose, categoryLabel }) => {
   return (
     <div className="transaction-modal" onClick={onClose}>
       <div className="transaction-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -18,6 +19,7 @@ const TransactionView: React.FC<Props> = ({ transaction, audit, userNames, onClo
         <div>البيان: {transaction.description}</div>
         <div>المبلغ: {transaction.amount.toLocaleString('ar-EG')}</div>
         <div>المرجع: {transaction.reference_number || '—'}</div>
+        <div>فئة المصروف: {categoryLabel || '—'}</div>
         <div>أنشئت بواسطة: {transaction.created_by ? (userNames[transaction.created_by] || transaction.created_by) : '—'}</div>
         <div>مرحلة بواسطة: {transaction.posted_by ? (userNames[transaction.posted_by] || transaction.posted_by) : '—'}</div>
         <div>الحالة: {transaction.is_posted ? 'مرحلة' : 'غير مرحلة'}</div>

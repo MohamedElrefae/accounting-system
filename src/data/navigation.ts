@@ -47,6 +47,30 @@ export const navigationItems: NavigationItem[] = [
         titleAr: "تصنيفات المعاملات",
         icon: "tag",
         path: "/main-data/transaction-classification"
+      },
+      {
+        id: "expenses-categories",
+        label: "Expenses Categories",
+        titleEn: "Expenses Categories",
+        titleAr: "فئات المصروفات",
+        icon: "Category",
+        path: "/main-data/expenses-categories"
+      },
+      {
+        id: "work-items",
+        label: "Work Items",
+        titleEn: "Work Items",
+        titleAr: "عناصر الأعمال",
+        icon: "tree-structure",
+        path: "/main-data/work-items"
+      },
+      {
+        id: "cost-centers",
+        label: "Cost Centers",
+        titleEn: "Cost Centers",
+        titleAr: "مراكز التكلفة",
+        icon: "target",
+        path: "/main-data/cost-centers"
       }
     ]
   },
@@ -102,6 +126,14 @@ export const navigationItems: NavigationItem[] = [
         path: "/reports/trial-balance"
       },
       {
+        id: "trial-balance-all-levels",
+        label: "Trial Balance (All Levels)",
+        titleEn: "Trial Balance (All Levels)",
+        titleAr: "ميزان المراجعة (شجري)",
+        icon: "scale",
+        path: "/reports/trial-balance-all-levels"
+      },
+      {
         id: "general-ledger",
         label: "General Ledger",
         titleEn: "General Ledger",
@@ -111,9 +143,9 @@ export const navigationItems: NavigationItem[] = [
       },
       {
         id: "account-explorer",
-        label: "Account Explorer (Tree)",
-        titleEn: "Account Explorer (Tree)",
-        titleAr: "مستكشف الحسابات (شجري)",
+        label: "Account Explorer",
+        titleEn: "Account Explorer",
+        titleAr: "أرصدة الحسابات",
         icon: "tree-structure",
         path: "/reports/account-explorer"
       },
@@ -134,6 +166,14 @@ export const navigationItems: NavigationItem[] = [
         path: "/reports/balance-sheet"
       },
       {
+        id: "custom-reports",
+        label: "Custom Reports Builder",
+        titleEn: "Custom Reports Builder",
+        titleAr: "منشئ التقارير المخصصة",
+        icon: "Tune",
+        path: "/reports/custom"
+      },
+      {
         id: "main-data-reports",
         label: "Main Data Reports",
         titleEn: "Main Data Reports",
@@ -147,6 +187,14 @@ export const navigationItems: NavigationItem[] = [
             titleAr: "تقارير تصنيفات المعاملات",
             icon: "tag",
             path: "/reports/main-data/transaction-classification"
+          },
+          {
+            id: "work-item-usage",
+            label: "Work Item Usage",
+            titleEn: "Work Item Usage",
+            titleAr: "استخدام عناصر الأعمال",
+            icon: "activity",
+            path: "/reports/main-data/work-item-usage"
           }
         ]
       }
@@ -192,6 +240,14 @@ export const navigationItems: NavigationItem[] = [
         path: "/settings/account-prefix-mapping"
       },
       {
+        id: "font-preferences",
+        label: "Font Settings",
+        titleEn: "Font & Formatting",
+        titleAr: "إعدادات الخطوط والتنسيق",
+        icon: "type",
+        path: "/settings/font-preferences"
+      },
+      {
         id: "diagnostics",
         label: "Diagnostics",
         titleEn: "Diagnostics",
@@ -199,6 +255,14 @@ export const navigationItems: NavigationItem[] = [
         icon: "activity", 
         path: "/settings/diagnostics",
         superAdminOnly: true
+      },
+      {
+        id: "organization-management",
+        label: "Organization Settings",
+        titleEn: "Company/Organization Settings",
+        titleAr: "إعدادات المؤسسة",
+        icon: "settings",
+        path: "/settings/organization-management"
       }
     ]
   }

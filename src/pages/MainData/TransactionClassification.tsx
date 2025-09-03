@@ -27,7 +27,8 @@ interface TransactionClassificationItem {
 
 function getInitialOrgId(): string | '' {
   try {
-    const v = localStorage.getItem('org_id');
+    const { getActiveOrgId } = require('../../utils/org');
+    const v = getActiveOrgId?.();
     if (v && v.length > 0) return v;
   } catch {}
   return '';
@@ -143,7 +144,7 @@ const TransactionClassificationPage: React.FC = () => {
         if (!getInitialOrgId() && orgs.length > 0) {
           const first = orgs[0].id;
           setOrgId(first);
-          try { localStorage.setItem('org_id', first); } catch {}
+          try { const { setActiveOrgId } = require('../../utils/org'); setActiveOrgId?.(first); } catch {}
         }
       } catch {}
     })();
@@ -299,7 +300,7 @@ const TransactionClassificationPage: React.FC = () => {
           {/* Organization selector */}
           <select value={orgId} onChange={(e) => { 
             setOrgId(e.target.value); 
-            try { localStorage.setItem('org_id', e.target.value); } catch {} 
+            try { const { setActiveOrgId } = require('../../utils/org'); setActiveOrgId?.(e.target.value); } catch {} 
           }} className="filter-select">
             <option value="">اختر المؤسسة</option>
             {organizations.map(o => (

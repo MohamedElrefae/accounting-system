@@ -14,6 +14,9 @@ export interface CompanyConfig {
   number_format: string
   default_org_id?: string | null
   default_project_id?: string | null
+  // Optional company-wide dashboard shortcuts
+  // Stored as JSONB in DB: [{ label, path, icon?, accessKey? }]
+  shortcuts?: Array<{ label: string; path: string; icon?: string; accessKey?: string }>
   created_at: string
   updated_at: string
 }
@@ -27,11 +30,12 @@ const DEFAULT_COMPANY_CONFIG: Partial<CompanyConfig> = {
   transaction_number_separator: '-',
   fiscal_year_start_month: 1, // January
   currency_code: 'SAR',
-  currency_symbol: 'ر.س', // Can be 'none' for numbers only
+  currency_symbol: 'none', // default to numbers only unless configured
   date_format: 'YYYY-MM-DD',
   number_format: 'ar-SA',
   default_org_id: null,
-  default_project_id: null
+  default_project_id: null,
+  shortcuts: []
 }
 
 // Cache for company config

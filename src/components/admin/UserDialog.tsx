@@ -25,12 +25,26 @@ import {
 import { supabase } from '../../utils/supabase';
 import { audit } from '../../utils/audit';
 import { useAuth } from '../../contexts/AuthContext';
+import type { Role } from './UserFormConfig';
+
+type ExistingUserProfileDb = {
+  id: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  full_name_ar?: string;
+  department?: string;
+  job_title?: string;
+  phone?: string;
+  is_active?: boolean;
+  user_roles?: { roles?: { id?: number } }[];
+};
 
 interface UserDialogProps {
   open: boolean;
   onClose: () => void;
-  user: any | null; // null for new user
-  roles: any[];
+  user: ExistingUserProfileDb | null; // null for new user
+  roles: Role[];
   onUserSaved: () => void;
 }
 
@@ -70,7 +84,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
         department: user.department || '',
         job_title: user.job_title || '',
         phone: user.phone || '',
-        role_id: user.user_roles?.[0]?.roles?.id || '',
+        role_id: String(user.user_roles?.[0]?.roles?.id ?? ''),
         is_active: user.is_active !== false,
         send_invite: false
       });
@@ -243,9 +257,10 @@ export const UserDialog: React.FC<UserDialogProps> = ({
 
       onUserSaved();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving user:', error);
-      setError(error.message || 'فشل حفظ المستخدم');
+      const msg = error instanceof Error ? error.message : String(error);
+      setError(msg || 'فشل حفظ المستخدم');
     } finally {
       setSaving(false);
     }

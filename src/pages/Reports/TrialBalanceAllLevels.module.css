@@ -1,0 +1,327 @@
+/* Unified theme-based styling for Trial Balance (All Levels) page */
+.container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: auto;
+}
+
+.professionalFilterBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color, #ddd);
+}
+
+.filterSection, .centerSection, .actionSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filterSelect, .filterInput {
+  height: 32px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #ccc);
+  background: var(--bg-input, #fff);
+  color: var(--fg, #111);
+}
+
+.languageToggle { display: inline-flex; border: 1px solid var(--border, var(--border-color,#3a3a3a)); border-radius: 6px; overflow: hidden; background: var(--field_bg, var(--surface, #1f2937)); }
+.languageOption { height: 32px; padding: 0 12px; border: none; background: var(--field_bg, transparent); color: var(--text, #e5e7eb); cursor: pointer; transition: background-color .15s ease, color .15s ease; }
+.languageOption:hover { background: var(--hover-bg, #374151); }
+.languageOption.active { background: var(--accent, #3b82f6); color: var(--on-accent, #fff); }
+
+.groupControls { display: inline-flex; gap: 6px; }
+.groupControlButton { height: 32px; width: 36px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border, var(--border-color,#3a3a3a)); border-radius: 6px; background: var(--field_bg, var(--surface, #1f2937)); color: var(--text, #e5e7eb); cursor: pointer; transition: background-color .15s ease, border-color .15s ease; }
+.groupControlButton:hover { background: var(--hover-bg, #374151); border-color: var(--accent, #3b82f6); }
+.groupControlButton:focus { outline: 2px solid var(--accent, #3b82f6); outline-offset: 2px; }
+
+.featureToggles { display: inline-flex; gap: 8px; }
+.viewSwitch { display: inline-flex; border: 1px solid var(--border, var(--border-color,#3a3a3a)); border-radius: 6px; overflow: hidden; background: var(--field_bg, var(--surface, #1f2937)); }
+.featureToggle { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--border, var(--border-color,#3a3a3a)); border-radius: 6px; background: var(--field_bg, var(--surface, #1f2937)); color: var(--text, #e5e7eb); cursor: pointer; transition: background-color .15s ease, border-color .15s ease; }
+.featureToggle:hover { background: var(--hover-bg, #374151); border-color: var(--accent, #3b82f6); }
+.featureToggle.active { background: var(--accent, #3b82f6); color: var(--on-accent, #fff); }
+.toggleText { font-size: 12px; }
+
+.exportGroup { display: inline-flex; gap: 8px; }
+.exportButton { height: 32px; padding: 0 10px; border: 1px solid var(--border, var(--border-color,#3a3a3a)); border-radius: 6px; background: var(--field_bg, var(--surface, #1f2937)); color: var(--text, #e5e7eb); cursor: pointer; transition: background-color .15s ease, border-color .15s ease; }
+.exportButton:hover { background: var(--hover-bg, #374151); border-color: var(--accent, #3b82f6); }
+.exportButton:focus { outline: 2px solid var(--accent, #3b82f6); outline-offset: 2px; }
+
+.actionButton { height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--border, var(--border-color,#3a3a3a)); background: var(--field_bg, var(--surface, #1f2937)); color: var(--text, #e5e7eb); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background-color .15s ease, border-color .15s ease; }
+.actionButton:hover { background: var(--hover-bg, #374151); border-color: var(--accent, #3b82f6); }
+.actionButton:focus { outline: 2px solid var(--accent, #3b82f6); outline-offset: 2px; }
+.actionButton.primary { background: var(--btn-primary-bg, #111); color: var(--btn-primary-fg, #fff); }
+.actionButton.secondary { background: var(--bg, #fff); color: var(--fg, #111); }
+
+.contentWrapper { padding: 12px 16px; }
+
+.errorAlert { margin: 12px 16px; padding: 10px 12px; border: 1px solid #f5c2c7; color: #842029; background: #f8d7da; border-radius: 6px; }
+
+.noPrint { }
+
+/* Indentation levels for hierarchical rows */
+.indent-0 { padding-inline-start: 0; }
+.indent-1 { padding-inline-start: 12px; }
+.indent-2 { padding-inline-start: 24px; }
+.indent-3 { padding-inline-start: 36px; }
+.indent-4 { padding-inline-start: 48px; }
+.indent-5 { padding-inline-start: 60px; }
+.indent-6 { padding-inline-start: 72px; }
+
+.treeToggle {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 4px;
+  background: var(--bg, #fff);
+  cursor: pointer;
+  margin-inline-end: 8px;
+}
+
+/* Group containers matching original Trial Balance styling */
+.financialGroup {
+  margin-bottom: 1.5rem;
+  background: var(--surface, #fff);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Group header with distinct background */
+.groupHeader {
+  background: var(--hover-bg, #f8fafc);
+  padding: 0.75rem 1rem;
+  border-bottom: 2px solid var(--border-color, #e2e8f0);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.groupTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--heading, #1e293b);
+  margin: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.accountCount {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #64748b);
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+/* Group content - contains all account lines */
+.groupContent {
+  padding: 0;
+  background: var(--surface, #fff);
+}
+
+/* Individual account lines within the group */
+.accountLine {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border-light, #f1f5f9);
+  transition: background-color 0.2s ease;
+  background: var(--surface, #fff);
+}
+
+.accountLine:hover {
+  background-color: var(--hover-bg, #f8fafc);
+}
+
+.accountLine:last-child {
+  border-bottom: none;
+}
+
+/* Account info styling */
+.accountInfo {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.accountCode {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: var(--accent, #0ea5e9);
+  min-width: 80px;
+  font-size: 0.9rem;
+}
+
+.accountName {
+  color: var(--text, #334155);
+  font-weight: 500;
+  flex: 1;
+}
+
+.accountAmounts {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+}
+
+.debitAmount, .creditAmount {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  font-size: 0.95rem;
+  min-width: 120px;
+  text-align: right;
+  color: var(--text, #334155);
+}
+
+/* Nested children container */
+.branchChildren {
+  padding-inline-start: 0;
+}
+
+/* Group subtotal styling */
+.groupSubtotal {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--selected-bg, #e0f2fe);
+  border-top: 1px solid var(--border-color, #e2e8f0);
+  font-weight: 600;
+}
+
+.subtotalLabel {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text, #334155);
+}
+
+.subtotalAmounts {
+  display: flex;
+  gap: 2rem;
+}
+
+.subtotalDebit, .subtotalCredit {
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  color: var(--text, #334155);
+  min-width: 120px;
+  text-align: right;
+}
+
+/* ACCOUNT EXPLORER FULL SCREEN STYLING */
+.accountExplorerFullScreen {
+  max-width: 100vw !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+}
+
+/* Account Explorer table styles (module-scoped, no ancestor required) */
+.accountsTable {
+  width: 100%;
+  table-layout: auto;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  margin: 0;
+}
+
+.accountsTable th,
+.accountsTable td {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+
+.accountsTable th {
+  background: var(--hover-bg);
+  font-weight: 700;
+  text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.accountsTable tbody tr:hover {
+  background: var(--hover-bg);
+}
+
+.tableCodeCell {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.tableCenter {
+  text-align: center;
+}
+
+.tableRight {
+  text-align: right;
+  font-family: 'Courier New', monospace;
+  font-weight: 500;
+}
+
+:global(html[data-theme='light']) .groupControlButton,
+:global(html[data-theme='light']) .featureToggle,
+:global(html[data-theme='light']) .exportButton,
+:global(html[data-theme='light']) .actionButton {
+  background: var(--surface, #ffffff);
+  color: var(--text, #111827);
+  border-color: var(--border-color, #d1d5db);
+}
+
+/* Parent row highlighting */
+.aeParentRow {
+  background: var(--hover-bg) !important;
+  font-weight: 700;
+}
+.aeParentRow td { font-family: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif; }
+
+/* Stronger emphasis for top hierarchy levels */
+.aeLevel1Row { background: color-mix(in oklab, var(--hover-bg) 70%, transparent) !important; }
+.aeLevel2Row { background: color-mix(in oklab, var(--hover-bg) 55%, transparent) !important; }
+.aeLevel3Row { background: color-mix(in oklab, var(--hover-bg) 40%, transparent) !important; }
+.aeLevel4Row { background: color-mix(in oklab, var(--hover-bg) 25%, transparent) !important; }
+
+/* Clickable row affordances for GL drilldown */
+.clickableRow {
+  cursor: pointer;
+  transition: background-color .15s ease, box-shadow .15s ease, transform .05s ease;
+  will-change: background-color, box-shadow, transform;
+}
+.clickableRow:hover {
+  background: var(--hover-bg);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 20%, transparent);
+}
+.clickableRow:active {
+  background: color-mix(in oklab, var(--hover-bg) 85%, var(--accent) 15%);
+  transform: scale(0.997);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 35%, transparent), 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+.clickableRow:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 45%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .clickableRow { transition: background-color .15s ease, box-shadow .15s ease; }
+  .clickableRow:active { transform: none; }
+}

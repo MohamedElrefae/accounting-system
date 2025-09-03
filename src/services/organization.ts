@@ -4,17 +4,26 @@ import type { Organization } from "../types";
 export type { Organization };
 
 export async function getOrganizations(): Promise<Organization[]> {
-  const { data, error } = await supabase
-    .from("organizations")
-    .select("*")
-    .eq("status", "active")
-    .order("code", { ascending: true });
-
+  // Try with status filter first (if column exists)
+  let { data, error } = await supabase
+    .from('organizations')
+    .select('*')
+    .eq('status', 'active')
+    .order('code', { ascending: true })
   if (error) {
-    console.error("Error fetching organizations:", error);
-    return [];
+    // Fallback: retry without status filter (some schemas may not have this column)
+    console.warn('getOrganizations: falling back without status filter. Reason:', error.message)
+    const res = await supabase
+      .from('organizations')
+      .select('*')
+      .order('code', { ascending: true })
+    if (res.error) {
+      console.error('Error fetching organizations:', res.error)
+      return []
+    }
+    return (res.data as Organization[]) || []
   }
-  return (data as Organization[]) || [];
+  return (data as Organization[]) || []
 }
 
 export async function getOrganization(id: string): Promise<Organization | null> {

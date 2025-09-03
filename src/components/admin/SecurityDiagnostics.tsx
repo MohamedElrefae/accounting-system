@@ -26,7 +26,7 @@ const RlsChecks: React.FC = () => {
         .from('user_roles')
         .select('user_id')
         .limit(100);
-      const onlyOwn = (res2.data || []).every((r: any) => r.user_id === uid);
+      const onlyOwn = (res2.data || []).every((r: { user_id?: string }) => r.user_id === uid);
       const ok2 = !res2.error && onlyOwn;
 
       // 3) user_permissions should only return current user's rows
@@ -34,12 +34,13 @@ const RlsChecks: React.FC = () => {
         .from('user_permissions')
         .select('user_id')
         .limit(100);
-      const onlyOwnP = (res3.data || []).every((r: any) => r.user_id === uid);
+      const onlyOwnP = (res3.data || []).every((r: { user_id?: string }) => r.user_id === uid);
       const ok3 = !res3.error && onlyOwnP;
 
       setStatus(`Profiles: ${ok1 ? 'ok' : 'fail'} • Roles: ${ok2 ? 'ok' : 'fail'} • Permissions: ${ok3 ? 'ok' : 'fail'}`);
-    } catch (e: any) {
-      setStatus(`Error: ${e?.message || e}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setStatus(`Error: ${msg}`);
     } finally {
       setRunning(false);
     }

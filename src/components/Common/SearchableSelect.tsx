@@ -22,6 +22,9 @@ interface SearchableSelectProps {
   className?: string;
   required?: boolean;
   error?: boolean;
+  // Optional drilldown modal
+  showDrilldownModal?: boolean;
+  treeOptions?: SearchableSelectOption[];
 }
 
 const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -33,10 +36,13 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   disabled = false,
   clearable = false,
   className = '',
-  required: _required = false,
-  error = false
+  required = false,
+  error = false,
+  showDrilldownModal = false,
+  treeOptions,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isTreeOpen, setIsTreeOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -111,8 +117,18 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
     }
   };
 
-  // Get current selected option
-  const selectedOption = visibleFlatOptions.find(option => option.value === value) || options.find(o => o.value === value);
+  // Get current selected option (search deeply in the tree so selection shows even when collapsed)
+  const findOptionDeep = (opts: SearchableSelectOption[], target: string): SearchableSelectOption | undefined => {
+    for (const opt of opts || []) {
+      if (opt.value === target) return opt;
+      if (opt.children && opt.children.length) {
+        const found = findOptionDeep(opt.children, target);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  };
+  const selectedOption = value ? findOptionDeep(options, value) : undefined;
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -282,7 +298,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
       try {
         const arr = Array.from(expanded);
         localStorage.setItem(storageKey, JSON.stringify(arr));
-      } catch {}
+      } catch { void 0; }
     }
   }, [isOpen, storageKey, expanded, searchTerm]);
 
@@ -304,6 +320,55 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
     className
   ].filter(Boolean).join(' ');
 
+  // Build tree (for modal) from provided treeOptions or options
+  const treeData: SearchableSelectOption[] = treeOptions && treeOptions.length ? treeOptions : options;
+
+  // Modal state for drilldown
+  const [treeSearchTerm, setTreeSearchTerm] = useState('');
+  const [treeExpanded, setTreeExpanded] = useState<Set<string>>(new Set());
+
+  const treeMatches = (opt: SearchableSelectOption, term: string) => {
+    if (!term) return true;
+    const text = (opt.searchText || opt.label || '').toLowerCase();
+    return text.includes(term.toLowerCase());
+  };
+  type TreeFlat = SearchableSelectOption & { __depth: number; __isParent: boolean };
+  const buildTreeVisible = (
+    opts: SearchableSelectOption[],
+    depth: number,
+    out: TreeFlat[],
+    term: string
+  ) => {
+    for (const opt of opts || []) {
+      const hasChildren = !!(opt.children && opt.children.length);
+      const includeThis = term ? treeMatches(opt, term) : true;
+      if (!term) {
+        out.push({ ...opt, __depth: depth, __isParent: hasChildren });
+      } else if (includeThis) {
+        out.push({ ...opt, __depth: depth, __isParent: hasChildren });
+      }
+      if (hasChildren) {
+        const childList: TreeFlat[] = [];
+        buildTreeVisible(opt.children!, depth + 1, childList, term);
+        if (term) {
+          if (childList.length > 0) {
+            if (!includeThis) {
+              out.push({ ...opt, __depth: depth, __isParent: hasChildren });
+            }
+            out.push(...childList);
+          }
+        } else if (treeExpanded.has(opt.value)) {
+          out.push(...childList);
+        }
+      }
+    }
+  };
+  const treeFlat: TreeFlat[] = React.useMemo(() => {
+    const list: TreeFlat[] = [];
+    buildTreeVisible(treeData, 0, list, treeSearchTerm);
+    return list;
+  }, [treeData, treeExpanded, treeSearchTerm]);
+
   return (
     <div
       ref={containerRef}
@@ -320,11 +385,23 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
         aria-haspopup="listbox"
         aria-labelledby={id}
       >
-        <span className={styles.selectedText}>
+        <span className={styles.selectedText} aria-required={required}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         
         <div className={styles.indicators}>
+          {showDrilldownModal && !disabled && (
+            <button
+              type="button"
+              className={styles.clearButton}
+              onClick={(e) => { e.stopPropagation(); setIsTreeOpen(true); }}
+              tabIndex={-1}
+              aria-label="اختيار من الشجرة"
+              title="اختيار من الشجرة"
+            >
+              🗂
+            </button>
+          )}
           {clearable && value && !disabled && (
             <button
               type="button"
@@ -410,7 +487,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
                     index === highlightedIndex ? styles.optionHighlighted : '',
                     option.disabled ? styles.optionDisabled : ''
                   ].filter(Boolean).join(' ')}
-                  onClick={(_e) => {
+                  onClick={() => {
                     // If clicking caret, handled below
                     if (!option.disabled) handleSelect(option.value);
                   }}
@@ -436,6 +513,107 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
                 </div>
               ))
             )}
+          </div>
+        </div>
+      )}
+      {/* Drilldown Modal */}
+      {showDrilldownModal && isTreeOpen && (
+        <div 
+          style={{
+            position: 'fixed', inset: 0 as any, background: 'rgba(0,0,0,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+          }}
+          onClick={() => setIsTreeOpen(false)}
+        >
+          <div
+            style={{
+              width: '720px', maxWidth: '95vw', maxHeight: '80vh', background: 'var(--surface)',
+              borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden', display: 'flex', flexDirection: 'column'
+            }}
+            onClick={(e) => e.stopPropagation()}
+            dir="rtl"
+          >
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontWeight: 700 }}>اختر الحساب من الشجرة</div>
+              <button className={styles.clearButton} onClick={() => setIsTreeOpen(false)} aria-label="إغلاق">✖</button>
+            </div>
+            <div style={{ padding: 12, borderBottom: '1px solid var(--border)' }}>
+              <input
+                type="text"
+                placeholder="ابحث..."
+                value={treeSearchTerm}
+                onChange={(e) => setTreeSearchTerm(e.target.value)}
+                className={styles.searchInput}
+                style={{ width: '100%' }}
+              />
+              <div className={styles.actionsRow}>
+                <button
+                  type="button"
+                  className={styles.actionButton}
+                  onClick={() => {
+                    const all = new Set<string>();
+                    const walk = (opts: SearchableSelectOption[]) => {
+                      for (const o of opts || []) { if (o.children && o.children.length) { all.add(o.value); walk(o.children); } }
+                    };
+                    walk(treeData);
+                    setTreeExpanded(all);
+                  }}
+                >توسيع الكل</button>
+                <button
+                  type="button"
+                  className={styles.actionButton}
+                  onClick={() => setTreeExpanded(new Set())}
+                >طيّ الكل</button>
+              </div>
+            </div>
+            <div style={{ overflow: 'auto' }}>
+              {treeFlat.length === 0 ? (
+                <div className={styles.noOptions}>لا توجد خيارات متاحة</div>
+              ) : (
+                treeFlat.map((opt, idx) => (
+                  <div
+                    key={opt.value + ':' + idx}
+                    className={[
+                      styles.option,
+                      opt.value === value ? styles.optionSelected : ''
+                    ].filter(Boolean).join(' ')}
+                    onClick={() => {
+                      // Only allow selecting non-disabled (postable) items
+                      if (!opt.disabled && opt.value && !opt.value.startsWith('__')) {
+                        onChange(opt.value);
+                        setIsTreeOpen(false);
+                      } else if (opt.__isParent) {
+                        // toggle expand if parent clicked
+                        setTreeExpanded(prev => {
+                          const next = new Set(prev);
+                          if (next.has(opt.value)) next.delete(opt.value); else next.add(opt.value);
+                          return next;
+                        });
+                      }
+                    }}
+                    title={opt.title}
+                    style={{ paddingRight: `calc(20px + ${opt.__depth * 16}px)` }}
+                  >
+                    {opt.__isParent && opt.children && opt.children.length ? (
+                      <button
+                        type="button"
+                        className={styles.caret}
+                        onClick={(e) => { e.stopPropagation(); setTreeExpanded(prev => { const n = new Set(prev); if (n.has(opt.value)) n.delete(opt.value); else n.add(opt.value); return n; }); }}
+                        aria-label={treeExpanded.has(opt.value) ? 'طي' : 'توسيع'}
+                      >
+                        <ChevronDown size={14} className={treeExpanded.has(opt.value) ? styles.caretOpen : styles.caretClosed} />
+                      </button>
+                    ) : (
+                      <span className={styles.caretPlaceholder} />
+                    )}
+                    <span className={styles.optionLabel}>{opt.label}</span>
+                  </div>
+                ))
+              )}
+            </div>
+            <div style={{ padding: 12, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
+              <button className={styles.actionButton} onClick={() => setIsTreeOpen(false)} title="إغلاق">إغلاق</button>
+            </div>
           </div>
         </div>
       )}

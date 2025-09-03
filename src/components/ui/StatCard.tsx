@@ -21,13 +21,15 @@ const iconMap = {
 
 interface StatCardProps {
   stat: StatCardType;
+  size?: 'small' | 'normal';
 }
 
-const StatCard: React.FC<StatCardProps> = ({ stat }) => {
+const StatCard: React.FC<StatCardProps> = ({ stat, size = 'normal' }) => {
   const { language } = useAppStore();
   
   const title = language === 'ar' ? stat.titleAr : stat.titleEn;
   const isPositive = (stat.change ?? 0) > 0;
+  const compact = size === 'small';
 
   return (
     <Card 
@@ -35,42 +37,44 @@ const StatCard: React.FC<StatCardProps> = ({ stat }) => {
         height: '100%',
         transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
         '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: (theme) => theme.shadows[8],
+          transform: 'translateY(-2px)',
+          boxShadow: (theme) => theme.shadows[6],
         },
       }}
     >
-      <CardContent sx={{ p: 3 }}>
+      <CardContent sx={{ p: compact ? 2 : 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <Box sx={{ flex: 1 }}>
             <Typography
-              variant="body2"
+              variant="caption"
               color="text.secondary"
               gutterBottom
-              sx={{ fontWeight: 500 }}
+              sx={{ fontWeight: 600, letterSpacing: 0.2 }}
             >
               {title}
             </Typography>
             <Typography
-              variant="h4"
+              variant={compact ? 'h6' : 'h4'}
               component="div"
-              sx={{ fontWeight: 700, mb: 2 }}
+              sx={{ fontWeight: 700, mb: compact ? 1 : 2 }}
             >
               {stat.value}
             </Typography>
-            <Chip
-              icon={isPositive ? <TrendingUp /> : <TrendingDown />}
-              label={`${isPositive ? '+' : ''}${stat.change}%`}
-              color={isPositive ? 'success' : 'error'}
-              size="small"
-              sx={{ fontWeight: 600 }}
-            />
+            {typeof stat.change !== 'undefined' && (
+              <Chip
+                icon={isPositive ? <TrendingUp /> : <TrendingDown />}
+                label={`${isPositive ? '+' : ''}${stat.change}%`}
+                color={isPositive ? 'success' : 'error'}
+                size="small"
+                sx={{ fontWeight: 600 }}
+              />
+            )}
           </Box>
           <Avatar
             sx={{
               bgcolor: `${stat.color}.main`,
-              width: 56,
-              height: 56,
+              width: compact ? 40 : 56,
+              height: compact ? 40 : 56,
             }}
           >
             {iconMap[stat.icon as keyof typeof iconMap] || <AccountBalance />}

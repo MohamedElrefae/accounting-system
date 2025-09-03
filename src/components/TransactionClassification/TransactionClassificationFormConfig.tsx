@@ -49,7 +49,7 @@ export const createTransactionClassificationFormConfig = (
       placeholder: 'مثال: 1',
       required: true,
       icon: <Hash size={16} />,
-      validation: validateCode,
+      validation: (value: unknown) => validateCode(value as number | string),
       helpText: 'كود فريد لتصنيف المعاملة (رقم من 1 إلى 9999)',
       min: 1,
       max: 9999
@@ -61,7 +61,7 @@ export const createTransactionClassificationFormConfig = (
       placeholder: 'مثال: وارد خزينة',
       required: true,
       icon: <FileText size={16} />,
-      validation: validateName,
+      validation: (value: unknown) => validateName(String(value ?? '')),
       helpText: 'اسم تصنيف المعاملة المالية'
     },
     {
@@ -82,29 +82,30 @@ export const createTransactionClassificationFormConfig = (
     fields,
     submitLabel: isEditing ? '💾 حفظ التعديلات' : '✨ إنشاء التصنيف',
     cancelLabel: '❌ إلغاء',
-    customValidator: (data: any): ValidationResult => {
+    customValidator: (data: Record<string, unknown>): ValidationResult => {
       const errors: ValidationError[] = [];
+      const d = data as Partial<TransactionClassificationFormData & { code?: number | string; name?: string; post_to_costs?: boolean }>;
       
       // Validate code
-      const codeError = validateCode(data.code);
+      const codeError = validateCode(d.code as number | string);
       if (codeError) errors.push(codeError);
       
       // Validate name
-      const nameError = validateName(data.name);
+      const nameError = validateName(String(d.name ?? ''));
       if (nameError) errors.push(nameError);
       
       // Ensure post_to_costs has a default value
-      if (data.post_to_costs === undefined) {
-        data.post_to_costs = false;
+      if (d.post_to_costs === undefined) {
+        (d as Record<string, unknown>).post_to_costs = false;
       }
       
       return { isValid: errors.length === 0, errors };
     },
-    autoFillLogic: (formData: any) => {
+    autoFillLogic: (formData: Record<string, unknown>) => {
       const auto: Partial<TransactionClassificationFormData> = {};
       
       // Set default values
-      if (formData.post_to_costs === undefined) {
+      if ((formData as Partial<TransactionClassificationFormData>).post_to_costs === undefined) {
         auto.post_to_costs = false;
       }
       

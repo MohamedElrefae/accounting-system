@@ -112,7 +112,8 @@ const validatePhone = (phone: string): ValidationError | null => {
   if (!phone || !phone.trim()) {
     return null; // Phone is optional
   }
-  const phoneRegex = /^[\d\s\-\+\(\)]+$/;
+  // Allow digits, spaces, plus, parentheses, and dashes
+  const phoneRegex = /^[\d\s\-+()]+$/;
   if (!phoneRegex.test(phone)) {
     return { field: 'phone', message: 'رقم الهاتف غير صحيح' };
   }
@@ -140,16 +141,17 @@ const validateCustomJobTitle = (customJobTitle: string, jobTitle: string): Valid
 // };
 
 // Auto-fill logic
-const createUserAutoFillLogic = (_roles: Role[]) => (formData: any) => {
-  const auto: Partial<any> = {};
+const createUserAutoFillLogic = () => (formData: Record<string, unknown>) => {
+  const fd = formData as Partial<UserRecord & { department?: string; job_title?: string; custom_job_title?: string }>;
+  const auto: Partial<UserRecord> = {};
   
   // Auto-fill full name in Arabic if not provided
-  if (formData.first_name && formData.last_name && !formData.full_name_ar) {
-    auto.full_name_ar = `${formData.first_name} ${formData.last_name}`;
+  if (fd.first_name && fd.last_name && !fd.full_name_ar) {
+    auto.full_name_ar = `${fd.first_name} ${fd.last_name}`;
   }
   
   // Suggest department-related job titles
-  if (formData.department && !formData.job_title) {
+  if (fd.department && !fd.job_title) {
     const suggestions: Record<string, string> = {
       'accounting': 'accountant',
       'sales': 'sales_rep',
@@ -158,21 +160,21 @@ const createUserAutoFillLogic = (_roles: Role[]) => (formData: any) => {
       'marketing': 'coordinator',
       'finance': 'analyst'
     };
-    if (suggestions[formData.department]) {
-      auto.job_title = suggestions[formData.department];
+    if (fd.department && suggestions[fd.department]) {
+      auto.job_title = suggestions[fd.department];
     }
   }
   
   // Default values for new users
-  if (formData.is_active === undefined) {
+  if (fd.is_active === undefined) {
     auto.is_active = true;
   }
   
-  if (formData.send_invite === undefined) {
+  if (fd.send_invite === undefined) {
     auto.send_invite = true;
   }
   
-  if (formData.require_password_change === undefined) {
+  if (fd.require_password_change === undefined) {
     auto.require_password_change = true;
   }
   
@@ -256,7 +258,7 @@ export const createUserFormConfig = (
       required: true,
       disabled: isEditing, // Can't change email for existing users
       icon: <Mail size={16} />,
-      validation: validateEmail,
+      validation: (value: unknown) => validateEmail(String(value ?? '')),
       helpText: isEditing ? 'لا يمكن تغيير البريد الإلكتروني بعد إنشاء الحساب' : 'عنوان البريد الإلكتروني للمستخدم'
     }
   ];
@@ -271,7 +273,7 @@ export const createUserFormConfig = (
         placeholder: 'أدخل كلمة مرور قوية',
         required: true,
         icon: <Lock size={16} />,
-        validation: validatePassword,
+        validation: (value: unknown) => validatePassword(String(value ?? '')),
         helpText: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل',
 
       },
@@ -282,13 +284,12 @@ export const createUserFormConfig = (
         placeholder: 'أعد كتابة كلمة المرور',
         required: true,
         icon: <Lock size={16} />,
-        validation: (value: string) => {
-          if (!value || !value.trim()) {
+        validation: (value: unknown) => {
+          const v = String(value ?? '');
+          if (!v.trim()) {
             return { field: 'confirm_password', message: 'تأكيد كلمة المرور مطلوب' };
           }
-          if (!value) {
-            return { field: 'confirm_password', message: 'كلمات المرور غير متطابقة' };
-          }
+          // Actual matching check happens in customValidator since we need both fields
           return null;
         },
         helpText: 'أعد كتابة كلمة المرور للتأكيد'
@@ -305,7 +306,7 @@ export const createUserFormConfig = (
       placeholder: 'أدخل الاسم الأول',
       required: true,
       icon: <User size={16} />,
-      validation: validateFirstName,
+      validation: (value: unknown) => validateFirstName(String(value ?? '')),
       helpText: 'الاسم الأول للمستخدم'
     },
     {
@@ -315,7 +316,7 @@ export const createUserFormConfig = (
       placeholder: 'أدخل اسم العائلة',
       required: true,
       icon: <User size={16} />,
-      validation: validateLastName,
+      validation: (value: unknown) => validateLastName(String(value ?? '')),
       helpText: 'اسم العائلة للمستخدم'
     },
     {
@@ -351,7 +352,7 @@ export const createUserFormConfig = (
     label: 'المسمى الوظيفي المخصص',
     placeholder: 'أدخل المسمى الوظيفي',
     icon: <Briefcase size={16} />,
-    validation: (value: string) => validateCustomJobTitle(value, ''),
+    validation: (value: unknown) => validateCustomJobTitle(String(value ?? ''), ''),
     helpText: 'حدد المسمى الوظيفي إذا اخترت "أخرى"',
     conditionalLogic: (formData) => formData.job_title === 'other'
   });
@@ -364,7 +365,7 @@ export const createUserFormConfig = (
       label: 'رقم الهاتف',
       placeholder: '05xxxxxxxx',
       icon: <Phone size={16} />,
-      validation: validatePhone,
+      validation: (value: unknown) => validatePhone(String(value ?? '')),
       helpText: 'رقم الهاتف (اختياري)'
     },
     {
@@ -411,12 +412,13 @@ export const createUserFormConfig = (
 
     submitLabel: isEditing ? '💾 حفظ التعديلات' : '✨ إنشاء المستخدم',
     cancelLabel: '❌ إلغاء',
-    customValidator: (data: any) => {
+    customValidator: (data: Record<string, unknown>) => {
       const errors: ValidationError[] = [];
+      const d = data as Partial<UserRecord & { confirm_password?: string }>;
       
       // Password confirmation check for new users
       if (!isEditing) {
-        if (data.password && data.confirm_password && data.password !== data.confirm_password) {
+        if (d.password && d.confirm_password && d.password !== d.confirm_password) {
           errors.push({ 
             field: 'confirm_password', 
             message: 'كلمات المرور غير متطابقة' 
@@ -425,7 +427,7 @@ export const createUserFormConfig = (
       }
       
       // Custom job title validation
-      if (data.job_title === 'other' && (!data.custom_job_title || !data.custom_job_title.trim())) {
+      if (d.job_title === 'other' && (!d.custom_job_title || !String(d.custom_job_title).trim())) {
         errors.push({ 
           field: 'custom_job_title', 
           message: 'يرجى تحديد المسمى الوظيفي المخصص' 
@@ -437,7 +439,7 @@ export const createUserFormConfig = (
         errors
       };
     },
-    autoFillLogic: createUserAutoFillLogic(roles),
+    autoFillLogic: createUserAutoFillLogic(),
     layout: {
       columns: 2,
       responsive: true,

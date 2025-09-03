@@ -3,10 +3,11 @@
  * Provides consistent export interface across all data tables in the application
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { UniversalTableData } from '../../utils/UniversalExportManager';
 import { useUniversalExport } from '../../hooks/useUniversalExport';
 import type { ExportConfig } from '../../hooks/useUniversalExport';
+import CustomizedPDFModal from './CustomizedPDFModal';
 import './ExportButtons.css';
 
 interface ExportButtonsProps {
@@ -17,6 +18,7 @@ interface ExportButtonsProps {
   onExportError?: (format: string, error: Error) => void;
   showAllFormats?: boolean;
   showBatchExport?: boolean;
+  showCustomizedPDF?: boolean;
   disabled?: boolean;
   size?: 'small' | 'medium' | 'large';
   layout?: 'horizontal' | 'vertical' | 'dropdown';
@@ -31,11 +33,14 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
   onExportError,
   showAllFormats = true,
   showBatchExport = false,
+  showCustomizedPDF = true,
   disabled = false,
   size = 'medium',
   layout = 'horizontal',
   className = ''
 }) => {
+  const [customizedPDFModalOpen, setCustomizedPDFModalOpen] = useState(false);
+  
   const exportMethods = useUniversalExport({
     onExportStart,
     onExportComplete,
@@ -64,12 +69,16 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
         case 'json':
           await exportMethods.exportToJSON(data, config);
           break;
-        case 'all':
+      case 'customized-pdf':
+          setCustomizedPDFModalOpen(true);
+          break;
+      case 'all':
           await exportMethods.exportAll(data, config);
           break;
       }
-    } catch (error) {
+    } catch {
       // Silent error handling - error already handled by export hooks
+      void 0;
     }
   };
 
@@ -80,6 +89,13 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
       icon: '📄',
       className: 'export-btn-pdf',
       show: showAllFormats
+    },
+    {
+      format: 'customized-pdf',
+      label: 'PDF مخصص',
+      icon: '⚙️',
+      className: 'export-btn-customized-pdf',
+      show: showCustomizedPDF
     },
     {
       format: 'excel',
@@ -172,29 +188,48 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
     return (
       <div className={`export-buttons-wrapper ${className}`}>
         {renderDropdown()}
+        {showCustomizedPDF && (
+          <CustomizedPDFModal
+            isOpen={customizedPDFModalOpen}
+            onClose={() => setCustomizedPDFModalOpen(false)}
+            data={data}
+            title={config?.title || 'تقرير البيانات'}
+          />
+        )}
       </div>
     );
   }
 
   return (
-    <div className={`export-buttons export-buttons-${layout} export-buttons-${size} ${className}`}>
-      {exportButtons.filter(btn => btn.show).map(renderButton)}
-      {showBatchExport && (
-        <button
-          className={`export-btn export-btn-batch export-btn-${size}`}
-          onClick={() => handleExport('all')}
-          disabled={disabled || exportMethods.isExporting}
-          title="تصدير جميع الصيغ"
-        >
-          {exportMethods.isExporting ? (
-            <span className="export-spinner">⏳</span>
-          ) : (
-            <span className="export-icon">📦</span>
-          )}
-          <span className="export-label">تصدير الكل</span>
-        </button>
+    <>
+      <div className={`export-buttons export-buttons-${layout} export-buttons-${size} ${className}`}>
+        {exportButtons.filter(btn => btn.show).map(renderButton)}
+        {showBatchExport && (
+          <button
+            className={`export-btn export-btn-batch export-btn-${size}`}
+            onClick={() => handleExport('all')}
+            disabled={disabled || exportMethods.isExporting}
+            title="تصدير جميع الصيغ"
+          >
+            {exportMethods.isExporting ? (
+              <span className="export-spinner">⏳</span>
+            ) : (
+              <span className="export-icon">📦</span>
+            )}
+            <span className="export-label">تصدير الكل</span>
+          </button>
+        )}
+      </div>
+      
+      {showCustomizedPDF && (
+        <CustomizedPDFModal
+          isOpen={customizedPDFModalOpen}
+          onClose={() => setCustomizedPDFModalOpen(false)}
+          data={data}
+          title={config?.title || 'تقرير البيانات'}
+        />
       )}
-    </div>
+    </>
   );
 };
 

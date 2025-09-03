@@ -21,6 +21,12 @@ interface ButtonState {
   error: boolean;
 }
 
+interface ExtraColumn {
+  key: string;
+  header: string;
+  render: (node: any) => React.ReactNode;
+}
+
 interface TreeViewProps {
   data: TreeNode[];
   onEdit?: (node: TreeNode) => void;
@@ -35,6 +41,8 @@ interface TreeViewProps {
   isDeleteDisabled?: (node: TreeNode) => boolean;
   getDeleteDisabledReason?: (node: TreeNode) => string | undefined;
   maxLevel?: number;
+  // New: extra columns to display between level and actions
+  extraColumns?: ExtraColumn[];
 }
 
 const TreeView: React.FC<TreeViewProps> = ({ 
@@ -49,7 +57,8 @@ const TreeView: React.FC<TreeViewProps> = ({
   getChildrenCount,
   isDeleteDisabled,
   getDeleteDisabledReason,
-  maxLevel = 4 
+  maxLevel = 4,
+  extraColumns = []
 }) => {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [buttonStates, setButtonStates] = useState<{[key: string]: ButtonState}>({});
@@ -167,6 +176,13 @@ const TreeView: React.FC<TreeViewProps> = ({
           <div className="tree-node-level">
             <span className={`level-badge ${ui.badgeLevel}`}>{node.level}</span>
           </div>
+
+          {/* Extra dynamic columns */}
+          {extraColumns.length > 0 && extraColumns.map(col => (
+            <div key={`${col.key}-${node.id}`} className="tree-node-extra">
+              {col.render(node)}
+            </div>
+          ))}
           
           <div className="tree-node-actions">
             {/* Edit Button */}
@@ -366,8 +382,10 @@ const TreeView: React.FC<TreeViewProps> = ({
 
   const treeData = buildTree(data);
 
+  const containerClass = `tree-view-container ${extraColumns.length > 0 ? `tree-has-extras-${extraColumns.length}` : ''}`;
+
   return (
-    <div className="tree-view-container">
+    <div className={containerClass}>
       {/* Header Row */}
       <div className="tree-node tree-header">
         <div className="tree-node-expander"></div>
@@ -385,6 +403,12 @@ const TreeView: React.FC<TreeViewProps> = ({
         <div className="tree-node-level">
           <span className="header-text">المستوى</span>
         </div>
+        {/* Extra column headers */}
+        {extraColumns.length > 0 && extraColumns.map(col => (
+          <div key={`header-${col.key}`} className="tree-node-extra">
+            <span className="header-text">{col.header}</span>
+          </div>
+        ))}
         <div className="tree-node-actions">
           <span className="header-text">الإجراءات</span>
         </div>

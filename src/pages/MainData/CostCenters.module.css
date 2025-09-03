@@ -1,0 +1,67 @@
+/* Cost Centers Page - unified theme, no inline styles */
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--background);
+  color: var(--text);
+}
+
+.header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--topbar_bg);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--heading);
+  font-weight: 600;
+}
+
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 24px;
+  gap: 16px;
+  overflow: auto;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.cardBody {
+  padding: 16px;
+}
+
+.filtersRow {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.tableContainer {
+  overflow: auto;
+}
+
+.sectionTitle {
+  font-weight: 600;
+  color: var(--heading);
+}
+
+.footerActions {
+  display: flex;
+  gap: 8px;
+}

@@ -76,11 +76,12 @@ const validateDescriptionAr = (descriptionAr: string): ValidationError | null =>
 };
 
 // Auto-fill logic
-const createRoleAutoFillLogic = () => (formData: any) => {
-  const auto: Partial<any> = {};
+const createRoleAutoFillLogic = () => (formData: Record<string, unknown>) => {
+  const fd = formData as { name?: string; name_ar?: string; description?: string; description_ar?: string };
+  const auto: Record<string, unknown> = {};
   
   // Auto-generate Arabic name suggestions based on common role patterns
-  if (formData.name && !formData.name_ar) {
+  if (fd.name && !fd.name_ar) {
     const nameMap: Record<string, string> = {
       'admin': 'مدير',
       'user': 'مستخدم',
@@ -94,7 +95,7 @@ const createRoleAutoFillLogic = () => (formData: any) => {
       'moderator': 'مشرف'
     };
     
-    const lowerName = formData.name.toLowerCase();
+    const lowerName = fd.name.toLowerCase();
     for (const [en, ar] of Object.entries(nameMap)) {
       if (lowerName.includes(en)) {
         auto.name_ar = ar;
@@ -104,17 +105,17 @@ const createRoleAutoFillLogic = () => (formData: any) => {
     
     // If no match found, suggest a generic translation
     if (!auto.name_ar) {
-      auto.name_ar = `دور ${formData.name}`;
+      auto.name_ar = `دور ${fd.name}`;
     }
   }
   
   // Auto-generate description based on name
-  if (formData.name && !formData.description) {
-    auto.description = `Role for ${formData.name} with specific permissions and access rights.`;
+  if (fd.name && !fd.description) {
+    auto.description = `Role for ${fd.name} with specific permissions and access rights.`;
   }
   
-  if (formData.name_ar && !formData.description_ar) {
-    auto.description_ar = `دور ${formData.name_ar} مع صلاحيات وحقوق وصول محددة.`;
+  if (fd.name_ar && !fd.description_ar) {
+    auto.description_ar = `دور ${fd.name_ar} مع صلاحيات وحقوق وصول محددة.`;
   }
   
   return auto;
@@ -152,7 +153,7 @@ export const createRoleFormConfig = (
       required: true,
       disabled: existingRole?.is_system, // Can't change system role names
       icon: <Shield size={16} />,
-      validation: validateName,
+      validation: (value: unknown) => validateName(String(value ?? '')),
       helpText: existingRole?.is_system 
         ? 'لا يمكن تغيير اسم الأدوار النظامية' 
         : 'اسم الدور باللغة الإنجليزية (أحرف، أرقام، شرطات فقط)'
@@ -164,7 +165,7 @@ export const createRoleFormConfig = (
       placeholder: 'مدير، مستخدم، مشرف، إلخ',
       required: true,
       icon: <Globe size={16} />,
-      validation: validateNameAr,
+      validation: (value: unknown) => validateNameAr(String(value ?? '')),
       helpText: 'اسم الدور باللغة العربية'
     },
     {
@@ -174,7 +175,7 @@ export const createRoleFormConfig = (
       placeholder: 'Role description in English (optional)',
       rows: 1,
       icon: <FileText size={16} />,
-      validation: validateDescription,
+      validation: (value: unknown) => validateDescription(String(value ?? '')),
       helpText: 'وصف مختصر للدور ومسؤولياته بالإنجليزية'
     },
     {
@@ -184,7 +185,7 @@ export const createRoleFormConfig = (
       placeholder: 'وصف الدور باللغة العربية (اختياري)',
       rows: 1,
       icon: <FileText size={16} />,
-      validation: validateDescriptionAr,
+      validation: (value: unknown) => validateDescriptionAr(String(value ?? '')),
       helpText: 'وصف مختصر للدور ومسؤولياته بالعربية'
     }
   ];
@@ -203,15 +204,16 @@ export const createRoleFormConfig = (
 
     submitLabel: isEditing ? '💾 حفظ التعديلات' : '✨ إنشاء الدور',
     cancelLabel: '❌ إلغاء',
-    customValidator: (data: any): ValidationResult => {
+    customValidator: (data: Record<string, unknown>): ValidationResult => {
       const errors: ValidationError[] = [];
       
       // Check for duplicate names (this would be handled by backend, but good to check)
-      if (!data.name || !data.name.trim()) {
+      const d = data as { name?: string; name_ar?: string };
+      if (!d.name || !d.name.trim()) {
         errors.push({ field: 'name', message: 'اسم الدور بالإنجليزية مطلوب' });
       }
       
-      if (!data.name_ar || !data.name_ar.trim()) {
+      if (!d.name_ar || !d.name_ar.trim()) {
         errors.push({ field: 'name_ar', message: 'اسم الدور بالعربية مطلوب' });
       }
       

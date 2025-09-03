@@ -1,0 +1,56 @@
+/* Work Item Usage page styles (no inline styles) */
+.container {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 64px);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.select,
+.input,
+.button {
+  height: 36px;
+}
+
+.content {
+  flex: 1;
+  padding: 16px 24px;
+}
+
+.tableWrap {
+  border: 1px solid var(--border-color, #e2e6ed);
+  border-radius: 12px;
+  background: var(--surface-bg, #fff);
+  overflow: hidden;
+}
+
+.resetBtn {
+  padding: 0 10px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg,#f97316,#ea580c);
+  color: #fff;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+}
+

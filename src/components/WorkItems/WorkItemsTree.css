@@ -1,0 +1,82 @@
+/* Work Items dedicated tree (keeps original TreeView untouched) */
+@import '../Common/UltimateButtons.css';
+.wit-container {
+  background-color: var(--content-bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  overflow: auto;
+}
+
+/* Scope badge styles */
+.wit-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.2;
+  border: 1px solid var(--border-light);
+  background: var(--chip-bg);
+}
+.wit-badge.catalog { color: var(--text-secondary); background: rgba(107,114,128,0.12); }
+.wit-badge.override { color: var(--accent-primary); background: rgba(59,130,246,0.12); }
+
+.wit-header-row,
+.wit-node {
+  display: grid;
+  grid-template-columns: 28px 24px 10px 160px minmax(260px, 1fr) 160px 90px 420px;
+  align-items: center;
+  gap: 8px;
+}
+
+.wit-header-row {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--table_header_bg);
+  color: var(--text-primary);
+  font-weight: 600;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.wit-node-wrap { position: relative; }
+
+.wit-node { padding: 10px 12px; border-bottom: 1px solid var(--border-light); }
+.wit-node:hover { background: var(--hover-bg); }
+.wit-node.inactive { opacity: .85; background: rgba(239,68,68,.04); }
+
+.wit-expander { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer; border-radius: 6px; transition: background .2s ease; }
+.wit-expander.no-children { visibility: hidden; cursor: default; }
+.wit-expander:hover { background: var(--hover-bg); color: var(--accent); }
+.wit-expander .exp-icon { transition: transform .2s ease; }
+.wit-expander.expanded .exp-icon { transform: rotate(90deg); }
+
+/* Depth-based indentation to avoid inline styles */
+.wit-expander.depth-0 { margin-left: 0 }
+.wit-expander.depth-1 { margin-left: 20px }
+.wit-expander.depth-2 { margin-left: 40px }
+.wit-expander.depth-3 { margin-left: 60px }
+.wit-expander.depth-4 { margin-left: 80px }
+.wit-expander.depth-5 { margin-left: 100px }
+.wit-expander.depth-6 { margin-left: 120px }
+.wit-expander.depth-7 { margin-left: 140px }
+.wit-expander.depth-8 { margin-left: 160px }
+.wit-expander.depth-9 { margin-left: 180px }
+.wit-expander.depth-10 { margin-left: 200px }
+
+.wit-select { display: flex; align-items: center; justify-content: center; }
+.wit-status { width: 10px; height: 10px; border-radius: 50%; }
+.wit-status.active { background: var(--success); box-shadow: 0 0 4px var(--success); }
+.wit-status.inactive { background: var(--error); box-shadow: 0 0 4px var(--error); }
+
+.wit-code { font-family: monospace; font-weight: 700; display: flex; align-items: center; gap: 4px; }
+.wit-code .seg { background: var(--chip-bg); border: 1px solid var(--border); border-radius: 6px; padding: 0 6px; }
+.wit-code .dot { opacity: 0.5; }
+.wit-name { display: flex; align-items: center; gap: 6px; }
+.wit-name.clickable { cursor: pointer; }
+.wit-scope { color: var(--text-secondary); }
+.wit-level { display: flex; align-items: center; }
+
+.wit-actions { display: flex; align-items: center; gap: 8px; }
+
+.wit-children { position: relative; }
+.wit-children::before { content: ''; position: absolute; left: 24px; top: 0; bottom: 0; width: 1px; background: var(--border-light); }
+

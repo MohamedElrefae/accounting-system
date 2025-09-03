@@ -14,11 +14,25 @@ interface PanelState {
   dockPosition?: 'left' | 'right' | 'top' | 'bottom';
 }
 
+type ExistingUserFromDb = {
+  id: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  full_name_ar?: string;
+  department?: string;
+  job_title?: string;
+  phone?: string;
+  is_active?: boolean;
+  avatar_url?: string;
+  user_roles?: { roles?: { id?: number } }[];
+};
+
 interface UserDialogProps {
   open: boolean;
   onClose: () => void;
-  user: any | null;
-  roles: any[];
+  user: ExistingUserFromDb | null;
+  roles: Role[];
   onUserSaved: () => void;
 }
 
@@ -58,10 +72,10 @@ export const UserDialogEnhanced: React.FC<UserDialogProps> = ({
   // Convert roles to Role format
   const roleRecords: Role[] = roles.map(role => ({
     id: role.id,
-    name: role.name || role.name_en || '',
-    name_ar: role.name_ar || role.name || '',
-    description: role.description,
-    description_ar: role.description_ar
+    name: (role as any).name ?? (role as any).name_en ?? '',
+    name_ar: (role as any).name_ar ?? (role as any).name ?? '',
+    description: (role as any).description,
+    description_ar: (role as any).description_ar
   }));
 
   // Create form configuration
@@ -72,22 +86,23 @@ export const UserDialogEnhanced: React.FC<UserDialogProps> = ({
   );
 
   // Handle form submission
-  const handleFormSubmit = async (formData: any) => {
+  const handleFormSubmit = async (formData: Record<string, unknown>) => {
     try {
-      const finalJobTitle = formData.job_title === 'other' 
-        ? formData.custom_job_title 
-        : formData.job_title;
+      const finalJobTitle = (formData as any).job_title === 'other'
+        ? String((formData as any).custom_job_title || '')
+        : String((formData as any).job_title || '');
 
+      const fd = formData as unknown as UserRecord;
       if (user) {
         // Update existing user
-        const updateData: any = {
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          full_name_ar: formData.full_name_ar,
-          department: formData.department,
+        const updateData: Partial<UserRecord> & { updated_at: string } = {
+          first_name: fd.first_name,
+          last_name: fd.last_name,
+          full_name_ar: fd.full_name_ar,
+          department: fd.department,
           job_title: finalJobTitle,
-          phone: formData.phone,
-          is_active: formData.is_active,
+          phone: fd.phone,
+          is_active: fd.is_active,
           updated_at: new Date().toISOString()
         };
 
@@ -99,12 +114,12 @@ export const UserDialogEnhanced: React.FC<UserDialogProps> = ({
         if (updateError) throw updateError;
 
         // Update role if changed
-        if (formData.role_id) {
+        if (fd.role_id) {
           await supabase.from('user_roles').delete().eq('user_id', user.id);
           
           const { error: roleError } = await supabase.from('user_roles').insert({
             user_id: user.id,
-            role_id: parseInt(formData.role_id),
+            role_id: parseInt(fd.role_id),
             assigned_by: currentUser?.id,
             is_active: true
           });
@@ -124,13 +139,13 @@ export const UserDialogEnhanced: React.FC<UserDialogProps> = ({
       } else {
         // Create new user using signUp (client-safe)
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
+          email: fd.email,
+          password: fd.password as string,
           options: {
             data: {
-              first_name: formData.first_name,
-              last_name: formData.last_name,
-              require_password_change: formData.require_password_change
+              first_name: fd.first_name,
+              last_name: fd.last_name,
+              require_password_change: fd.require_password_change
             },
             emailRedirectTo: `${window.location.origin}/login`
           }
@@ -140,16 +155,16 @@ export const UserDialogEnhanced: React.FC<UserDialogProps> = ({
 
         if (signUpData?.user) {
           // Create user profile
-          const profileData: any = {
+          const profileData: Partial<UserRecord> & { id: string; email: string; created_at: string } = {
             id: signUpData.user.id,
-            email: formData.email,
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-            full_name_ar: formData.full_name_ar,
-            department: formData.department,
+            email: fd.email,
+            first_name: fd.first_name,
+            last_name: fd.last_name,
+            full_name_ar: fd.full_name_ar,
+            department: fd.department,
             job_title: finalJobTitle,
-            phone: formData.phone,
-            is_active: formData.is_active,
+            phone: fd.phone,
+            is_active: fd.is_active,
             created_at: new Date().toISOString()
           };
 
@@ -160,10 +175,10 @@ export const UserDialogEnhanced: React.FC<UserDialogProps> = ({
           if (profileError) throw profileError;
 
           // Assign role
-          if (formData.role_id) {
+          if (fd.role_id) {
             await supabase.from('user_roles').insert({
               user_id: signUpData.user.id,
-              role_id: parseInt(formData.role_id),
+              role_id: parseInt(fd.role_id),
               assigned_by: currentUser?.id,
               is_active: true
             });
@@ -172,9 +187,9 @@ export const UserDialogEnhanced: React.FC<UserDialogProps> = ({
           // Log via secure RPC only if authenticated
           if (currentUser?.id) {
             await audit(supabase, 'user.create', 'user', signUpData.user.id, {
-              email: formData.email,
-              role_id: formData.role_id,
-              department: formData.department
+              email: fd.email,
+              role_id: fd.role_id,
+              department: fd.department
             });
           }
         }
@@ -183,7 +198,7 @@ export const UserDialogEnhanced: React.FC<UserDialogProps> = ({
       // Success - reload and close
       onUserSaved();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving user:', error);
       throw error; // Let the form handle the error display
     }
@@ -206,10 +221,10 @@ export const UserDialogEnhanced: React.FC<UserDialogProps> = ({
       isMaximized={panelState.isMaximized}
       isDocked={panelState.isDocked}
       dockPosition={panelState.dockPosition || 'right'}
-      onMove={(position: any) => setPanelState(prev => ({ ...prev, position }))}
-      onResize={(size: any) => setPanelState(prev => ({ ...prev, size }))}
+      onMove={(position) => setPanelState(prev => ({ ...prev, position }))}
+      onResize={(size) => setPanelState(prev => ({ ...prev, size }))}
       onMaximize={() => setPanelState(prev => ({ ...prev, isMaximized: !prev.isMaximized }))}
-      onDock={(dockPosition: any) => setPanelState(prev => ({ ...prev, isDocked: true, dockPosition }))}
+      onDock={(dockPosition) => setPanelState(prev => ({ ...prev, isDocked: true, dockPosition }))}
       onResetPosition={() => setPanelState(prev => ({ ...prev, position: { x: 100, y: 100 }, isMaximized: false, isDocked: false }))}
     >
       <UnifiedCRUDForm

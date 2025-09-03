@@ -89,41 +89,54 @@ const generateSubAccountCode = (accounts: AccountLite[], parentId: string | null
   return `${parent.code}-${maxChild + 1}`;
 };
 
-const createAccountAutoFillLogic = (parentAccounts: AccountLite[]) => (formData: any) => {
+type AccountFormData = Partial<AccountLite> & {
+  level_display?: string;
+  account_type_display?: string;
+  is_standard?: boolean;
+  code?: string;
+  name_ar?: string;
+  name_en?: string | null;
+  parent_id?: string | null | '';
+  allow_transactions?: boolean;
+  is_active?: boolean;
+};
+
+const createAccountAutoFillLogic = (parentAccounts: AccountLite[]) => (formData: Record<string, unknown>) => {
+  const fd = formData as AccountFormData;
   const auto: Partial<AccountLite & { level_display?: string; name_en?: string; name_ar?: string; code?: string; allow_transactions?: boolean }> = {};
 
   // Parent-driven level (authoritative)
-  if (formData.parent_id && formData.parent_id !== '') {
-    const parent = parentAccounts.find(a => a.id === formData.parent_id);
+  if (fd.parent_id && fd.parent_id !== '') {
+    const parent = parentAccounts.find(a => a.id === fd.parent_id);
     if (parent) {
       auto.level = parent.level + 1;
-      if (formData.allow_transactions === undefined) {
+      if (fd.allow_transactions === undefined) {
         auto.allow_transactions = (auto.level || 1) >= 3;
       }
       auto.level_display = `المستوى ${auto.level} - ${getLevelDescription(auto.level || 1)}`;
 
-      if (!formData.code || formData.code === '') {
-        const suggested = generateSubAccountCode(parentAccounts, formData.parent_id);
+      if (!fd.code || fd.code === '') {
+        const suggested = generateSubAccountCode(parentAccounts, fd.parent_id as string);
         auto.code = suggested;
       }
 
       auto.account_type = parent.account_type;
       auto.statement_type = parent.statement_type;
-      if (!formData.name_ar || formData.name_ar === '') auto.name_ar = `حساب فرعي جديد لـ ${parent.name_ar}`;
-      if (!formData.name_en || formData.name_en === '') auto.name_en = `New Sub-account for ${parent.name_en || parent.name_ar}`;
+      if (!fd.name_ar || fd.name_ar === '') auto.name_ar = `حساب فرعي جديد لـ ${parent.name_ar}`;
+      if (!fd.name_en || fd.name_en === '') auto.name_en = `New Sub-account for ${parent.name_en || parent.name_ar}`;
     }
-  } else if (formData.code) {
+  } else if (fd.code) {
     // Root-level only: if no parent selected, derive a display-only level from code formatting (optional)
-    const lvl = calculateLevelFromCode(formData.code);
+    const lvl = calculateLevelFromCode(fd.code);
     auto.level = Math.min(lvl, 4);
-    if (formData.allow_transactions === undefined) {
+    if (fd.allow_transactions === undefined) {
       auto.allow_transactions = (auto.level || 1) >= 3;
     }
     auto.level_display = `المستوى ${auto.level} - ${getLevelDescription(auto.level || 1)}`;
   }
 
-  if (formData.is_active === undefined) auto.is_active = true;
-  return auto;
+  if (fd.is_active === undefined) auto.is_active = true;
+  return auto as Record<string, unknown>;
 };
 
 export const createAccountFormConfig = (
@@ -135,8 +148,8 @@ export const createAccountFormConfig = (
 ): FormConfig => {
 
   const fields: FormField[] = [
-    { id: 'code', type: 'text', label: 'كود الحساب', placeholder: 'مثال: 1-1 أو 1100', required: true, icon: <Hash size={16} />, validation: validateAccountCode, helpText: 'كود فريد للحساب. في حال اختيار حساب أب، المستوى يُحدد من الأب تلقائياً. يسمح بالتقسيم 5-1 أو أكواد رقمية مثل 1100', autoComplete: 'off' },
-    { id: 'name_ar', type: 'text', label: 'اسم الحساب بالعربية', placeholder: 'اسم الحساب باللغة العربية', required: true, icon: <FileText size={16} />, validation: validateArabicName, helpText: 'اسم الحساب الرئيسي باللغة العربية' },
+    { id: 'code', type: 'text', label: 'كود الحساب', placeholder: 'مثال: 1-1 أو 1100', required: true, icon: <Hash size={16} />, validation: (value: unknown) => validateAccountCode(String(value ?? '')), helpText: 'كود فريد للحساب. في حال اختيار حساب أب، المستوى يُحدد من الأب تلقائياً. يسمح بالتقسيم 5-1 أو أكواد رقمية مثل 1100', autoComplete: 'off' },
+    { id: 'name_ar', type: 'text', label: 'اسم الحساب بالعربية', placeholder: 'اسم الحساب باللغة العربية', required: true, icon: <FileText size={16} />, validation: (value: unknown) => validateArabicName(String(value ?? '')), helpText: 'اسم الحساب الرئيسي باللغة العربية' },
     { id: 'name_en', type: 'text', label: 'اسم الحساب بالإنجليزية', placeholder: 'Account name in English (optional)', icon: <Globe size={16} />, helpText: 'اسم الحساب بالإنجليزية (اختياري)' },
     // Show the editable selector ONLY when there is no parent selected
     { id: 'account_type', type: 'select', label: 'نوع الحساب', required: true, icon: <BarChart3 size={16} />, options: [
@@ -193,7 +206,7 @@ export const createAccountFormConfig = (
       }
       if (!formData.parent_id && formData.code) {
         // Fallback for root-only items when no parent selected
-        const byCode = calculateLevelFromCode(formData.code || '');
+        const byCode = calculateLevelFromCode(String(formData.code || ''));
         if (byCode > 0) lvl = Math.min(byCode, 4);
       }
       formData.level = lvl;
@@ -217,18 +230,19 @@ export const createAccountFormConfig = (
     fields,
     submitLabel: isEditing ? '💾 حفظ التعديلات' : '✨ إنشاء الحساب',
     cancelLabel: '❌ إلغاء',
-    customValidator: (data: any): ValidationResult => {
+    customValidator: (data: Record<string, unknown>): ValidationResult => {
+      const d = data as AccountFormData;
       const errors: ValidationError[] = [];
       // Normalize level from selected parent first
-      if (data.parent_id) {
-        const parent = parentAccounts.find(a => a.id === data.parent_id);
-        if (parent) data.level = parent.level + 1; else data.level = 1;
+      if (d.parent_id) {
+        const parent = parentAccounts.find(a => a.id === d.parent_id);
+        if (parent) d.level = parent.level + 1; else d.level = 1;
       } else {
-        data.level = 1;
+        d.level = 1;
       }
       // Allow both hyphenated (5-1) and compact (1100) codes
-      if (data.code && !isValidAccountCode(data.code)) errors.push({ field: 'code', message: 'كود الحساب غير صحيح' });
-      if (!data.name_ar) errors.push({ field: 'name_ar', message: 'اسم الحساب بالعربية مطلوب' });
+      if (d.code && !isValidAccountCode(d.code)) errors.push({ field: 'code', message: 'كود الحساب غير صحيح' });
+      if (!d.name_ar) errors.push({ field: 'name_ar', message: 'اسم الحساب بالعربية مطلوب' });
       // Do not override allow_transactions here; respect user choice and DB value
       return { isValid: errors.length === 0, errors };
     },

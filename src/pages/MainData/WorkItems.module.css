@@ -1,0 +1,81 @@
+/* Full-screen Work Items page styles (no inline styles) */
+.container {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 64px); /* within DashboardLayout content area */
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: var(--header-bg, transparent);
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.checkboxRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.select,
+.input,
+.button {
+  height: 36px;
+}
+
+.content {
+  flex: 1;
+  padding: 16px 24px;
+}
+
+.card {
+  background: var(--card-bg, transparent);
+  border-radius: 12px;
+}
+
+.cardBody {
+  padding: 16px;
+}
+
+.tableContainer {
+  border: 1px solid var(--border-color, #e2e6ed);
+  border-radius: 12px;
+  background: var(--surface-bg, #fff);
+  overflow: hidden;
+}
+
+.controlsRow {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+}
+
+ .spacer {
+  flex: 1;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.errorText {
+  color: var(--error);
+  font-size: 0.85rem;
+  padding: 2px 0 8px;
+}
+

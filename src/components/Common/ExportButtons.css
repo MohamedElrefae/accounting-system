@@ -148,6 +148,20 @@
   border-color: #0e7490;
 }
 
+.export-btn-customized-pdf {
+  border-color: #7c2d12;
+  color: #7c2d12;
+  font-weight: 600;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+}
+
+.export-btn-customized-pdf:hover:not(:disabled) {
+  background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%);
+  border-color: #92400e;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(124, 45, 18, 0.2);
+}
+
 /* Icon and Label Styles */
 .export-icon {
   font-size: 1.25em;

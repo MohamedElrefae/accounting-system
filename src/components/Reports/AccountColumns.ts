@@ -2,7 +2,7 @@
 // Keeping in one place to maintain perfect alignment.
 
 export type ExplorerMode = 'asof' | 'range'
-export interface ColumnOpts { withTxnCount?: boolean }
+export interface ColumnOpts { withTxnCount?: boolean; periodOnly?: boolean }
 
 // Fixed widths used across both views
 export const COL_WIDTHS = {
@@ -19,13 +19,15 @@ export const COL_WIDTHS = {
   periodCredits: '140px',
   closingDebit: '140px',
   closingCredit: '140px',
+  periodNet: '140px',
+  finalNet: '140px',
   txCount: '120px',
   actions: '180px',
 } as const
 
 export function gridColumnsForMode(mode: ExplorerMode, opts: ColumnOpts = {}): string {
   if (mode === 'range') {
-    return [
+    const cols = [
       COL_WIDTHS.expander,
       COL_WIDTHS.status,
       COL_WIDTHS.spacer,
@@ -34,12 +36,21 @@ export function gridColumnsForMode(mode: ExplorerMode, opts: ColumnOpts = {}): s
       COL_WIDTHS.type,
       COL_WIDTHS.level,
       ...(opts.withTxnCount ? [COL_WIDTHS.txCount] : [] as string[]),
-      COL_WIDTHS.openingDebit,
-      COL_WIDTHS.openingCredit,
+    ]
+    if (!opts.periodOnly) {
+      cols.push(COL_WIDTHS.openingDebit, COL_WIDTHS.openingCredit)
+    }
+    // Always include period and final columns in range mode
+    cols.push(
       COL_WIDTHS.periodDebits,
       COL_WIDTHS.periodCredits,
-      COL_WIDTHS.actions,
-    ].join(' ')
+      COL_WIDTHS.closingDebit,
+      COL_WIDTHS.closingCredit,
+      COL_WIDTHS.periodNet,
+      COL_WIDTHS.finalNet,
+    )
+    cols.push(COL_WIDTHS.actions)
+    return cols.join(' ')
   }
   // asof
   return [
@@ -53,6 +64,7 @@ export function gridColumnsForMode(mode: ExplorerMode, opts: ColumnOpts = {}): s
     ...(opts.withTxnCount ? [COL_WIDTHS.txCount] : [] as string[]),
     COL_WIDTHS.closingDebit,
     COL_WIDTHS.closingCredit,
+    COL_WIDTHS.finalNet,
     COL_WIDTHS.actions,
   ].join(' ')
 }
@@ -65,10 +77,13 @@ export function tableColWidths(mode: ExplorerMode, opts: ColumnOpts = {}): strin
       COL_WIDTHS.type,
       COL_WIDTHS.level,
       ...(opts.withTxnCount ? [COL_WIDTHS.txCount] : [] as string[]),
-      COL_WIDTHS.openingDebit,
-      COL_WIDTHS.openingCredit,
+      ...(opts.periodOnly ? [] : [COL_WIDTHS.openingDebit, COL_WIDTHS.openingCredit]),
       COL_WIDTHS.periodDebits,
       COL_WIDTHS.periodCredits,
+      COL_WIDTHS.closingDebit,
+      COL_WIDTHS.closingCredit,
+      COL_WIDTHS.periodNet,
+      COL_WIDTHS.finalNet,
       COL_WIDTHS.actions,
     ]
   }
@@ -80,6 +95,7 @@ export function tableColWidths(mode: ExplorerMode, opts: ColumnOpts = {}): strin
     ...(opts.withTxnCount ? [COL_WIDTHS.txCount] : [] as string[]),
     COL_WIDTHS.closingDebit,
     COL_WIDTHS.closingCredit,
+    COL_WIDTHS.finalNet,
     COL_WIDTHS.actions,
   ]
 }

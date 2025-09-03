@@ -24,6 +24,7 @@ export interface UniversalExportOptions {
   subtitle?: string;
   format: 'pdf' | 'excel' | 'csv' | 'html' | 'json';
   orientation?: 'portrait' | 'landscape';
+  pageSize?: 'A4' | 'A3' | 'Letter';
   includeHeader?: boolean;
   includeFooter?: boolean;
   fontSize?: number;
@@ -227,16 +228,20 @@ export class UniversalExportManager {
    */
   private async exportToPDF(data: UniversalTableData, options: UniversalExportOptions): Promise<void> {
     try {
-      // Generate HTML content
-      const html = this.generateHTML(data, options);
+      // Generate HTML content with full customization support
+      const html = this.generateCustomizedHTML(data, options);
       
       // Create a hidden iframe for printing
       const iframe = document.createElement('iframe');
       iframe.style.position = 'absolute';
       iframe.style.top = '-10000px';
       iframe.style.left = '-10000px';
-      iframe.style.width = '210mm';  // A4 width
-      iframe.style.height = '297mm'; // A4 height
+      
+      // Set iframe dimensions based on page settings
+      const { width, height } = this.getPageDimensions(options);
+      iframe.style.width = width;
+      iframe.style.height = height;
+      
       document.body.appendChild(iframe);
       
       // Write HTML content to iframe
@@ -259,11 +264,15 @@ export class UniversalExportManager {
             
             // Clean up after a delay
             setTimeout(() => {
-              document.body.removeChild(iframe);
+              if (document.body.contains(iframe)) {
+                document.body.removeChild(iframe);
+              }
             }, 1000);
           } catch (error) {
             console.error('Print failed:', error);
-            document.body.removeChild(iframe);
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
           }
         }, 500);
       };
@@ -484,11 +493,13 @@ export class UniversalExportManager {
   }
 
   /**
-   * Generate HTML for export
+   * Generate customized HTML for export with full settings support
    */
-  private generateHTML(data: UniversalTableData, options: UniversalExportOptions): string {
+  private generateCustomizedHTML(data: UniversalTableData, options: UniversalExportOptions): string {
     const rtlDir = options.rtlLayout !== false ? 'rtl' : 'ltr';
     const lang = options.rtlLayout !== false ? 'ar' : 'en';
+    const fontSize = options.fontSize || 12;
+    const margins = options.margins || { top: 20, right: 20, bottom: 20, left: 20 };
     
     return `
 <!DOCTYPE html>
@@ -498,76 +509,128 @@ export class UniversalExportManager {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${options.title}</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        @page {
+            size: ${options.orientation === 'landscape' ? 'landscape' : 'portrait'};
+            margin: ${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm;
+        }
         
         body {
-            font-family: 'Noto Sans Arabic', Arial, sans-serif;
+            font-family: ${rtlDir === 'rtl' ? "'Noto Sans Arabic', Arial, sans-serif" : "'Roboto', Arial, sans-serif"};
             direction: ${rtlDir};
-            margin: 20px;
             background: white;
             color: #333;
+            font-size: ${fontSize}px;
+            line-height: 1.4;
         }
         
         .export-container {
-            max-width: 1200px;
+            width: 100%;
             margin: 0 auto;
         }
         
         .export-header {
             text-align: center;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 2px solid #333;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #2c3e50;
         }
         
         .export-title {
-            font-size: 24px;
+            font-size: ${Math.round(fontSize * 1.8)}px;
             font-weight: 700;
             color: #2c3e50;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
         
         .export-subtitle {
-            font-size: 16px;
+            font-size: ${Math.round(fontSize * 1.2)}px;
             color: #7f8c8d;
         }
         
         .export-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
+            margin: 15px 0;
+            font-size: ${fontSize}px;
         }
         
         .export-table th,
         .export-table td {
             border: 1px solid #ddd;
-            padding: 12px;
+            padding: ${Math.max(8, fontSize * 0.8)}px;
             text-align: ${rtlDir === 'rtl' ? 'right' : 'left'};
             direction: ${rtlDir};
+            vertical-align: top;
         }
         
         .export-table th {
             background-color: #f8f9fa;
             font-weight: 600;
             color: #2c3e50;
+            font-size: ${Math.round(fontSize * 0.9)}px;
         }
         
         .export-table tr:nth-child(even) {
-            background-color: #f9f9f9;
+            background-color: #fdfdfd;
+        }
+        
+        .export-table tr:hover {
+            background-color: #f5f5f5;
         }
         
         .export-footer {
-            margin-top: 30px;
+            margin-top: 20px;
             text-align: center;
-            font-size: 14px;
+            font-size: ${Math.round(fontSize * 0.85)}px;
             color: #7f8c8d;
             border-top: 1px solid #ddd;
-            padding-top: 20px;
+            padding-top: 15px;
         }
         
+        /* Currency and number alignment */
+        .export-table td.number,
+        .export-table td.currency {
+            text-align: ${rtlDir === 'rtl' ? 'left' : 'right'};
+            font-family: 'Roboto', Arial, sans-serif;
+        }
+        
+        /* Print-specific styles */
         @media print {
-            body { margin: 0; }
-            .export-container { max-width: none; }
+            body {
+                margin: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            
+            .export-container {
+                max-width: none;
+                width: 100%;
+            }
+            
+            .export-table {
+                page-break-inside: avoid;
+            }
+            
+            .export-table thead {
+                display: table-header-group;
+            }
+            
+            .export-table tbody {
+                display: table-row-group;
+            }
+            
+            .export-table tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
         }
     </style>
 </head>
@@ -589,7 +652,11 @@ export class UniversalExportManager {
             <tbody>
                 ${data.rows.map(row => `
                 <tr>
-                    ${data.columns.map(col => `<td>${row[col.key] || ''}</td>`).join('')}
+                    ${data.columns.map(col => {
+                      const value = row[col.key] || '';
+                      const cellClass = col.type === 'currency' || col.type === 'number' ? ` class="${col.type}"` : '';
+                      return `<td${cellClass}>${this.formatValueForHTML(value, col, options)}</td>`;
+                    }).join('')}
                 </tr>
                 `).join('')}
             </tbody>
@@ -597,12 +664,101 @@ export class UniversalExportManager {
         
         ${options.includeFooter !== false ? `
         <div class="export-footer">
-            <p>تم إنشاء هذا التقرير في ${new Date().toLocaleDateString('ar-EG')}</p>
+            <p>تم إنشاء هذا التقرير في ${this.formatDateForLocale(new Date(), options)}</p>
         </div>
         ` : ''}
     </div>
 </body>
 </html>`;
+  }
+  
+  /**
+   * Get page dimensions based on settings
+   */
+  private getPageDimensions(options: UniversalExportOptions): { width: string; height: string } {
+    const isLandscape = options.orientation === 'landscape';
+    
+    // Default to A4 if not specified
+    let width: string, height: string;
+    
+    switch (options.pageSize || 'A4') {
+      case 'A3':
+        width = isLandscape ? '420mm' : '297mm';
+        height = isLandscape ? '297mm' : '420mm';
+        break;
+      case 'Letter':
+        width = isLandscape ? '279mm' : '216mm';
+        height = isLandscape ? '216mm' : '279mm';
+        break;
+      case 'A4':
+      default:
+        width = isLandscape ? '297mm' : '210mm';
+        height = isLandscape ? '210mm' : '297mm';
+        break;
+    }
+    
+    return { width, height };
+  }
+  
+  /**
+   * Format value for HTML display with proper localization
+   */
+  private formatValueForHTML(value: any, column: UniversalTableColumn, options: UniversalExportOptions): string {
+    if (value === null || value === undefined || value === '') return '—';
+    
+    const useArabicNumerals = options.useArabicNumerals !== false;
+    
+    switch (column.type) {
+      case 'currency':
+        const currencyValue = Number(value) || 0;
+        let formatted = currencyValue.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
+        if (useArabicNumerals) {
+          formatted = this.arabicEngine.convertNumerals(formatted, true);
+        }
+        return formatted;
+        
+      case 'number':
+        const numberValue = Number(value) || 0;
+        let numFormatted = numberValue.toLocaleString('en-US');
+        if (useArabicNumerals) {
+          numFormatted = this.arabicEngine.convertNumerals(numFormatted, true);
+        }
+        return numFormatted;
+        
+      case 'date':
+        return this.formatDateForLocale(new Date(value), options);
+        
+      case 'percentage':
+        const percentValue = `${(Number(value) * 100).toFixed(2)}%`;
+        return useArabicNumerals ? this.arabicEngine.convertNumerals(percentValue, true) : percentValue;
+        
+      case 'boolean':
+        return value ? 'نعم' : 'لا';
+        
+      default:
+        return String(value);
+    }
+  }
+  
+  /**
+   * Format date for locale
+   */
+  private formatDateForLocale(date: Date, options: UniversalExportOptions): string {
+    if (options.rtlLayout !== false) {
+      return date.toLocaleDateString('ar-EG');
+    } else {
+      return date.toLocaleDateString('en-US');
+    }
+  }
+  
+  /**
+   * Generate HTML for export (legacy method for compatibility)
+   */
+  private generateHTML(data: UniversalTableData, options: UniversalExportOptions): string {
+    return this.generateCustomizedHTML(data, options);
   }
 
 

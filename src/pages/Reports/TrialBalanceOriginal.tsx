@@ -20,7 +20,7 @@ import ExpandMore from '@mui/icons-material/ExpandMore'
 import ExpandLess from '@mui/icons-material/ExpandLess'
 import UnfoldMore from '@mui/icons-material/UnfoldMore'
 import UnfoldLess from '@mui/icons-material/UnfoldLess'
-import { fetchTransactionsDateRange } from '../../services/reports/account-explorer'
+import { fetchTransactionsDateRange } from '../../services/reports/common';
 
 interface TBRow {
   account_id: string

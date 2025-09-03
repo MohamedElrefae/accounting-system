@@ -7,7 +7,7 @@ import './StandardFinancialStatements.css'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import { getCompanyConfig } from '../../services/company-config'
-import { fetchTransactionsDateRange } from '../../services/reports/account-explorer'
+import { fetchTransactionsDateRange } from '../../services/reports/common';
 import { fetchProfitLossReport, type PLFilters, type PLRow, type PLSummary } from '../../services/reports/profit-loss'
 import Visibility from '@mui/icons-material/Visibility'
 import VisibilityOff from '@mui/icons-material/VisibilityOff'

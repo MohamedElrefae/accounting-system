@@ -25,7 +25,8 @@ const OrganizationSettings: React.FC = () => {
     date_format: 'YYYY-MM-DD',
     number_format: 'ar-SA',
     default_org_id: '',
-    default_project_id: ''
+    default_project_id: '',
+    shortcutsJSON: '[]'
   });
 
   const { showToast } = useToast();
@@ -54,7 +55,8 @@ const OrganizationSettings: React.FC = () => {
         date_format: currentConfig.date_format,
         number_format: currentConfig.number_format,
         default_org_id: currentConfig.default_org_id || '',
-        default_project_id: currentConfig.default_project_id || ''
+        default_project_id: currentConfig.default_project_id || '',
+        shortcutsJSON: JSON.stringify((currentConfig as any).shortcuts || [], null, 2)
       });
     } catch (e) {
       showToast('فشل تحميل إعدادات المؤسسة', { severity: 'error' });
@@ -68,7 +70,18 @@ const OrganizationSettings: React.FC = () => {
     if (!config) return;
     setSaving(true);
     try {
-      await updateCompanyConfig(formData);
+      // Parse shortcuts JSON (optional)
+      let parsedShortcuts: any = [];
+      try {
+        parsedShortcuts = JSON.parse(formData.shortcutsJSON || '[]');
+        if (!Array.isArray(parsedShortcuts)) throw new Error('Shortcuts must be an array');
+      } catch (err) {
+        showToast('صيغة الاختصارات غير صحيحة. يجب إدخال مصفوفة JSON.', { severity: 'error' });
+        setSaving(false);
+        return;
+      }
+
+      await updateCompanyConfig({ ...formData, shortcuts: parsedShortcuts } as any);
       clearDateFormatCache();
       showToast('تم حفظ الإعدادات بنجاح', { severity: 'success' });
       await loadConfig();
@@ -207,6 +220,28 @@ const OrganizationSettings: React.FC = () => {
             </div>
           </div>
         </div>
+
+            {/* Dashboard Shortcuts */}
+            <div className={styles.section}>
+              <div className={styles.sectionHeader}><Settings size={18} /><h2>اختصارات لوحة التحكم</h2></div>
+              <div className={styles.formGrid}>
+                <div className={styles.formField} style={{ gridColumn: '1 / -1' }}>
+                  <label htmlFor="shortcutsJSON">قائمة الاختصارات (JSON)</label>
+                  <textarea
+                    id="shortcutsJSON"
+                    value={formData.shortcutsJSON}
+                    onChange={e=>setFormData(p=>({...p,shortcutsJSON:e.target.value}))}
+                    placeholder='[
+  { "label": "Accounts Tree", "path": "/main-data/accounts-tree", "icon": "AccountTree", "accessKey": "A" },
+  { "label": "All Transactions", "path": "/transactions/all", "icon": "ReceiptLong", "accessKey": "T" }
+]'
+                    rows={8}
+                    style={{ width: '100%', fontFamily: 'monospace' }}
+                  />
+                  <small>أدخل مصفوفة من العناصر: label, path, icon (اختياري), accessKey (اختياري)</small>
+                </div>
+              </div>
+            </div>
 
             <div className={styles.section}>
               <div className={styles.sectionHeader}><FolderOpen size={18} /><h2>الإعدادات الافتراضية للمؤسسة والمشاريع</h2></div>

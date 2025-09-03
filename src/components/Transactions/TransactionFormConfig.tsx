@@ -1,8 +1,12 @@
-import { Hash, FileText, Calendar, DollarSign, Receipt, MessageSquare, Building2, FolderOpen, Tag } from 'lucide-react';
+import { Hash, FileText, Calendar, DollarSign, Receipt, MessageSquare, Building2, FolderOpen, Tag, Layers } from 'lucide-react';
 import type { FormConfig, FormField } from '../Common/UnifiedCRUDForm';
 import type { Account, TransactionRecord, Project } from '../../services/transactions';
 import type { Organization } from '../../types';
 import type { TransactionClassification } from '../../services/transaction-classification';
+import type { ExpensesCategoryRow } from '../../types/expenses-categories';
+import type { WorkItemRow } from '../../types/work-items';
+import { toWorkItemOptions } from '../../services/work-items';
+import type { SearchableSelectOption } from '../Common/SearchableSelect';
 
 import { getCurrentDate, DATE_FORMATS } from '../../utils/dateHelpers';
 
@@ -78,12 +82,20 @@ const validateDate = (date: string): ValidationError | null => {
 };
 
 // Auto-fill logic
-const createTransactionAutoFillLogic = (accounts: Account[]) => (formData: any) => {
-  const auto: Partial<any> = {};
+const createTransactionAutoFillLogic = (accounts: Account[]) => (formData: Record<string, unknown>) => {
+  type TransactionFormData = {
+    description?: string;
+    reference_number?: string;
+    debit_account_id?: string;
+    credit_account_id?: string;
+    notes?: string;
+  };
+  const fd = formData as TransactionFormData;
+  const auto: Record<string, unknown> = {};
   
   // Auto-fill reference number based on description if empty
-  if (formData.description && !formData.reference_number) {
-    const desc = formData.description.trim();
+  if (fd.description && !fd.reference_number) {
+    const desc = fd.description.trim();
     if (desc.includes('فاتورة') || desc.includes('invoice')) {
       auto.reference_number = `INV-${Date.now()}`;
     } else if (desc.includes('دفع') || desc.includes('payment')) {
@@ -94,9 +106,9 @@ const createTransactionAutoFillLogic = (accounts: Account[]) => (formData: any) 
   }
   
   // Auto-suggest notes based on selected accounts
-  if (formData.debit_account_id && formData.credit_account_id && !formData.notes) {
-    const debitAccount = accounts.find(a => a.id === formData.debit_account_id);
-    const creditAccount = accounts.find(a => a.id === formData.credit_account_id);
+  if (fd.debit_account_id && fd.credit_account_id && !fd.notes) {
+    const debitAccount = accounts.find(a => a.id === fd.debit_account_id);
+    const creditAccount = accounts.find(a => a.id === fd.credit_account_id);
     
     if (debitAccount && creditAccount) {
       auto.notes = `تحويل من ${creditAccount.name} إلى ${debitAccount.name}`;
@@ -113,7 +125,10 @@ export const createTransactionFormConfig = (
   projects: Project[] = [],
   organizations: Organization[] = [],
   classifications: TransactionClassification[] = [],
-  existingTransaction?: TransactionRecord | null
+  existingTransaction?: TransactionRecord | null,
+  expensesCategories: ExpensesCategoryRow[] = [],
+  workItems: WorkItemRow[] = [],
+  costCenters: Array<{ id: string; code: string; name: string; name_ar?: string | null; project_id?: string | null; level: number }> = []
 ): FormConfig => {
   
   // Build hierarchical (level-based) options with real tree nodes and level headers
@@ -143,7 +158,7 @@ export const createTransactionFormConfig = (
     }
   };
 
-  const makeNode = (acc: Account): any => {
+  const makeNode = (acc: Account): SearchableSelectOption => {
     const children = (byParent[acc.id] || []).map(makeNode);
     return {
       value: acc.id,
@@ -163,7 +178,8 @@ export const createTransactionFormConfig = (
     if (!byLevel[lvl]) byLevel[lvl] = [];
     byLevel[lvl].push(a);
   }
-  const allAccountOptions: any[] = [];
+  // Hierarchical options for drilldown modal (grouped by level with tree children)
+  const allAccountOptions: SearchableSelectOption[] = [];
   for (const lvl of [1, 2, 3, 4]) {
     const list = byLevel[lvl] || [];
     if (list.length === 0) continue;
@@ -176,6 +192,17 @@ export const createTransactionFormConfig = (
       children: list.map(makeNode)
     });
   }
+
+  // Flat options for dropdown (postable only, no collapse/expand headers)
+  const flatPostableOptions: SearchableSelectOption[] = accounts
+    .filter(a => a.is_postable)
+    .sort((x, y) => x.code.localeCompare(y.code))
+    .map(a => ({
+      value: a.id,
+      label: `${a.code} - ${a.name}`,
+      searchText: `${a.code} ${a.name}`.toLowerCase(),
+      disabled: false,
+    }));
 
   // Convert projects to select options
   const projectOptions = projects.map(project => ({
@@ -197,8 +224,42 @@ export const createTransactionFormConfig = (
     label: `${classification.code} - ${classification.name}`,
     searchText: `${classification.code} ${classification.name}`.toLowerCase()
   }));
+
+  // Build expenses categories options by linked account for fast filtering
+  // Leaf-only, active categories
+  const activeCategories = (expensesCategories || []).filter(ec => ec.is_active !== false && (ec.child_count == null || ec.child_count === 0));
+  const optionsByAccount: Record<string, { value: string; label: string; searchText?: string }[]> = {};
+  for (const ec of activeCategories) {
+    if (!ec.linked_account_id) continue;
+    const list = optionsByAccount[ec.linked_account_id] || [];
+    list.push({ value: ec.id, label: `${ec.code} - ${ec.description}`, searchText: `${ec.code} ${ec.description}`.toLowerCase() });
+    optionsByAccount[ec.linked_account_id] = list;
+  }
+  // Helper to build union options for selected debit/credit accounts
+  const getCategoryOptionsForSelection = (form: Record<string, unknown>) => {
+    const debitId = (form as { debit_account_id?: string })?.debit_account_id || '';
+    const creditId = (form as { credit_account_id?: string })?.credit_account_id || '';
+    const res: SearchableSelectOption[] = [];
+    const seen = new Set<string>();
+    const pushAll = (arr?: { value: string; label: string; searchText?: string }[]) => {
+      for (const o of arr || []) { if (!seen.has(o.value)) { seen.add(o.value); res.push(o); } }
+    };
+    if (debitId) pushAll(optionsByAccount[debitId]);
+    if (creditId) pushAll(optionsByAccount[creditId]);
+    // Optional: sort by label for stable UX
+    res.sort((a, b) => a.label.localeCompare(b.label));
+    return res;
+  };
   
-  // Defaults can be applied in future if needed (kept intentionally minimal to avoid unused variables)
+
+  const workItemOptions = toWorkItemOptions(workItems);
+
+  // Convert cost centers to select options
+  const costCenterOptions = costCenters.map(cc => ({
+    value: cc.id,
+    label: `${cc.code} - ${cc.name}${cc.project_id ? ' (مشروع محدد)' : ''}`,
+    searchText: `${cc.code} ${cc.name} ${cc.name_ar || ''}`.toLowerCase()
+  }));
 
   const fields: FormField[] = [
     {
@@ -209,7 +270,7 @@ export const createTransactionFormConfig = (
       required: false,
       disabled: true, // Auto-generated
       icon: <Hash size={16} />,
-      validation: isEditing ? validateEntryNumber : undefined, // Only validate when editing
+      validation: isEditing ? ((value: unknown) => validateEntryNumber(String(value ?? ''))) : undefined, // Only validate when editing
       helpText: isEditing ? 'رقم القيد (لا يمكن تغييره)' : 'رقم القيد سيتم توليده تلقائياً عند الحفظ',
       colSpan: 1,
       position: { row: 1, col: 1 }
@@ -221,7 +282,7 @@ export const createTransactionFormConfig = (
       required: true,
       defaultValue: getCurrentDate(DATE_FORMATS.ISO), // Default to today in ISO format for HTML date input
       icon: <Calendar size={16} />,
-      validation: validateDate,
+      validation: (value: unknown) => validateDate(String(value ?? '')),
       helpText: 'تاريخ إجراء المعاملة',
       colSpan: 1,
       position: { row: 1, col: 2 }
@@ -233,22 +294,23 @@ export const createTransactionFormConfig = (
       placeholder: 'اكتب وصفاً واضحاً للمعاملة...',
       required: true,
       icon: <FileText size={16} />,
-      validation: validateDescription,
+      validation: (value: unknown) => validateDescription(String(value ?? '')),
       helpText: 'وصف مفصل يوضح طبيعة المعاملة',
       colSpan: 1,
       position: { row: 2, col: 1 }
     },
     {
       id: 'debit_account_id',
-      type: 'searchable-select' as any,
+      type: 'searchable-select',
       label: 'الحساب المدين',
       required: true,
-      options: [{ value: '', label: 'اختر الحساب المدين...', searchText: '' }, ...allAccountOptions],
+      options: [{ value: '', label: 'اختر الحساب المدين...', searchText: '' }, ...flatPostableOptions],
       icon: <Building2 size={16} />,
-      validation: (value: string) => {
-        const base = validateAccountSelection(value, 'debit_account_id', 'الحساب المدين');
+      validation: (value: unknown) => {
+        const val = String(value ?? '');
+        const base = validateAccountSelection(val, 'debit_account_id', 'الحساب المدين');
         if (base) return base;
-        const selected = accounts.find(a => a.id === value);
+        const selected = accounts.find(a => a.id === val);
         if (selected && !selected.is_postable) {
           return { field: 'debit_account_id', message: 'هذا الحساب غير قابل للترحيل — اختر حساباً تفصيلياً' };
         }
@@ -258,20 +320,23 @@ export const createTransactionFormConfig = (
       searchable: true,
       clearable: true,
       placeholder: 'ابحث عن الحساب المدين...',
+      // Provide hierarchical options for drilldown modal
+      drilldownOptions: allAccountOptions,
       colSpan: 1,
       position: { row: 3, col: 1 }
     },
     {
       id: 'credit_account_id',
-      type: 'searchable-select' as any,
+      type: 'searchable-select',
       label: 'الحساب الدائن',
       required: true,
-      options: [{ value: '', label: 'اختر الحساب الدائن...', searchText: '' }, ...allAccountOptions],
+      options: [{ value: '', label: 'اختر الحساب الدائن...', searchText: '' }, ...flatPostableOptions],
       icon: <Building2 size={16} />,
-      validation: (value: string) => {
-        const base = validateAccountSelection(value, 'credit_account_id', 'الحساب الدائن');
+      validation: (value: unknown) => {
+        const val = String(value ?? '');
+        const base = validateAccountSelection(val, 'credit_account_id', 'الحساب الدائن');
         if (base) return base;
-        const selected = accounts.find(a => a.id === value);
+        const selected = accounts.find(a => a.id === val);
         if (selected && !selected.is_postable) {
           return { field: 'credit_account_id', message: 'هذا الحساب غير قابل للترحيل — اختر حساباً تفصيلياً' };
         }
@@ -281,6 +346,8 @@ export const createTransactionFormConfig = (
       searchable: true,
       clearable: true,
       placeholder: 'ابحث عن الحساب الدائن...',
+      // Provide hierarchical options for drilldown modal
+      drilldownOptions: allAccountOptions,
       colSpan: 1,
       position: { row: 3, col: 2 }
     },
@@ -293,7 +360,7 @@ export const createTransactionFormConfig = (
       min: 0.01,
       step: 0.01,
       icon: <DollarSign size={16} />,
-      validation: validateAmount,
+      validation: (value: unknown) => validateAmount(Number(value ?? 0)),
       helpText: 'مبلغ المعاملة بالريال السعودي',
       colSpan: 1,
       position: { row: 4, col: 1 }
@@ -311,7 +378,7 @@ export const createTransactionFormConfig = (
     },
     {
       id: 'organization_id',
-      type: 'searchable-select' as any,
+      type: 'searchable-select',
       label: 'المؤسسة',
       required: false,
       options: [{ value: '', label: 'بدون مؤسسة', searchText: '' }, ...organizationOptions],
@@ -325,7 +392,7 @@ export const createTransactionFormConfig = (
     },
     {
       id: 'project_id',
-      type: 'searchable-select' as any,
+      type: 'searchable-select',
       label: 'المشروع',
       required: false,
       options: [{ value: '', label: 'بدون مشروع', searchText: '' }, ...projectOptions],
@@ -339,7 +406,7 @@ export const createTransactionFormConfig = (
     },
     {
       id: 'classification_id',
-      type: 'searchable-select' as any,
+      type: 'searchable-select',
       label: 'تصنيف المعاملة',
       required: false,
       options: [{ value: '', label: 'بدون تصنيف', searchText: '' }, ...classificationOptions],
@@ -352,6 +419,52 @@ export const createTransactionFormConfig = (
       position: { row: 6, col: 1 }
     },
     {
+      id: 'cost_center_id',
+      type: 'searchable-select',
+      label: 'مركز التكلفة',
+      required: false,
+      options: costCenterOptions.length > 0 
+        ? [{ value: '', label: 'بدون مركز تكلفة', searchText: '' }, ...costCenterOptions]
+        : [{ value: '', label: 'لا يوجد مراكز تكلفة متاحة', searchText: '' }],
+      icon: <Layers size={16} />,
+      helpText: 'مركز التكلفة (مطلوب عند تصنيفات معينة)',
+      searchable: true,
+      clearable: true,
+      placeholder: costCenterOptions.length > 0 ? 'اختر مركز التكلفة...' : 'لا يوجد مراكز تكلفة',
+      colSpan: 1,
+      position: { row: 6, col: 2 }
+    },
+    {
+      id: 'work_item_id',
+      type: 'searchable-select',
+      label: 'عنصر العمل',
+      required: false,
+      options: [{ value: '', label: 'بدون عنصر', searchText: '' }, ...workItemOptions],
+      icon: <Tag size={16} />,
+      helpText: 'اختياري — اختر عنصر عمل (كتالوج المؤسسة أو مشروع)',
+      searchable: true,
+      clearable: true,
+      placeholder: 'اختر عنصر العمل...',
+      colSpan: 1,
+      position: { row: 7, col: 1 }
+    },
+    {
+      id: 'expenses_category_id',
+      type: 'searchable-select',
+      label: 'فئة المصروفات',
+      required: false,
+      options: [],
+      optionsProvider: (form) => getCategoryOptionsForSelection(form),
+      icon: <Tag size={16} />,
+      helpText: 'يتم تصفية الفئات حسب الحساب المدين/الدائن المحدد',
+      searchable: true,
+      clearable: true,
+      placeholder: 'اختر فئة المصروفات...',
+      dependsOnAny: ['debit_account_id', 'credit_account_id'],
+      colSpan: 1,
+      position: { row: 7, col: 2 }
+    },
+    {
       id: 'notes',
       type: 'text',
       label: 'ملاحظات',
@@ -360,7 +473,7 @@ export const createTransactionFormConfig = (
       icon: <MessageSquare size={16} />,
       helpText: 'أي ملاحظات إضافية حول المعاملة',
       colSpan: 1,
-      position: { row: 6, col: 2 }
+      position: { row: 8, col: 1 }
     }
   ];
 
@@ -386,11 +499,19 @@ export const createTransactionFormConfig = (
     fields,
     submitLabel: isEditing ? '💾 حفظ التعديلات' : '✨ إضافة المعاملة',
     cancelLabel: '❌ إلغاء',
-    customValidator: (data: any) => {
+    customValidator: (data: Record<string, unknown>) => {
       const errors: ValidationError[] = [];
       
       // Cross-field validation: Debit and Credit accounts must be different
-      if (data.debit_account_id && data.credit_account_id && data.debit_account_id === data.credit_account_id) {
+      const fd = data as { 
+        debit_account_id?: string; 
+        credit_account_id?: string; 
+        amount?: string | number; 
+        expenses_category_id?: string;
+        classification_id?: string;
+        cost_center_id?: string;
+      };
+      if (fd.debit_account_id && fd.credit_account_id && fd.debit_account_id === fd.credit_account_id) {
         errors.push({ 
           field: 'credit_account_id', 
           message: 'الحساب المدين والدائن يجب أن يكونا مختلفين' 
@@ -398,12 +519,37 @@ export const createTransactionFormConfig = (
       }
       
       // Amount cross-validation
-      const amount = parseFloat(data.amount);
-      if (isNaN(amount) || amount <= 0) {
+      const amountVal = typeof fd.amount === 'string' ? parseFloat(fd.amount) : Number(fd.amount);
+      if (isNaN(amountVal) || amountVal <= 0) {
         errors.push({ 
           field: 'amount', 
           message: 'يرجى إدخال مبلغ صحيح أكبر من صفر' 
         });
+      }
+
+      // Require expenses category if either side is an expense account (both sides rule)
+      const debit = accounts.find(a => a.id === fd.debit_account_id);
+      const credit = accounts.find(a => a.id === fd.credit_account_id);
+      const isExpense = (acc?: Account) => {
+        const c = (acc?.category || '').toLowerCase();
+        return c === 'expense' || c === 'expenses';
+      };
+      if ((isExpense(debit) || isExpense(credit)) && (!fd.expenses_category_id || String(fd.expenses_category_id).trim() === '')) {
+        errors.push({
+          field: 'expenses_category_id',
+          message: 'فئة المصروف مطلوبة عند اختيار حساب مصروف على أي من الجانبين'
+        });
+      }
+      
+      // Require cost center if classification requires post_to_costs
+      if (fd.classification_id) {
+        const selectedClassification = classifications.find(c => c.id === fd.classification_id);
+        if (selectedClassification?.post_to_costs && (!fd.cost_center_id || String(fd.cost_center_id).trim() === '')) {
+          errors.push({
+            field: 'cost_center_id',
+            message: 'مركز التكلفة مطلوب عند اختيار تصنيف يتطلب تسجيل التكاليف'
+          });
+        }
       }
       
       return {
@@ -419,6 +565,7 @@ export const createTransactionFormConfig = (
         { field: 'entry_number' },
         { field: 'entry_date' },
         { field: 'description' },
+        { field: 'work_item_id' },
         { field: 'debit_account_id' },
         { field: 'credit_account_id' },
         { field: 'amount' },

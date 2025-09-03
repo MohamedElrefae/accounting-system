@@ -4,7 +4,7 @@ import './StandardFinancialStatements.css'
 import { supabase } from '../../utils/supabase'
 import { getCompanyConfig } from '../../services/company-config'
 import { fetchProjects, fetchOrganizations } from '../../services/lookups'
-import { fetchTransactionsDateRange } from '../../services/reports/account-explorer'
+import { fetchTransactionsDateRange } from '../../services/reports/common'
 import { 
   fetchTransactionClassificationSummary, 
   fetchClassificationAccountBreakdown,

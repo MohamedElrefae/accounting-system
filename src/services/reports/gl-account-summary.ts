@@ -61,6 +61,7 @@ export async function fetchGLTotals(filters: Omit<GLAccountSummaryFilters, 'limi
     p_org_id: filters.orgId ?? null,
     p_project_id: filters.projectId ?? null,
     p_posted_only: filters.postedOnly ?? true,
+    p_classification_id: filters.classificationId ?? null,
   })
   if (error) throw error
   const rows = (data as GLTotals[]) ?? []

@@ -16,20 +16,22 @@ export interface ColumnConfig {
   type?: 'text' | 'number' | 'date' | 'currency' | 'boolean' | 'actions'
 }
 
-interface ResizableTableProps {
+type RowRecord = Record<string, unknown>
+
+interface ResizableTableProps<T extends RowRecord> {
   columns: ColumnConfig[]
-  data: any[]
+  data: T[]
   onColumnResize: (columnKey: string, newWidth: number) => void
   className?: string
   rowHeight?: number
   headerHeight?: number
-  renderCell?: (value: any, column: ColumnConfig, row: any, rowIndex: number) => React.ReactNode
-  onRowClick?: (row: any, index: number) => void
+  renderCell?: (value: unknown, column: ColumnConfig, row: T, rowIndex: number) => React.ReactNode
+  onRowClick?: (row: T, index: number) => void
   isLoading?: boolean
   emptyMessage?: string
 }
 
-const ResizableTable: React.FC<ResizableTableProps> = ({
+function ResizableTable<T extends RowRecord>({
   columns,
   data,
   onColumnResize,
@@ -40,37 +42,22 @@ const ResizableTable: React.FC<ResizableTableProps> = ({
   onRowClick,
   isLoading = false,
   emptyMessage = 'لا توجد بيانات'
-}) => {
+}: ResizableTableProps<T>) {
   const [isResizing, setIsResizing] = useState<string | null>(null)
-  const [_startX, _setStartX] = useState(0)
-  const [_startWidth, _setStartWidth] = useState(0)
   const tableRef = useRef<HTMLTableElement>(null)
   const resizeRef = useRef<{ column: string; startX: number; startWidth: number } | null>(null)
 
   // Filter visible columns and maintain their order
   const visibleColumns = columns.filter(col => col.visible)
 
-  const handleMouseDown = useCallback((e: React.MouseEvent, columnKey: string, currentWidth: number) => {
-    e.preventDefault()
-    setIsResizing(columnKey)
-    _setStartX(e.clientX)
-    _setStartWidth(currentWidth)
-    resizeRef.current = {
-      column: columnKey,
-      startX: e.clientX,
-      startWidth: currentWidth
-    }
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-  }, [])
-
+  // Define move/up handlers BEFORE the mousedown handler to avoid TDZ/runtime init issues
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!resizeRef.current) return
-    
+
     const { column, startX, startWidth } = resizeRef.current
     const deltaX = e.clientX - startX
     const newWidth = Math.max(80, Math.min(500, startWidth + deltaX))
-    
+
     onColumnResize(column, newWidth)
   }, [onColumnResize])
 
@@ -81,6 +68,18 @@ const ResizableTable: React.FC<ResizableTableProps> = ({
     document.removeEventListener('mouseup', handleMouseUp)
   }, [handleMouseMove])
 
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>, columnKey: string, currentWidth: number) => {
+    e.preventDefault()
+    setIsResizing(columnKey)
+    resizeRef.current = {
+      column: columnKey,
+      startX: e.clientX,
+      startWidth: currentWidth
+    }
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }, [handleMouseMove, handleMouseUp])
+
   // Cleanup event listeners on unmount
   useEffect(() => {
     return () => {
@@ -89,27 +88,28 @@ const ResizableTable: React.FC<ResizableTableProps> = ({
     }
   }, [handleMouseMove, handleMouseUp])
 
-  const formatCellValue = (value: any, column: ColumnConfig) => {
+  const formatCellValue = (value: unknown, column: ColumnConfig) => {
     if (value === null || value === undefined) return '—'
     
     switch (column.type) {
       case 'currency':
-        // Use CurrencyFormatter for proper company-based currency formatting
-        return <CurrencyFormatter amount={value} />
+        // Use CurrencyFormatter only for numeric values
+        return typeof value === 'number' ? <CurrencyFormatter amount={value} /> : String(value)
       case 'number':
-        return typeof value === 'number' ? value.toLocaleString('ar-EG') : value
+        return typeof value === 'number' ? value.toLocaleString('ar-EG') : String(value)
       case 'date':
         // Use DateFormatter for proper company-based date formatting
-        return <DateFormatter date={value} />
+        return (typeof value === 'string' || value instanceof Date) ? <DateFormatter date={value} /> : String(value)
       case 'boolean':
         return value ? 'نعم' : 'لا'
       default:
-        return value
+        return String(value)
     }
   }
 
-  const getCellContent = (row: any, column: ColumnConfig, rowIndex: number) => {
-    const value = row[column.key]
+  const getCellContent = (row: T, column: ColumnConfig, rowIndex: number) => {
+    const rec = row as RowRecord
+    const value = rec[column.key]
     
     if (renderCell) {
       const customContent = renderCell(value, column, row, rowIndex)
