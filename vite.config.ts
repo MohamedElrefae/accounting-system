@@ -1,9 +1,40 @@
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
+import { visualizer } from "rollup-plugin-visualizer"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react()],
+export default defineConfig(({ mode }) => ({
+  plugins: [
+    react(),
+    mode === 'analyze' && visualizer({
+      filename: 'dist/stats.html',
+      open: true,
+      gzipSize: true,
+      brotliSize: true,
+    })
+  ].filter(Boolean),
+  resolve: {
+    alias: {
+      // Force single React/MUI instance to prevent multiple context issues
+      'react': path.resolve(__dirname, 'node_modules/react'),
+      'react/jsx-runtime': path.resolve(__dirname, 'node_modules/react/jsx-runtime.js'),
+      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+      'react-dom/client': path.resolve(__dirname, 'node_modules/react-dom/client.js'),
+      '@mui/material': path.resolve(__dirname, 'node_modules/@mui/material'),
+      '@mui/system': path.resolve(__dirname, 'node_modules/@mui/system'),
+      '@mui/base': path.resolve(__dirname, 'node_modules/@mui/base'),
+      '@mui/utils': path.resolve(__dirname, 'node_modules/@mui/utils')
+    },
+    dedupe: ['react', 'react-dom']
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom', '@mui/material', '@mui/system', '@mui/base', '@mui/utils', '@emotion/react', '@emotion/styled']
+  },
   build: {
     target: "esnext",
     minify: "esbuild",
@@ -107,4 +138,4 @@ export default defineConfig({
     port: 3000,
     open: true,
   },
-})
+}))
