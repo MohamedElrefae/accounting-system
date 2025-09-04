@@ -40,6 +40,10 @@ export default defineConfig(({ mode }) => ({
     minify: "esbuild",
     sourcemap: true,
     chunkSizeWarningLimit: 1000, // Increase limit to 1000kB
+    commonjsOptions: {
+      transformMixedEsModules: true,
+      defaultIsModuleExports: true
+    },
     rollupOptions: {
       output: {
         // Improved manual chunks for better code splitting
