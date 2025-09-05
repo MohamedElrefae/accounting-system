@@ -4,6 +4,12 @@ import { CacheProvider } from '@emotion/react';
 import createCache from '@emotion/cache';
 import { jsx as _jsx } from 'react/jsx-runtime';
 
+// Probe so we can confirm this shim is executing in production
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+;(globalThis as any).SHIM_SEP = 'active'
+// eslint-disable-next-line no-console
+console.log('[shim] StyledEngineProvider active')
+
 let cache: import('@emotion/cache').EmotionCache | undefined;
 if (typeof document === 'object') {
   cache = createCache({ key: 'css', prepend: true });
