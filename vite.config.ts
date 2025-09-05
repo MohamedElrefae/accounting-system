@@ -30,8 +30,11 @@ export default defineConfig(({ mode }) => ({
       '@mui/base': path.resolve(__dirname, 'node_modules/@mui/base'),
       '@mui/utils': path.resolve(__dirname, 'node_modules/@mui/utils'),
       '@emotion/cache$': path.resolve(__dirname, 'node_modules/@emotion/cache/dist/emotion-cache.browser.esm.js'),
+      '@mui/styled-engine$': path.resolve(__dirname, 'src/shims/styled-engine-index.ts'),
       '@mui/styled-engine/StyledEngineProvider': path.resolve(__dirname, 'src/shims/StyledEngineProvider.tsx'),
-      '@mui/styled-engine/StyledEngineProvider.js': path.resolve(__dirname, 'src/shims/StyledEngineProvider.tsx')
+      '@mui/styled-engine/StyledEngineProvider.js': path.resolve(__dirname, 'src/shims/StyledEngineProvider.tsx'),
+      '@mui/material/styles/StyledEngineProvider': path.resolve(__dirname, 'src/shims/StyledEngineProvider.tsx'),
+      '@mui/material/StyledEngineProvider': path.resolve(__dirname, 'src/shims/StyledEngineProvider.tsx')
     },
     dedupe: ['react', 'react-dom']
   },
