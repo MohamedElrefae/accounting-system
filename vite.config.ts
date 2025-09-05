@@ -28,12 +28,13 @@ export default defineConfig(({ mode }) => ({
       '@mui/material': path.resolve(__dirname, 'node_modules/@mui/material'),
       '@mui/system': path.resolve(__dirname, 'node_modules/@mui/system'),
       '@mui/base': path.resolve(__dirname, 'node_modules/@mui/base'),
-      '@mui/utils': path.resolve(__dirname, 'node_modules/@mui/utils')
+      '@mui/utils': path.resolve(__dirname, 'node_modules/@mui/utils'),
+      '@emotion/cache$': path.resolve(__dirname, 'node_modules/@emotion/cache/dist/emotion-cache.browser.esm.js')
     },
     dedupe: ['react', 'react-dom']
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', '@mui/material', '@mui/system', '@mui/base', '@mui/utils', '@emotion/react', '@emotion/styled']
+    include: ['react', 'react-dom', '@mui/material', '@mui/system', '@mui/base', '@mui/utils', '@emotion/react', '@emotion/styled', '@emotion/cache']
   },
   build: {
     target: "esnext",
