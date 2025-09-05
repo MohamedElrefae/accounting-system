@@ -2,6 +2,14 @@
 
 Date: 2025-08-23
 
+Open checklist (remaining tasks)
+- [ ] Add approval_status filter control on Transactions page UI
+- [ ] Show submitter name and timestamp next to submit note in details drawer
+- [ ] Add client guards to hide submit/edit appropriately when status changes in-session
+- [ ] Seed/assign Reviewer role in all environments (schema-aware grants)
+- [ ] Unit/integration tests for submit/review/post paths and RLS
+- [ ] Documentation: user guide for My vs Pending flows, permissions matrix
+
 ## Scope and goals
 - Introduced a single-line transaction entry flow in the current app with reliable posting, permissions, and reporting.
 - Ensured the Transactions page aligns with your Accounts Tree UI and integrates with your existing permissions model and Supabase backend.
@@ -197,6 +205,63 @@ Trial balance (custom range):
 select *
 from public.trial_balance_range('2025-01-01', '2025-03-31');
 ```
+
+---
+
+## 2025-09-03 — Approval workflow and Pending review UI
+
+### Summary
+- Added review workflow across DB, services, and UI, and separated creation flow (My) from review (Pending).
+
+### Backend/Database
+- New approval columns on public.transactions (idempotent migration 055_approval_workflow.sql):
+  - approval_status, submitted_at/by, reviewed_at/by, review_action, review_reason
+- New permissions: transactions.review (inserted schema-agnostically)
+- RPCs:
+  - review_transaction(p_transaction_id, p_action='approve|revise|reject', p_reason)
+    - approve: sets approval fields and posts via post_transaction
+    - revise/reject: set status and log reason
+  - submit_transaction(p_transaction_id, p_note) — creator/manager submit for review; logs audit details with action='submitted' and note
+- transaction_audit constraint updated to allow action='review' (idempotent logic)
+
+### Services
+- Extended TransactionRecord with optional approval fields
+- New APIs in src/services/transactions.ts:
+  - approveTransaction, requestRevision, rejectTransaction, submitTransaction
+- Pending filter now requires is_posted=false AND approval_status='submitted'
+
+### Frontend (Transactions)
+- Route guard: /transactions/pending now requires transactions.review
+- Pending actions replaced with:
+  - اعتماد (approve), إرجاع للتعديل (revise), رفض (reject) — modal captures reasons
+- My view gained "إرسال للمراجعة" (Submit for review):
+  - Opens a themed modal to require a note; calls submit_transaction
+  - Hidden when approval_status ∈ ['submitted','approved','rejected']
+- Details drawer (TransactionView):
+  - Shows "ملاحظات الإرسال" from latest audit row with details.action='submitted'
+- Theming: removed inline styles; added CSS classes (audit-title, audit-box, audit-entry, submit-note-box, submit-note-text)
+
+### Verification/SQL snippets
+- Columns exist:
+```sql
+select column_name from information_schema.columns
+where table_schema='public' and table_name='transactions'
+  and column_name in ('approval_status','submitted_at','submitted_by','reviewed_at','reviewed_by','review_action','review_reason')
+order by column_name;
+```
+- RPCs exist:
+```sql
+select routine_schema, routine_name
+from information_schema.routines
+where routine_schema='public' and routine_name in ('review_transaction','submit_transaction');
+```
+- Reviewer role grant (schema-aware) and assignment by email included in earlier communications.
+
+### Next steps
+- Option: show submitter/timestamp next to the submit note in details
+- Option: add filters for approval_status in Transactions page UI
+- Option: expose submitted_by/reviewed_by names in details list
+- QA: test full lifecycle (draft → submitted → approve/post or revise/reject), RLS and permissions
 
 Ledger for an account:
 ```sql

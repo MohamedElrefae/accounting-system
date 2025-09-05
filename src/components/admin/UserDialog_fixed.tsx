@@ -213,7 +213,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
         )}
 
         <Grid container spacing={2}>
-<Grid size={{ xs: 12 }}>
+<Grid xs={12}>
             <TextField
               fullWidth
               label="البريد الإلكتروني"
@@ -229,7 +229,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
 </Grid>
 
           {!user && (
-            <Grid size={{ xs: 12 }}>
+            <Grid xs={12}>
               <TextField
                 fullWidth
                 label="كلمة المرور"
@@ -242,7 +242,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
 </Grid>
           )}
 
-<Grid size={{ xs: 12, md: 6 }}>
+<Grid xs={12} md={6}>
             <TextField
               fullWidth
               label="الاسم الأول"
@@ -251,7 +251,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
             />
 </Grid>
 
-<Grid size={{ xs: 12, md: 6 }}>
+<Grid xs={12} md={6}>
             <TextField
               fullWidth
               label="اسم العائلة"
@@ -260,7 +260,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
             />
           </Grid>
 
-<Grid size={{ xs: 12 }}>
+<Grid xs={12}>
             <TextField
               fullWidth
               label="الاسم الكامل بالعربية"
@@ -269,7 +269,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
             />
           </Grid>
 
-<Grid size={{ xs: 12, md: 6 }}>
+<Grid xs={12} md={6}>
             <TextField
               fullWidth
               label="القسم"
@@ -281,7 +281,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
             />
           </Grid>
 
-<Grid size={{ xs: 12, md: 6 }}>
+<Grid xs={12} md={6}>
             <TextField
               fullWidth
               label="الوظيفة"
@@ -293,7 +293,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
             />
           </Grid>
 
-<Grid size={{ xs: 12, md: 6 }}>
+<Grid xs={12} md={6}>
             <TextField
               fullWidth
               label="رقم الهاتف"
@@ -302,7 +302,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
             />
           </Grid>
 
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid xs={12} md={6}>
             <TextField
               fullWidth
               select
@@ -319,7 +319,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
             </TextField>
           </Grid>
 
-<Grid size={{ xs: 12 }}>
+<Grid xs={12}>
             <FormControlLabel
               control={
                 <Switch
@@ -332,7 +332,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
           </Grid>
 
           {!user && (
-<Grid size={{ xs: 12 }}>
+<Grid xs={12}>
               <FormControlLabel
                 control={
                   <Switch

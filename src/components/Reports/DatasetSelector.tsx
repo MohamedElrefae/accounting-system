@@ -30,7 +30,7 @@ const DatasetSelector: React.FC<DatasetSelectorProps> = ({
         </Typography>
         <Grid container spacing={2}>
           {[1, 2, 3].map((index) => (
-            <Grid size={{ xs: 12, md: 6 }} key={index}>
+            <Grid xs={12} md={6} key={index}>
               <Card>
                 <CardContent>
                   <Skeleton variant="text" width="60%" height={32} />
@@ -73,7 +73,7 @@ const DatasetSelector: React.FC<DatasetSelectorProps> = ({
 
       <Grid container spacing={2}>
         {datasets.map((dataset) => (
-          <Grid size={{ xs: 12, md: 6 }} key={dataset.id}>
+          <Grid xs={12} md={6} key={dataset.id}>
             <Card
               sx={{
                 cursor: 'pointer',

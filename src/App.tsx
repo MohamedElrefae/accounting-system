@@ -156,7 +156,7 @@ const App: React.FC = () => {
             </React.Suspense>
           } />
           <Route path="/transactions/pending" element={
-            <RequirePermission perm="transactions.post">
+            <RequirePermission perm="transactions.review">
               <React.Suspense fallback={<div>Loading...</div>}>
                 <TransactionsPage />
               </React.Suspense>

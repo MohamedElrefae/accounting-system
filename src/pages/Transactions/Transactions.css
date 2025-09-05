@@ -93,9 +93,18 @@
 .transaction-modal-content--wide { width: min(1200px, 95vw); max-height: 90vh; }
 .modal-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .modal-title { margin: 0 0 0.5rem 0; font-weight: 700; }
+.modal-label { display: block; margin-bottom: 8px; }
 .textarea-field { min-height: 80px; }
 .textarea-field.notes { min-height: 60px; }
 .button-container { display: flex; gap: 0.5rem; justify-content: flex-start; margin-top: 0.5rem; }
+
+/* Audit box and submit note styling */
+.audit-title { margin-top: 8px; font-weight: 600; }
+.audit-box { max-height: 250px; overflow-y: auto; border: 1px solid rgba(0,0,0,0.2); border-radius: 8px; padding: 8px; }
+.audit-entry { padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,0.08); }
+.submit-note-box { padding: 8px; border: 1px solid rgba(0,0,0,0.2); border-radius: 8px; background: var(--surface, #0f0f0f); }
+.submit-note-text { white-space: pre-wrap; color: var(--text, #eaeaea); }
+
 .error-message { color: #ff6b6b; padding: 0.5rem; background: #390b0b; border: 1px solid #7a1f1f; border-radius: 8px; }
 .loading-container { display: grid; place-items: center; padding: 2rem; }
 .error-container { color: #ff6b6b; padding: 1rem; }

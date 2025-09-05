@@ -1,8 +1,12 @@
 import * as React from 'react';
 import PropTypes from 'prop-types';
 import { CacheProvider } from '@emotion/react';
-import createCache from '@emotion/cache';
+import * as emotionCacheNS from '@emotion/cache';
 import { jsx as _jsx } from 'react/jsx-runtime';
+
+// Normalize ESM/CJS interop for @emotion/cache default export across bundlers
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const createCache: typeof import('@emotion/cache').default = (emotionCacheNS as any).default || (emotionCacheNS as any);
 
 // Probe so we can confirm this shim is executing in production
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

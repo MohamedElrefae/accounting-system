@@ -377,7 +377,7 @@ export default function RoleManagement() {
       {loading ? (
         <Grid container spacing={3}>
           {[...Array(4)].map((_, i) => (
-<Grid size={{ xs: 12, md: 6, lg: 4 }} key={i}>
+<Grid xs={12} md={6} lg={4} key={i}>
               <Skeleton variant="rectangular" height={200} />
             </Grid>
           ))}
@@ -385,7 +385,7 @@ export default function RoleManagement() {
       ) : (
         <Grid container spacing={3}>
           {roles.map(role => (
-<Grid size={{ xs: 12, md: 6, lg: 4 }} key={role.id}>
+<Grid xs={12} md={6} lg={4} key={role.id}>
               <Card>
                 <CardContent>
                   <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={2}>
@@ -491,7 +491,7 @@ export default function RoleManagement() {
         <DialogContent dividers>
           <Stack spacing={3}>
             <Grid container spacing={2}>
-<Grid size={{ xs: 12, md: 6 }}>
+<Grid xs={12} md={6}>
                 <TextField
                   fullWidth
                   label="اسم الدور (بالإنجليزية)"
@@ -500,7 +500,7 @@ export default function RoleManagement() {
                   disabled={selectedRole?.is_system}
                 />
               </Grid>
-<Grid size={{ xs: 12, md: 6 }}>
+<Grid xs={12} md={6}>
                 <TextField
                   fullWidth
                   label="اسم الدور (بالعربية)"
@@ -508,7 +508,7 @@ export default function RoleManagement() {
                   onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
                 />
               </Grid>
-<Grid size={{ xs: 12, md: 6 }}>
+<Grid xs={12} md={6}>
                 <TextField
                   fullWidth
                   label="الوصف (بالإنجليزية)"
@@ -518,7 +518,7 @@ export default function RoleManagement() {
                   rows={1}
                 />
               </Grid>
-<Grid size={{ xs: 12, md: 6 }}>
+<Grid xs={12} md={6}>
                 <TextField
                   fullWidth
                   label="الوصف (بالعربية)"
@@ -554,7 +554,7 @@ export default function RoleManagement() {
                   <AccordionDetails>
                     <Grid container spacing={1}>
                       {category.permissions.map(permission => (
-<Grid size={{ xs: 12, md: 6 }} key={permission.name}>
+<Grid xs={12} md={6} key={permission.name}>
                           <FormControlLabel
                             control={
                               <Checkbox

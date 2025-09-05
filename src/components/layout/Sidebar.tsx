@@ -22,7 +22,7 @@ import Inventory from '@mui/icons-material/Inventory';
 import Settings from '@mui/icons-material/Settings';
 import ListIcon from '@mui/icons-material/List';
 import Add from '@mui/icons-material/Add';
-import EditNote from '@mui/icons-material/EditNote';
+import Edit from '@mui/icons-material/Edit';
 import Book from '@mui/icons-material/Book';
 import Balance from '@mui/icons-material/Balance';
 import ShoppingCart from '@mui/icons-material/ShoppingCart';
@@ -77,7 +77,7 @@ const getIcon = (iconName: string) => {
     case 'Add':
       return <Add />;
     case 'EditNote':
-      return <EditNote />;
+      return <Edit />;
     case 'Book':
       return <Book />;
     case 'Balance':

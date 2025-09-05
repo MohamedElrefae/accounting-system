@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { getAccounts, getTransactions, createTransaction, deleteTransaction, postTransaction, updateTransaction, getTransactionAudit, getCurrentUserId, getProjects, type Account, type TransactionRecord, type TransactionAudit, type Project } from '../../services/transactions'
+import { getAccounts, getTransactions, createTransaction, deleteTransaction, updateTransaction, getTransactionAudit, getCurrentUserId, getProjects, approveTransaction, requestRevision, rejectTransaction, submitTransaction, type Account, type TransactionRecord, type TransactionAudit, type Project } from '../../services/transactions'
 import { listWorkItemsAll } from '../../services/work-items'
 import type { WorkItemRow } from '../../types/work-items'
 import { getOrganizations } from '../../services/organization'
@@ -51,8 +51,9 @@ const TransactionsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [_formErrors, _setFormErrors] = useState<Record<string, string>>({})
-  const [postingId, setPostingId] = useState<string | null>(null)
+  // const [postingId, setPostingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  // const [submittingId, setSubmittingId] = useState<string | null>(null)
 
   // Unified form state
   const [formOpen, setFormOpen] = useState(false)
@@ -110,6 +111,19 @@ const TransactionsPage: React.FC = () => {
   const { showToast } = useToast()
   const [showDiag, setShowDiag] = useState(false)
   const [showLogs, setShowLogs] = useState(false)
+
+  // Review modal state
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const [reviewAction, setReviewAction] = useState<'approve' | 'revise' | 'reject' | null>(null)
+  const [reviewReason, setReviewReason] = useState('')
+  const [reviewTargetId, setReviewTargetId] = useState<string | null>(null)
+  const [reviewBusy, setReviewBusy] = useState(false)
+
+  // Submit modal state
+  const [submitOpen, setSubmitOpen] = useState(false)
+  const [submitNote, setSubmitNote] = useState('')
+  const [submitTargetId, setSubmitTargetId] = useState<string | null>(null)
+  const [submitBusy, setSubmitBusy] = useState(false)
 
   // determine mode: my | pending | all
   const mode: 'my' | 'pending' | 'all' = location.pathname.includes('/transactions/my')
@@ -626,27 +640,48 @@ const TransactionsPage: React.FC = () => {
     }
   }
 
-  const handlePost = async (id: string) => {
-    const ok = window.confirm('تأكيد الترحيل؟ لا يمكن التراجع عن هذا الإجراء.')
-    if (!ok) return
-    setPostingId(id)
-    // optimistic mark posted
-    const prev = transactions
-    const rec = transactions.find(t => t.id === id)
-    const optimistic = transactions.map(t => t.id === id ? { ...t, is_posted: true, posted_at: new Date().toISOString() } as TransactionRecord : t)
-    setTransactions(optimistic)
+  const openReview = (action: 'approve' | 'revise' | 'reject', id: string) => {
+    setReviewAction(action)
+    setReviewReason('')
+    setReviewTargetId(id)
+    setReviewOpen(true)
+  }
+
+  const submitReview = async () => {
+    if (!reviewAction || !reviewTargetId) return
+    setReviewBusy(true)
     try {
-      await postTransaction(id)
-      showToast('تم ترحيل المعاملة', { severity: 'success' })
+      if (reviewAction === 'approve') {
+        await approveTransaction(reviewTargetId, reviewReason || null as any)
+        showToast('تم اعتماد المعاملة (وتم ترحيلها)', { severity: 'success' })
+      } else if (reviewAction === 'revise') {
+        if (!reviewReason.trim()) {
+          showToast('يرجى إدخال سبب الإرجاع للتعديل', { severity: 'error' })
+          setReviewBusy(false)
+          return
+        }
+        await requestRevision(reviewTargetId, reviewReason)
+        showToast('تم إرجاع المعاملة للتعديل', { severity: 'success' })
+      } else if (reviewAction === 'reject') {
+        if (!reviewReason.trim()) {
+          showToast('يرجى إدخال سبب الرفض', { severity: 'error' })
+          setReviewBusy(false)
+          return
+        }
+        await rejectTransaction(reviewTargetId, reviewReason)
+        showToast('تم رفض المعاملة', { severity: 'success' })
+      }
+      setReviewOpen(false)
+      setReviewTargetId(null)
+      setReviewAction(null)
+      setReviewReason('')
+      await reload()
     } catch (e: any) {
-      // rollback
-      setTransactions(prev)
-      const detail = rec ? ` (رقم القيد ${rec.entry_number})` : ''
-      const msg = e?.message || ''
-      showToast(`فشل ترحيل المعاملة${detail}. تم التراجع عن العملية. السبب: ${msg}`.trim(), { severity: 'error' })
-      logClientError({ context: 'transactions.post', message: msg, extra: { id } })
+      const msg = e?.message || 'فشل إجراء المراجعة'
+      showToast(msg, { severity: 'error' })
+      logClientError({ context: `transactions.review.${reviewAction}`, message: msg, extra: { id: reviewTargetId, reason: reviewReason } })
     } finally {
-      setPostingId(null)
+      setReviewBusy(false)
     }
   }
 
@@ -690,7 +725,7 @@ const TransactionsPage: React.FC = () => {
       {showDiag && (
         <div className="diag-panel">
           <div className="diag-perms-box">
-            {['transactions.create','transactions.update','transactions.delete','transactions.post','transactions.manage'].map(key => (
+            {['transactions.create','transactions.update','transactions.delete','transactions.post','transactions.review','transactions.manage'].map(key => (
               <PermissionBadge key={key} allowed={hasPerm(key)} label={key} />
             ))}
           </div>
@@ -931,14 +966,36 @@ const TransactionsPage: React.FC = () => {
                     } catch {}
                     setDetailsOpen(true)
                   }}><div className="btn-content"><span className="btn-text">تفاصيل</span></div></button>
-                  {/* Approve/Post in pending mode if permitted */}
+                  {/* Review actions in pending mode if permitted */}
                   {mode === 'pending' && !row.original.is_posted && (
-                    <WithPermission perm="transactions.post">
-                    <button className="ultimate-btn ultimate-btn-success" onClick={() => handlePost(row.original.id)} disabled={postingId === row.original.id}>
-                      <div className="btn-content"><span className="btn-text">{postingId === row.original.id ? 'جارٍ الترحيل...' : 'ترحيل'}</span></div>
-                    </button>
-                    </WithPermission>
+                    <>
+                      <WithPermission perm="transactions.review">
+                        <button className="ultimate-btn ultimate-btn-success" onClick={() => openReview('approve', row.original.id)}>
+                          <div className="btn-content"><span className="btn-text">اعتماد</span></div>
+                        </button>
+                      </WithPermission>
+                      <WithPermission perm="transactions.review">
+                        <button className="ultimate-btn ultimate-btn-edit" onClick={() => openReview('revise', row.original.id)}>
+                          <div className="btn-content"><span className="btn-text">إرجاع للتعديل</span></div>
+                        </button>
+                      </WithPermission>
+                      <WithPermission perm="transactions.review">
+                        <button className="ultimate-btn ultimate-btn-delete" onClick={() => openReview('reject', row.original.id)}>
+                          <div className="btn-content"><span className="btn-text">رفض</span></div>
+                        </button>
+                      </WithPermission>
+                    </>
                   )}
+                  {/* Submit for review (my) - Temporarily disabled */}
+                  {/*mode === 'my' && !row.original.is_posted && row.original.created_by === currentUserId && !['submitted','approved','rejected'].includes((row.original as any).approval_status || 'draft') && (
+                    <button className="ultimate-btn ultimate-btn-success" onClick={() => {
+                      setSubmitTargetId(row.original.id)
+                      setSubmitNote('')
+                      setSubmitOpen(true)
+                    }}>
+                      <div className="btn-content"><span className="btn-text">إرسال للمراجعة</span></div>
+                    </button>
+                  )*/}
                   {/* Edit (my) */}
                   {mode === 'my' && !row.original.is_posted && hasPerm('transactions.update') && row.original.created_by === currentUserId && (
                     <button className="ultimate-btn ultimate-btn-edit" onClick={() => {
@@ -1053,6 +1110,88 @@ const TransactionsPage: React.FC = () => {
               </button>
             </div>
             <ClientErrorLogs />
+          </div>
+        </div>
+      )}
+
+      {/* Review Modal */}
+      {reviewOpen && (
+        <div className="transaction-modal" onClick={() => !reviewBusy && setReviewOpen(false)}>
+          <div className="transaction-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header-row">
+              <h3 className="modal-title">{reviewAction === 'approve' ? 'اعتماد المعاملة' : reviewAction === 'revise' ? 'إرجاع للتعديل' : 'رفض المعاملة'}</h3>
+              <button className="ultimate-btn ultimate-btn-delete" onClick={() => !reviewBusy && setReviewOpen(false)}>
+                <div className="btn-content"><span className="btn-text">إغلاق</span></div>
+              </button>
+            </div>
+            <div>
+              <label className="modal-title modal-label">سبب الإجراء</label>
+              <textarea
+                className="textarea-field"
+                placeholder={reviewAction === 'approve' ? 'ملاحظات (اختياري)' : 'السبب (إلزامي)'}
+                value={reviewReason}
+                onChange={e => setReviewReason(e.target.value)}
+              />
+              <div className="button-container">
+                <button className="ultimate-btn ultimate-btn-success" onClick={submitReview} disabled={reviewBusy}>
+                  <div className="btn-content"><span className="btn-text">تأكيد</span></div>
+                </button>
+                <button className="ultimate-btn ultimate-btn-warning" onClick={() => !reviewBusy && setReviewOpen(false)} disabled={reviewBusy}>
+                  <div className="btn-content"><span className="btn-text">إلغاء</span></div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Submit Note Modal */}
+      {submitOpen && (
+        <div className="transaction-modal" onClick={() => !submitBusy && setSubmitOpen(false)}>
+          <div className="transaction-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header-row">
+              <h3 className="modal-title">إرسال للمراجعة</h3>
+              <button className="ultimate-btn ultimate-btn-delete" onClick={() => !submitBusy && setSubmitOpen(false)}>
+                <div className="btn-content"><span className="btn-text">إغلاق</span></div>
+              </button>
+            </div>
+            <div>
+              <label className="modal-title modal-label">ملاحظات الإرسال (إلزامي)</label>
+              <textarea
+                className="textarea-field"
+                placeholder={'أدخل سبب/ملاحظات الإرسال'}
+                value={submitNote}
+                onChange={e => setSubmitNote(e.target.value)}
+              />
+              <div className="button-container">
+                <button className="ultimate-btn ultimate-btn-success" onClick={async () => {
+                  if (!submitTargetId) return
+                  if (!submitNote.trim()) {
+                    showToast('يرجى إدخال ملاحظات الإرسال', { severity: 'error' })
+                    return
+                  }
+                  setSubmitBusy(true)
+                  try {
+                    await submitTransaction(submitTargetId, submitNote)
+                    showToast('تم إرسال المعاملة للمراجعة بنجاح', { severity: 'success' })
+                    setSubmitOpen(false)
+                    setSubmitTargetId(null)
+                    setSubmitNote('')
+                    await reload()
+                  } catch (e: any) {
+                    showToast(e?.message || 'فشل إرسال المعاملة للمراجعة', { severity: 'error' })
+                    logClientError({ context: 'transactions.submit', message: e?.message || '', extra: { id: submitTargetId, note: submitNote } })
+                  }
+                    setSubmitBusy(false)
+                  }
+                } disabled={submitBusy}>
+                  <div className="btn-content"><span className="btn-text">تأكيد الإرسال</span></div>
+                </button>
+                <button className="ultimate-btn ultimate-btn-warning" onClick={() => !submitBusy && setSubmitOpen(false)} disabled={submitBusy}>
+                  <div className="btn-content"><span className="btn-text">إلغاء</span></div>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

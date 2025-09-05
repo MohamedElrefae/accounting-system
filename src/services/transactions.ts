@@ -46,6 +46,14 @@ export interface TransactionRecord {
   created_by: string | null
   project_id?: string | null
   org_id?: string | null
+  // Optional approval workflow fields (may not exist until migration applied)
+  approval_status?: 'draft' | 'submitted' | 'approved' | 'rejected' | 'revision_requested' | 'cancelled'
+  submitted_at?: string | null
+  submitted_by?: string | null
+  reviewed_at?: string | null
+  reviewed_by?: string | null
+  review_action?: 'approved' | 'rejected' | 'revision_requested' | null
+  review_reason?: string | null
   created_at: string
   updated_at: string
 }
@@ -262,7 +270,7 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
   }
 
   if (pendingOnly) {
-    query = query.eq('is_posted', false)
+    query = query.eq('is_posted', false).eq('approval_status', 'submitted')
   }
 
   const f = options?.filters
@@ -482,6 +490,42 @@ export async function postTransaction(id: string): Promise<void> {
   const { error } = await supabase.rpc('post_transaction', {
     p_transaction_id: id,
     p_posted_by: uid,
+  })
+  if (error) throw error
+}
+
+// Review actions RPC (approval workflow)
+export async function approveTransaction(id: string, reason?: string | null): Promise<void> {
+  const { error } = await supabase.rpc('review_transaction', {
+    p_transaction_id: id,
+    p_action: 'approve',
+    p_reason: reason ?? null,
+  })
+  if (error) throw error
+}
+
+export async function requestRevision(id: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('review_transaction', {
+    p_transaction_id: id,
+    p_action: 'revise',
+    p_reason: reason,
+  })
+  if (error) throw error
+}
+
+export async function rejectTransaction(id: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('review_transaction', {
+    p_transaction_id: id,
+    p_action: 'reject',
+    p_reason: reason,
+  })
+  if (error) throw error
+}
+
+export async function submitTransaction(id: string, note?: string | null): Promise<void> {
+  const { error } = await supabase.rpc('submit_transaction', {
+    p_transaction_id: id,
+    p_note: note ?? null,
   })
   if (error) throw error
 }

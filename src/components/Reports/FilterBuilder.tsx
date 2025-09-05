@@ -331,7 +331,7 @@ const FilterBuilder: React.FC<FilterBuilderProps> = ({
                   value={currentFilter.operator || 'eq'}
                   onChange={(e) => setCurrentFilter(prev => ({ 
                     ...prev, 
-                    operator: e.target.value,
+                    operator: e.target.value as ReportFilter['operator'],
                     value: '', // Reset value when operator changes
                   }))}
                   label="نوع المرشح"

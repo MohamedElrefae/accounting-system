@@ -423,7 +423,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
           {bulkMode ? (
             // Bulk invitation mode
             <Grid container spacing={2}>
-<Grid size={{ xs: 12 }}>
+<Grid xs={12}>
                 <TextField
                   fullWidth
                   multiline
@@ -436,7 +436,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
                 />
               </Grid>
               
-<Grid size={{ xs: 12, md: 6 }}>
+<Grid xs={12} md={6}>
                 <TextField
                   fullWidth
                   select
@@ -453,7 +453,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
                 </TextField>
               </Grid>
 
-<Grid size={{ xs: 12, md: 6 }}>
+<Grid xs={12} md={6}>
                 <TextField
                   fullWidth
                   type="datetime-local"
@@ -483,7 +483,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
                   </Stack>
 
                   <Grid container spacing={2}>
-<Grid size={{ xs: 12, md: 6 }}>
+<Grid xs={12} md={6}>
                       <TextField
                         fullWidth
                         label="البريد الإلكتروني"
@@ -498,7 +498,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
                       />
                     </Grid>
 
-<Grid size={{ xs: 12, md: 6 }}>
+<Grid xs={12} md={6}>
                       <TextField
                         fullWidth
                         select
@@ -523,7 +523,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
                       </TextField>
                     </Grid>
 
-<Grid size={{ xs: 12, md: 6 }}>
+<Grid xs={12} md={6}>
                       <TextField
                         fullWidth
                         type="datetime-local"
@@ -534,7 +534,7 @@ export const InviteUserDialog: React.FC<InviteUserDialogProps> = ({
                       />
                     </Grid>
 
-<Grid size={{ xs: 12, md: 6 }}>
+<Grid xs={12} md={6}>
                       <FormControlLabel
                         control={
                           <Switch

@@ -94,7 +94,7 @@ const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
     const isDatasetAvailable = availableDatasets.some(d => d.name === template.datasetName);
 
     return (
-            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={template.id}>
+            <Grid xs={12} sm={6} md={4} key={template.id}>
         <Card
           sx={{
             height: '100%',
@@ -256,7 +256,7 @@ const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
               </Typography>
 
               <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid size={4}>
+                <Grid xs={4}>
                   <Typography variant="subtitle2">الفئة:</Typography>
                   <Chip 
                     size="small"
@@ -264,7 +264,7 @@ const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
                     color={getCategoryInfo(selectedTemplate.category).color}
                   />
                 </Grid>
-                <Grid size={4}>
+                <Grid xs={4}>
                   <Typography variant="subtitle2">المستوى:</Typography>
                   <Chip 
                     size="small"
@@ -272,7 +272,7 @@ const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
                     color={getDifficultyInfo(selectedTemplate.difficulty).color}
                   />
                 </Grid>
-                <Grid size={4}>
+                <Grid xs={4}>
                   <Typography variant="subtitle2">الوقت المتوقع:</Typography>
                   <Typography variant="body2">{selectedTemplate.estimatedExecutionTime}</Typography>
                 </Grid>

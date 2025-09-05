@@ -357,7 +357,6 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
       anchorEl={profileMenuAnchor}
       open={Boolean(profileMenuAnchor)}
       onClose={handleProfileMenuClose}
-      onClick={handleProfileMenuClose}
       transformOrigin={{ horizontal: 'right', vertical: 'top' }}
       anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
     >

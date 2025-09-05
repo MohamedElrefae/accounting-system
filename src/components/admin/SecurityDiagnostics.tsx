@@ -77,21 +77,21 @@ export const SecurityDiagnostics: React.FC = () => {
       <Divider />
       <CardContent>
         <Grid container spacing={2}>
-<Grid size={{ xs: 12, md: 4 }}>
+<Grid xs={12} md={4}>
 
             <Stack spacing={1}>
               <Typography variant="subtitle2">Idle auto-logout</Typography>
               <Typography variant="body2">Timeout: {idleMinutes} minute(s)</Typography>
             </Stack>
 </Grid>
-<Grid size={{ xs: 12, md: 4 }}>
+<Grid xs={12} md={4}>
             <Stack spacing={1}>
               <Typography variant="subtitle2">Feature flags</Typography>
               <Typography variant="body2">Audit logging: {isAuditEnabled ? 'enabled' : 'disabled'}</Typography>
               <Typography variant="body2">Invite emails (Edge Function): {isInviteFxEnabled ? 'enabled' : 'disabled'}</Typography>
             </Stack>
 </Grid>
-<Grid size={{ xs: 12, md: 4 }}>
+<Grid xs={12} md={4}>
             <Stack spacing={1}>
               <Typography variant="subtitle2">Current user</Typography>
               <Typography variant="body2">User ID: {profile?.id || '—'}</Typography>

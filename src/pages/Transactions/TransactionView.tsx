@@ -10,6 +10,19 @@ interface Props {
 }
 
 const TransactionView: React.FC<Props> = ({ transaction, audit, userNames, onClose, categoryLabel }) => {
+  // Extract latest submit note from audit details
+  const submitNote = React.useMemo(() => {
+    for (const row of audit) {
+      try {
+        const d: any = row.details
+        if (row.action === 'post' && d && typeof d === 'object' && d.action === 'submitted' && d.note) {
+          return String(d.note)
+        }
+      } catch {}
+    }
+    return ''
+  }, [audit])
+
   return (
     <div className="transaction-modal" onClick={onClose}>
       <div className="transaction-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -24,19 +37,26 @@ const TransactionView: React.FC<Props> = ({ transaction, audit, userNames, onClo
         <div>مرحلة بواسطة: {transaction.posted_by ? (userNames[transaction.posted_by] || transaction.posted_by) : '—'}</div>
         <div>الحالة: {transaction.is_posted ? 'مرحلة' : 'غير مرحلة'}</div>
 
-        <div style={{ marginTop: '8px', fontWeight: 600 }}>سجل الإجراءات</div>
-        <div style={{ maxHeight: '250px', overflowY: 'auto', border: '1px solid rgba(0,0,0,0.2)', borderRadius: 8, padding: '8px' }}>
+        {submitNote && (
+          <div className="submit-note-box">
+            <div className="modal-title modal-label">ملاحظات الإرسال</div>
+            <div className="submit-note-text">{submitNote}</div>
+          </div>
+        )}
+
+        <div className="audit-title">سجل الإجراءات</div>
+        <div className="audit-box">
           {audit.length === 0 ? (
             <div>لا يوجد سجل</div>
           ) : audit.map(row => (
-            <div key={row.id} style={{ padding: '6px 0', borderBottom: '1px dashed rgba(255,255,255,0.08)' }}>
+            <div key={row.id} className="audit-entry">
               <div><strong>الإجراء:</strong> {row.action}</div>
               <div><strong>المستخدم:</strong> {row.actor_id ? (userNames[row.actor_id] || row.actor_id.substring(0,8)) : '—'}</div>
               <div><strong>التاريخ:</strong> {new Date(row.created_at).toLocaleString('ar-EG')}</div>
             </div>
           ))}
         </div>
-        <div className="button-container" style={{ marginTop: '10px' }}>
+        <div className="button-container">
           <button className="ultimate-btn ultimate-btn-delete" onClick={onClose}>
             <div className="btn-content"><span className="btn-text">إغلاق</span></div>
           </button>

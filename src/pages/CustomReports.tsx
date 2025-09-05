@@ -457,7 +457,7 @@ const CustomReports: React.FC = () => {
           {/* Report Builder */}
           <Grid container spacing={3}>
             {/* Left Panel - Builder Steps */}
-            <Grid size={{ xs: 12, md: 8 }}>
+            <Grid xs={12} md={8}>
               <Paper elevation={2} sx={{ p: 3 }}>
                 {/* Progress Stepper */}
                 <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
@@ -560,7 +560,7 @@ const CustomReports: React.FC = () => {
             </Grid>
 
             {/* Right Panel - Quick Actions & Preview */}
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Grid xs={12} md={4}>
               <Box sx={{ position: 'sticky', top: 24 }}>
                 {/* Quick Actions */}
                 <Card sx={{ mb: 3 }}>

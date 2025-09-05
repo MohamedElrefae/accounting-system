@@ -595,7 +595,7 @@ export const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
                             if (showEffectiveOnly && !isEffective) return null;
 
                             return (
-<Grid size={{ xs: 12, md: 6 }} key={permission.name}>
+<Grid xs={12} md={6} key={permission.name}>
                                 <Box
                                   sx={{
                                     p: 1.5,
