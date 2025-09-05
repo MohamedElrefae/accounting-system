@@ -8,18 +8,25 @@ import { ToastProvider } from './contexts/ToastContext'
 import { UserProfileProvider } from './contexts/UserProfileContext'
 import { FontPreferencesProvider } from './contexts/FontPreferencesContext'
 
+import { CacheProvider } from '@emotion/react'
+import createCache from '@emotion/cache'
+
+const muiCache = createCache({ key: 'css', prepend: true })
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AuthProvider>
-      <FontPreferencesProvider>
-        <CustomThemeProvider>
-          <ToastProvider>
-            <UserProfileProvider>
-              <App />
-            </UserProfileProvider>
-          </ToastProvider>
-        </CustomThemeProvider>
-      </FontPreferencesProvider>
-    </AuthProvider>
+    <CacheProvider value={muiCache}>
+      <AuthProvider>
+        <FontPreferencesProvider>
+          <CustomThemeProvider>
+            <ToastProvider>
+              <UserProfileProvider>
+                <App />
+              </UserProfileProvider>
+            </ToastProvider>
+          </CustomThemeProvider>
+        </FontPreferencesProvider>
+      </AuthProvider>
+    </CacheProvider>
   </StrictMode>,
 )
