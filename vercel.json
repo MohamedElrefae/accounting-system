@@ -1,9 +1,12 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
+  "builds": [
+    { "src": "package.json", "use": "@vercel/static-build" }
+  ],
+  "buildCommand": "npm ci && npm run build",
   "outputDirectory": "dist",
-  "builds": [{ "src": "dist/**", "use": "@vercel/static" }],
   "routes": [
-    { "src": "/(.*)", "dest": "dist/$1" }
+    { "src": "/(assets|js|css)/(.*)", "dest": "/$1/$2" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
