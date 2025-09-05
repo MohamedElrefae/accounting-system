@@ -29,7 +29,8 @@ export default defineConfig(({ mode }) => ({
       '@mui/system': path.resolve(__dirname, 'node_modules/@mui/system'),
       '@mui/base': path.resolve(__dirname, 'node_modules/@mui/base'),
       '@mui/utils': path.resolve(__dirname, 'node_modules/@mui/utils'),
-      '@emotion/cache$': path.resolve(__dirname, 'node_modules/@emotion/cache/dist/emotion-cache.browser.esm.js'),
+      // Normalize @emotion/cache default export for all consumers
+      '@emotion/cache$': path.resolve(__dirname, 'src/shims/emotion-cache-default.ts'),
       // Ensure every StyledEngineProvider path resolves to our shim
       '@mui/styled-engine$': path.resolve(__dirname, 'src/shims/styled-engine-index.ts'),
       '@mui/styled-engine/StyledEngineProvider': path.resolve(__dirname, 'src/shims/StyledEngineProvider.tsx'),
@@ -44,7 +45,7 @@ export default defineConfig(({ mode }) => ({
       '@mui/material/styles/StyledEngineProvider': path.resolve(__dirname, 'src/shims/StyledEngineProvider.tsx'),
       '@mui/material/StyledEngineProvider': path.resolve(__dirname, 'src/shims/StyledEngineProvider.tsx')
     },
-    dedupe: ['react', 'react-dom']
+    dedupe: ['react', 'react-dom', '@emotion/react', '@emotion/styled']
   },
   optimizeDeps: {
     include: ['react', 'react-dom', '@mui/material', '@mui/system', '@mui/base', '@mui/utils', '@emotion/react', '@emotion/styled', '@emotion/cache']
