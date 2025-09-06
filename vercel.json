@@ -26,8 +26,8 @@
       ]
     }
   ],
-  "routes": [
-    { "src": "/(assets|js|css)/(.*)", "dest": "/$1/$2" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/(assets|js|css)/(.*)", "destination": "/$1/$2" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
