@@ -357,8 +357,8 @@ export default function UserManagement() {
   const isIndeterminate = selectedUserIds.size > 0 && !isAllSelected;
 
   return (
-    <Box sx={{ p: 3 }} dir="rtl">
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }} dir="rtl">
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2, flexShrink: 0 }}>
         <Typography variant="h4" fontWeight="bold">
           إدارة المستخدمين
         </Typography>
@@ -401,7 +401,7 @@ export default function UserManagement() {
         </Alert>
       )}
 
-      <Paper sx={{ mb: 3, p: 2 }}>
+      <Paper sx={{ mb: 2, p: 2, flexShrink: 0 }}>
         <Stack spacing={2}>
           <TextField
             fullWidth
@@ -508,8 +508,9 @@ onChange={(e) => { const v = e.target.value as unknown as string; handleBulkRole
         </Paper>
       </Collapse>
 
-      <TableContainer component={Paper}>
-        <Table>
+      <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+        <TableContainer component={Paper}>
+          <Table>
           <TableHead>
             <TableRow>
               <TableCell padding="checkbox">
@@ -649,8 +650,9 @@ onChange={(e) => { const v = e.target.value as unknown as string; handleBulkRole
               })
             )}
           </TableBody>
-        </Table>
-      </TableContainer>
+          </Table>
+        </TableContainer>
+      </Box>
 
       {/* Permission Matrix Dialog */}
       {permissionDialogOpen && selectedUser && (

@@ -1,0 +1,6 @@
+reference_number,entry_date,amount,current_debit_code,current_credit_code,new_debit_code,new_credit_code,note
+234-01,2023-02-28,296636.00,1120,1120,null,null,null
+294-01,2023-05-15,30000.00,1110,1110,null,null,null
+39-01,2023-07-30,1389125.00,1210,1210,null,null,null
+42-01,2023-08-30,1875573.50,1210,1210,null,null,null
+608-01,2025-04-30,497890.00,1120,1120,null,null,null

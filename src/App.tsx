@@ -26,6 +26,8 @@ import { ResetPassword } from './components/auth/ResetPassword';
 import AuthDebug from './pages/AuthDebug';
 const UserManagement = React.lazy(() => import('./pages/admin/UserManagement'));
 const RoleManagement = React.lazy(() => import('./pages/admin/RoleManagement'));
+const PermissionsManagement = React.lazy(() => import('./pages/admin/PermissionsManagement'));
+const UserManagementSystem = React.lazy(() => import('./pages/admin/UserManagementSystem'));
 const Diagnostics = React.lazy(() => import('./pages/admin/Diagnostics'));
 const Profile = React.lazy(() => import('./pages/admin/Profile'));
 const ProjectManagement = React.lazy(() => import('./components/Projects/ProjectManagement'));
@@ -271,6 +273,13 @@ const App: React.FC = () => {
                 {React.createElement(React.lazy(() => import('./pages/admin/AccountPrefixMapping')))}
               </React.Suspense>
             } />
+            {/* Unified User Management System */}
+            <Route path="/settings/user-management" element={
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <UserManagementSystem />
+              </React.Suspense>
+            } />
+            {/* Individual routes for direct access */}
             <Route path="/settings/users" element={
               <React.Suspense fallback={<div>Loading...</div>}>
                 <UserManagement />
@@ -280,6 +289,13 @@ const App: React.FC = () => {
               <React.Suspense fallback={<div>Loading...</div>}>
                 <RoleManagement />
               </React.Suspense>
+            } />
+            <Route path="/settings/permissions" element={
+              <RequirePermission perm="permissions.view">
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <PermissionsManagement />
+                </React.Suspense>
+              </RequirePermission>
             } />
             <Route path="/settings/organization-management" element={
               <React.Suspense fallback={<div>Loading...</div>}>

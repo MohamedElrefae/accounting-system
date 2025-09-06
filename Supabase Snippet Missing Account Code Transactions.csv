@@ -1,0 +1,18 @@
+entry_date_text,reference_number,amount_text,debit_account_code_raw,debit_account_name_src,credit_account_code_raw,credit_account_name_src,missing_reason
+06/03/2025,560.5-01,298000,null,null,1110,الخزينة,missing_debit_code
+06/03/2025,560.9-01,298000,1120,البنوك,null,null,missing_credit_code
+13/06/2024,416-01,900000,null,null,1110,الخزينة,missing_debit_code
+13/06/2024,416-01,900000,1120,البنوك,null,null,missing_credit_code
+25/07/2022,921-01,100,null,null,2120,حساب مستحقات مقاولي الباطن,missing_debit_code
+25/07/2022,932-01,600,1110,الخزينة,null,null,missing_credit_code
+27/07/2022,921-01,100,1110,الخزينة,null,null,missing_credit_code
+27/07/2022,929-01,75,null,null,5100,تكاليف تنفيذ مباشرة,missing_debit_code
+28/07/2022,929-01,75,1110,الخزينة,null,null,missing_credit_code
+28/07/2022,932-01,600,null,null,2120,حساب مستحقات مقاولي الباطن,missing_debit_code
+30/01/2023,16-01,5037832.25,4110,إيرادات العقود الإنشائية الأساسية,null,null,missing_credit_code
+30/07/2023,39-01,1389125,null,null,1210,ذمم تجارية - العملاء,missing_debit_code
+30/08/2023,40-01,10452.42443,null,null,5100,تكاليف تنفيذ مباشرة,missing_debit_code
+30/08/2023,42-01,1875573.5,null,null,1210,ذمم تجارية - العملاء,missing_debit_code
+30/09/2023,43-01,9507.617078,null,null,5100,تكاليف تنفيذ مباشرة,missing_debit_code
+30/12/2022,16-01,4754467.25,null,null,1210,ذمم تجارية - العملاء,missing_debit_code
+30/12/2022,16-02,283365,null,null,1340,مواد لدى مواقع العملاء (تشوينات),missing_debit_code

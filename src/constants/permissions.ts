@@ -145,10 +145,31 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     icon: 'Receipt',
     permissions: [
       {
-        name: 'transactions.view',
-        nameAr: 'عرض المعاملات',
-        description: 'View all transactions',
-        descriptionAr: 'عرض جميع المعاملات',
+        name: 'transactions.create',
+        nameAr: 'إنشاء المعاملات',
+        description: 'Create new transactions',
+        descriptionAr: 'إنشاء معاملات جديدة',
+        category: 'transactions'
+      },
+      {
+        name: 'transactions.update',
+        nameAr: 'تعديل المعاملات',
+        description: 'Update own unposted transactions',
+        descriptionAr: 'تعديل المعاملات غير المرحلة',
+        category: 'transactions'
+      },
+      {
+        name: 'transactions.delete',
+        nameAr: 'حذف المعاملات',
+        description: 'Delete unposted transactions',
+        descriptionAr: 'حذف المعاملات غير المرحلة',
+        category: 'transactions'
+      },
+      {
+        name: 'transactions.post',
+        nameAr: 'ترحيل المعاملات',
+        description: 'Post/approve transactions',
+        descriptionAr: 'ترحيل واعتماد المعاملات',
         category: 'transactions'
       },
       {
@@ -166,38 +187,17 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         category: 'transactions'
       },
       {
-        name: 'transactions.post',
-        nameAr: 'ترحيل المعاملات',
-        description: 'Post and approve transactions',
-        descriptionAr: 'ترحيل واعتماد المعاملات',
+        name: 'transactions.review',
+        nameAr: 'مراجعة واعتماد المعاملات',
+        description: 'Review transactions: approve/reject/request revision',
+        descriptionAr: 'مراجعة المعاملات: اعتماد/رفض/طلب تعديل',
         category: 'transactions'
       },
       {
-        name: 'transactions.create',
-        nameAr: 'إنشاء معاملات',
-        description: 'Create new transactions',
-        descriptionAr: 'إنشاء معاملات جديدة',
-        category: 'transactions'
-      },
-      {
-        name: 'transactions.update',
-        nameAr: 'تعديل المعاملات',
-        description: 'Update existing transactions',
-        descriptionAr: 'تعديل المعاملات الموجودة',
-        category: 'transactions'
-      },
-      {
-        name: 'transactions.delete',
-        nameAr: 'حذف المعاملات',
-        description: 'Delete transactions',
-        descriptionAr: 'حذف المعاملات',
-        category: 'transactions'
-      },
-      {
-        name: 'transactions.approve',
-        nameAr: 'اعتماد المعاملات',
-        description: 'Approve or reject transactions',
-        descriptionAr: 'اعتماد أو رفض المعاملات',
+        name: 'transactions.manage',
+        nameAr: 'إدارة المعاملات',
+        description: 'Manage all transactions (edit/delete)',
+        descriptionAr: 'إدارة جميع المعاملات (تعديل/حذف)',
         category: 'transactions'
       }
     ]
@@ -235,6 +235,49 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         description: 'Delete expenses categories',
         descriptionAr: 'حذف فئات المصروفات',
         category: 'expenses_categories'
+      }
+    ]
+  },
+  {
+    key: 'permissions',
+    name: 'Permissions Management',
+    nameAr: 'إدارة الصلاحيات',
+    icon: 'Security',
+    permissions: [
+      {
+        name: 'permissions.view',
+        nameAr: 'عرض الصلاحيات',
+        description: 'View all permissions in the system',
+        descriptionAr: 'عرض جميع الصلاحيات في النظام',
+        category: 'permissions'
+      },
+      {
+        name: 'permissions.create',
+        nameAr: 'إنشاء صلاحيات',
+        description: 'Create new permissions',
+        descriptionAr: 'إنشاء صلاحيات جديدة',
+        category: 'permissions'
+      },
+      {
+        name: 'permissions.update',
+        nameAr: 'تعديل الصلاحيات',
+        description: 'Update existing permissions',
+        descriptionAr: 'تعديل الصلاحيات الموجودة',
+        category: 'permissions'
+      },
+      {
+        name: 'permissions.delete',
+        nameAr: 'حذف الصلاحيات',
+        description: 'Delete permissions from the system',
+        descriptionAr: 'حذف الصلاحيات من النظام',
+        category: 'permissions'
+      },
+      {
+        name: 'permissions.manage',
+        nameAr: 'إدارة الصلاحيات',
+        description: 'Full permissions management access',
+        descriptionAr: 'وصول كامل لإدارة الصلاحيات',
+        category: 'permissions'
       }
     ]
   },

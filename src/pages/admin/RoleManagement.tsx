@@ -218,32 +218,18 @@ export default function RoleManagement() {
     try {
       setSavingPerms(true);
 
-      // Reset existing permissions for this role
-      await supabase
-        .from('role_permissions')
-        .delete()
-        .eq('role_id', selectedRole.id);
+      // Use the new RPC function to save permissions
+      const { data, error } = await supabase.rpc('save_role_permissions', {
+        p_role_id: selectedRole.id,
+        p_permission_names: formData.permissions
+      });
 
-      if (formData.permissions.length > 0) {
-        // Resolve permission IDs
-        const { data: perms, error: permsError } = await supabase
-          .from('permissions')
-          .select('id, name')
-          .in('name', formData.permissions);
-
-        if (permsError) throw permsError;
-
-        if (perms && perms.length > 0) {
-          const rolePermissions = perms.map(p => ({
-            role_id: selectedRole.id,
-            permission_id: p.id
-          }));
-
-          const { error: insertError } = await supabase.from('role_permissions').insert(rolePermissions);
-          if (insertError) throw insertError;
-        }
+      if (error) {
+        console.error('RPC Error:', error);
+        throw error;
       }
 
+      console.log('Save result:', data);
       alert('تم حفظ الصلاحيات بنجاح');
       await loadRoles();
       setEditDialogOpen(false);
@@ -349,8 +335,8 @@ export default function RoleManagement() {
   };
 
   return (
-    <Box sx={{ p: 3 }} dir="rtl">
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }} dir="rtl">
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3, flexShrink: 0 }}>
         <Typography variant="h4" fontWeight="bold">
           إدارة الأدوار والصلاحيات
         </Typography>
@@ -374,18 +360,19 @@ export default function RoleManagement() {
         </Stack>
       </Stack>
 
-      {loading ? (
-        <Grid container spacing={3}>
-          {[...Array(4)].map((_, i) => (
-<Grid xs={12} md={6} lg={4} key={i}>
-              <Skeleton variant="rectangular" height={200} />
-            </Grid>
-          ))}
-        </Grid>
-      ) : (
-        <Grid container spacing={3}>
-          {roles.map(role => (
-<Grid xs={12} md={6} lg={4} key={role.id}>
+      <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+        {loading ? (
+          <Grid container spacing={3}>
+            {[...Array(4)].map((_, i) => (
+              <Grid item xs={12} md={6} lg={4} key={i}>
+                <Skeleton variant="rectangular" height={200} />
+              </Grid>
+            ))}
+          </Grid>
+        ) : (
+          <Grid container spacing={3}>
+            {roles.map(role => (
+            <Grid item xs={12} md={6} lg={4} key={role.id}>
               <Card>
                 <CardContent>
                   <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={2}>
@@ -470,8 +457,9 @@ export default function RoleManagement() {
               </Card>
             </Grid>
           ))}
-        </Grid>
-      )}
+          </Grid>
+        )}
+      </Box>
 
       {/* Edit/Create Role Dialog */}
       <Dialog
@@ -491,7 +479,7 @@ export default function RoleManagement() {
         <DialogContent dividers>
           <Stack spacing={3}>
             <Grid container spacing={2}>
-<Grid xs={12} md={6}>
+              <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
                   label="اسم الدور (بالإنجليزية)"
@@ -500,7 +488,7 @@ export default function RoleManagement() {
                   disabled={selectedRole?.is_system}
                 />
               </Grid>
-<Grid xs={12} md={6}>
+              <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
                   label="اسم الدور (بالعربية)"
@@ -508,7 +496,7 @@ export default function RoleManagement() {
                   onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
                 />
               </Grid>
-<Grid xs={12} md={6}>
+              <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
                   label="الوصف (بالإنجليزية)"
@@ -518,7 +506,7 @@ export default function RoleManagement() {
                   rows={1}
                 />
               </Grid>
-<Grid xs={12} md={6}>
+              <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
                   label="الوصف (بالعربية)"
@@ -554,7 +542,7 @@ export default function RoleManagement() {
                   <AccordionDetails>
                     <Grid container spacing={1}>
                       {category.permissions.map(permission => (
-<Grid xs={12} md={6} key={permission.name}>
+                        <Grid item xs={12} md={6} key={permission.name}>
                           <FormControlLabel
                             control={
                               <Checkbox

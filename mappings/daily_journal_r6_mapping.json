@@ -1,0 +1,51 @@
+{
+  "رقم_المرجع": "reference_number",
+  "reference_number": "reference_number",
+
+  "تاريخ_القيد": "entry_date",
+  "entry_date": "entry_date",
+  "transaction entry_date": "entry_date",
+  "transaction entry_date": "entry_date_text",
+
+  "المبلغ": "amount",
+  "amount": "amount",
+  "amount": "amount_text",
+  "المبلغ ": "amount",
+
+  "مدين_كود": "debit_account_code",
+  "debit_account_code": "debit_account_code",
+  "debit_account_id": "debit_account_code",
+
+  "دائن_كود": "credit_account_code",
+  "credit_account_code": "credit_account_code",
+  "credit_account_id": "credit_account_code",
+
+  "مدين_اسم": "debit_account_name_src",
+  "debit_account_name_src": "debit_account_name_src",
+  "debit_account desc": "debit_account_name_src",
+
+  "دائن_اسم": "credit_account_name_src",
+  "credit_account_name_src": "credit_account_name_src",
+  "credit_account_ descr": "credit_account_name_src",
+
+  "الوصف": "txn_description",
+  "description": "txn_description",
+  "txn_description": "txn_description",
+  "transaction description": "txn_description",
+
+  "كود_التصنيف": "classification_code",
+  "classification_code": "classification_code",
+  "transaction_classification code": "classification_code",
+
+  "كود_بند_العمل": "work_item_code",
+  "work_item_code": "work_item_code",
+  "work_items  code": "work_item_code",
+
+  "كود_المصروف": "expenses_code",
+  "expenses_code": "expenses_code",
+  "expenses_categories code": "expenses_code",
+  "transaction_classification name": "classification_name",
+  "work_items  descrip": "work_item_description",
+  "expenses_categories description": "expenses_description"
+}
+

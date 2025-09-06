@@ -208,20 +208,12 @@ export const navigationItems: NavigationItem[] = [
     icon: "settings",
     children: [
       {
-        id: "users",
-        label: "Users",
-        titleEn: "Users",
-        titleAr: "المستخدمون",
-        icon: "users",
-        path: "/settings/users"
-      },
-      {
-        id: "roles",
-        label: "Roles & Permissions",
-        titleEn: "Roles & Permissions", 
-        titleAr: "الأدوار والصلاحيات",
-        icon: "shield",
-        path: "/settings/roles"
+        id: "user-management",
+        label: "User Management",
+        titleEn: "User Management",
+        titleAr: "إدارة المستخدمين",
+        icon: "Security",
+        path: "/settings/user-management"
       },
       {
         id: "org-management",
