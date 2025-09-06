@@ -31,37 +31,11 @@ function forceStyledEngineProviderShim() {
   }
 }
 
-function forceEmotionCacheShim() {
-  return {
-    name: 'force-emotion-cache-shim',
-    enforce: 'pre' as const,
-    resolveId(id: string, importer?: string) {
-      // Do not intercept when our own shim resolves the real ESM file
-      if (importer && importer.endsWith(path.normalize('src/shims/emotion-cache-default.ts'))) {
-        return null
-      }
-      // Allow direct dist imports to resolve to the real file
-      if (id.includes('/@emotion/cache/dist/') || id.includes('\\@emotion\\cache\\dist\\')) {
-        return null
-      }
-      if (
-        id === '@emotion/cache' ||
-        id.includes('/@emotion/cache') ||
-        id.includes('node_modules/@emotion/cache') ||
-        id.includes('node_modules\\@emotion\\cache')
-      ) {
-        return path.resolve(__dirname, 'src/shims/emotion-cache-default.ts')
-      }
-      return null
-    },
-  }
-}
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
   plugins: [
     forceStyledEngineProviderShim(),
-    forceEmotionCacheShim(),
     react(),
     mode === 'analyze' && visualizer({
       filename: 'dist/stats.html',
@@ -81,8 +55,6 @@ export default defineConfig(({ mode }) => ({
       '@mui/system': path.resolve(__dirname, 'node_modules/@mui/system'),
       '@mui/base': path.resolve(__dirname, 'node_modules/@mui/base'),
       '@mui/utils': path.resolve(__dirname, 'node_modules/@mui/utils'),
-      // Normalize @emotion/cache default export for all consumers
-      '@emotion/cache$': path.resolve(__dirname, 'src/shims/emotion-cache-default.ts'),
       // Ensure every StyledEngineProvider path resolves to our shim
       '@mui/styled-engine$': path.resolve(__dirname, 'src/shims/styled-engine-index.ts'),
       '@mui/styled-engine/StyledEngineProvider': path.resolve(__dirname, 'src/shims/StyledEngineProvider.tsx'),
