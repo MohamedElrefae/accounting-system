@@ -5,6 +5,27 @@
   ],
   "buildCommand": "npm ci && npm run build",
   "outputDirectory": "dist",
+  "headers": [
+    {
+      "source": "/index.html",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "header", "key": "Accept", "value": ".*text/html.*" }],
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, must-revalidate" }
+      ]
+    }
+  ],
   "routes": [
     { "src": "/(assets|js|css)/(.*)", "dest": "/$1/$2" },
     { "src": "/(.*)", "dest": "/index.html" }
