@@ -1,0 +1,47 @@
+| code | suggested_name                            | normal_balance | category  |
+| ---- | ----------------------------------------- | -------------- | --------- |
+| 1340 |                        (       )          | debit          | asset     |
+| 2230 |                        /                  | credit         | liability |
+
+
+
+| reference_number | entry_date | amount     | account_code |
+| ---------------- | ---------- | ---------- | ------------ |
+| 234-01           | 2023-02-28 | 296636.00  | 1120         |
+| 294-01           | 2023-05-15 | 30000.00   | 1110         |
+| 39-01            | 2023-07-30 | 1389125.00 | 1210         |
+| 42-01            | 2023-08-30 | 1875573.50 | 1210         |
+| 608-01           | 2025-04-30 | 497890.00  | 1120         |
+
+| same_account_count |
+| ------------------ |
+| 5                  |
+
+
+| reference_number | entry_date | amount     | account_code | debit_account_name_src | credit_account_name_src |
+| ---------------- | ---------- | ---------- | ------------ | ---------------------- | ----------------------- |
+| 234-01           | 2023-02-28 | 296636.00  | 1120         |                        |                         |
+| 294-01           | 2023-05-15 | 30000.00   | 1110         |                        |                         |
+| 39-01            | 2023-07-30 | 1389125.00 | 1210         |            -           |            -            |
+| 42-01            | 2023-08-30 | 1875573.50 | 1210         |            -           |            -            |
+| 608-01           | 2025-04-30 | 497890.00  | 1120         |                        |                         |
+
+
+| reference_number | entry_date | amount     | current_debit_code | current_credit_code | new_debit_code | new_credit_code | note |
+| ---------------- | ---------- | ---------- | ------------------ | ------------------- | -------------- | --------------- | ---- |
+| 234-01           | 2023-02-28 | 296636.00  | 1120               | 1120                | null           | null            | null |
+| 294-01           | 2023-05-15 | 30000.00   | 1110               | 1110                | null           | null            | null |
+| 39-01            | 2023-07-30 | 1389125.00 | 1210               | 1210                | null           | null            | null |
+| 42-01            | 2023-08-30 | 1875573.50 | 1210               | 1210                | null           | null            | null |
+| 608-01           | 2025-04-30 | 497890.00  | 1120               | 1120                | null           | null            | null |
+
+- Example templates: replace the {{}} placeholders with your chosen codes
+-- Make sure new_debit_code != new_credit_code, and they exist in public.accounts(code)
+UPDATE staging.trx_corrections
+SET new_debit_code = '{{DEBIT_CODE}}', new_credit_code = '{{CREDIT_CODE}}', note = 'manual fix'
+WHERE reference_number = '{{REF}}' AND entry_date = '{{YYYY-MM-DD}}' AND amount = {{AMOUNT}};
+
+-- Example based on your earlier sample (adjust if needed):
+-- UPDATE staging.trx_corrections
+-- SET new_debit_code = '1110', new_credit_code = '1120', note = 'bank -> AR'
+-- WHERE reference_number = '416-01' AND entry_date = '2024-06-13' AND amount = 900000;
