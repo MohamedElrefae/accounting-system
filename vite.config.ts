@@ -29,10 +29,33 @@ function forceStyledEngineProviderShim() {
   }
 }
 
+// Ultimate blocklist: replace any StyledEngineProvider.js with a virtual no-op module
+function blockStyledEngineProvider() {
+  const VIRTUAL_ID = 'virtual:sep-noop'
+  return {
+    name: 'block-sep-virtual',
+    enforce: 'pre' as const,
+    resolveId(id: string) {
+      const lower = id.replace(/\\/g, '/').toLowerCase()
+      if (lower.endsWith('/styledengineprovider.js')) {
+        return VIRTUAL_ID
+      }
+      return null
+    },
+    load(id: string) {
+      if (id === VIRTUAL_ID) {
+        return `import React from 'react';\nexport default function StyledEngineProvider(props){ return props?.children ?? null }`;
+      }
+      return null
+    },
+  }
+}
+
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
   plugins: [
+    blockStyledEngineProvider(),
     forceStyledEngineProviderShim(),
     react(),
     mode === 'analyze' && visualizer({
