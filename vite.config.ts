@@ -13,16 +13,14 @@ function forceStyledEngineProviderShim() {
     name: 'force-sep-shim',
     enforce: 'pre' as const,
     resolveId(id: string) {
-      // Match both package specifiers and absolute paths under node_modules
+      // Reroute any StyledEngineProvider implementation to our NO-OP shim
+      const lower = id.replace(/\\/g, '/').toLowerCase()
       if (
-        id.includes('@mui/styled-engine/StyledEngineProvider') ||
-        id.endsWith('/@mui/styled-engine/StyledEngineProvider/index.js') ||
-        id.endsWith('/@mui/styled-engine/StyledEngineProvider/StyledEngineProvider.js') ||
-        id.includes('node_modules/@mui/styled-engine/StyledEngineProvider') ||
-        id.includes('node_modules\\@mui\\styled-engine\\StyledEngineProvider') ||
-        id.endsWith('/@mui/styled-engine/modern/StyledEngineProvider/StyledEngineProvider.js') ||
-        id.endsWith('/@mui/styled-engine/legacy/StyledEngineProvider/StyledEngineProvider.js') ||
-        id.endsWith('/@mui/styled-engine/node/StyledEngineProvider/StyledEngineProvider.js')
+        lower.endsWith('/styledengineprovider.js') ||
+        lower.includes('@mui/styled-engine/styledengineprovider') ||
+        lower.includes('@mui/system/styledengineprovider') ||
+        lower.includes('@mui/material/styles/styledengineprovider') ||
+        lower.includes('@mui/material/styledengineprovider')
       ) {
         return path.resolve(__dirname, 'src/shims/StyledEngineProvider.tsx')
       }
