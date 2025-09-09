@@ -74,6 +74,7 @@ const Dashboard: React.FC = () => {
   const [refreshing, setRefreshing] = React.useState<boolean>(false);
   const [currencySymbol, setCurrencySymbol] = React.useState<string>('none');
   const [numberFormat, setNumberFormat] = React.useState<string>('en-US');
+  const [dateFormat, setDateFormat] = React.useState<string>('YYYY-MM-DD');
   const [compactTicks, setCompactTicks] = React.useState<boolean>(true);
   const [customShortcuts, setCustomShortcuts] = React.useState<Array<{ label: string; path: string; icon?: string; accessKey?: string }>>([]);
   const [userShortcuts, setUserShortcuts] = React.useState<Array<{ label: string; path: string; icon?: string; accessKey?: string }>>([]);
@@ -86,6 +87,7 @@ const Dashboard: React.FC = () => {
   const [dateTo, setDateTo] = React.useState<string>('');
   const [numbersOnlyDashboard, setNumbersOnlyDashboard] = React.useState<boolean>(false);
   const [showFilters, setShowFilters] = React.useState<boolean>(false);
+  const [postedOnly, setPostedOnly] = React.useState<boolean>(false);
   const axisNumberFormatter = React.useMemo(() => new Intl.NumberFormat(numberFormat || 'en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), [numberFormat]);
   const compactNumberFormatter = React.useMemo(() => new Intl.NumberFormat(numberFormat || 'en-US', { notation: 'compact', maximumFractionDigits: 1 }), [numberFormat]);
   const formatAxisTick = (v: number) => {
@@ -108,7 +110,19 @@ const Dashboard: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US');
+    const d = new Date(dateString);
+    const y = String(d.getFullYear());
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    switch ((dateFormat || 'YYYY-MM-DD').toUpperCase()) {
+      case 'MM/DD/YYYY':
+        return `${m}/${day}/${y}`;
+      case 'DD/MM/YYYY':
+        return `${day}/${m}/${y}`;
+      case 'YYYY-MM-DD':
+      default:
+        return `${y}-${m}-${day}`;
+    }
   };
 
   // Date helpers
@@ -265,11 +279,13 @@ const Dashboard: React.FC = () => {
       const df = localStorage.getItem('dashboard_date_from');
       const dt = localStorage.getItem('dashboard_date_to');
       const no = localStorage.getItem('dashboard_numbers_only');
+      const po = localStorage.getItem('dashboard_posted_only');
       if (so) setSelectedOrgId(so);
       if (sp) setSelectedProjectId(sp);
       if (df) setDateFrom(df);
       if (dt) setDateTo(dt);
       if (no) setNumbersOnlyDashboard(no === 'true');
+      if (po) setPostedOnly(po === 'true');
     } catch {}
     // load orgs and projects
     (async () => {
@@ -312,6 +328,7 @@ const Dashboard: React.FC = () => {
       const cfg = await getCompanyConfig();
       setCurrencySymbol(cfg.currency_symbol || 'none');
       setNumberFormat(cfg.number_format || (language === 'ar' ? 'ar-SA' : 'en-US'));
+      setDateFormat(cfg.date_format || 'YYYY-MM-DD');
       setCustomShortcuts(Array.isArray((cfg as any).shortcuts) ? ((cfg as any).shortcuts as any) : []);
 
       // Fetch accounts map once (include normal_balance)
@@ -369,7 +386,13 @@ const Dashboard: React.FC = () => {
       if (dateTo) {
         rangeQ = rangeQ.lte('entry_date', dateTo);
       }
+      if (dateTo) {
+        rangeQ = rangeQ.lte('entry_date', dateTo);
+      }
       rangeQ = applyScope(rangeQ);
+      if (postedOnly) {
+        rangeQ = rangeQ.eq('is_posted', true);
+      }
       const { data: txRange, error: rangeErr } = await rangeQ;
       if (rangeErr) throw rangeErr;
       const txs = txRange || [];
@@ -462,7 +485,7 @@ const Dashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [language]);
+  }, [language, postedOnly]);
 
   React.useEffect(() => {
     void load();
@@ -498,6 +521,12 @@ const Dashboard: React.FC = () => {
           <IconButton size="small" onClick={() => setShowFilters(v => !v)} aria-label={language === 'ar' ? 'إظهار/إخفاء المرشحات' : 'Toggle filters'}>
             <ExpandMoreIcon sx={{ transform: showFilters ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
           </IconButton>
+          <Chip
+            size="small"
+            label={postedOnly ? (language === 'ar' ? 'مرحلة فقط' : 'Posted only') : (language === 'ar' ? 'الكل' : 'All transactions')}
+            color={postedOnly ? 'success' : 'default'}
+            variant={postedOnly ? 'filled' : 'outlined'}
+          />
           {lastUpdated && (
             <Typography variant="caption" color="text.secondary">
               {(language === 'ar' ? 'آخر تحديث: ' : 'Last updated: ') + new Date(lastUpdated).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US')}
@@ -528,6 +557,10 @@ const Dashboard: React.FC = () => {
             <FormControlLabel
               control={<Switch size="small" checked={numbersOnlyDashboard} onChange={(e) => { setNumbersOnlyDashboard(e.target.checked); try { localStorage.setItem('dashboard_numbers_only', String(e.target.checked)); } catch {} }} />}
               label={language === 'ar' ? 'أرقام فقط' : 'Numbers only'}
+            />
+            <FormControlLabel
+              control={<Switch size="small" checked={postedOnly} onChange={(e) => { setPostedOnly(e.target.checked); try { localStorage.setItem('dashboard_posted_only', String(e.target.checked)); } catch {} }} />}
+              label={language === 'ar' ? 'المرحلة فقط' : 'Posted only'}
             />
             <Select size="small" value={selectedOrgId} displayEmpty onChange={(e)=>{ setSelectedOrgId(e.target.value as string); try { localStorage.setItem('dashboard_scope_org', String(e.target.value||'')); } catch {} }}>
               <MenuItem value="">{language === 'ar' ? 'كل المؤسسات' : 'All Orgs'}</MenuItem>

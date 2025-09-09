@@ -276,6 +276,15 @@ export const navigationItems: NavigationItem[] = [
         path: "/settings/font-preferences"
       },
       {
+        id: "export-database",
+        label: "Export Database",
+        titleEn: "Export Database",
+        titleAr: "تصدير قاعدة البيانات",
+        icon: "database",
+        path: "/settings/export-database",
+        requiredPermission: "data.export"
+      },
+      {
         id: "diagnostics",
         label: "Diagnostics",
         titleEn: "Diagnostics",

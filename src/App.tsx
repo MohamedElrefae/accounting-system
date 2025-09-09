@@ -33,6 +33,7 @@ const Profile = React.lazy(() => import('./pages/admin/Profile'));
 const ProjectManagement = React.lazy(() => import('./components/Projects/ProjectManagement'));
 const OrgManagementTabs = React.lazy(() => import('./components/Organizations/OrganizationManagementTabs'));
 const FontSettings = React.lazy(() => import('./components/Settings/FontSettings'));
+const ExportDatabasePage = React.lazy(() => import('./pages/admin/ExportDatabase'));
 const ApprovalsInbox = React.lazy(() => import('./pages/Approvals/Inbox'));
 import { useHasPermission } from './hooks/useHasPermission';
 
@@ -313,6 +314,13 @@ const App: React.FC = () => {
               <React.Suspense fallback={<div>Loading...</div>}>
                 <FontSettings />
               </React.Suspense>
+            } />
+            <Route path="/settings/export-database" element={
+              <RequirePermission perm="data.export">
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <ExportDatabasePage />
+                </React.Suspense>
+              </RequirePermission>
             } />
             <Route path="/settings/preferences" element={<PlaceholderPage title="Preferences" />} />
             <Route path="/settings/backup" element={<PlaceholderPage title="Backup & Restore" />} />

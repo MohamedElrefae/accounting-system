@@ -6,6 +6,7 @@ import { Outlet } from 'react-router-dom';
 import TopBar from './TopBar';
 import SidebarPortal from "./SidebarPortal";
 import useAppStore from '../../store/useAppStore';
+import { DRAWER_WIDTH, DRAWER_COLLAPSED_WIDTH } from './Sidebar';
 
 const DashboardLayout: React.FC = () => {
   const { sidebarCollapsed, toggleSidebar, language } = useAppStore();
@@ -73,6 +74,9 @@ const DashboardLayout: React.FC = () => {
             flexDirection: 'column',
             backgroundColor: 'background.default',
             overflow: 'hidden',
+            // Shift the entire main area away from the fixed sidebar using logical margin
+            marginInlineStart: `${sidebarCollapsed ? DRAWER_COLLAPSED_WIDTH : DRAWER_WIDTH}px`,
+            transition: 'margin 200ms ease',
           }}
         >
           {/* offset for AppBar */}
@@ -81,10 +85,6 @@ const DashboardLayout: React.FC = () => {
             flex: 1,
             p: 3,
             overflow: 'auto',
-            // logical padding to account for sidebar width on the appropriate side
-            ...(isRtl
-              ? { paddingRight: `${sidebarCollapsed ? 64 : 280}px` }
-              : { paddingLeft: `${sidebarCollapsed ? 64 : 280}px` }),
           }}>
             <Outlet />
           </Box>
