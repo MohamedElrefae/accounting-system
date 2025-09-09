@@ -9,6 +9,7 @@ import GitHub from '@mui/icons-material/GitHub';
 import Google from '@mui/icons-material/Google';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import useAppStore from '../../store/useAppStore';
 
 const schema = yup.object({
   email: yup.string().email('البريد الإلكتروني غير صحيح').required('البريد الإلكتروني مطلوب'),
@@ -20,6 +21,7 @@ type FormValues = { email: string; password: string };
 export const LoginForm: React.FC = () => {
   const { signIn, signInWithProvider } = useAuth();
   const navigate = useNavigate();
+  const { setLanguage } = useAppStore();
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -29,7 +31,8 @@ export const LoginForm: React.FC = () => {
     try {
       setSubmitting(true);
       await signIn(values.email, values.password);
-      // Navigate to dashboard after successful sign-in
+      // Set Arabic as default language after successful login and then navigate
+      setLanguage('ar');
       navigate('/');
     } catch (e: any) {
       console.error('[Login] signIn error:', e);

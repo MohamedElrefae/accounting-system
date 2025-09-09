@@ -6,7 +6,7 @@ const useAppStore = create<AppStore>()(
   persist(
     (set, get) => ({
       // Initial state
-      language: 'en',
+      language: 'ar',
       theme: 'dark',
       sidebarCollapsed: false,
       notifications: [],
@@ -16,8 +16,9 @@ const useAppStore = create<AppStore>()(
       // Actions
       setLanguage: (language: Language) => {
         set({ language });
-        // Update document direction
+        // Update document direction and lang attribute
         document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+        document.documentElement.lang = language;
       },
 
       setTheme: (theme: ThemeMode) => set({ theme }),
