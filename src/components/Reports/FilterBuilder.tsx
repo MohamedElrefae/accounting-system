@@ -21,12 +21,10 @@ import {
   IconButton,
   Chip,
 } from '@mui/material';
-import {
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  Edit as EditIcon,
-  FilterAlt as FilterIcon,
-} from '@mui/icons-material';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import FilterIcon from '@mui/icons-material/FilterAlt';
 import type { FilterBuilderProps, ReportFilter } from '../../types/reports';
 
 const operatorLabels: Record<string, string> = {

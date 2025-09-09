@@ -1,7 +1,7 @@
 # StyledEngineProvider runtime error (lI is not a function)
 
 Status: Open
-Last updated: 2025-09-05
+Last updated: 2025-09-06
 Owner: Eng
 
 ---
@@ -165,6 +165,106 @@ function forceEmotionCacheShim() {
 
 ## Rollback plan
 - If the enforced plugin redirections cause unexpected behavior, remove plugins and revert to previously working commit while we iterate in a separate branch.
+
+---
+
+## Progress update (2025-09-06)
+
+Changes implemented
+- Added and wired a robust @emotion/cache shim that imports the concrete ESM browser build and guarantees a callable default export
+  - File: src/shims/emotion-cache-default.ts
+  - Alias: '@emotion/cache$' -> src/shims/emotion-cache-default.ts (in vite.config.ts)
+  - Probe: window.EMOTION_CACHE_SHIM = 'active'
+- Confirmed StyledEngineProvider no-op shim remains enforced through aliases and pre-resolve plugins already present
+  - Files: src/shims/StyledEngineProvider.tsx, src/shims/styled-engine-index.ts
+  - Plugins: blockStyledEngineProvider(), forceStyledEngineProviderShim() (vite.config.ts)
+
+Current behavior
+- The browser still reports: "StyledEngineProvider.js:13 Uncaught TypeError: lI is not a function"
+- This indicates a code path is still executing the node_modules @mui/styled-engine/StyledEngineProvider module (module-scope createCache call) rather than our shim.
+
+Working hypothesis (refined)
+- Relative imports inside @mui/styled-engine (e.g., './StyledEngineProvider') can bypass our current alias checks because resolveId sees a relative id and our handler doesn’t look at the importer path.
+- Similarly, internal references to @emotion/cache might resolve to a file path that bypasses the '@emotion/cache$' alias (e.g., direct dist file paths).
+
+Next steps (queued)
+1) Harden resolver for path-level interception
+   - Update forceStyledEngineProviderShim to inspect both id and importer:
+     - If id is relative and importer is inside node_modules/@mui/styled-engine/…, redirect to src/shims/StyledEngineProvider.tsx
+     - If id resolves to any absolute path ending with '/StyledEngineProvider.js' under @mui/styled-engine, redirect as well
+   - Add forceEmotionCacheShim to intercept any absolute/relative path resolving to @emotion/cache (including dist paths) and redirect to src/shims/emotion-cache-default.ts
+
+2) Verify build output and mapping
+   - After local build, search dist for 'StyledEngineProvider' to confirm only shim code is present and the node_modules file is not
+   - Use source maps if minified to confirm mapping to shim
+
+3) Clean deploy and sanity check
+   - Rebuild locally and redeploy without cache; verify probes in console and ensure no runtime StyledEngineProvider errors
+
+Pseudocode for resolver hardening (to implement next)
+```ts path=null start=null
+import path from 'node:path'
+
+function forceStyledEngineProviderShim() {
+  return {
+    name: 'force-sep-shim',
+    enforce: 'pre' as const,
+    resolveId(id: string, importer?: string) {
+      const lower = id.replace(/\\\\/g, '/').toLowerCase()
+      const imp = importer ? importer.replace(/\\\\/g, '/').toLowerCase() : ''
+
+      // 1) Relative import from within @mui/styled-engine
+      if ((lower === './styledengineprovider' || lower.endsWith('/styledengineprovider')) &&
+          imp.includes('/node_modules/@mui/styled-engine/')) {
+        return path.resolve(__dirname, 'src/shims/StyledEngineProvider.tsx')
+      }
+
+      // 2) Any absolute path that lands on StyledEngineProvider.js
+      if (lower.endsWith('/styledengineprovider.js')) {
+        return path.resolve(__dirname, 'src/shims/StyledEngineProvider.tsx')
+      }
+
+      // 3) Package specifier variants
+      if (
+        lower.includes('@mui/styled-engine/styledengineprovider') ||
+        lower.includes('@mui/system/styledengineprovider') ||
+        lower.includes('@mui/material/styles/styledengineprovider') ||
+        lower.includes('@mui/material/styledengineprovider')
+      ) {
+        return path.resolve(__dirname, 'src/shims/StyledEngineProvider.tsx')
+      }
+
+      return null
+    }
+  }
+}
+
+function forceEmotionCacheShim() {
+  return {
+    name: 'force-emotion-cache-shim',
+    enforce: 'pre' as const,
+    resolveId(id: string, importer?: string) {
+      const lower = id.replace(/\\\\/g, '/').toLowerCase()
+      const imp = importer ? importer.replace(/\\\\/g, '/').toLowerCase() : ''
+
+      // Package specifier or deep path to @emotion/cache
+      if (
+        lower === '@emotion/cache' ||
+        lower.includes('/@emotion/cache') ||
+        imp.includes('/node_modules/@emotion/cache')
+      ) {
+        return path.resolve(__dirname, 'src/shims/emotion-cache-default.ts')
+      }
+      return null
+    }
+  }
+}
+
+// usage in vite config plugins: [forceStyledEngineProviderShim(), forceEmotionCacheShim(), …]
+```
+
+Tracking
+- Keep this section updated with which resolver rules are added and their impact on the bundle graph.
 
 ---
 

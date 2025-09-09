@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, Divider, Stack, Typography, Button } fro
 import Grid from '@mui/material/Grid';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useUserProfile } from '../../contexts/UserProfileContext';
+import { supabase } from '../../utils/supabase';
 
 const RlsChecks: React.FC = () => {
   const { profile } = useUserProfile();
@@ -14,7 +15,7 @@ const RlsChecks: React.FC = () => {
       // These checks should succeed if RLS is configured as owner-only
       const uid = profile?.id || '';
       // 1) own profile should be readable
-      const res1 = await (await import('../../utils/supabase')).supabase
+      const res1 = await supabase
         .from('user_profiles')
         .select('id')
         .eq('id', uid)
@@ -22,7 +23,7 @@ const RlsChecks: React.FC = () => {
       const ok1 = !!res1.data && !res1.error;
 
       // 2) user_roles should only return current user's rows
-      const res2 = await (await import('../../utils/supabase')).supabase
+      const res2 = await supabase
         .from('user_roles')
         .select('user_id')
         .limit(100);
@@ -30,7 +31,7 @@ const RlsChecks: React.FC = () => {
       const ok2 = !res2.error && onlyOwn;
 
       // 3) user_permissions should only return current user's rows
-      const res3 = await (await import('../../utils/supabase')).supabase
+      const res3 = await supabase
         .from('user_permissions')
         .select('user_id')
         .limit(100);

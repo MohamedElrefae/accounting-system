@@ -10,12 +10,10 @@ import {
   alpha,
   useTheme
 } from '@mui/material';
-import {
-  People as PeopleIcon,
-  Security as SecurityIcon,
-  AdminPanelSettings as AdminIcon,
-  Key as KeyIcon
-} from '@mui/icons-material';
+import PeopleIcon from '@mui/icons-material/People';
+import SecurityIcon from '@mui/icons-material/Security';
+import AdminIcon from '@mui/icons-material/AdminPanelSettings';
+import KeyIcon from '@mui/icons-material/Key';
 
 // Import enterprise components
 import EnterpriseUserManagement from './EnterpriseUserManagement';

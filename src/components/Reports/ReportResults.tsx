@@ -18,16 +18,14 @@ import {
   ListItemIcon,
   ListItemText,
 } from '@mui/material';
-import {
-  GetApp as ExportIcon,
-  Save as SaveIcon,
-  TableChart as TableIcon,
-  FileDownload as CsvIcon,
-  PictureAsPdf as PdfIcon,
-  Description as ExcelIcon,
-  FileCopy as JsonIcon,
-  ContentCopy as ClipboardIcon,
-} from '@mui/icons-material';
+import ExportIcon from '@mui/icons-material/GetApp';
+import SaveIcon from '@mui/icons-material/Save';
+import TableIcon from '@mui/icons-material/TableChart';
+import CsvIcon from '@mui/icons-material/FileDownload';
+import PdfIcon from '@mui/icons-material/PictureAsPdf';
+import ExcelIcon from '@mui/icons-material/Description';
+import JsonIcon from '@mui/icons-material/FileCopy';
+import ClipboardIcon from '@mui/icons-material/ContentCopy';
 import type { ReportResultsProps } from '../../types/reports';
 import {
   exportToExcel,

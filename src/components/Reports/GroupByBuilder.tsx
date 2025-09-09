@@ -20,11 +20,9 @@ import {
   IconButton,
   Chip,
 } from '@mui/material';
-import {
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  Group as GroupIcon,
-} from '@mui/icons-material';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import GroupIcon from '@mui/icons-material/Group';
 import type { GroupByBuilderProps, ReportGroupBy } from '../../types/reports';
 
 const GroupByBuilder: React.FC<GroupByBuilderProps> = ({

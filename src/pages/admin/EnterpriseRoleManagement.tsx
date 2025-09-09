@@ -50,28 +50,26 @@ import {
   useTheme
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  ExpandMore as ExpandMoreIcon,
-  Save as SaveIcon,
-  Search as SearchIcon,
-  Visibility as ViewIcon,
-  Group as GroupIcon,
-  AdminPanelSettings as AdminIcon,
-  Compare as CompareIcon,
-  ContentCopy as CopyIcon,
-  FileDownload as ExportIcon,
-  Analytics as AnalyticsIcon,
-  Timeline as TimelineIcon,
-  People as PeopleIcon,
-  Shield as ShieldIcon,
-  Star as StarIcon,
-  CheckCircle as CheckIcon,
-  MoreVert as MoreIcon,
-  Assignment as PermissionIcon
-} from '@mui/icons-material';
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import SaveIcon from '@mui/icons-material/Save';
+import SearchIcon from '@mui/icons-material/Search';
+import ViewIcon from '@mui/icons-material/Visibility';
+import GroupIcon from '@mui/icons-material/Group';
+import AdminIcon from '@mui/icons-material/AdminPanelSettings';
+import CompareIcon from '@mui/icons-material/Compare';
+import CopyIcon from '@mui/icons-material/ContentCopy';
+import ExportIcon from '@mui/icons-material/FileDownload';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import PeopleIcon from '@mui/icons-material/People';
+import ShieldIcon from '@mui/icons-material/Shield';
+import StarIcon from '@mui/icons-material/Star';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import MoreIcon from '@mui/icons-material/MoreVert';
+import PermissionIcon from '@mui/icons-material/Assignment';
 import { supabase } from '../../utils/supabase';
 import { PERMISSION_CATEGORIES } from '../../constants/permissions';
 

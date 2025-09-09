@@ -1,0 +1,243 @@
+import { defineConfig } from "vite"
+import react from "@vitejs/plugin-react"
+import { visualizer } from "rollup-plugin-visualizer"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+
+
+
+
+
+
+
+
+
+// https://vite.dev/config/
+export default defineConfig(({ mode }) => ({
+  plugins: [
+    // Hard-redirect any StyledEngineProvider deep import to our no-op shim
+    {
+      name: 'redirect-styledengineprovider',
+      enforce: 'pre' as const,
+      resolveId(id: string) {
+        const lower = String(id).replace(/\\/g, '/').toLowerCase()
+        if (
+          lower.endsWith('/styledengineprovider.js') ||
+          lower.endsWith('/styledengineprovider')
+        ) {
+          return path.resolve(__dirname, 'src/shims/StyledEngineProvider.tsx')
+        }
+        return null
+      }
+    },
+    // Hard-redirect any ClassNameConfigurator deep import to our no-op shim
+    {
+      name: 'redirect-classnameconfigurator',
+      enforce: 'pre' as const,
+      resolveId(id: string) {
+        const lower = String(id).replace(/\\/g, '/').toLowerCase()
+        if (
+          lower.endsWith('/classnameconfigurator.js') ||
+          lower.endsWith('/classnameconfigurator')
+        ) {
+          return path.resolve(__dirname, 'src/shims/mui-base-classname-configurator.tsx')
+        }
+        return null
+      }
+    },
+    // Hard-redirect any useEnhancedEffect deep import to our safe shim
+    {
+      name: 'redirect-useenhancedeffect',
+      enforce: 'pre' as const,
+      resolveId(id: string) {
+        const lower = String(id).replace(/\\/g, '/').toLowerCase()
+        if (
+          lower.includes('useenhancedeffect')
+        ) {
+          return path.resolve(__dirname, 'src/shims/mui-use-enhanced-effect.ts')
+        }
+        return null
+      }
+    },
+    react(),
+    mode === 'analyze' && visualizer({
+      filename: 'dist/stats.html',
+      open: true,
+      gzipSize: true,
+      brotliSize: true,
+    })
+  ].filter(Boolean),
+  resolve: {
+    alias: {
+      // Force single React instance to prevent multiple context issues
+      'react': path.resolve(__dirname, 'node_modules/react'),
+      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+      '@mui/material': path.resolve(__dirname, 'node_modules/@mui/material'),
+      '@mui/system': path.resolve(__dirname, 'node_modules/@mui/system'),
+      '@mui/base': path.resolve(__dirname, 'node_modules/@mui/base'),
+      '@mui/utils': path.resolve(__dirname, 'node_modules/@mui/utils'),
+      // Minimal shim: route StyledEngineProvider to no-op to avoid createCache issues
+      '@mui/styled-engine/StyledEngineProvider': path.resolve(__dirname, 'src/shims/StyledEngineProvider.tsx'),
+      '@mui/material/styles/StyledEngineProvider': path.resolve(__dirname, 'src/shims/StyledEngineProvider.tsx'),
+      '@mui/system/StyledEngineProvider': path.resolve(__dirname, 'src/shims/StyledEngineProvider.tsx'),
+      // Minimal shim: route MUI Base ClassNameConfigurator to no-op provider
+      '@mui/base/unstable_ClassNameConfigurator': path.resolve(__dirname, 'src/shims/mui-base-classname-configurator.tsx'),
+      '@mui/base/ClassNameConfigurator': path.resolve(__dirname, 'src/shims/mui-base-classname-configurator.tsx'),
+      '@mui/base/utils/ClassNameConfigurator': path.resolve(__dirname, 'src/shims/mui-base-classname-configurator.tsx'),
+'@mui/material/utils/ClassNameConfigurator': path.resolve(__dirname, 'src/shims/mui-base-classname-configurator.tsx'),
+      // Safe alias for useEnhancedEffect
+      '@mui/utils/useEnhancedEffect': path.resolve(__dirname, 'src/shims/mui-use-enhanced-effect.ts'),
+      '@mui/material/utils/useEnhancedEffect': path.resolve(__dirname, 'src/shims/mui-use-enhanced-effect.ts'),
+      '@mui/base/utils/useEnhancedEffect': path.resolve(__dirname, 'src/shims/mui-use-enhanced-effect.ts')
+    },
+    dedupe: ['react', 'react-dom', '@emotion/react', '@emotion/styled', '@emotion/cache', 'zustand', 'use-sync-external-store']
+  },
+  esbuild: {
+    // Limit the number of files processed simultaneously
+    target: 'esnext',
+    // Reduce memory usage during transformation
+    logLevel: 'warning'
+  },
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom'
+    ],
+    exclude: [
+      '@mui/icons-material',
+      '@mui/icons-material/esm',
+      '@mui/icons-material/lib'
+    ],
+    // Limit concurrent processing to prevent EMFILE errors
+    entries: [
+      'src/**/*.{ts,tsx}',
+      '!src/**/*.test.{ts,tsx}',
+      '!src/**/*.stories.{ts,tsx}'
+    ],
+    // Force optimization to happen only when needed
+    force: false
+  },
+  build: {
+    target: "esnext",
+    minify: "esbuild",
+    sourcemap: true,
+    chunkSizeWarningLimit: 1000, // Increase limit to 1000kB
+    commonjsOptions: {
+      transformMixedEsModules: true
+    },
+    rollupOptions: {
+      output: {
+        // Improved manual chunks for better code splitting
+        manualChunks: (id) => {
+          // Core React libraries
+          if (id.includes("react") || id.includes("react-dom") || id.includes("react-router-dom")) {
+            return "react-vendor";
+          }
+          
+          // MUI Core (most commonly used)
+          if (id.includes("@mui/material") || id.includes("@mui/system") || id.includes("@emotion")) {
+            return "mui-core";
+          }
+          
+          // MUI Icons (separate chunk as its large)
+          if (id.includes("@mui/icons-material")) {
+            return "mui-icons";
+          }
+          
+          // MUI X components (data grid, charts, date pickers)
+          if (id.includes("@mui/x-")) {
+            return "mui-x";
+          }
+          
+          // Chart libraries
+          if (id.includes("recharts") || id.includes("d3-")) {
+            return "charts";
+          }
+          
+          // Supabase and auth
+          if (id.includes("@supabase") || id.includes("auth")) {
+            return "supabase";
+          }
+          
+          // Form libraries
+          if (id.includes("react-hook-form") || id.includes("yup") || id.includes("@hookform")) {
+            return "forms";
+          }
+          
+          // Utility libraries
+          if (id.includes("dayjs") || id.includes("xlsx") || id.includes("jspdf") || id.includes("zustand")) {
+            return "utils";
+          }
+          
+          // Lucide icons
+          if (id.includes("lucide-react")) {
+            return "icons";
+          }
+          
+          // TanStack Query
+          if (id.includes("@tanstack")) {
+            return "query";
+          }
+          
+          // Heavy admin components
+          if (id.includes("/admin/") || id.includes("UserManagement") || id.includes("RoleManagement")) {
+            return "admin-components";
+          }
+          
+          // Charts and reporting components
+          if (id.includes("/Transactions/") || id.includes("AccountsTree") || id.includes("TrialBalance")) {
+            return "business-components";
+          }
+          
+          // Other large vendor libraries
+          if (id.includes("node_modules")) {
+            return "vendor";
+          }
+        },
+        // Optimize chunk file names
+        chunkFileNames: (chunkInfo) => {
+          const facadeModuleId = chunkInfo.facadeModuleId
+            ? chunkInfo.facadeModuleId.split("/").pop()?.replace(".tsx", "").replace(".ts", "")
+            : "chunk";
+          return `js/${facadeModuleId}-[hash].js`;
+        },
+        assetFileNames: (assetInfo) => {
+          const info = assetInfo.name?.split(".") || ['unknown'];
+          const ext = info[info.length - 1];
+          if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(ext)) {
+            return `images/[name]-[hash][extname]`;
+          }
+          if (/css/i.test(ext)) {
+            return `css/[name]-[hash][extname]`;
+          }
+          return `assets/[name]-[hash][extname]`;
+        },
+      },
+    },
+  },
+  server: {
+    port: 3000,
+    open: true,
+    watch: {
+      // Completely ignore MUI icons directories to prevent file watching
+      ignored: [
+        '**/node_modules/@mui/icons-material/esm/**',
+        '**/node_modules/@mui/icons-material/lib/**',
+        '**/node_modules/@mui/icons-material/**/*.js',
+        '!**/node_modules/@mui/icons-material/index.js',
+        '!**/node_modules/@mui/icons-material/package.json'
+      ],
+      // Use polling to reduce file system load
+      usePolling: false,
+      interval: 1000
+    }
+  },
+  preview: {
+    port: 3000,
+    open: true,
+  },
+}))

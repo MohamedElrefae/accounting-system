@@ -97,7 +97,7 @@ export const navigationItems: NavigationItem[] = [
         titleAr: "في انتظار الموافقة",
         icon: "clock",
         path: "/transactions/pending",
-        requiredPermission: "transactions.post"
+        requiredPermission: "transactions.review"
       },
       {
         id: "all-transactions",
@@ -107,6 +107,42 @@ export const navigationItems: NavigationItem[] = [
         icon: "list",
         path: "/transactions/all",
         requiredPermission: "transactions.read.all"
+      }
+    ]
+  },
+  {
+    id: "approvals",
+    label: "Approvals",
+    titleEn: "Approvals",
+    titleAr: "الموافقات",
+    icon: "Assignment",
+    children: [
+      {
+        id: "approvals-inbox",
+        label: "Inbox",
+        titleEn: "Inbox",
+        titleAr: "صندوق الموافقات",
+        icon: "Assignment",
+        path: "/approvals/inbox",
+        requiredPermission: "transactions.review"
+      },
+      {
+        id: "approvals-workflows",
+        label: "Workflows",
+        titleEn: "Workflows",
+        titleAr: "مسارات الموافقات",
+        icon: "Assignment",
+        path: "/approvals/workflows",
+        requiredPermission: "transactions.manage"
+      },
+      {
+        id: "approvals-test",
+        label: "Test",
+        titleEn: "Test",
+        titleAr: "اختبار المسارات",
+        icon: "Assignment",
+        path: "/approvals/test",
+        requiredPermission: "transactions.manage"
       }
     ]
   },

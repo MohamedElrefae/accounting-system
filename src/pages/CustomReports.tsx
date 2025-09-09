@@ -24,13 +24,11 @@ import {
   FormControlLabel,
   Checkbox,
 } from '@mui/material';
-import {
-  Save as SaveIcon,
-  PlayArrow as PlayIcon,
-  Refresh as RefreshIcon,
-  Dashboard as DashboardIcon,
-  TableChart as TableIcon,
-} from '@mui/icons-material';
+import SaveIcon from '@mui/icons-material/Save';
+import PlayIcon from '@mui/icons-material/PlayArrow';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import TableIcon from '@mui/icons-material/TableChart';
 import { useToast } from '../contexts/ToastContext';
 import { useReportPresets } from '../hooks/useReportPresets';
 import { useUniversalReportSync } from '../hooks/useUniversalReportSync';

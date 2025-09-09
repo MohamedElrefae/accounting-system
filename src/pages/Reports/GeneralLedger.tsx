@@ -13,6 +13,7 @@ import { useReportPresets } from '../../hooks/useReportPresets'
 import { getCompanyConfig } from '../../services/company-config'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
+import { supabase } from '../../utils/supabase'
 import './StandardFinancialStatements.css'
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
@@ -1157,7 +1158,6 @@ const GeneralLedger: React.FC = () => {
       
       // Load classifications
       try {
-        const { supabase } = await import('../../utils/supabase')
         const { data: classData } = await supabase
           .from('transaction_classifications')
           .select('id, name')

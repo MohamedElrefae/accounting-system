@@ -193,30 +193,30 @@ function classifyBSAccountType(code: string): BSRow['account_type'] | null {
   const cleanCode = code.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
   const firstChar = cleanCode.charAt(0)
 
-  // Based on your actual chart of accounts from the screenshot:
+  // Fixed mapping based on actual chart of accounts:
   // 1 = الأصول (Assets) - Balance Sheet
   if (firstChar === '1') {
     return 'assets'
   }
   
-  // 2 = الالتزامات (Liabilities) - Balance Sheet
+  // 2 = الخصوم (Liabilities) - Balance Sheet
   if (firstChar === '2') {
     return 'liabilities'
   }
   
-  // 3 = الإيرادات (Revenue) - NOT Balance Sheet
+  // 3 = حقوق الملكية (Equity) - Balance Sheet - FIXED!
   if (firstChar === '3') {
-    return null
+    return 'equity'
   }
   
-  // 4 = المصروفات (Expenses) - NOT Balance Sheet
+  // 4 = الإيرادات (Revenue) - NOT Balance Sheet
   if (firstChar === '4') {
     return null
   }
   
-  // 5 = حقوق الملكية (Equity) - Balance Sheet
+  // 5 = التكاليف والمصروفات (Expenses) - NOT Balance Sheet
   if (firstChar === '5') {
-    return 'equity'
+    return null
   }
 
   // Handle other possible patterns

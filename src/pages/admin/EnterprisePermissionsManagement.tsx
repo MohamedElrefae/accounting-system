@@ -52,26 +52,24 @@ import {
   useTheme
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
-import {
-  Add as AddPermissionIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Search as SearchIcon,
-  Visibility as ViewIcon,
-  Key as KeyIcon,
-  Lock as LockIcon,
-  ExpandMore as ExpandMoreIcon,
-  MoreVert as MoreIcon,
-  ContentCopy as CopyIcon,
-  FileDownload as ExportIcon,
-  Analytics as AnalyticsIcon,
-  Group as GroupIcon,
-  Assignment as AssignmentIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckIcon,
-  PlayArrow as TestIcon,
-  Category as CategoryIcon
-} from '@mui/icons-material';
+import AddPermissionIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import SearchIcon from '@mui/icons-material/Search';
+import ViewIcon from '@mui/icons-material/Visibility';
+import KeyIcon from '@mui/icons-material/Key';
+import LockIcon from '@mui/icons-material/Lock';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import MoreIcon from '@mui/icons-material/MoreVert';
+import CopyIcon from '@mui/icons-material/ContentCopy';
+import ExportIcon from '@mui/icons-material/FileDownload';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import GroupIcon from '@mui/icons-material/Group';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import WarningIcon from '@mui/icons-material/Warning';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import TestIcon from '@mui/icons-material/PlayArrow';
+import CategoryIcon from '@mui/icons-material/Category';
 import { supabase } from '../../utils/supabase';
 import { PERMISSION_CATEGORIES } from '../../constants/permissions';
 

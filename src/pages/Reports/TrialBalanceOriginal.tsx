@@ -182,12 +182,12 @@ export default function TrialBalanceOriginal() {
         const firstToken = String(code).trim().split(/[^0-9A-Za-z]/)[0]
         const d1 = firstToken.substring(0,1)
         
-        // Based on your actual chart of accounts from the screenshot:
-        if (d1 === '1') return 'assets'        // 1 = الأصول (Assets)
-        if (d1 === '2') return 'liabilities'  // 2 = الالتزامات (Liabilities)
-        if (d1 === '3') return 'revenue'      // 3 = الإيرادات (Revenue)
-        if (d1 === '4') return 'expenses'     // 4 = المصروفات (Expenses)
-        if (d1 === '5') return 'equity'       // 5 = حقوق الملكية (Equity)
+        // Fixed mapping based on actual chart of accounts:
+        if (d1 === '1') return 'assets'        // 1 = الأصول (Assets) ✅
+        if (d1 === '2') return 'liabilities'   // 2 = الخصوم (Liabilities) ✅
+        if (d1 === '3') return 'equity'        // 3 = حقوق الملكية (Equity) - FIXED!
+        if (d1 === '4') return 'revenue'       // 4 = الإيرادات (Revenue) - FIXED!
+        if (d1 === '5') return 'expenses'      // 5 = التكاليف والمصروفات (Expenses) - FIXED!
         
         return undefined
       }
