@@ -24,13 +24,11 @@ import {
   ListItemText,
   Divider,
 } from '@mui/material';
-import {
-  Search as SearchIcon,
-  PlayArrow as UseTemplateIcon,
-  Info as InfoIcon,
-  FilterList as FilterIcon,
-  AccessTime as TimeIcon,
-} from '@mui/icons-material';
+import SearchIcon from '@mui/icons-material/Search';
+import UseTemplateIcon from '@mui/icons-material/PlayArrow';
+import InfoIcon from '@mui/icons-material/Info';
+import FilterIcon from '@mui/icons-material/FilterList';
+import TimeIcon from '@mui/icons-material/AccessTime';
 import {
   getReportTemplates,
   getTemplatesByCategory,

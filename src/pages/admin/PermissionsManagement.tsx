@@ -27,18 +27,16 @@ import {
   Tooltip
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Security as SecurityIcon,
-  ExpandMore as ExpandMoreIcon,
-  Save as SaveIcon,
-  Search as SearchIcon,
-  Key as KeyIcon,
-  Visibility as ViewIcon,
-  Code as CodeIcon
-} from '@mui/icons-material';
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import SecurityIcon from '@mui/icons-material/Security';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import SaveIcon from '@mui/icons-material/Save';
+import SearchIcon from '@mui/icons-material/Search';
+import KeyIcon from '@mui/icons-material/Key';
+import ViewIcon from '@mui/icons-material/Visibility';
+import CodeIcon from '@mui/icons-material/Code';
 import { supabase } from '../../utils/supabase';
 import { PermissionGuard } from '../../components/auth/PermissionGuard';
 

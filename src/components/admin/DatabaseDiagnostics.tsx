@@ -10,7 +10,9 @@ import {
   Chip,
   CircularProgress
 } from '@mui/material';
-import { PlayArrow as RunIcon, CheckCircle, Error } from '@mui/icons-material';
+import RunIcon from '@mui/icons-material/PlayArrow';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
 import { supabase } from '../../utils/supabase';
 
 interface TestResult {
@@ -245,7 +247,7 @@ export function DatabaseDiagnostics() {
       case 'success':
         return <CheckCircle color="success" />;
       case 'error':
-        return <Error color="error" />;
+        return <ErrorIcon color="error" />;
       case 'running':
         return <CircularProgress size={20} />;
       default:

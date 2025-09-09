@@ -1,6 +1,5 @@
-import * as React from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
-import { jsx as _jsx } from 'react/jsx-runtime';
 
 // Probe so we can confirm this shim is executing in production (NO-OP version)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -10,10 +10,8 @@ import {
   Chip,
   IconButton,
 } from '@mui/material';
-import {
-  Dataset as DatasetIcon,
-  Info as InfoIcon,
-} from '@mui/icons-material';
+import DatasetIcon from '@mui/icons-material/Dataset';
+import InfoIcon from '@mui/icons-material/Info';
 import type { DatasetSelectorProps } from '../../types/reports';
 
 const DatasetSelector: React.FC<DatasetSelectorProps> = ({

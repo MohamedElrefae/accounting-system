@@ -23,17 +23,15 @@ import {
   CircularProgress,
   Switch
 } from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  Search as SearchIcon,
-  Security as SecurityIcon,
-  Info as InfoIcon,
-  Save as SaveIcon,
-  Refresh as RefreshIcon,
-  AdminPanelSettings as AdminIcon,
-  LockOpen as GrantIcon,
-  Lock as RevokeIcon
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import SearchIcon from '@mui/icons-material/Search';
+import SecurityIcon from '@mui/icons-material/Security';
+import InfoIcon from '@mui/icons-material/Info';
+import SaveIcon from '@mui/icons-material/Save';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import AdminIcon from '@mui/icons-material/AdminPanelSettings';
+import GrantIcon from '@mui/icons-material/LockOpen';
+import RevokeIcon from '@mui/icons-material/Lock';
 import Grid from '@mui/material/Grid';
 import { supabase } from '../../utils/supabase';
 import { audit } from '../../utils/audit';

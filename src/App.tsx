@@ -33,6 +33,7 @@ const Profile = React.lazy(() => import('./pages/admin/Profile'));
 const ProjectManagement = React.lazy(() => import('./components/Projects/ProjectManagement'));
 const OrgManagementTabs = React.lazy(() => import('./components/Organizations/OrganizationManagementTabs'));
 const FontSettings = React.lazy(() => import('./components/Settings/FontSettings'));
+const ApprovalsInbox = React.lazy(() => import('./pages/Approvals/Inbox'));
 import { useHasPermission } from './hooks/useHasPermission';
 
 // Placeholder components for other pages
@@ -316,6 +317,29 @@ const App: React.FC = () => {
             <Route path="/settings/preferences" element={<PlaceholderPage title="Preferences" />} />
             <Route path="/settings/backup" element={<PlaceholderPage title="Backup & Restore" />} />
             
+            {/* Approvals */}
+            <Route path="/approvals/inbox" element={
+              <RequirePermission perm="transactions.review">
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <ApprovalsInbox />
+                </React.Suspense>
+              </RequirePermission>
+            } />
+            <Route path="/approvals/workflows" element={
+              <RequirePermission perm="transactions.manage">
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  {React.createElement(React.lazy(() => import('./pages/Approvals/Workflows')))}
+                </React.Suspense>
+              </RequirePermission>
+            } />
+            <Route path="/approvals/test" element={
+              <RequirePermission perm="transactions.manage">
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  {React.createElement(React.lazy(() => import('./pages/Approvals/TestWorkflow')))}
+                </React.Suspense>
+              </RequirePermission>
+            } />
+
             {/* Export Test Page */}
             <Route path="/export-test" element={
               <React.Suspense fallback={<div>Loading...</div>}>

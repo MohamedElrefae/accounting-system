@@ -20,14 +20,12 @@ import {
   IconButton,
   Chip,
 } from '@mui/material';
-import {
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  Edit as EditIcon,
-  Sort as SortIcon,
-  ArrowUpward as AscIcon,
-  ArrowDownward as DescIcon,
-} from '@mui/icons-material';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import SortIcon from '@mui/icons-material/Sort';
+import AscIcon from '@mui/icons-material/ArrowUpward';
+import DescIcon from '@mui/icons-material/ArrowDownward';
 import type { SortBuilderProps, ReportSort } from '../../types/reports';
 
 const SortBuilder: React.FC<SortBuilderProps> = ({

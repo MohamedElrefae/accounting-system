@@ -13,10 +13,8 @@ import {
   Button,
   Chip,
 } from '@mui/material';
-import {
-  Refresh as RefreshIcon,
-  Visibility as PreviewIcon,
-} from '@mui/icons-material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import PreviewIcon from '@mui/icons-material/Visibility';
 import type { ReportPreviewProps } from '../../types/reports';
 
 const ReportPreview: React.FC<ReportPreviewProps> = ({

@@ -16,17 +16,15 @@ import {
   Button,
   Collapse,
 } from '@mui/material';
-import {
-  TextFields as TextIcon,
-  Numbers as NumberIcon,
-  Event as DateIcon,
-  CheckBox as BooleanIcon,
-  Search as SearchIcon,
-  SelectAll as SelectAllIcon,
-  DeselectOutlined as DeselectAllIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-} from '@mui/icons-material';
+import TextIcon from '@mui/icons-material/TextFields';
+import NumberIcon from '@mui/icons-material/Numbers';
+import DateIcon from '@mui/icons-material/Event';
+import BooleanIcon from '@mui/icons-material/CheckBox';
+import SearchIcon from '@mui/icons-material/Search';
+import SelectAllIcon from '@mui/icons-material/SelectAll';
+import DeselectAllIcon from '@mui/icons-material/DeselectOutlined';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import type { FieldSelectorProps, ReportField } from '../../types/reports';
 
 const getFieldIcon = (type: string) => {

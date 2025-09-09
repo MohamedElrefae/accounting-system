@@ -202,41 +202,41 @@ function classifyPLAccountType(code: string): PLRow['account_type'] | null {
   const firstChar = cleanCode.charAt(0)
   const firstTwo = cleanCode.substring(0, 2)
 
-  // Based on your actual chart of accounts from the screenshot:
+  // Fixed mapping based on actual chart of accounts:
   // 1 = الأصول (Assets) - NOT P&L
   if (firstChar === '1') {
     return null
   }
   
-  // 2 = الالتزامات (Liabilities) - NOT P&L
+  // 2 = الخصوم (Liabilities) - NOT P&L
   if (firstChar === '2') {
     return null
   }
   
-  // 3 = الإيرادات (Revenue) - THIS IS P&L!
+  // 3 = حقوق الملكية (Equity) - NOT P&L
   if (firstChar === '3') {
+    return null
+  }
+  
+  // 4 = الإيرادات (Revenue) - THIS IS P&L! - FIXED!
+  if (firstChar === '4') {
     return 'revenue'
   }
   
-  // 4 = المصروفات (Expenses) - THIS IS P&L!
-  if (firstChar === '4') {
+  // 5 = التكاليف والمصروفات (Expenses) - THIS IS P&L! - FIXED!
+  if (firstChar === '5') {
     // Sub-categorize expenses based on sub-codes
-    if (firstTwo === '40' || firstTwo === '41' || firstTwo === '42') {
+    if (firstTwo === '50' || firstTwo === '51' || firstTwo === '52') {
       return 'cost_of_sales' // Cost of sales/COGS
     }
-    if (firstTwo >= '43' && firstTwo <= '48') {
+    if (firstTwo >= '53' && firstTwo <= '58') {
       return 'expenses' // Operating expenses
     }
-    if (firstTwo === '49') {
+    if (firstTwo === '59') {
       return 'other_expenses' // Other expenses
     }
-    // Default all 4xxx to expenses if no specific sub-category
+    // Default all 5xxx to expenses if no specific sub-category
     return 'expenses'
-  }
-  
-  // 5 = حقوق الملكية (Equity) - NOT P&L
-  if (firstChar === '5') {
-    return null
   }
 
   // Handle other possible P&L patterns

@@ -15,13 +15,11 @@ import {
   Switch
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
-import {
-  Person as PersonIcon,
-  Email as EmailIcon,
-  Work as WorkIcon,
-  Business as BusinessIcon,
-  Save as SaveIcon
-} from '@mui/icons-material';
+import PersonIcon from '@mui/icons-material/Person';
+import EmailIcon from '@mui/icons-material/Email';
+import WorkIcon from '@mui/icons-material/Work';
+import BusinessIcon from '@mui/icons-material/Business';
+import SaveIcon from '@mui/icons-material/Save';
 import { supabase } from '../../utils/supabase';
 import { audit } from '../../utils/audit';
 import { useAuth } from '../../contexts/AuthContext';

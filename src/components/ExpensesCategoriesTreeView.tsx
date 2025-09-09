@@ -11,17 +11,15 @@ import {
   CircularProgress,
   Fade
 } from '@mui/material';
-import {
-  ChevronRight,
-  ExpandMore,
-  Edit,
-  Add,
-  Delete,
-  VisibilityOff,
-  Visibility,
-  AccountTree,
-  Category
-} from '@mui/icons-material';
+import ChevronRight from '@mui/icons-material/ChevronRight';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import Edit from '@mui/icons-material/Edit';
+import Add from '@mui/icons-material/Add';
+import Delete from '@mui/icons-material/Delete';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import Visibility from '@mui/icons-material/Visibility';
+import AccountTree from '@mui/icons-material/AccountTree';
+import Category from '@mui/icons-material/Category';
 import { lightTheme as theme } from '../styles/theme';
 
 type ExpensesCategoryView = {

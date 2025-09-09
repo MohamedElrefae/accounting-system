@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { getAccounts, getTransactions, createTransaction, deleteTransaction, updateTransaction, getTransactionAudit, getCurrentUserId, getProjects, approveTransaction, requestRevision, rejectTransaction, submitTransaction, type Account, type TransactionRecord, type TransactionAudit, type Project } from '../../services/transactions'
+import { getAccounts, getTransactions, createTransaction, deleteTransaction, updateTransaction, getTransactionAudit, getCurrentUserId, getProjects, approveTransaction, requestRevision, rejectTransaction, submitTransaction, getUserDisplayMap, type Account, type TransactionRecord, type TransactionAudit, type Project } from '../../services/transactions'
 import { listWorkItemsAll } from '../../services/work-items'
 import type { WorkItemRow } from '../../types/work-items'
 import { getOrganizations } from '../../services/organization'
@@ -14,6 +14,7 @@ import { useToast } from '../../contexts/ToastContext'
 import ExportButtons from '../../components/Common/ExportButtons'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
 import TransactionView from './TransactionView'
+import { getApprovalHistoryByTransactionId, type ApprovalHistoryRow } from '../../services/approvals'
 import ClientErrorLogs from '../admin/ClientErrorLogs'
 import PermissionBadge from '../../components/Common/PermissionBadge'
 import { WithPermission } from '../../components/Common/withPermission'
@@ -27,7 +28,7 @@ import ColumnConfiguration from '../../components/Common/ColumnConfiguration'
 import type { ColumnConfig } from '../../components/Common/ColumnConfiguration'
 import useColumnPreferences from '../../hooks/useColumnPreferences'
 import SearchableSelect, { type SearchableSelectOption } from '../../components/Common/SearchableSelect'
-
+import { supabase } from '../../utils/supabase'
 
 interface FilterState {
   dateFrom: string
@@ -61,6 +62,7 @@ const TransactionsPage: React.FC = () => {
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [detailsFor, setDetailsFor] = useState<TransactionRecord | null>(null)
   const [audit, setAudit] = useState<TransactionAudit[]>([])
+  const [approvalHistory, setApprovalHistory] = useState<ApprovalHistoryRow[]>([])
   
   // Unified form panel state
   const [panelPosition, setPanelPosition] = useState<{ x: number; y: number }>({ x: 100, y: 100 })
@@ -273,7 +275,6 @@ const TransactionsPage: React.FC = () => {
     const ids: string[] = []
     rows.forEach(t => { if (t.created_by) ids.push(t.created_by); if (t.posted_by) ids.push(t.posted_by!) })
     try {
-      const { getUserDisplayMap } = await import('../../services/transactions')
       const map = await getUserDisplayMap(ids)
       setUserNames(map)
     } catch {}
@@ -653,7 +654,22 @@ const TransactionsPage: React.FC = () => {
     try {
       if (reviewAction === 'approve') {
         await approveTransaction(reviewTargetId, reviewReason || null as any)
-        showToast('تم اعتماد المعاملة (وتم ترحيلها)', { severity: 'success' })
+        // After approval, check whether posting actually happened. If posting permissions
+        // are missing, the RPC succeeds (approved) but posting is skipped gracefully.
+        let posted = false
+        try {
+          const { data } = await supabase
+            .from('transactions')
+            .select('is_posted')
+            .eq('id', reviewTargetId)
+            .single()
+          posted = Boolean(data?.is_posted)
+        } catch {}
+        if (posted) {
+          showToast('تم اعتماد المعاملة (وتم ترحيلها)', { severity: 'success' })
+        } else {
+          showToast('تم اعتماد المعاملة (لم تُرحَّل — صلاحية الترحيل مطلوبة)', { severity: 'warning' as any })
+        }
       } else if (reviewAction === 'revise') {
         if (!reviewReason.trim()) {
           showToast('يرجى إدخال سبب الإرجاع للتعديل', { severity: 'error' })
@@ -964,8 +980,20 @@ const TransactionsPage: React.FC = () => {
                       const rows = await getTransactionAudit(row.original.id)
                       setAudit(rows)
                     } catch {}
+                    try {
+                      const hist = await getApprovalHistoryByTransactionId(row.original.id)
+                      setApprovalHistory(hist)
+                    } catch {}
                     setDetailsOpen(true)
                   }}><div className="btn-content"><span className="btn-text">تفاصيل</span></div></button>
+                  {/* Test workflow shortcut */}
+                  <WithPermission perm="transactions.manage">
+                    <button className="ultimate-btn" title="اختبار المسار" onClick={() => {
+                      try { window.open(`/approvals/test?txId=${row.original.id}`, '_blank', 'noopener') } catch {}
+                    }}>
+                      <div className="btn-content"><span className="btn-text">اختبار</span></div>
+                    </button>
+                  </WithPermission>
                   {/* Review actions in pending mode if permitted */}
                   {mode === 'pending' && !row.original.is_posted && (
                     <>
@@ -1089,6 +1117,7 @@ const TransactionsPage: React.FC = () => {
         <TransactionView
           transaction={detailsFor}
           audit={audit}
+          approvalHistory={approvalHistory}
           userNames={userNames}
           categoryLabel={(detailsFor as any).expenses_category_id ? (() => {
             const m: Record<string,string> = {}

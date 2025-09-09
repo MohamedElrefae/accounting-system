@@ -1,5 +1,6 @@
 import { supabase } from '../utils/supabase'
 import { formatDateForSupabase } from '../utils/dateHelpers'
+import { getTransactionNumberConfig } from './company-config'
 
 export interface Account {
   id: string
@@ -89,7 +90,6 @@ export async function getNextTransactionNumber(config?: TransactionNumberConfig)
   let actualConfig = config
   if (!actualConfig) {
     try {
-      const { getTransactionNumberConfig } = await import('./company-config')
       actualConfig = await getTransactionNumberConfig()
     } catch (error) {
       console.error('Error loading company config, using default:', error)

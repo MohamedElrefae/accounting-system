@@ -2,6 +2,8 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { StyledEngineProvider } from '@mui/material/styles'
+
 import { AuthProvider } from './contexts/AuthContext'
 import { CustomThemeProvider } from './contexts/ThemeContext'
 import { ToastProvider } from './contexts/ToastContext'
@@ -21,18 +23,20 @@ console.log('[app] CacheProvider active')
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <CacheProvider value={muiCache}>
-      <AuthProvider>
-        <FontPreferencesProvider>
-          <CustomThemeProvider>
-            <ToastProvider>
-              <UserProfileProvider>
-                <App />
-              </UserProfileProvider>
-            </ToastProvider>
-          </CustomThemeProvider>
-        </FontPreferencesProvider>
-      </AuthProvider>
-    </CacheProvider>
+    <StyledEngineProvider injectFirst>
+      <CacheProvider value={muiCache}>
+        <AuthProvider>
+          <FontPreferencesProvider>
+            <CustomThemeProvider>
+              <ToastProvider>
+                <UserProfileProvider>
+                  <App />
+                </UserProfileProvider>
+              </ToastProvider>
+            </CustomThemeProvider>
+          </FontPreferencesProvider>
+        </AuthProvider>
+      </CacheProvider>
+    </StyledEngineProvider>
   </StrictMode>,
 )

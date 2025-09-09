@@ -46,31 +46,29 @@ import {
   useTheme
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
-import {
-  PersonAdd as AddUserIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Search as SearchIcon,
-  Visibility as ViewIcon,
-  Group as GroupIcon,
-  AdminPanelSettings as AdminIcon,
-  Person as PersonIcon,
-  Email as EmailIcon,
-  Phone as PhoneIcon,
-  Work as WorkIcon,
-  Business as BusinessIcon,
-  CheckCircle as ActiveIcon,
-  Cancel as InactiveIcon,
-  Security as SecurityIcon,
-  MoreVert as MoreIcon,
-  FileDownload as ExportIcon,
-  Analytics as AnalyticsIcon,
-  Timeline as TimelineIcon,
-  PersonOff as DeactivateIcon,
-  PersonAddAlt as InviteIcon,
-  Shield as ShieldIcon,
-  Key as PermissionIcon
-} from '@mui/icons-material';
+import AddUserIcon from '@mui/icons-material/PersonAdd';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import SearchIcon from '@mui/icons-material/Search';
+import ViewIcon from '@mui/icons-material/Visibility';
+import GroupIcon from '@mui/icons-material/Group';
+import AdminIcon from '@mui/icons-material/AdminPanelSettings';
+import PersonIcon from '@mui/icons-material/Person';
+import EmailIcon from '@mui/icons-material/Email';
+import PhoneIcon from '@mui/icons-material/Phone';
+import WorkIcon from '@mui/icons-material/Work';
+import BusinessIcon from '@mui/icons-material/Business';
+import ActiveIcon from '@mui/icons-material/CheckCircle';
+import InactiveIcon from '@mui/icons-material/Cancel';
+import SecurityIcon from '@mui/icons-material/Security';
+import MoreIcon from '@mui/icons-material/MoreVert';
+import ExportIcon from '@mui/icons-material/FileDownload';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import DeactivateIcon from '@mui/icons-material/PersonOff';
+import InviteIcon from '@mui/icons-material/PersonAddAlt';
+import ShieldIcon from '@mui/icons-material/Shield';
+import PermissionIcon from '@mui/icons-material/Key';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 

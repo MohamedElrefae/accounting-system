@@ -23,15 +23,13 @@ import {
   IconButton
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
-import {
-  PersonAdd as PersonAddIcon,
-  Send as SendIcon,
-  Email as EmailIcon,
-  CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon,
-  Error as ErrorIcon,
-  ContentCopy as ContentCopyIcon
-} from '@mui/icons-material';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import SendIcon from '@mui/icons-material/Send';
+import EmailIcon from '@mui/icons-material/Email';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import ErrorIcon from '@mui/icons-material/Error';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { supabase } from '../../utils/supabase';
 import { audit } from '../../utils/audit';
 import { useAuth } from '../../contexts/AuthContext';

@@ -1,0 +1,12 @@
+/* Approvals Inbox styles using unified tokens (no inline) */
+.approval-container { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
+.approval-header { display: flex; justify-content: space-between; align-items: center; }
+.approval-title { margin: 0; font-size: 1.5rem; font-weight: 700; }
+.approval-actions { display: flex; gap: 8px; }
+.approval-table-wrap { background: var(--surface, #0f0f0f); border: 1px solid var(--border, rgba(0,0,0,0.2)); border-radius: 8px; overflow: hidden; }
+.approval-table { width: 100%; border-collapse: collapse; }
+.approval-table th, .approval-table td { padding: 10px 12px; border-bottom: 1px solid var(--border, rgba(0,0,0,0.1)); text-align: right; }
+.approval-table thead th { background: var(--surface, #0f0f0f); font-weight: 700; }
+.approval-table .empty { text-align: center; color: var(--text-secondary, #a3a3a3); padding: 16px; }
+.actions { display: flex; gap: 6px; }
+.error { color: #ff6b6b; }

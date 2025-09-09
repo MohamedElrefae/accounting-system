@@ -3,8 +3,10 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { Button, Container, TextField, Typography, Box, IconButton, InputAdornment, Paper, Stack } from '@mui/material';
-import { Visibility, VisibilityOff, GitHub } from '@mui/icons-material';
-import GoogleIcon from '@mui/icons-material/Google';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import GitHub from '@mui/icons-material/GitHub';
+import Google from '@mui/icons-material/Google';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -45,7 +47,7 @@ export const LoginForm: React.FC = () => {
 
         <Stack direction="row" spacing={2} mb={3}>
           <Button fullWidth variant="outlined" startIcon={<GitHub />} onClick={() => signInWithProvider('github')}>GitHub</Button>
-          <Button fullWidth variant="outlined" startIcon={<GoogleIcon />} onClick={() => signInWithProvider('google')}>جوجل</Button>
+          <Button fullWidth variant="outlined" startIcon={<Google />} onClick={() => signInWithProvider('google')}>جوجل</Button>
         </Stack>
 
         <Typography variant="h6" textAlign="center" mb={2}>تسجيل الدخول</Typography>

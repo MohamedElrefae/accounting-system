@@ -42,6 +42,7 @@ import {
 import { supabase } from '../utils/supabase';
 import { getActiveProjects } from '../services/projects';
 import { getOrganizations } from '../services/organization';
+import { getCompanyConfig } from '../services/company-config';
 import type { StatCard as StatCardType } from '../types';
 
 // Minimal shape for dashboard recent transactions
@@ -308,7 +309,6 @@ const Dashboard: React.FC = () => {
       };
 
       // Load company config (currency and number format)
-      const [{ getCompanyConfig }] = await Promise.all([import('../services/company-config')]);
       const cfg = await getCompanyConfig();
       setCurrencySymbol(cfg.currency_symbol || 'none');
       setNumberFormat(cfg.number_format || (language === 'ar' ? 'ar-SA' : 'en-US'));

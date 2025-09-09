@@ -17,7 +17,7 @@ import Brightness4 from '@mui/icons-material/Brightness4';
 import Brightness7 from '@mui/icons-material/Brightness7';
 import LanguageIcon from '@mui/icons-material/Language';
 import SettingsIcon from '@mui/icons-material/Settings';
-import LogoutIcon from '@mui/icons-material/Logout';
+import LogoutIcon from '@mui/icons-material/ExitToApp';
 import PaletteIcon from '@mui/icons-material/Palette';
 import useAppStore from '../../store/useAppStore';
 import { useCustomTheme } from '../../contexts/ThemeContext';
