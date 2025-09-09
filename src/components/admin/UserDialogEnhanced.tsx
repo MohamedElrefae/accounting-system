@@ -137,61 +137,37 @@ export const UserDialogEnhanced: React.FC<UserDialogProps> = ({
         }
 
       } else {
-        // Create new user using signUp (client-safe)
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        // Create new user via secure Edge Function (admin-only)
+        const payload = {
           email: fd.email,
-          password: fd.password as string,
-          options: {
-            data: {
-              first_name: fd.first_name,
-              last_name: fd.last_name,
-              require_password_change: fd.require_password_change
-            },
-            emailRedirectTo: `${window.location.origin}/login`
-          }
-        });
-
-        if (signUpError) throw signUpError;
-
-        if (signUpData?.user) {
-          // Create user profile
-          const profileData: Partial<UserRecord> & { id: string; email: string; created_at: string } = {
-            id: signUpData.user.id,
-            email: fd.email,
+          password: fd.password,
+          profile: {
             first_name: fd.first_name,
             last_name: fd.last_name,
             full_name_ar: fd.full_name_ar,
             department: fd.department,
             job_title: finalJobTitle,
             phone: fd.phone,
-            is_active: fd.is_active,
-            created_at: new Date().toISOString()
-          };
+            is_active: fd.is_active
+          },
+          role_id: fd.role_id ? parseInt(fd.role_id) : null,
+          require_password_change: fd.require_password_change !== false
+        };
 
-          const { error: profileError } = await supabase
-            .from('user_profiles')
-            .insert(profileData);
+        const { data: funcData, error: funcError } = await supabase.functions.invoke('admin-create-user', {
+          body: payload
+        });
+        if (funcError) throw funcError as any;
 
-          if (profileError) throw profileError;
+        const newUserId = (funcData as any)?.user?.id as string;
 
-          // Assign role
-          if (fd.role_id) {
-            await supabase.from('user_roles').insert({
-              user_id: signUpData.user.id,
-              role_id: parseInt(fd.role_id),
-              assigned_by: currentUser?.id,
-              is_active: true
-            });
-          }
-
-          // Log via secure RPC only if authenticated
-          if (currentUser?.id) {
-            await audit(supabase, 'user.create', 'user', signUpData.user.id, {
-              email: fd.email,
-              role_id: fd.role_id,
-              department: fd.department
-            });
-          }
+        // Log via secure RPC only if authenticated
+        if (currentUser?.id && newUserId) {
+          await audit(supabase, 'user.create', 'user', newUserId, {
+            email: fd.email,
+            role_id: fd.role_id,
+            department: fd.department
+          });
         }
       }
 

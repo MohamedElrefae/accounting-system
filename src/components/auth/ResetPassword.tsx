@@ -42,8 +42,12 @@ export const ResetPassword: React.FC = () => {
       const { error } = await supabase.auth.updateUser({
         password: values.password
       });
-      
       if (error) throw error;
+
+      // Clear the require_password_change flag after successful update
+      await supabase.auth.updateUser({
+        data: { require_password_change: false }
+      });
       
       setSuccess(true);
       

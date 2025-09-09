@@ -64,6 +64,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Auth state changed
       if (session?.user) {
         setUser(session.user);
+        // If user is required to change password, force redirect to reset page
+        try {
+          const requireChange = (session.user.user_metadata as any)?.require_password_change === true;
+          if (requireChange && window.location.pathname !== '/reset-password') {
+            // Hard redirect to ensure token/state is fresh on reset page
+            window.location.href = '/reset-password';
+            return; // Stop further redirects
+          }
+        } catch {}
+
         // Load profile but don't block on it - set loading to false first
         setLoading(false);
         try {

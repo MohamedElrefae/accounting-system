@@ -44,6 +44,7 @@ import { PermissionGuard } from '../../components/auth/PermissionGuard';
 import { PermissionMatrix } from '../../components/admin/PermissionMatrix';
 import { UserDialogEnhanced as UserDialog } from '../../components/admin/UserDialogEnhanced';
 import { InviteUserDialog } from '../../components/admin/InviteUserDialog';
+import { TestUserCreation } from '../../components/admin/TestUserCreation';
 import { PERMISSIONS } from '../../constants/permissions';
 
 interface User {
@@ -398,6 +399,9 @@ export default function UserManagement() {
           {errorMsg}
         </Alert>
       )}
+
+      {/* Temporary Test Component - Remove after testing */}
+      <TestUserCreation onUserCreated={loadUsers} />
 
       <Paper sx={{ mb: 2, p: 2, flexShrink: 0 }}>
         <Stack spacing={2}>

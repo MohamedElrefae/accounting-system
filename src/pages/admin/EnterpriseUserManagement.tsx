@@ -71,6 +71,7 @@ import ShieldIcon from '@mui/icons-material/Shield';
 import PermissionIcon from '@mui/icons-material/Key';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { TestUserCreation } from '../../components/admin/TestUserCreation';
 
 interface User {
   id: string;
@@ -338,9 +339,25 @@ export default function EnterpriseUserManagement() {
         // Update role assignment
         await handleRoleUpdate(selectedUser.id, formData.role_id);
       } else {
-        // Create new user would need special handling for auth.users
-        alert('إنشاء مستخدمين جدد يتطلب دعوة عبر البريد الإلكتروني');
-        return;
+        // Create new user via Edge Function (direct creation with temporary password)
+        const payload = {
+          email: formData.email,
+          password: 'TempPass123',
+          profile: {
+            first_name: formData.first_name,
+            last_name: formData.last_name,
+            full_name_ar: formData.full_name_ar,
+            department: formData.department,
+            job_title: formData.job_title,
+            phone: formData.phone,
+            is_active: formData.is_active
+          },
+          role_id: formData.role_id,
+          require_password_change: true
+        };
+
+        const { error } = await supabase.functions.invoke('admin-create-user', { body: payload });
+        if (error) throw error;
       }
 
       await loadUsers();
@@ -533,6 +550,9 @@ export default function EnterpriseUserManagement() {
           </Stack>
         </Stack>
       </Paper>
+
+      {/* Temporary Test - remove after confirming function works */}
+      <TestUserCreation onUserCreated={loadUsers} />
 
       {/* Filters and Controls */}
       <Paper elevation={0} sx={{ p: 2, mb: 2 }}>
