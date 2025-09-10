@@ -14,11 +14,13 @@ import PeopleIcon from '@mui/icons-material/People';
 import SecurityIcon from '@mui/icons-material/Security';
 import AdminIcon from '@mui/icons-material/AdminPanelSettings';
 import KeyIcon from '@mui/icons-material/Key';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
 
 // Import enterprise components
 import EnterpriseUserManagement from './EnterpriseUserManagement';
 import EnterpriseRoleManagement from './EnterpriseRoleManagement';
 import EnterprisePermissionsManagement from './EnterprisePermissionsManagement';
+import { AccessRequestManagement } from '../../components/admin/AccessRequestManagement';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -89,6 +91,13 @@ export default function UserManagementSystem() {
       icon: <KeyIcon />,
       color: theme.palette.warning.main,
       description: 'إدارة صلاحيات النظام'
+    },
+    {
+      label: 'طلبات الوصول',
+      labelEn: 'Access Requests',
+      icon: <PersonAddIcon />,
+      color: theme.palette.info.main,
+      description: 'مراجعة واعتماد طلبات الوصول الجديدة'
     }
   ];
 
@@ -296,6 +305,11 @@ export default function UserManagementSystem() {
           <CustomTabPanel value={value} index={2}>
             <Box sx={{ height: '100%', overflow: 'auto' }}>
               <EnterprisePermissionsManagement />
+            </Box>
+          </CustomTabPanel>
+          <CustomTabPanel value={value} index={3}>
+            <Box sx={{ height: '100%', overflow: 'auto' }}>
+              <AccessRequestManagement />
             </Box>
           </CustomTabPanel>
         </Box>

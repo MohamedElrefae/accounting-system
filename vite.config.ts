@@ -25,11 +25,25 @@ export default defineConfig(({ mode }) => ({
     include: ['react', 'react-dom']
   },
   server: {
+    host: true, // allow LAN access and avoids "use --host to expose" message
     port: 3000,
-    open: true
+    strictPort: true, // fail fast if 3000 is taken instead of switching ports silently
+    open: true,
+    watch: {
+      // OneDrive/Network folders on Windows often need polling to detect changes reliably
+      usePolling: true,
+      interval: 100
+    },
+    hmr: {
+      // Explicit HMR config tends to be more stable on some Windows setups
+      protocol: 'ws',
+      host: 'localhost'
+    }
   },
   preview: {
+    host: true,
     port: 4173,
+    strictPort: true,
     open: true
   },
   build: {

@@ -3,13 +3,13 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { Button, Container, TextField, Typography, Box, IconButton, InputAdornment, Paper, Stack } from '@mui/material';
+import { PersonAdd } from '@mui/icons-material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import GitHub from '@mui/icons-material/GitHub';
-import Google from '@mui/icons-material/Google';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import useAppStore from '../../store/useAppStore';
+import { AccessRequestForm } from './AccessRequestForm';
 
 const schema = yup.object({
   email: yup.string().email('البريد الإلكتروني غير صحيح').required('البريد الإلكتروني مطلوب'),
@@ -19,11 +19,12 @@ const schema = yup.object({
 type FormValues = { email: string; password: string };
 
 export const LoginForm: React.FC = () => {
-  const { signIn, signInWithProvider } = useAuth();
+  const { signIn } = useAuth();
   const navigate = useNavigate();
   const { setLanguage } = useAppStore();
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [showAccessRequest, setShowAccessRequest] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({ resolver: yupResolver(schema) });
 
@@ -42,16 +43,20 @@ export const LoginForm: React.FC = () => {
     }
   };
 
+  // Show access request form if requested
+  if (showAccessRequest) {
+    return (
+      <Container maxWidth="sm" sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <AccessRequestForm onBack={() => setShowAccessRequest(false)} />
+      </Container>
+    );
+  }
+
   return (
     <Container maxWidth="sm" sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <Paper elevation={6} sx={{ p: 4, width: '100%', direction: 'rtl' }}>
         <Typography variant="h4" fontWeight={700} gutterBottom textAlign="center">نظام المحاسبة</Typography>
         <Typography variant="body2" color="text.secondary" textAlign="center" mb={3}>نظام محاسبة متقدم للشركات</Typography>
-
-        <Stack direction="row" spacing={2} mb={3}>
-          <Button fullWidth variant="outlined" startIcon={<GitHub />} onClick={() => signInWithProvider('github')}>GitHub</Button>
-          <Button fullWidth variant="outlined" startIcon={<Google />} onClick={() => signInWithProvider('google')}>جوجل</Button>
-        </Stack>
 
         <Typography variant="h6" textAlign="center" mb={2}>تسجيل الدخول</Typography>
 
@@ -89,11 +94,29 @@ export const LoginForm: React.FC = () => {
             {submitting ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول'}
           </Button>
 
-          <Stack direction="row" justifyContent="center" spacing={3} mt={2}>
-            {import.meta.env.VITE_ALLOWED_SIGNUP_EMAIL ? (
-              <Button href="/register">إنشاء حساب جديد</Button>
-            ) : null}
-            <Button href="/forgot-password">نسيت كلمة المرور؟</Button>
+          <Stack direction="row" justifyContent="center" spacing={2} mt={2}>
+            <Button 
+              variant="outlined"
+              onClick={() => setShowAccessRequest(true)}
+              startIcon={<PersonAdd />}
+              sx={{ flex: 1 }}
+            >
+              طلب حساب جديد
+            </Button>
+            <Button href="/forgot-password" sx={{ flex: 1 }}>
+              نسيت كلمة المرور؟
+            </Button>
+          </Stack>
+          
+          <Stack direction="row" justifyContent="center" mt={2}>
+            <Button 
+              href="/register"
+              variant="contained"
+              color="success"
+              sx={{ minWidth: 200 }}
+            >
+              لديك موافقة؟ سجل الآن
+            </Button>
           </Stack>
         </Box>
       </Paper>

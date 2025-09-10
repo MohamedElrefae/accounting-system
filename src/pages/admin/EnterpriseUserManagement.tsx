@@ -71,7 +71,6 @@ import ShieldIcon from '@mui/icons-material/Shield';
 import PermissionIcon from '@mui/icons-material/Key';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { TestUserCreation } from '../../components/admin/TestUserCreation';
 
 interface User {
   id: string;
@@ -123,7 +122,6 @@ export default function EnterpriseUserManagement() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [permissionDialogOpen, setPermissionDialogOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [selectedUserForMenu, setSelectedUserForMenu] = useState<User | null>(null);
 
@@ -551,8 +549,6 @@ export default function EnterpriseUserManagement() {
         </Stack>
       </Paper>
 
-      {/* Temporary Test - remove after confirming function works */}
-      <TestUserCreation onUserCreated={loadUsers} />
 
       {/* Filters and Controls */}
       <Paper elevation={0} sx={{ p: 2, mb: 2 }}>
@@ -783,17 +779,6 @@ export default function EnterpriseUserManagement() {
                         onClick={() => handleEditUser(user)}
                       >
                         تعديل
-                      </Button>
-                      <Button
-                        size="small"
-                        startIcon={<SecurityIcon />}
-                        color="info"
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setPermissionDialogOpen(true);
-                        }}
-                      >
-                        الصلاحيات
                       </Button>
                       <Button
                         size="small"
@@ -1052,14 +1037,6 @@ export default function EnterpriseUserManagement() {
             <ListItemIcon><EditIcon /></ListItemIcon>
             <ListItemText>تعديل</ListItemText>
           </MenuItem>
-          <MenuItem onClick={() => {
-            setSelectedUser(selectedUserForMenu);
-            setPermissionDialogOpen(true);
-            setMenuAnchor(null);
-          }}>
-            <ListItemIcon><SecurityIcon /></ListItemIcon>
-            <ListItemText>إدارة الصلاحيات</ListItemText>
-          </MenuItem>
           <MenuItem>
             <ListItemIcon><TimelineIcon /></ListItemIcon>
             <ListItemText>سجل النشاط</ListItemText>
@@ -1213,23 +1190,6 @@ export default function EnterpriseUserManagement() {
         </DialogActions>
       </Dialog>
 
-      {/* Permission Dialog Placeholder */}
-      <Dialog
-        open={permissionDialogOpen}
-        onClose={() => setPermissionDialogOpen(false)}
-        maxWidth="lg"
-        fullWidth
-      >
-        <DialogTitle>إدارة صلاحيات المستخدم</DialogTitle>
-        <DialogContent>
-          <Alert severity="info">
-            سيتم تطوير واجهة إدارة الصلاحيات لاحقاً. حالياً يمكن تعيين الأدوار فقط.
-          </Alert>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPermissionDialogOpen(false)}>إغلاق</Button>
-        </DialogActions>
-      </Dialog>
 
       {/* Invite Dialog Placeholder */}
       <Dialog

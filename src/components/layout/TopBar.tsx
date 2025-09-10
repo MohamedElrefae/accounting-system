@@ -33,7 +33,7 @@ interface TopBarProps {
 
 const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
   const { language, toggleLanguage } = useAppStore();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { profile } = useUserProfile();
 
   const {
@@ -390,7 +390,15 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
         {t.settings}
       </MenuItem>
       <Divider />
-      <MenuItem onClick={handleProfileMenuClose}>
+      <MenuItem onClick={async () => {
+        try {
+          handleProfileMenuClose();
+          await signOut();
+        } catch (error) {
+          console.error('Logout failed:', error);
+          alert('فشل تسجيل الخروج');
+        }
+      }}>
         <LogoutIcon sx={{ mr: 2 }} />
         {t.logout}
       </MenuItem>

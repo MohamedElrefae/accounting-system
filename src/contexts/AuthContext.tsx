@@ -112,7 +112,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const result = await Promise.race([profilePromise, timeoutPromise]) as any;
       
       if (result?.error) {
-        // Profile load error, continuing anyway
+        // Profile doesn't exist, check if there's a pending profile
+        try {
+          const { data: userData } = await supabase.auth.getUser();
+          if (userData.user?.email) {
+            const { data: pendingProfile } = await supabase
+              .from('pending_user_profiles')
+              .select('*')
+              .eq('email', userData.user.email)
+              .eq('used', false)
+              .single();
+              
+            if (pendingProfile) {
+              // Create profile from pending data
+              const { error: createError } = await supabase
+                .from('user_profiles')
+                .insert({
+                  id: userId,
+                  email: pendingProfile.email,
+                  full_name_ar: pendingProfile.full_name_ar,
+                  phone: pendingProfile.phone,
+                  department: pendingProfile.department,
+                  job_title: pendingProfile.job_title,
+                  is_active: true
+                });
+                
+              if (!createError) {
+                // Mark pending profile as used
+                await supabase
+                  .from('pending_user_profiles')
+                  .update({ used: true })
+                  .eq('email', pendingProfile.email);
+                  
+                // Assign role if specified
+                if (pendingProfile.assigned_role && pendingProfile.assigned_role !== 'user') {
+                  await supabase
+                    .from('user_roles')
+                    .insert({
+                      user_id: userId,
+                      role_name: pendingProfile.assigned_role
+                    });
+                }
+                
+                // Try to load the newly created profile
+                const { data: newProfile } = await supabase
+                  .from('user_profiles')
+                  .select('*')
+                  .eq('id', userId)
+                  .single();
+                  
+                if (newProfile) {
+                  setProfile(newProfile as Profile);
+                  return;
+                }
+              }
+            }
+          }
+        } catch (pendingError) {
+          console.error('Failed to create profile from pending:', pendingError);
+        }
+        
+        console.log('Profile not found for user:', userId);
       } else if (result?.data) {
         // Profile loaded successfully
         setProfile(result.data as Profile);
@@ -159,10 +219,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    setUser(null);
-    setProfile(null);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      // Clear local state
+      setUser(null);
+      setProfile(null);
+      
+      // Clear any local storage items
+      localStorage.removeItem('is_super_admin');
+      
+      // Force redirect to login page
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('Sign out error:', error);
+      throw error;
+    }
   };
 
   const value = useMemo(() => ({ user, profile, loading, permissions, signIn, signInWithProvider, signUp, signOut, refreshProfile: async () => user && loadProfile(user.id) }), [user, profile, loading, permissions]);

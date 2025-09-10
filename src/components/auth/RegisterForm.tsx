@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { Button, Container, TextField, Typography, Box, Paper, Stack, Alert } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../utils/supabase';
 
 const schema = yup.object({
   email: yup.string().email('البريد الإلكتروني غير صحيح').required('البريد الإلكتروني مطلوب'),
@@ -24,15 +25,59 @@ export const RegisterForm: React.FC = () => {
   const allowedEmail = import.meta.env.VITE_ALLOWED_SIGNUP_EMAIL?.trim();
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const [approvedEmails, setApprovedEmails] = useState<string[]>([]);
+  const [checkingApproval, setCheckingApproval] = useState(true);
 
-  const registrationOpen = useMemo(() => Boolean(allowedEmail), [allowedEmail]);
+  // Check for approved emails from the public approved_emails table
+  useEffect(() => {
+    const loadApprovedEmails = async () => {
+      try {
+        console.log('Loading approved emails from approved_emails table...');
+        const { data, error } = await supabase
+          .from('approved_emails')
+          .select('email');
+        
+        console.log('Approved emails query result:', { data, error });
+        
+        if (!error && data) {
+          const emails = data.map(item => item.email.toLowerCase());
+          console.log('Setting approved emails:', emails);
+          setApprovedEmails(emails);
+        } else {
+          console.error('Error in approved emails query:', error);
+        }
+      } catch (error) {
+        console.error('Error loading approved emails:', error);
+      } finally {
+        setCheckingApproval(false);
+      }
+    };
+    
+    loadApprovedEmails();
+  }, []);
+
+  const registrationOpen = useMemo(() => Boolean(allowedEmail) || approvedEmails.length > 0, [allowedEmail, approvedEmails]);
 
   const { register, handleSubmit, formState: { errors }, setError } = useForm<FormValues>({ resolver: yupResolver(schema) });
 
   const onSubmit = async (values: FormValues) => {
     if (!registrationOpen) return;
-    if (allowedEmail && values.email.toLowerCase() !== allowedEmail.toLowerCase()) {
-      setError('email', { message: 'التسجيل متاح لعنوان بريد محدد فقط' });
+    
+    const emailLower = values.email.toLowerCase();
+    const isAllowedEmail = allowedEmail && emailLower === allowedEmail.toLowerCase();
+    const isApprovedEmail = approvedEmails.includes(emailLower);
+    
+    console.log('Email validation:', { 
+      email: emailLower, 
+      isAllowedEmail, 
+      isApprovedEmail, 
+      approvedEmails 
+    });
+    
+    if (!isAllowedEmail && !isApprovedEmail) {
+      setError('email', { 
+        message: 'هذا البريد غير مسموح له بالتسجيل. يرجى طلب الوصول أولاً.'
+      });
       return;
     }
     try {
@@ -52,15 +97,31 @@ export const RegisterForm: React.FC = () => {
         <Typography variant="h4" fontWeight={700} gutterBottom textAlign="center">إنشاء حساب</Typography>
         <Typography variant="body2" color="text.secondary" textAlign="center" mb={3}>سيتم إرسال رابط تأكيد إلى بريدك الإلكتروني</Typography>
 
-        {!registrationOpen && (
+        {checkingApproval && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            جاري التحقق من طلبات الوصول المعتمدة...
+          </Alert>
+        )}
+        
+        {!checkingApproval && !registrationOpen && (
           <Alert severity="warning" sx={{ mb: 2 }}>
-            التسجيل مغلق. الرجاء الاتصال بالمسؤول لفتح التسجيل الأولي عبر تعيين VITE_ALLOWED_SIGNUP_EMAIL.
+            التسجيل مغلق. يرجى طلب الوصول عبر صفحة تسجيل الدخول أولاً.
+          </Alert>
+        )}
+        
+        {!checkingApproval && approvedEmails.length > 0 && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            هناك {approvedEmails.length} بريد معتمد يمكنه التسجيل. استخدم بريدك المعتمد.
           </Alert>
         )}
 
         {sent ? (
           <Alert severity="success">
-            تم إنشاء الحساب بنجاح. يرجى التحقق من بريدك الإلكتروني لتأكيد الحساب قبل تسجيل الدخول.
+            ✅ تم إنشاء الحساب بنجاح!
+            <br /><br />
+            يرجى التحقق من بريدك الإلكتروني لتأكيد الحساب، ثم يمكنك تسجيل الدخول.
+            <br /><br />
+            📝 ملاحظة: سيتم تحميل بياناتك الشخصية تلقائياً بعد أول تسجيل دخول.
           </Alert>
         ) : (
           <Box component="form" onSubmit={handleSubmit(onSubmit)}>
@@ -72,7 +133,7 @@ export const RegisterForm: React.FC = () => {
               {...register('email')}
               error={!!errors.email}
               helperText={errors.email?.message}
-              disabled={!registrationOpen}
+              disabled={!registrationOpen || checkingApproval}
             />
 
             <TextField
@@ -83,7 +144,7 @@ export const RegisterForm: React.FC = () => {
               {...register('password')}
               error={!!errors.password}
               helperText={errors.password?.message}
-              disabled={!registrationOpen}
+              disabled={!registrationOpen || checkingApproval}
             />
 
             <TextField
@@ -94,12 +155,21 @@ export const RegisterForm: React.FC = () => {
               {...register('confirmPassword')}
               error={!!errors.confirmPassword}
               helperText={errors.confirmPassword?.message}
-              disabled={!registrationOpen}
+              disabled={!registrationOpen || checkingApproval}
             />
 
             <Stack direction="row" spacing={2} mt={2}>
-              <Button type="submit" variant="contained" disabled={!registrationOpen || submitting}>
-                {submitting ? 'جاري الإرسال...' : 'إنشاء حساب'}
+              <Button 
+                type="submit" 
+                variant="contained" 
+                disabled={!registrationOpen || submitting || checkingApproval}
+              >
+                {checkingApproval 
+                  ? 'جاري التحقق...' 
+                  : submitting 
+                    ? 'جاري الإرسال...' 
+                    : 'إنشاء حساب'
+                }
               </Button>
               <Button href="/login" variant="text">العودة لتسجيل الدخول</Button>
             </Stack>
