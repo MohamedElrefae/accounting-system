@@ -176,6 +176,11 @@ const { error: upErr } = await supabase
       // Refresh both contexts to ensure all components get updated data
       await refreshProfile(); // AuthContext
       await userProfileCtx.refreshProfile(); // UserProfileContext
+
+      // Log audit entry for profile update (best-effort)
+      try {
+        await import('../../utils/audit').then(({ audit }) => audit(supabase, 'profile.update', 'user', user.id, { fields: Object.keys(update) }));
+      } catch {}
       
       setSuccess('تم حفظ البيانات الشخصية');
       showToast('تم حفظ البيانات الشخصية', { severity: 'success' });

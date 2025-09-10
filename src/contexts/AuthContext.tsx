@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../utils/supabase';
+import { audit } from '../utils/audit';
 
 export type Profile = {
   id: string;
@@ -81,6 +82,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (e) {
           // Profile load failed, continuing anyway
         }
+        // Log sign-in activity (best-effort)
+        try {
+          await audit(supabase, 'auth.sign_in', 'auth', session.user.id, { email: session.user.email });
+        } catch {}
+
         // Ensure redirect after successful sign-in only
         // Do NOT redirect on PASSWORD_RECOVERY; the ResetPassword page must remain visible
         if (event === 'SIGNED_IN' && (window.location.pathname === '/login')) {
@@ -159,6 +165,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    try {
+      if (user?.id) {
+        await audit(supabase, 'auth.sign_out', 'auth', user.id, { email: user.email });
+      }
+    } catch {}
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     setUser(null);
