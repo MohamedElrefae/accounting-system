@@ -33,7 +33,7 @@ interface TopBarProps {
 
 const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
   const { language, toggleLanguage } = useAppStore();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { profile } = useUserProfile();
 
   const {
@@ -390,7 +390,16 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
         {t.settings}
       </MenuItem>
       <Divider />
-      <MenuItem onClick={handleProfileMenuClose}>
+      <MenuItem onClick={async () => {
+        handleProfileMenuClose();
+        try {
+          await signOut();
+        } catch (e) {
+          // fallback: continue to redirect even if supabase signOut throws
+        } finally {
+          window.location.href = '/login';
+        }
+      }}>
         <LogoutIcon sx={{ mr: 2 }} />
         {t.logout}
       </MenuItem>
