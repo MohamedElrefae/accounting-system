@@ -24,7 +24,6 @@ import { RegisterForm } from './components/auth/RegisterForm';
 import { ForgotPassword } from './components/auth/ForgotPassword';
 import { ResetPassword } from './components/auth/ResetPassword';
 import AuthDebug from './pages/AuthDebug';
-const UserManagement = React.lazy(() => import('./pages/admin/UserManagement'));
 const RoleManagement = React.lazy(() => import('./pages/admin/RoleManagement'));
 const PermissionsManagement = React.lazy(() => import('./pages/admin/PermissionsManagement'));
 const UserManagementSystem = React.lazy(() => import('./pages/admin/UserManagementSystem'));
@@ -281,12 +280,7 @@ const App: React.FC = () => {
                 <UserManagementSystem />
               </React.Suspense>
             } />
-            {/* Individual routes for direct access */}
-            <Route path="/settings/users" element={
-              <React.Suspense fallback={<div>Loading...</div>}>
-                <UserManagement />
-              </React.Suspense>
-            } />
+            {/* Individual routes for direct access (Enterprise only) */}
             <Route path="/settings/roles" element={
               <React.Suspense fallback={<div>Loading...</div>}>
                 <RoleManagement />
