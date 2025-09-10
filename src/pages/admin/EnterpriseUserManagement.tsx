@@ -60,7 +60,6 @@ import WorkIcon from '@mui/icons-material/Work';
 import BusinessIcon from '@mui/icons-material/Business';
 import ActiveIcon from '@mui/icons-material/CheckCircle';
 import InactiveIcon from '@mui/icons-material/Cancel';
-import SecurityIcon from '@mui/icons-material/Security';
 import MoreIcon from '@mui/icons-material/MoreVert';
 import ExportIcon from '@mui/icons-material/FileDownload';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
@@ -123,7 +122,6 @@ export default function EnterpriseUserManagement() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [permissionDialogOpen, setPermissionDialogOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [selectedUserForMenu, setSelectedUserForMenu] = useState<User | null>(null);
 
@@ -786,17 +784,6 @@ export default function EnterpriseUserManagement() {
                       </Button>
                       <Button
                         size="small"
-                        startIcon={<SecurityIcon />}
-                        color="info"
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setPermissionDialogOpen(true);
-                        }}
-                      >
-                        الصلاحيات
-                      </Button>
-                      <Button
-                        size="small"
                         startIcon={user.is_active ? <DeactivateIcon /> : <ActiveIcon />}
                         color={user.is_active ? 'error' : 'success'}
                         onClick={() => handleToggleUserStatus(user.id, user.is_active)}
@@ -940,12 +927,6 @@ export default function EnterpriseUserManagement() {
                         <IconButton size="small" onClick={() => handleEditUser(user)}>
                           <EditIcon />
                         </IconButton>
-                        <IconButton size="small" color="info" onClick={() => {
-                          setSelectedUser(user);
-                          setPermissionDialogOpen(true);
-                        }}>
-                          <SecurityIcon />
-                        </IconButton>
                         <IconButton 
                           size="small" 
                           color={user.is_active ? 'error' : 'success'}
@@ -1052,14 +1033,6 @@ export default function EnterpriseUserManagement() {
             <ListItemIcon><EditIcon /></ListItemIcon>
             <ListItemText>تعديل</ListItemText>
           </MenuItem>
-          <MenuItem onClick={() => {
-            setSelectedUser(selectedUserForMenu);
-            setPermissionDialogOpen(true);
-            setMenuAnchor(null);
-          }}>
-            <ListItemIcon><SecurityIcon /></ListItemIcon>
-            <ListItemText>إدارة الصلاحيات</ListItemText>
-          </MenuItem>
           <MenuItem>
             <ListItemIcon><TimelineIcon /></ListItemIcon>
             <ListItemText>سجل النشاط</ListItemText>
@@ -1134,6 +1107,9 @@ export default function EnterpriseUserManagement() {
                       </MenuItem>
                     ))}
                   </Select>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, ml: 1.5 }}>
+                    الصلاحيات يتم إدارتها من خلال الأدوار في تبويب "الأدوار"
+                  </Typography>
                 </FormControl>
               </Grid>
               <Grid item xs={12} md={6}>
@@ -1213,23 +1189,6 @@ export default function EnterpriseUserManagement() {
         </DialogActions>
       </Dialog>
 
-      {/* Permission Dialog Placeholder */}
-      <Dialog
-        open={permissionDialogOpen}
-        onClose={() => setPermissionDialogOpen(false)}
-        maxWidth="lg"
-        fullWidth
-      >
-        <DialogTitle>إدارة صلاحيات المستخدم</DialogTitle>
-        <DialogContent>
-          <Alert severity="info">
-            سيتم تطوير واجهة إدارة الصلاحيات لاحقاً. حالياً يمكن تعيين الأدوار فقط.
-          </Alert>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPermissionDialogOpen(false)}>إغلاق</Button>
-        </DialogActions>
-      </Dialog>
 
       {/* Invite Dialog Placeholder */}
       <Dialog
