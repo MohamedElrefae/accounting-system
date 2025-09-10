@@ -16,8 +16,7 @@ export const ForgotPassword: React.FC = () => {
   const [sent, setSent] = useState(false);
   
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({ 
-    resolver: yupResolver(schema),
-    defaultValues: { email: 'mohamedelrefae81@gmail.com' }
+    resolver: yupResolver(schema)
   });
 
   const onSubmit = async (values: FormValues) => {

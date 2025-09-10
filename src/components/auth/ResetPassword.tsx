@@ -30,8 +30,20 @@ export const ResetPassword: React.FC = () => {
   });
 
   useEffect(() => {
-    // Supabase will handle the token from the URL automatically
-    console.log('[ResetPassword] Component mounted, Supabase will process recovery token');
+    // Ensure session is established when arriving from email link
+    (async () => {
+      try {
+        const url = new URL(window.location.href);
+        const code = url.searchParams.get('code');
+        // New GoTrue behavior sends a `code` query param that must be exchanged for a session
+        if (code) {
+          await supabase.auth.exchangeCodeForSession(code);
+          console.log('[ResetPassword] Exchanged code for session');
+        }
+      } catch (e) {
+        console.warn('[ResetPassword] exchangeCodeForSession skipped:', e);
+      }
+    })();
   }, []);
 
   const onSubmit = async (values: FormValues) => {

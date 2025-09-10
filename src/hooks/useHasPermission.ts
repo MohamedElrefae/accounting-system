@@ -8,9 +8,11 @@ import { useAuth } from '../contexts/AuthContext'
 // - public.user_permissions(user_id, permission_id)
 // - public.user_roles(user_id, role_id)
 // - public.role_permissions(role_id, permission_id)
+// Also treats super admins as having all permissions
 export function useHasPermission() {
   const { user } = useAuth()
   const [perms, setPerms] = useState<Set<string>>(new Set())
+  const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false)
   const loadingRef = useRef(false)
 
   const load = useCallback(async (uid: string) => {
@@ -46,9 +48,22 @@ export function useHasPermission() {
       })
 
       setPerms(names)
+
+      // Super admin check
+      try {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('is_super_admin')
+          .eq('id', uid)
+          .single()
+        setIsSuperAdmin(!!profile?.is_super_admin)
+      } catch {
+        setIsSuperAdmin(false)
+      }
     } catch (e) {
       // Silent fail; default no extra perms
       setPerms(new Set())
+      setIsSuperAdmin(false)
     } finally {
       loadingRef.current = false
     }
@@ -59,13 +74,15 @@ export function useHasPermission() {
       load(user.id)
     } else {
       setPerms(new Set())
+      setIsSuperAdmin(false)
     }
   }, [user?.id, load])
 
   const hasPermission = useCallback((name?: string): boolean => {
+    if (isSuperAdmin) return true
     if (!name) return true
     return perms.has(name)
-  }, [perms])
+  }, [perms, isSuperAdmin])
 
   return hasPermission
 }

@@ -81,9 +81,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (e) {
           // Profile load failed, continuing anyway
         }
-        // Ensure redirect after successful sign-in or password recovery
-        if ((event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') && 
-            (window.location.pathname === '/login' || window.location.pathname === '/reset-password')) {
+        // Ensure redirect after successful sign-in only
+        // Do NOT redirect on PASSWORD_RECOVERY; the ResetPassword page must remain visible
+        if (event === 'SIGNED_IN' && (window.location.pathname === '/login')) {
           // Redirecting to dashboard
           // Use location.href for a hard redirect to ensure clean state
           setTimeout(() => {
