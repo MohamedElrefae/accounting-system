@@ -9,6 +9,7 @@ import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import { getCompanyConfig } from '../../services/company-config'
 import { fetchPrefixRules, classifyByRules, type PrefixRule } from '../../services/account-prefix-map'
+import { getAccountBalances, type AccountBalanceFilter } from '../../services/account-balances'
 import Visibility from '@mui/icons-material/Visibility'
 import VisibilityOff from '@mui/icons-material/VisibilityOff'
 import Bolt from '@mui/icons-material/Bolt'
@@ -21,6 +22,10 @@ import ExpandLess from '@mui/icons-material/ExpandLess'
 import UnfoldMore from '@mui/icons-material/UnfoldMore'
 import UnfoldLess from '@mui/icons-material/UnfoldLess'
 import { fetchTransactionsDateRange } from '../../services/reports/common';
+import { getActiveOrgId } from '../../utils/org';
+import { fetchOrganizations, type LookupOption } from '../../services/lookups';
+import { PDFGenerator, type PDFOptions, type PDFTableData } from '../../services/pdf-generator';
+import PictureAsPdf from '@mui/icons-material/PictureAsPdf';
 
 interface TBRow {
   account_id: string
@@ -54,6 +59,8 @@ export default function TrialBalanceOriginal() {
   const [projects, setProjects] = useState<{ id: string; code: string; name: string }[]>([])
   const [projectId, setProjectId] = useState<string>('')
   const [companyName, setCompanyName] = useState<string>('')
+  const [orgId, setOrgId] = useState<string>('')
+  const [orgOptions, setOrgOptions] = useState<LookupOption[]>([])
   const [activeGroupsOnly, setActiveGroupsOnly] = useState<boolean>(false)
   const [prefixRules, setPrefixRules] = useState<PrefixRule[]>([])
   const [_breakPerGroup, _setBreakPerGroup] = useState<boolean>(false)
@@ -125,6 +132,20 @@ export default function TrialBalanceOriginal() {
   async function loadProjects() {
     const { data } = await supabase.from('projects').select('id, code, name').eq('status', 'active').order('code')
     setProjects(data || [])
+    
+    // Load organizations and set default
+    try { 
+      const orgs = await fetchOrganizations(); 
+      setOrgOptions(orgs || [])
+      // Set default org from localStorage or first available
+      const storedOrgId = getActiveOrgId()
+      if (storedOrgId) {
+        setOrgId(storedOrgId)
+      } else if (orgs && orgs.length > 0) {
+        setOrgId(orgs[0].id)
+      }
+    } catch {}
+    
     try { const cfg = await getCompanyConfig(); setCompanyName(cfg.company_name || ''); } catch {}
     try { const rules = await fetchPrefixRules(); setPrefixRules(rules) } catch { /* fallback in classifier */ }
   }
@@ -134,75 +155,54 @@ export default function TrialBalanceOriginal() {
       setLoading(true)
       setError('')
 
-      // 1) Load accounts (flat list)
-      const accRes = await supabase
-        .from('accounts')
-        .select('id, code, name')
-        .order('code', { ascending: true })
-
-      if (accRes.error) throw accRes.error
-      const accounts: { id: string; code: string; name: string }[] = accRes.data || []
-
-      // 2) Load transactions within date range (only needed columns)
-      let txQuery = supabase
-        .from('transactions')
-        .select('debit_account_id, credit_account_id, amount, entry_date, project_id, is_posted')
-        .gte('entry_date', dateFrom)
-        .lte('entry_date', dateTo)
-      if (projectId) txQuery = txQuery.eq('project_id', projectId)
-      if (postedOnly) txQuery = txQuery.eq('is_posted', true)
-      const txRes = await txQuery
-
-      if (txRes.error) throw txRes.error
-      const txs = txRes.data || []
-
-      // 3) Aggregate debits/credits per account
-      const agg = new Map<string, { debit: number; credit: number }>()
-      for (const t of txs) {
-        if (t.debit_account_id) {
-          const a = agg.get(t.debit_account_id) || { debit: 0, credit: 0 }
-          a.debit += Number(t.amount || 0)
-          agg.set(t.debit_account_id, a)
-        }
-        if (t.credit_account_id) {
-          const a = agg.get(t.credit_account_id) || { debit: 0, credit: 0 }
-          a.credit += Number(t.amount || 0)
-          agg.set(t.credit_account_id, a)
-        }
-      }
-
-      // 4) Build rows in account order
-      // Classify account type based on your actual chart of accounts structure
-      function classifyAccount(code: string): TBRow['account_type'] {
+      // Use GL Summary function directly for guaranteed consistency with all financial reports
+      // This ensures 100% consistency with Trial Balance All Levels, Balance Sheet, P&L, etc.
+      
+      const { data: glSummaryData, error: glError } = await supabase.rpc('get_gl_account_summary', {
+        p_date_from: dateFrom,
+        p_date_to: dateTo,
+        p_org_id: orgId || null,
+        p_project_id: projectId || null,
+        p_posted_only: postedOnly,
+        p_limit: null,
+        p_offset: null,
+        p_classification_id: null,
+        p_cost_center_id: null,
+        p_work_item_id: null,
+        p_expenses_category_id: null,
+        p_debit_account_id: null,
+        p_credit_account_id: null,
+        p_amount_min: null,
+        p_amount_max: null
+      })
+      
+      if (glError) throw glError
+      
+      // Helper function to classify account type from account code
+      function classifyAccountByCode(code: string): TBRow['account_type'] {
         if (!code) return undefined
-        // Prefer server-configured prefix rules
-        const byRules = classifyByRules(code, prefixRules)
-        if (byRules) return byRules
-        
         const firstToken = String(code).trim().split(/[^0-9A-Za-z]/)[0]
         const d1 = firstToken.substring(0,1)
         
-        // Fixed mapping based on actual chart of accounts:
-        if (d1 === '1') return 'assets'        // 1 = الأصول (Assets) ✅
-        if (d1 === '2') return 'liabilities'   // 2 = الخصوم (Liabilities) ✅
-        if (d1 === '3') return 'equity'        // 3 = حقوق الملكية (Equity) - FIXED!
-        if (d1 === '4') return 'revenue'       // 4 = الإيرادات (Revenue) - FIXED!
-        if (d1 === '5') return 'expenses'      // 5 = التكاليف والمصروفات (Expenses) - FIXED!
+        if (d1 === '1') return 'assets'
+        if (d1 === '2') return 'liabilities'
+        if (d1 === '3') return 'equity'
+        if (d1 === '4') return 'revenue'
+        if (d1 === '5') return 'expenses'
         
         return undefined
       }
-
-      let out: TBRow[] = (accounts as any[]).map(acc => {
-        const a = agg.get(acc.id) || { debit: 0, credit: 0 }
-        return {
-          account_id: acc.id,
-          code: acc.code,
-          name: acc.name,
-          debit: a.debit,
-          credit: a.credit,
-          account_type: classifyAccount(acc.code),
-        } as TBRow
-      })
+      
+      // Convert GL Summary data to Trial Balance format
+      // GL Summary returns closing_debit and closing_credit which are the account balances
+      let out: TBRow[] = (glSummaryData || []).map((row: any) => ({
+        account_id: row.account_id,
+        code: row.account_code,
+        name: row.account_name_en || row.account_name_ar || 'Unknown',
+        debit: Number(row.closing_debit || 0),
+        credit: Number(row.closing_credit || 0),
+        account_type: classifyAccountByCode(row.account_code),
+      } as TBRow))
 
       if (!includeZeros) {
         out = out.filter(r => r.debit !== 0 || r.credit !== 0)
@@ -252,6 +252,76 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
     return exportToCSV(data as any, opts as any)
   }
 
+  // Professional PDF Export with UI Theme Colors
+  async function exportToProfessionalPDF() {
+    try {
+      // Prepare data for PDF generation
+      const columns = [
+        { key: 'code', header: uiLang === 'ar' ? 'رمز الحساب' : 'Account Code', width: '100px', align: 'center' as const, type: 'text' as const },
+        { key: 'name', header: uiLang === 'ar' ? 'اسم الحساب' : 'Account Name', width: 'auto', align: 'right' as const, type: 'text' as const },
+        { key: 'debit', header: uiLang === 'ar' ? 'مدين' : 'Debit', width: '120px', align: 'right' as const, type: 'currency' as const },
+        { key: 'credit', header: uiLang === 'ar' ? 'دائن' : 'Credit', width: '120px', align: 'right' as const, type: 'currency' as const },
+      ]
+
+      // Build table data with group headers and rows
+      const tableRows: any[] = []
+      grouped.forEach(group => {
+        // Add group header
+        tableRows.push({
+          code: '',
+          name: uiLang === 'ar' ? group.titleAr : group.titleEn,
+          debit: '',
+          credit: '',
+          isGroupHeader: true,
+          level: 0
+        })
+        
+        // Add group accounts
+        group.rows.forEach(row => {
+          tableRows.push({
+            code: row.code,
+            name: row.name,
+            debit: row.debit,
+            credit: row.credit,
+            isGroupHeader: false,
+            level: 1
+          })
+        })
+      })
+
+      const tableData: PDFTableData = {
+        columns,
+        rows: tableRows,
+        totals: {
+          totalDebits: totals.debit,
+          totalCredits: totals.credit,
+          netTotal: totals.diff,
+          balanceStatus: Math.abs(totals.diff) < 0.01 ? 'متوازن' : 'غير متوازن'
+        }
+      }
+
+      const options: PDFOptions = {
+        title: uiLang === 'ar' ? 'ميزان المراجعة' : 'Trial Balance',
+        subtitle: `${uiLang === 'ar' ? 'الفترة من' : 'Period from'} ${dateFrom} ${uiLang === 'ar' ? 'إلى' : 'to'} ${dateTo}`,
+        companyName: companyName || (uiLang === 'ar' ? 'الشركة التجارية للمقاولات' : 'Commercial Contracting Company'),
+        reportDate: `${dateFrom} ← ${dateTo}`,
+        orientation: 'portrait',
+        pageSize: 'A4',
+        showHeader: true,
+        showFooter: true,
+        language: uiLang,
+        numbersOnly: numbersOnly,
+        currencySymbol: numbersOnly ? 'none' : 'ج.م'
+      }
+
+      await PDFGenerator.generateFinancialReportPDF(tableData, options)
+    } catch (err) {
+      console.error('Professional PDF export failed:', err)
+      alert(uiLang === 'ar' ? 'فشل في تصدير PDF المهني' : 'Failed to export professional PDF')
+    }
+  }
+
+  // Legacy PDF Export (keep for backward compatibility)
   async function exportToPDF() {
     const element = document.getElementById('financial-report-content') as HTMLElement | null
     if (!element) return
@@ -740,9 +810,9 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
 
   useEffect(() => {
     // Auto reload when inputs change
-    load()
+    if (orgId) load()  // Only load when we have an org_id
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFrom, dateTo, projectId, includeZeros, activeGroupsOnly, postedOnly])
+  }, [dateFrom, dateTo, projectId, includeZeros, activeGroupsOnly, postedOnly, orgId])
 
   return (
     <div className={styles.container}>
@@ -856,6 +926,50 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
 
         {/* Right Section: Action Buttons */}
         <div className={styles.actionSection}>
+          {/* Show All button - comprehensive business view */}
+          <button
+            type="button"
+            className={`${styles.actionButton} ${styles.showAll}`}
+            onClick={() => {
+              // Reset to show all data with meaningful filters
+              setDateFrom(startOfYearISO())
+              setDateTo(todayISO())
+              setProjectId('')
+              setIncludeZeros(false) // Hide zero balances for business view
+              setPostedOnly(false)
+              setActiveGroupsOnly(true)
+            }}
+            title={uiLang === 'ar' ? 'عرض جميع البيانات (الحسابات ذات الأرصدة فقط)' : 'Show All Data (Accounts with balances only)'}
+            aria-label={uiLang === 'ar' ? 'عرض جميع بيانات ميزان المراجعة' : 'Show all trial balance data'}
+            style={{
+              fontSize: '14px',
+              padding: '8px 16px',
+              marginRight: '8px',
+              minWidth: '100px',
+              backgroundColor: '#28a745',
+              color: 'white',
+              fontWeight: 'bold',
+              border: 'none',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = '#218838'
+              e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)'
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = '#28a745'
+              e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+          >
+            🗂️ {uiLang === 'ar' ? 'عرض الكل' : 'Show All'}
+          </button>
+          
           <div className={styles.exportGroup}>
             <button 
               type="button" 
@@ -876,6 +990,34 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
               aria-label={uiLang === 'ar' ? 'تصدير ميزان المراجعة إلى CSV' : 'Export trial balance to CSV'}
             >
               <TableView fontSize="small" /> CSV
+            </button>
+            <button 
+              type="button" 
+              className={styles.exportButton}
+              onClick={exportToProfessionalPDF} 
+              disabled={loading || rows.length === 0}
+              title={uiLang === 'ar' ? 'تصدير إلى PDF مهني' : 'Export to Professional PDF'}
+              aria-label={uiLang === 'ar' ? 'تصدير ميزان المراجعة إلى PDF مهني بألوان واجهة المستخدم' : 'Export trial balance to professional PDF with UI colors'}
+              style={{
+                background: 'linear-gradient(135deg, #026081, #0abbfa)',
+                color: 'white',
+                border: 'none',
+                fontWeight: 'bold',
+                boxShadow: '0 2px 8px rgba(2, 96, 129, 0.2)',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #025670, #0299d9)'
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(2, 96, 129, 0.3)'
+                e.currentTarget.style.transform = 'translateY(-1px)'
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #026081, #0abbfa)'
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(2, 96, 129, 0.2)'
+                e.currentTarget.style.transform = 'translateY(0)'
+              }}
+            >
+              <PictureAsPdf fontSize="small" /> {uiLang === 'ar' ? 'PDF مهني' : 'Pro PDF'}
             </button>
           </div>
           <button 
