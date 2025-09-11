@@ -27,6 +27,15 @@ export interface ExportConfig {
   includeHeader?: boolean;
   includeFooter?: boolean;
   fontSize?: number;
+  // Advanced Excel options
+  excel?: {
+    currencyFormat?: 'symbol' | 'plain' | 'custom';
+    customCurrencyFormat?: string;
+    useLocaleSeparators?: boolean;
+    freezePanes?: boolean;
+    autoFilter?: boolean;
+    columnFormats?: { [columnKey: string]: string };
+  };
 }
 
 export interface ExportHookOptions {
@@ -229,6 +238,12 @@ export const createStandardColumns = (
     align?: 'left' | 'center' | 'right';
     currency?: string;
     visible?: boolean;
+    excel?: {
+      format?: string;
+      currencySymbol?: string;
+      locale?: string;
+      alignment?: 'left' | 'center' | 'right';
+    };
   }>
 ): UniversalTableColumn[] => {
   return definitions.map(def => ({
@@ -238,4 +253,63 @@ export const createStandardColumns = (
     currency: 'EGP',
     ...def
   }));
+};
+
+// Helper functions for advanced Excel configurations
+export const createExcelConfig = {
+  // Create config for plain numeric export (no currency symbols)
+  plainNumbers: (): ExportConfig['excel'] => ({
+    currencyFormat: 'plain',
+    freezePanes: true,
+    autoFilter: true
+  }),
+  
+  // Create config with custom currency format
+  customCurrency: (format: string): ExportConfig['excel'] => ({
+    currencyFormat: 'custom',
+    customCurrencyFormat: format,
+    freezePanes: true,
+    autoFilter: true
+  }),
+  
+  // Create config with Arabic locale support
+  arabicLocale: (): ExportConfig['excel'] => ({
+    currencyFormat: 'symbol',
+    useLocaleSeparators: true,
+    freezePanes: true,
+    autoFilter: true
+  }),
+  
+  // Create config with per-column custom formats
+  customColumnFormats: (formats: { [key: string]: string }): ExportConfig['excel'] => ({
+    currencyFormat: 'symbol',
+    columnFormats: formats,
+    freezePanes: true,
+    autoFilter: true
+  })
+};
+
+// Predefined Excel number formats
+export const ExcelFormats = {
+  // Currency formats
+  currencyEGP: '#,##0.00" ج.م"',
+  currencyUSD: '[$-en-US]#,##0.00" $"',
+  currencyEUR: '[$-en-US]#,##0.00" €"',
+  currencyPlain: '#,##0.00',
+  
+  // Date formats
+  dateShort: 'dd/mm/yyyy',
+  dateLong: 'dd/mm/yyyy hh:mm',
+  dateArabic: '[$-ar-EG]dd/mm/yyyy',
+  dateTime: 'dd/mm/yyyy hh:mm:ss',
+  
+  // Number formats
+  numberPlain: '#,##0.00',
+  numberInteger: '#,##0',
+  numberScientific: '0.00E+00',
+  
+  // Percentage formats
+  percentSimple: '0.00%',
+  percentInteger: '0%',
+  percentDetailed: '0.000%'
 };

@@ -5,6 +5,7 @@ import { fetchTransactionsDateRange } from '../../services/reports/common'
 import ExportButtons from '../../components/Common/ExportButtons'
 import PresetBar from '../../components/Common/PresetBar'
 import { fetchGLAccountSummary, type GLAccountSummaryRow } from '../../services/reports/gl-account-summary'
+import { getAccountBalances, getCategoryTotals, type AccountBalanceFilter } from '../../services/account-balances'
 import { fetchOrganizations, fetchProjects, fetchAccountsMinimal, type LookupOption } from '../../services/lookups'
 import type { UniversalTableData } from '../../utils/UniversalExportManager'
 import { exportToExcel, exportToCSV } from '../../utils/UniversalExportManager'
@@ -59,8 +60,9 @@ const useDebounced = (value: string, delay: number) => {
 const GeneralLedger: React.FC = () => {
   // Filters
   const [filters, setFilters] = useState<GLFilters>({
-    dateFrom: firstDayOfMonthISO(), // Show full month by default instead of just today
-    dateTo: todayISO(),
+    // Start with no dates so the app auto-expands to the full available range
+    dateFrom: '',
+    dateTo: '',
     includeOpening: true,
     postedOnly: false,
   })
@@ -481,13 +483,42 @@ const GeneralLedger: React.FC = () => {
           break
         case 'r': // Ctrl+R: Reset filters
           e.preventDefault()
-          setFilters({ dateFrom: todayISO(), dateTo: todayISO(), includeOpening: true, postedOnly: false })
-          setAccountId(''); setOrgId(''); setProjectId('');
-          setHideZeroAccounts(true); setActivityOnly(false);
-          setOnlyPostable(false); setOnlyNonPostable(false);
+          // Reset date range filters
+          setFilters({ dateFrom: firstDayOfMonthISO(), dateTo: todayISO(), includeOpening: true, postedOnly: false })
+          
+          // Reset basic filters
+          setAccountId(''); 
+          setOrgId(''); 
+          setProjectId('');
+          setClassificationId(''); // Reset classification filter
+          
+          // Reset UI state filters
+          setHideZeroAccounts(true); 
+          setActivityOnly(false);
+          setOnlyPostable(false); 
+          setOnlyNonPostable(false);
           setIncludeChildrenInDrilldown(true);
+          
+          // Reset search/pagination
           setCurrentPage(1);
           setSearchTerm('');
+          setJumpCode(''); // Reset jump code
+          
+          // Reset advanced filters
+          setAmountFilters({
+            minDebit: '',
+            maxDebit: '',
+            minCredit: '',
+            maxCredit: '',
+            minBalance: '',
+            maxBalance: ''
+          });
+          setAccountTypeFilter('all');
+          setBalanceTypeFilter('all');
+          
+          // Close any open filters or modals
+          setShowAdvancedFilters(false);
+          setShowAnalytics(false);
           break
         case 'h': // Ctrl+H: Show/hide shortcuts help
           e.preventDefault()
@@ -1957,22 +1988,122 @@ const GeneralLedger: React.FC = () => {
           #
         </button>
         
-        {/* Reset button - also smaller */}
+        {/* Clean: turn ALL filters off, including dates (show everything, including zero balances) */}
         <button
           className={styles.presetButton}
           onClick={() => {
-            setFilters({ dateFrom: firstDayOfMonthISO(), dateTo: todayISO(), includeOpening: true, postedOnly: false })
-            setAccountId(''); setOrgId(''); setProjectId('');
-            setHideZeroAccounts(true); setActivityOnly(false);
-            setOnlyPostable(false); setOnlyNonPostable(false);
+            // Reset date range (no date filter)
+            setFilters({ dateFrom: '', dateTo: '', includeOpening: true, postedOnly: false })
+
+            // Reset basic selectors
+            setAccountId('');
+            setOrgId('');
+            setProjectId('');
+            setClassificationId('');
+
+            // Turn OFF all additional filters (show zero balances, no special modes)
+            setHideZeroAccounts(false);
+            setActivityOnly(false);
+            setOnlyPostable(false);
+            setOnlyNonPostable(false);
             setIncludeChildrenInDrilldown(true);
+
+            // Clear search and pagination helpers
             setCurrentPage(1);
             setSearchTerm('');
+            setJumpCode('');
+
+            // Clear advanced amount/type filters
+            setAmountFilters({
+              minDebit: '',
+              maxDebit: '',
+              minCredit: '',
+              maxCredit: '',
+              minBalance: '',
+              maxBalance: ''
+            });
+            setAccountTypeFilter('all');
+            setBalanceTypeFilter('all');
+
+            // Close panels
+            setShowAdvancedFilters(false);
+            setShowAnalytics(false);
           }}
-          title="إعادة تعيين"
-          style={{fontSize: '30px', padding: '9px 14px', minWidth: '54px', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}
+          title="تنظيف المرشحات (عرض كل شيء بما في ذلك الأرصدة الصفرية)"
+          style={{fontSize: '28px', padding: '9px 14px', minWidth: '54px', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}
         >
-          🔄
+          🧹
+        </button>
+        
+        {/* Show All: clear date limits (select all dates) and keep hide-zero ON */}
+        <button
+          className={styles.presetButton}
+          onClick={() => {
+            // Remove date filters (all dates)
+            setFilters({ dateFrom: '', dateTo: '', includeOpening: true, postedOnly: false })
+
+            // Reset basic filters
+            setAccountId('');
+            setOrgId('');
+            setProjectId('');
+            setClassificationId('');
+
+            // Keep "has balance" view
+            setHideZeroAccounts(true);
+            setActivityOnly(false);
+            setOnlyPostable(false);
+            setOnlyNonPostable(false);
+            setIncludeChildrenInDrilldown(true);
+
+            // Reset search/pagination
+            setCurrentPage(1);
+            setSearchTerm('');
+            setJumpCode('');
+
+            // Clear advanced filters
+            setAmountFilters({
+              minDebit: '',
+              maxDebit: '',
+              minCredit: '',
+              maxCredit: '',
+              minBalance: '',
+              maxBalance: ''
+            });
+            setAccountTypeFilter('all');
+            setBalanceTypeFilter('all');
+
+            // Close panels
+            setShowAdvancedFilters(false);
+            setShowAnalytics(false);
+          }}
+          title="عرض جميع البيانات (كل التواريخ وإخفاء الأرصدة الصفرية)"
+          style={{
+            fontSize: '16px', 
+            padding: '8px 16px', 
+            marginLeft: '8px',
+            minWidth: '100px', 
+            minHeight: '42px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            backgroundColor: '#28a745',
+            color: 'white',
+            fontWeight: 'bold',
+            border: 'none',
+            borderRadius: '4px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            transition: 'all 0.2s ease'            
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.backgroundColor = '#218838'
+            e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)'
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.backgroundColor = '#28a745'
+            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
+          }}
+        >
+          🗂️ عرض الكل
         </button>
         
 

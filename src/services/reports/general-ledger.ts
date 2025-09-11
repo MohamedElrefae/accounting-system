@@ -1,5 +1,16 @@
 import { supabase } from '../../utils/supabase'
 
+/**
+ * General Ledger Report Service
+ * 
+ * Note: This service uses the get_general_ledger_report stored procedure which provides
+ * detailed transaction-level data with running balances. The stored procedure should
+ * implement the same natural balance logic as the canonical balance service for consistency.
+ * 
+ * For account-level aggregated balances, use the canonical balance service instead:
+ * import { getAccountBalances } from '../account-balances'
+ */
+
 export interface GLFilters {
   accountId?: string | null
   dateFrom?: string | null

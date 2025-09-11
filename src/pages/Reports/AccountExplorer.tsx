@@ -14,11 +14,13 @@ import { listWorkItemsAll } from '../../services/work-items'
 import { getCostCentersForSelector } from '../../services/cost-centers'
 import TableView from '@mui/icons-material/TableView'
 import Print from '@mui/icons-material/Print'
+import PictureAsPdf from '@mui/icons-material/PictureAsPdf'
 import Refresh from '@mui/icons-material/Refresh'
 import UnfoldMore from '@mui/icons-material/UnfoldMore'
 import UnfoldLess from '@mui/icons-material/UnfoldLess'
 import Visibility from '@mui/icons-material/Visibility'
 import VisibilityOff from '@mui/icons-material/VisibilityOff'
+import { generateFinancialPDF, type PDFTableData, type PDFOptions } from '../../services/pdf-generator'
 
 // Account Explorer (Financial Reports)
 // Read-only page that reuses chart-of-accounts hierarchy and displays balances in tree and table views.
@@ -104,6 +106,7 @@ const AccountExplorerReport: React.FC = () => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string>('')
+  const [companyName, setCompanyName] = useState<string>('')
 
   // Fullscreen
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -146,7 +149,7 @@ const AccountExplorerReport: React.FC = () => {
       try { const orgs = await fetchOrganizations(); setOrgOptions(orgs || []) } catch {}
       try { const projs = await fetchProjects(); setProjectOptions(projs || []) } catch {}
       try { const { getActiveOrgId } = require('../../utils/org'); const stored = getActiveOrgId?.(); if (stored) setOrgId(stored) } catch {}
-      try { const cfg = await getCompanyConfig(); setCurrencySymbol(cfg.currency_symbol || cfg.currency_code || 'EGP') } catch {}
+      try { const cfg = await getCompanyConfig(); setCurrencySymbol(cfg.currency_symbol || cfg.currency_code || 'EGP'); setCompanyName(cfg?.company_name || '') } catch {}
     })()
   }, [])
   useEffect(() => { orgIdRef.current = orgId || null }, [orgId])
@@ -383,8 +386,519 @@ const AccountExplorerReport: React.FC = () => {
     const a = document.createElement('a'); a.href = url; a.download = 'account-explorer.csv'; a.click(); URL.revokeObjectURL(url)
   }
 
+  // Professional commercial print function
+  // Professional PDF generation function
+  async function generatePDF() {
+    try {
+      const projectName = projectId ? projectOptions.find(p => p.id === projectId)?.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
+      const reportTitle = uiLang === 'ar' ? 'مستكشف الحسابات - التقرير المالي' : 'Account Explorer - Financial Report'
+      const periodText = mode === 'range' ? `${uiLang === 'ar' ? 'من' : 'From'} ${dateFrom} ${uiLang === 'ar' ? 'إلى' : 'To'} ${dateTo}` : `${uiLang === 'ar' ? 'حتى تاريخ' : 'As of'} ${dateTo}`
+      
+      // Build PDF table structure
+      const pdfColumns: PDFTableColumn[] = [
+        { key: 'code', header: uiLang === 'ar' ? 'رمز الحساب' : 'Account Code', width: '100px', align: 'center', type: 'text' },
+        { key: 'name', header: uiLang === 'ar' ? 'اسم الحساب' : 'Account Name', width: '300px', align: 'right', type: 'text' },
+        { key: 'type', header: uiLang === 'ar' ? 'نوع الحساب' : 'Account Type', width: '120px', align: 'center', type: 'text' },
+        { key: 'level', header: uiLang === 'ar' ? 'المستوى' : 'Level', width: '80px', align: 'center', type: 'number' }
+      ]
+      
+      // Add dynamic columns based on mode
+      if (mode === 'range') {
+        if (showOpeningInRange) {
+          pdfColumns.push(
+            { key: 'opening_debit', header: uiLang === 'ar' ? 'افتتاحي مدين' : 'Opening Debit', width: '120px', align: 'right', type: 'currency' },
+            { key: 'opening_credit', header: uiLang === 'ar' ? 'افتتاحي دائن' : 'Opening Credit', width: '120px', align: 'right', type: 'currency' }
+          )
+        }
+        pdfColumns.push(
+          { key: 'period_debits', header: uiLang === 'ar' ? 'مدين الفترة' : 'Period Debits', width: '120px', align: 'right', type: 'currency' },
+          { key: 'period_credits', header: uiLang === 'ar' ? 'دائن الفترة' : 'Period Credits', width: '120px', align: 'right', type: 'currency' },
+          { key: 'closing_debit', header: uiLang === 'ar' ? 'مدين ختامي' : 'Closing Debit', width: '120px', align: 'right', type: 'currency' },
+          { key: 'closing_credit', header: uiLang === 'ar' ? 'دائن ختامي' : 'Closing Credit', width: '120px', align: 'right', type: 'currency' },
+          { key: 'period_net', header: uiLang === 'ar' ? 'صافي الفترة' : 'Period Net', width: '120px', align: 'right', type: 'currency' },
+          { key: 'final_net', header: uiLang === 'ar' ? 'الصافي الختامي' : 'Final Net', width: '120px', align: 'right', type: 'currency' }
+        )
+      } else {
+        pdfColumns.push(
+          { key: 'closing_debit', header: uiLang === 'ar' ? 'مدين ختامي' : 'Closing Debit', width: '120px', align: 'right', type: 'currency' },
+          { key: 'closing_credit', header: uiLang === 'ar' ? 'دائن ختامي' : 'Closing Credit', width: '120px', align: 'right', type: 'currency' },
+          { key: 'final_net', header: uiLang === 'ar' ? 'الصافي الختامي' : 'Final Net', width: '120px', align: 'right', type: 'currency' }
+        )
+      }
+      
+      // Build PDF rows
+      const pdfRows = visibleFlat.map(n => {
+        const periodNet = Number(n.rollup.period_debits || 0) - Number(n.rollup.period_credits || 0)
+        const finalNet = Number(n.rollup.closing_debit || 0) - Number(n.rollup.closing_credit || 0)
+        
+        const row: Record<string, any> = {
+          code: n.code,
+          name: n.name_ar || n.name,
+          type: n.category || '—',
+          level: n.level,
+          closing_debit: Number(n.rollup.closing_debit || 0),
+          closing_credit: Number(n.rollup.closing_credit || 0),
+          final_net: finalNet
+        }
+        
+        if (mode === 'range') {
+          row.opening_debit = Number(n.rollup.opening_debit || 0)
+          row.opening_credit = Number(n.rollup.opening_credit || 0)
+          row.period_debits = Number(n.rollup.period_debits || 0)
+          row.period_credits = Number(n.rollup.period_credits || 0)
+          row.period_net = periodNet
+        }
+        
+        return row
+      })
+      
+      // Calculate totals from root accounts (same as UI)
+      const rootAccounts = nodes.filter(n => !n.parent_id)
+      const totalClosingDebits = rootAccounts.reduce((sum, acc) => sum + Number(acc.rollup.closing_debit || 0), 0)
+      const totalClosingCredits = rootAccounts.reduce((sum, acc) => sum + Number(acc.rollup.closing_credit || 0), 0)
+      const totalPeriodDebits = rootAccounts.reduce((sum, acc) => sum + Number(acc.rollup.period_debits || 0), 0)
+      const totalPeriodCredits = rootAccounts.reduce((sum, acc) => sum + Number(acc.rollup.period_credits || 0), 0)
+      const totalNet = totalClosingDebits - totalClosingCredits
+      
+      // Build totals object
+      const totals: Record<string, number> = {
+        totalClosingDebits,
+        totalClosingCredits,
+        netTotal: totalNet
+      }
+      
+      if (mode === 'range') {
+        totals.totalPeriodDebits = totalPeriodDebits
+        totals.totalPeriodCredits = totalPeriodCredits
+      }
+      
+      const tableData: PDFTableData = {
+        columns: pdfColumns,
+        rows: pdfRows,
+        totals
+      }
+      
+      const pdfOptions: PDFOptions = {
+        title: reportTitle,
+        subtitle: periodText,
+        companyName: companyName,
+        reportDate: dateTo,
+        orientation: 'landscape', // Better for financial reports with many columns
+        language: uiLang,
+        numbersOnly: numbersOnly,
+        currencySymbol: numbersOnly ? 'none' : currencySymbol,
+        showHeader: true,
+        showFooter: true
+      }
+      
+      await generateFinancialPDF(tableData, pdfOptions)
+      
+    } catch (error) {
+      console.error('PDF generation failed:', error)
+      alert(uiLang === 'ar' ? 'فشل في إنشاء ملف PDF' : 'Failed to generate PDF')
+    }
+  }
+
   function printReport() {
-    window.print()
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+
+    // Prepare report data
+    const currentDate = new Date().toLocaleDateString('ar-EG')
+    const projectName = projectId ? projectOptions.find(p => p.id === projectId)?.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
+    const reportTitle = uiLang === 'ar' ? 'مستكشف الحسابات - التقرير المالي' : 'Account Explorer - Financial Report'
+    
+    // Build professional commercial report HTML
+    const reportHTML = `
+      <!DOCTYPE html>
+      <html dir="rtl" lang="ar">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>${reportTitle}</title>
+          <style>
+            /* Commercial Accounting Report Styles */
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            
+            body { 
+              font-family: 'Arial', 'Tahoma', sans-serif;
+              direction: rtl;
+              background: white;
+              color: black;
+              font-size: 12px;
+              line-height: 1.3;
+              padding: 15mm;
+            }
+            
+            /* Report Header - Commercial Standard */
+            .print-header {
+              text-align: center;
+              margin-bottom: 25px;
+              border: 2px solid black;
+              padding: 15px;
+            }
+            
+            .company-name {
+              font-size: 20px;
+              font-weight: bold;
+              margin-bottom: 8px;
+              color: black;
+              text-transform: uppercase;
+            }
+            
+            .report-title {
+              font-size: 18px;
+              font-weight: bold;
+              margin-bottom: 8px;
+              color: black;
+              text-decoration: underline;
+            }
+            
+            .report-period {
+              font-size: 14px;
+              font-weight: bold;
+              margin-bottom: 10px;
+              color: black;
+            }
+            
+            .report-filters {
+              font-size: 11px;
+              color: black;
+              border-top: 1px solid black;
+              padding-top: 8px;
+              display: flex;
+              justify-content: space-between;
+              flex-wrap: wrap;
+            }
+            
+            .filter-item {
+              margin: 2px 10px;
+              font-weight: normal;
+            }
+            
+            /* Table Structure */
+            .report-content {
+              margin-top: 20px;
+            }
+            
+            .accounts-table {
+              width: 100%;
+              border-collapse: collapse;
+              border: 2px solid black;
+              background: white;
+              font-size: 11px;
+            }
+            
+            .accounts-table thead {
+              background: white;
+              border-bottom: 2px solid black;
+              font-weight: bold;
+              color: black;
+            }
+            
+            .accounts-table th {
+              padding: 8px 6px;
+              text-align: center;
+              font-size: 12px;
+              border-right: 1px solid black;
+              font-weight: bold;
+            }
+            
+            .accounts-table th:last-child {
+              border-right: none;
+            }
+            
+            .accounts-table td {
+              padding: 4px 6px;
+              border-right: 1px solid #ddd;
+              border-bottom: 1px solid #eee;
+              color: black;
+            }
+            
+            .accounts-table td:last-child {
+              border-right: none;
+            }
+            
+            .account-code {
+              font-family: 'Courier New', monospace;
+              font-weight: bold;
+              text-align: center;
+              width: 80px;
+            }
+            
+            .account-name {
+              text-align: right;
+              font-weight: normal;
+              width: 250px;
+            }
+            
+            .account-level {
+              text-align: center;
+              font-weight: normal;
+              width: 60px;
+            }
+            
+            .account-type {
+              text-align: center;
+              font-weight: normal;
+              width: 100px;
+            }
+            
+            .amount-cell {
+              font-family: 'Courier New', monospace;
+              font-weight: bold;
+              text-align: right;
+              width: 110px;
+            }
+            
+            .parent-row {
+              background: #f8f8f8;
+              font-weight: bold;
+            }
+            
+            .level-1 {
+              background: #f0f0f0;
+              font-weight: bold;
+            }
+            
+            .level-2 {
+              background: #f5f5f5;
+              font-weight: bold;
+            }
+            
+            /* Grand Total Section */
+            .grand-total {
+              margin-top: 20px;
+              border: 2px solid black;
+              background: white;
+            }
+            
+            .grand-total-header {
+              background: white;
+              color: black;
+              padding: 10px;
+              text-align: center;
+              font-weight: bold;
+              font-size: 14px;
+              border-bottom: 2px solid black;
+            }
+            
+            .total-row {
+              display: flex;
+              padding: 8px 12px;
+              border-bottom: 1px solid #666;
+              font-weight: bold;
+              font-size: 13px;
+            }
+            
+            .total-row:last-child {
+              border-bottom: none;
+              background: white;
+              border-top: 2px solid black;
+            }
+            
+            .total-label {
+              flex: 1;
+              color: black;
+              font-weight: bold;
+            }
+            
+            .total-amount {
+              width: 120px;
+              text-align: right;
+              font-family: 'Courier New', monospace;
+              color: black;
+              font-weight: bold;
+              margin-left: 20px;
+            }
+            
+            /* Print-specific */
+            @media print {
+              body { padding: 10mm; }
+              .accounts-table { font-size: 10px; }
+              @page { 
+                size: A4 landscape;
+                margin: 10mm;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <!-- Professional Commercial Report Header -->
+          <div class="print-header">
+            <div class="company-name">${companyName || (uiLang === 'ar' ? 'الشركة التجارية' : 'Commercial Company')}</div>
+            <div class="report-title">${reportTitle}</div>
+            <div class="report-period">${mode === 'range' ? `${uiLang === 'ar' ? 'من' : 'From'}: ${dateFrom} ${uiLang === 'ar' ? 'إلى' : 'To'}: ${dateTo}` : `${uiLang === 'ar' ? 'حتى تاريخ' : 'As of'}: ${dateTo}`}</div>
+            <div class="report-filters">
+              <span class="filter-item">${uiLang === 'ar' ? 'المشروع' : 'Project'}: ${projectName}</span>
+              <span class="filter-item">${uiLang === 'ar' ? 'تاريخ الطباعة' : 'Print Date'}: ${currentDate}</span>
+              <span class="filter-item">${uiLang === 'ar' ? 'وضع العرض' : 'View Mode'}: ${viewMode === 'table' ? (uiLang === 'ar' ? 'جدول' : 'Table') : (uiLang === 'ar' ? 'شجرة' : 'Tree')}</span>
+              ${postedOnly ? `<span class="filter-item">${uiLang === 'ar' ? 'قيود معتمدة فقط' : 'Posted Only'}</span>` : ''}
+              ${!includeZeros ? `<span class="filter-item">${uiLang === 'ar' ? 'إخفاء الأصفار' : 'Hide Zeros'}</span>` : ''}
+              ${searchTerm ? `<span class="filter-item">${uiLang === 'ar' ? 'البحث' : 'Search'}: ${searchTerm}</span>` : ''}
+            </div>
+          </div>
+          
+          <!-- Report Content -->
+          <div class="report-content">
+            ${generateAccountsPrintContent()}
+          </div>
+        </body>
+      </html>
+    `
+    
+    printWindow.document.write(reportHTML)
+    printWindow.document.close()
+    
+    // Wait for content to load, then print
+    setTimeout(() => {
+      printWindow.focus()
+      printWindow.print()
+      printWindow.close()
+    }, 500)
+  }
+
+  // Generate accounts print content with proper commercial formatting
+  function generateAccountsPrintContent(): string {
+    let html = ''
+    
+    // Main accounts table
+    html += `
+      <table class="accounts-table">
+        <thead>
+          <tr>
+            <th class="account-code">${uiLang === 'ar' ? 'رمز الحساب' : 'Account Code'}</th>
+            <th class="account-name">${uiLang === 'ar' ? 'اسم الحساب' : 'Account Name'}</th>
+            <th class="account-type">${uiLang === 'ar' ? 'نوع الحساب' : 'Account Type'}</th>
+            <th class="account-level">${uiLang === 'ar' ? 'المستوى' : 'Level'}</th>`
+    
+    // Dynamic columns based on mode
+    if (mode === 'range') {
+      if (showOpeningInRange) {
+        html += `
+            <th class="amount-cell">${uiLang === 'ar' ? 'افتتاحي مدين' : 'Opening Debit'}</th>
+            <th class="amount-cell">${uiLang === 'ar' ? 'افتتاحي دائن' : 'Opening Credit'}</th>`
+      }
+      html += `
+            <th class="amount-cell">${uiLang === 'ar' ? 'مدين الفترة' : 'Period Debit'}</th>
+            <th class="amount-cell">${uiLang === 'ar' ? 'دائن الفترة' : 'Period Credit'}</th>
+            <th class="amount-cell">${uiLang === 'ar' ? 'مدين ختامي' : 'Closing Debit'}</th>
+            <th class="amount-cell">${uiLang === 'ar' ? 'دائن ختامي' : 'Closing Credit'}</th>
+            <th class="amount-cell">${uiLang === 'ar' ? 'صافي الفترة' : 'Period Net'}</th>
+            <th class="amount-cell">${uiLang === 'ar' ? 'الصافي الختامي' : 'Final Net'}</th>`
+    } else {
+      html += `
+            <th class="amount-cell">${uiLang === 'ar' ? 'مدين ختامي' : 'Closing Debit'}</th>
+            <th class="amount-cell">${uiLang === 'ar' ? 'دائن ختامي' : 'Closing Credit'}</th>
+            <th class="amount-cell">${uiLang === 'ar' ? 'الصافي الختامي' : 'Final Net'}</th>`
+    }
+    
+    html += `
+          </tr>
+        </thead>
+        <tbody>`
+    
+    // Generate account rows
+    for (const account of visibleFlat) {
+      if (!includeZeros && isZero(account)) continue
+      
+      const periodNet = Number(account.rollup.period_debits || 0) - Number(account.rollup.period_credits || 0)
+      const finalNet = Number(account.rollup.closing_debit || 0) - Number(account.rollup.closing_credit || 0)
+      const hasChildren = (account.children && account.children.length > 0)
+      
+      let rowClass = ''
+      if (hasChildren) {
+        if (account.level === 1) rowClass = 'parent-row level-1'
+        else if (account.level === 2) rowClass = 'parent-row level-2'
+        else rowClass = 'parent-row'
+      }
+      
+      const indentStyle = `padding-right: ${(account.level - 1) * 20}px;`
+      
+      html += `
+        <tr class="${rowClass}">
+          <td class="account-code">${account.code}</td>
+          <td class="account-name" style="${indentStyle}">${account.name_ar || account.name}</td>
+          <td class="account-type">${account.category || '—'}</td>
+          <td class="account-level">${account.level}</td>`
+      
+      // Dynamic amount columns
+      if (mode === 'range') {
+        if (showOpeningInRange) {
+          html += `
+          <td class="amount-cell">${formatArabicCurrency(account.rollup.opening_debit, numbersOnly ? 'none' : currencySymbol)}</td>
+          <td class="amount-cell">${formatArabicCurrency(account.rollup.opening_credit, numbersOnly ? 'none' : currencySymbol)}</td>`
+        }
+        html += `
+          <td class="amount-cell">${formatArabicCurrency(account.rollup.period_debits, numbersOnly ? 'none' : currencySymbol)}</td>
+          <td class="amount-cell">${formatArabicCurrency(account.rollup.period_credits, numbersOnly ? 'none' : currencySymbol)}</td>
+          <td class="amount-cell">${formatArabicCurrency(account.rollup.closing_debit, numbersOnly ? 'none' : currencySymbol)}</td>
+          <td class="amount-cell">${formatArabicCurrency(account.rollup.closing_credit, numbersOnly ? 'none' : currencySymbol)}</td>
+          <td class="amount-cell">${formatArabicCurrency(periodNet, numbersOnly ? 'none' : currencySymbol)}</td>
+          <td class="amount-cell">${formatArabicCurrency(finalNet, numbersOnly ? 'none' : currencySymbol)}</td>`
+      } else {
+        html += `
+          <td class="amount-cell">${formatArabicCurrency(account.rollup.closing_debit, numbersOnly ? 'none' : currencySymbol)}</td>
+          <td class="amount-cell">${formatArabicCurrency(account.rollup.closing_credit, numbersOnly ? 'none' : currencySymbol)}</td>
+          <td class="amount-cell">${formatArabicCurrency(finalNet, numbersOnly ? 'none' : currencySymbol)}</td>`
+      }
+      
+      html += `
+        </tr>`
+    }
+    
+    html += `
+        </tbody>
+      </table>`
+    
+    // Grand Total Section - Calculate from root accounts only (same as UI)
+    // Get root accounts (nodes without parent_id)
+    const rootAccounts = nodes.filter(n => !n.parent_id)
+    const totalClosingDebits = rootAccounts.reduce((sum, acc) => sum + Number(acc.rollup.closing_debit || 0), 0)
+    const totalClosingCredits = rootAccounts.reduce((sum, acc) => sum + Number(acc.rollup.closing_credit || 0), 0)
+    const totalPeriodDebits = rootAccounts.reduce((sum, acc) => sum + Number(acc.rollup.period_debits || 0), 0)
+    const totalPeriodCredits = rootAccounts.reduce((sum, acc) => sum + Number(acc.rollup.period_credits || 0), 0)
+    const totalNet = totalClosingDebits - totalClosingCredits
+    const difference = Math.abs(totalClosingDebits - totalClosingCredits)
+    const isBalanced = difference < 0.01
+    
+    html += `
+      <div class="grand-total">
+        <div class="grand-total-header">${uiLang === 'ar' ? 'المجاميع العامة' : 'Grand Totals'}</div>`
+    
+    if (mode === 'range') {
+      html += `
+        <div class="total-row">
+          <div class="total-label">${uiLang === 'ar' ? 'إجمالي مدين الفترة' : 'Total Period Debits'}</div>
+          <div class="total-amount">${formatArabicCurrency(totalPeriodDebits, numbersOnly ? 'none' : currencySymbol)}</div>
+        </div>
+        <div class="total-row">
+          <div class="total-label">${uiLang === 'ar' ? 'إجمالي دائن الفترة' : 'Total Period Credits'}</div>
+          <div class="total-amount">${formatArabicCurrency(totalPeriodCredits, numbersOnly ? 'none' : currencySymbol)}</div>
+        </div>`
+    }
+    
+    html += `
+        <div class="total-row">
+          <div class="total-label">${uiLang === 'ar' ? 'إجمالي المدين الختامي' : 'Total Closing Debits'}</div>
+          <div class="total-amount">${formatArabicCurrency(totalClosingDebits, numbersOnly ? 'none' : currencySymbol)}</div>
+        </div>
+        <div class="total-row">
+          <div class="total-label">${uiLang === 'ar' ? 'إجمالي الدائن الختامي' : 'Total Closing Credits'}</div>
+          <div class="total-amount">${formatArabicCurrency(totalClosingCredits, numbersOnly ? 'none' : currencySymbol)}</div>
+        </div>
+        <div class="total-row">
+          <div class="total-label">${uiLang === 'ar' ? 'الصافي الإجمالي' : 'Total Net'}</div>
+          <div class="total-amount">${formatArabicCurrency(totalNet, numbersOnly ? 'none' : currencySymbol)}</div>
+        </div>
+        <div class="total-row">
+          <div class="total-label">${uiLang === 'ar' ? 'حالة التوازن' : 'Balance Status'}</div>
+          <div class="total-amount">${isBalanced ? (uiLang === 'ar' ? 'متوازن ✓' : 'Balanced ✓') : (uiLang === 'ar' ? 'غير متوازن' : 'Unbalanced')}</div>
+        </div>
+      </div>`
+    
+    return html
   }
 
   return (
@@ -460,7 +974,36 @@ const AccountExplorerReport: React.FC = () => {
         <div className={styles.actionSection}>
           <div className={styles.exportGroup}>
             <button type="button" className={styles.exportButton} onClick={exportCSV} title={uiLang === 'ar' ? 'تصدير CSV' : 'Export CSV'}><TableView fontSize="small" /> CSV</button>
-            <button type="button" className={styles.exportButton} onClick={printReport} title={uiLang === 'ar' ? 'طباعة' : 'Print'}><Print fontSize="small" /> {uiLang === 'ar' ? 'طباعة' : 'Print'}</button>
+            <button 
+              type="button" 
+              className={`${styles.exportButton} ${styles.pdfButton}`} 
+              onClick={generatePDF} 
+              title={uiLang === 'ar' ? 'تصدير PDF رسمي' : 'Export Official PDF'}
+              style={{
+                backgroundColor: '#dc2626',
+                color: 'white',
+                fontWeight: 'bold',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '8px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = '#b91c1c'
+                e.currentTarget.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)'
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = '#dc2626'
+                e.currentTarget.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)'
+              }}
+            >
+              <PictureAsPdf fontSize="small" /> {uiLang === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+            </button>
+            <button type="button" className={styles.exportButton} onClick={printReport} title={uiLang === 'ar' ? 'طباعة شاشة' : 'Print Screen'}><Print fontSize="small" /> {uiLang === 'ar' ? 'طباعة' : 'Print'}</button>
           </div>
           <button type="button" className={styles.actionButton} onClick={toggleFullscreen} title={uiLang === 'ar' ? (isFullscreen ? 'الخروج من ملء الشاشة' : 'ملء الشاشة') : (isFullscreen ? 'Exit Full Screen' : 'Full Screen')}>
             {isFullscreen ? (uiLang === 'ar' ? 'الخروج من ملء الشاشة' : 'Exit Full Screen') : (uiLang === 'ar' ? 'ملء الشاشة' : 'Full Screen')}

@@ -7,6 +7,7 @@ import type { ExpensesCategoryRow } from '../../types/expenses-categories';
 import type { WorkItemRow } from '../../types/work-items';
 import { toWorkItemOptions } from '../../services/work-items';
 import type { SearchableSelectOption } from '../Common/SearchableSelect';
+import { transactionValidator, type ValidationWarning } from '../../services/transaction-validation';
 
 import { getCurrentDate, DATE_FORMATS } from '../../utils/dateHelpers';
 
@@ -499,8 +500,9 @@ export const createTransactionFormConfig = (
     fields,
     submitLabel: isEditing ? '💾 حفظ التعديلات' : '✨ إضافة المعاملة',
     cancelLabel: '❌ إلغاء',
-    customValidator: (data: Record<string, unknown>) => {
+    customValidator: async (data: Record<string, unknown>) => {
       const errors: ValidationError[] = [];
+      const warnings: ValidationError[] = [];
       
       // Cross-field validation: Debit and Credit accounts must be different
       const fd = data as { 
@@ -510,6 +512,8 @@ export const createTransactionFormConfig = (
         expenses_category_id?: string;
         classification_id?: string;
         cost_center_id?: string;
+        description?: string;
+        entry_date?: string;
       };
       if (fd.debit_account_id && fd.credit_account_id && fd.debit_account_id === fd.credit_account_id) {
         errors.push({ 
@@ -525,6 +529,38 @@ export const createTransactionFormConfig = (
           field: 'amount', 
           message: 'يرجى إدخال مبلغ صحيح أكبر من صفر' 
         });
+      }
+
+      // Smart validation using the new validation service
+      if (fd.debit_account_id && fd.credit_account_id && amountVal > 0 && fd.description) {
+        try {
+          const validationResult = await transactionValidator.validateTransaction({
+            debit_account_id: fd.debit_account_id,
+            credit_account_id: fd.credit_account_id,
+            amount: amountVal,
+            description: fd.description,
+            entry_date: fd.entry_date || new Date().toISOString().split('T')[0]
+          });
+
+          // Add validation errors
+          for (const error of validationResult.errors) {
+            errors.push({
+              field: error.field,
+              message: error.message
+            });
+          }
+
+          // Add validation warnings (as warnings, not errors)
+          for (const warning of validationResult.warnings) {
+            warnings.push({
+              field: warning.field,
+              message: `⚠️ ${warning.message}${warning.details ? ' - ' + warning.details : ''}`
+            });
+          }
+        } catch (validationError) {
+          console.error('Transaction validation failed:', validationError);
+          // Don't fail form submission due to validation service errors
+        }
       }
 
       // Require expenses category if either side is an expense account (both sides rule)
@@ -554,7 +590,8 @@ export const createTransactionFormConfig = (
       
       return {
         isValid: errors.length === 0,
-        errors
+        errors,
+        warnings
       };
     },
     autoFillLogic: createTransactionAutoFillLogic(accounts),

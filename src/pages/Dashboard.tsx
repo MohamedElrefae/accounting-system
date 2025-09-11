@@ -43,6 +43,7 @@ import { supabase } from '../utils/supabase';
 import { getActiveProjects } from '../services/projects';
 import { getOrganizations } from '../services/organization';
 import { getCompanyConfig } from '../services/company-config';
+import { getCategoryTotals, type AccountBalanceFilter } from '../services/account-balances';
 import type { StatCard as StatCardType } from '../types';
 
 // Minimal shape for dashboard recent transactions
@@ -87,7 +88,7 @@ const Dashboard: React.FC = () => {
   const [dateTo, setDateTo] = React.useState<string>('');
   const [numbersOnlyDashboard, setNumbersOnlyDashboard] = React.useState<boolean>(false);
   const [showFilters, setShowFilters] = React.useState<boolean>(false);
-  const [postedOnly, setPostedOnly] = React.useState<boolean>(false);
+  const [postedOnly, setPostedOnly] = React.useState<boolean>(false); // Default: show all transactions
   const axisNumberFormatter = React.useMemo(() => new Intl.NumberFormat(numberFormat || 'en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), [numberFormat]);
   const compactNumberFormatter = React.useMemo(() => new Intl.NumberFormat(numberFormat || 'en-US', { notation: 'compact', maximumFractionDigits: 1 }), [numberFormat]);
   const formatAxisTick = (v: number) => {
@@ -114,6 +115,7 @@ const Dashboard: React.FC = () => {
     const y = String(d.getFullYear());
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
+    // Use organization date format from company config
     switch ((dateFormat || 'YYYY-MM-DD').toUpperCase()) {
       case 'MM/DD/YYYY':
         return `${m}/${day}/${y}`;
@@ -331,7 +333,18 @@ const Dashboard: React.FC = () => {
       setDateFormat(cfg.date_format || 'YYYY-MM-DD');
       setCustomShortcuts(Array.isArray((cfg as any).shortcuts) ? ((cfg as any).shortcuts as any) : []);
 
-      // Fetch accounts map once (include normal_balance)
+      // Use unified balance service for consistency with all reports
+      const balanceFilters: AccountBalanceFilter = {
+        dateFrom,
+        dateTo,
+        postedOnly,
+        orgId: orgId || undefined,
+        projectId: projectId || undefined
+      };
+      
+      const categoryTotals = await getCategoryTotals(balanceFilters);
+      
+      // Get accounts for transaction categorization
       const { data: accts, error: acctErr } = await supabase
         .from('accounts')
         .select('id, name, category, normal_balance');
@@ -349,6 +362,10 @@ const Dashboard: React.FC = () => {
         .order('created_at', { ascending: false })
         .limit(10);
       recentQ = applyScope(recentQ);
+      // Apply posting filter to recent transactions if in Posted-only mode
+      if (postedOnly) {
+        recentQ = recentQ.eq('is_posted', true);
+      }
       const { data: txRecent, error: txErr } = await recentQ;
       if (txErr) throw txErr;
       const rows = txRecent || [];
@@ -390,79 +407,45 @@ const Dashboard: React.FC = () => {
         rangeQ = rangeQ.lte('entry_date', dateTo);
       }
       rangeQ = applyScope(rangeQ);
+      // Only filter by posting status if postedOnly is true
       if (postedOnly) {
         rangeQ = rangeQ.eq('is_posted', true);
       }
+      // If All mode (postedOnly = false), include both posted and unposted transactions
       const { data: txRange, error: rangeErr } = await rangeQ;
       if (rangeErr) throw rangeErr;
       const txs = txRange || [];
 
-      // Build monthly buckets
+      // Build monthly buckets using consistent formatting
       const monthKeys: string[] = [];
       for (let i = 5; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const key = d.toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US', { month: 'short', year: '2-digit' });
+        // Use organization number format for consistent month display
+        const key = d.toLocaleString(numberFormat || (language === 'ar' ? 'ar-SA' : 'en-US'), { month: 'short', year: '2-digit' });
         monthKeys.push(key);
       }
       const revenueByMonth: number[] = Array(6).fill(0);
       const expensesByMonth: number[] = Array(6).fill(0);
 
-      // Running totals (natural-sign balances)
-      let totalAssets = 0;
-      let totalLiabilities = 0;
-      let totalEquity = 0;
-      let totalRevenue = 0;
-      let totalExpenses = 0;
-      let pendingCount = 0;
+      // Initialize totals using unified category totals
+      let totalAssets = Math.abs(categoryTotals['asset'] || 0);
+      let totalLiabilities = Math.abs(categoryTotals['liability'] || 0);
+      let totalEquity = Math.abs(categoryTotals['equity'] || 0);
+      let totalRevenue = Math.abs(categoryTotals['revenue'] || 0);
+      let totalExpenses = Math.abs(categoryTotals['expense'] || 0);
 
+      // Build revenue/expenses by month from transactions (informational)
       for (const r of txs) {
         const d = new Date(r.entry_date);
-        const key = d.toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US', { month: 'short', year: '2-digit' });
+        const key = d.toLocaleString(numberFormat || (language === 'ar' ? 'ar-SA' : 'en-US'), { month: 'short', year: '2-digit' });
         const idx = monthKeys.indexOf(key);
-
-        const debit = acctMap[r.debit_account_id];
-        const credit = acctMap[r.credit_account_id];
-        const debitCat = debit?.category || null;
-        const creditCat = credit?.category || null;
-        // const creditName = credit?.name || '—';
-
-        // Natural-sign rollup per category using normal_balance
-        const debitNormal = debit?.normal_balance || 'debit';
-        const creditNormal = credit?.normal_balance || 'credit';
-        // Debit leg
-        if (debitCat) {
-          const delta = (debitNormal === 'debit' ? 1 : -1) * r.amount;
-          if (debitCat === 'asset') totalAssets += delta;
-          else if (debitCat === 'liability') totalLiabilities += delta;
-          else if (debitCat === 'equity') totalEquity += delta;
-          else if (debitCat === 'revenue') totalRevenue += delta;
-          else if (debitCat === 'expense') {
-            totalExpenses += delta;
-            if (idx >= 0) expensesByMonth[idx] += r.amount; // chart uses raw expense amounts per month
-          }
+        const creditCat = acctMap[r.credit_account_id]?.category || null;
+        const debitCat = acctMap[r.debit_account_id]?.category || null;
+        if (idx >= 0 && (!postedOnly || r.is_posted)) {
+          if (creditCat === 'revenue') revenueByMonth[idx] += r.amount;
+          if (debitCat === 'expense') expensesByMonth[idx] += r.amount;
         }
-        // Credit leg
-        if (creditCat) {
-          const delta = (creditNormal === 'debit' ? -1 : 1) * r.amount;
-          if (creditCat === 'asset') totalAssets += delta;
-          else if (creditCat === 'liability') totalLiabilities += delta;
-          else if (creditCat === 'equity') totalEquity += delta;
-          else if (creditCat === 'revenue') {
-            totalRevenue += delta;
-            if (idx >= 0) revenueByMonth[idx] += r.amount; // chart revenue per month
-          }
-          // credit to expenses rarely occurs, ignore for breakdown/chart
-        }
-
-        if (r.is_posted === false) pendingCount += 1;
       }
-
-      // Ensure natural-sign totals are positive for display
-      totalAssets = Math.max(totalAssets, 0);
-      totalLiabilities = Math.max(totalLiabilities, 0);
-      totalEquity = Math.max(totalEquity, 0);
-      totalRevenue = Math.max(totalRevenue, 0);
-      totalExpenses = Math.max(totalExpenses, 0);
       const netProfit = totalRevenue - totalExpenses;
 
       // Compose stat cards (fallback to mock colors/icons semantics)
@@ -512,7 +495,16 @@ const Dashboard: React.FC = () => {
 
       {/* Statistics Cards + Actions */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>{language === 'ar' ? 'المؤشرات المالية' : 'Financial Indicators'}</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>{language === 'ar' ? 'المؤشرات المالية' : 'Financial Indicators'}</Typography>
+          <Chip
+            size="small"
+            label={postedOnly ? (language === 'ar' ? 'مرحّلة فقط' : 'Posted only') : (language === 'ar' ? 'جميع المعاملات' : 'All transactions')}
+            color={postedOnly ? 'warning' : 'primary'}
+            variant="outlined"
+            sx={{ fontSize: '0.75rem' }}
+          />
+        </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           <FormControlLabel
             control={<Switch size="small" checked={compactTicks} onChange={(e) => setCompactTicks(e.target.checked)} />}
@@ -523,13 +515,13 @@ const Dashboard: React.FC = () => {
           </IconButton>
           <Chip
             size="small"
-            label={postedOnly ? (language === 'ar' ? 'مرحلة فقط' : 'Posted only') : (language === 'ar' ? 'الكل' : 'All transactions')}
-            color={postedOnly ? 'success' : 'default'}
+            label={postedOnly ? (language === 'ar' ? 'مرحّلة فقط' : 'Posted only') : (language === 'ar' ? 'جميع المعاملات' : 'All transactions')}
+            color={postedOnly ? 'warning' : 'primary'}
             variant={postedOnly ? 'filled' : 'outlined'}
           />
           {lastUpdated && (
             <Typography variant="caption" color="text.secondary">
-              {(language === 'ar' ? 'آخر تحديث: ' : 'Last updated: ') + new Date(lastUpdated).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US')}
+              {(language === 'ar' ? 'آخر تحديث: ' : 'Last updated: ') + formatDate(lastUpdated.toISOString().slice(0, 10)) + ' ' + lastUpdated.toLocaleTimeString(numberFormat || (language === 'ar' ? 'ar-SA' : 'en-US'), { hour12: false })}
             </Typography>
           )}
           <Button variant="outlined" size="small" onClick={async () => { setRefreshing(true); await load(); setRefreshing(false); }} startIcon={refreshing ? <CircularProgress size={14} /> : undefined} disabled={refreshing}>
@@ -610,9 +602,18 @@ const Dashboard: React.FC = () => {
         <Box sx={{ flex: { xs: '1 1 100%', lg: '1 1 calc(66.666% - 12px)' } }}>
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
-                {t.monthlyRevenue}
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  {t.monthlyRevenue}
+                </Typography>
+                <Chip
+                  size="small"
+                  label={postedOnly ? (language === 'ar' ? 'مرحّلة فقط' : 'Posted only') : (language === 'ar' ? 'جميع المعاملات' : 'All transactions')}
+                  color={postedOnly ? 'warning' : 'primary'}
+                  variant="outlined"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              </Box>
               <Box sx={{ height: 350 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData}>
@@ -749,11 +750,12 @@ const Dashboard: React.FC = () => {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 600 }}>{'Date'}</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>{'Description'}</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>{'Category'}</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>{'Type'}</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>{'Amount'}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{language === 'ar' ? 'التاريخ' : 'Date'}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{language === 'ar' ? 'الوصف' : 'Description'}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{language === 'ar' ? 'الفئة' : 'Category'}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{language === 'ar' ? 'النوع' : 'Type'}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{language === 'ar' ? 'الحالة' : 'Status'}</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>{language === 'ar' ? 'المبلغ' : 'Amount'}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -764,37 +766,50 @@ const Dashboard: React.FC = () => {
                       <TableCell><Skeleton width={220} /></TableCell>
                       <TableCell><Skeleton width={160} /></TableCell>
                       <TableCell><Skeleton width={80} /></TableCell>
+                      <TableCell><Skeleton width={80} /></TableCell>
                       <TableCell align="right"><Skeleton width={120} /></TableCell>
                     </TableRow>
                   ))
                 )}
                 {!loading && !error && recent.length === 0 && (
-                  <TableRow><TableCell colSpan={5}>{'No recent transactions'}</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6}>{language === 'ar' ? 'لا توجد معاملات حديثة' : 'No recent transactions'}</TableCell></TableRow>
                 )}
-                {!loading && !error && recent.map((transaction) => (
-                  <TableRow key={transaction.id} hover>
-                    <TableCell>{formatDate(transaction.entry_date)}</TableCell>
-                    <TableCell>{transaction.description}</TableCell>
-                    <TableCell>{transaction.category ?? '-'}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={transaction.type === 'income' ? t.income : t.expense}
-                        color={transaction.type === 'income' ? 'success' : 'error'}
-                        size="small"
-                        variant="outlined"
-                      />
-                    </TableCell>
-                    <TableCell 
-                      align="right"
-                      sx={{ 
-                        color: transaction.type === 'income' ? 'success.main' : 'error.main',
-                        fontWeight: 600,
-                      }}
-                    >
-                      {transaction.type === 'income' ? '+' : '-'}{formatAmount(transaction.amount)}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {!loading && !error && recent.map((transaction) => {
+                  // Cast to access is_posted property
+                  const tx = transaction as any;
+                  return (
+                    <TableRow key={transaction.id} hover>
+                      <TableCell>{formatDate(transaction.entry_date)}</TableCell>
+                      <TableCell>{transaction.description}</TableCell>
+                      <TableCell>{transaction.category ?? '-'}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={transaction.type === 'income' ? t.income : t.expense}
+                          color={transaction.type === 'income' ? 'success' : 'error'}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={tx.is_posted ? (language === 'ar' ? 'مرحّلة' : 'Posted') : (language === 'ar' ? 'غير مرحّلة' : 'Draft')}
+                          color={tx.is_posted ? 'success' : 'warning'}
+                          size="small"
+                          variant={tx.is_posted ? 'filled' : 'outlined'}
+                        />
+                      </TableCell>
+                      <TableCell 
+                        align="right"
+                        sx={{ 
+                          color: transaction.type === 'income' ? 'success.main' : 'error.main',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {transaction.type === 'income' ? '+' : '-'}{formatAmount(transaction.amount)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>

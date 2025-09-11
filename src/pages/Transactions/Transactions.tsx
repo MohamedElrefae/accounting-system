@@ -29,6 +29,7 @@ import type { ColumnConfig } from '../../components/Common/ColumnConfiguration'
 import useColumnPreferences from '../../hooks/useColumnPreferences'
 import SearchableSelect, { type SearchableSelectOption } from '../../components/Common/SearchableSelect'
 import { supabase } from '../../utils/supabase'
+import { transactionValidationAPI } from '../../services/transaction-validation-api'
 
 interface FilterState {
   dateFrom: string
@@ -487,6 +488,39 @@ const TransactionsPage: React.FC = () => {
     _setFormErrors({})
     try {
       setIsSaving(true)
+
+      // Perform backend validation before saving
+      try {
+        const validationResult = await transactionValidationAPI.validateTransactionBeforeSave({
+          debit_account_id: data.debit_account_id,
+          credit_account_id: data.credit_account_id,
+          amount: parseFloat(data.amount),
+          description: data.description,
+          entry_date: data.entry_date,
+          transaction_id: editingTx?.id
+        })
+
+        // Show validation warnings (but allow proceeding)
+        if (validationResult.warnings.length > 0) {
+          const warningMessage = validationResult.warnings.map(w => w.message).join('\n')
+          const proceed = window.confirm(`تحذيرات التحقق:\n${warningMessage}\n\nهل تريد المتابعة؟`)
+          if (!proceed) {
+            setIsSaving(false)
+            return
+          }
+        }
+
+        // Block submission if there are errors
+        if (!validationResult.is_valid) {
+          const errorMessage = validationResult.errors.map(e => e.message).join('\n')
+          showToast(`أخطاء في التحقق من صحة المعاملة:\n${errorMessage}`, { severity: 'error' })
+          setIsSaving(false)
+          return
+        }
+      } catch (validationError) {
+        console.warn('Backend validation failed, proceeding with client validation only:', validationError)
+        // Continue with normal processing if backend validation fails
+      }
 
       if (editingTx) {
         // Update existing transaction

@@ -43,6 +43,15 @@ export interface UniversalExportOptions {
     headerBg?: string;
     footerBg?: string;
   };
+  // Excel-specific options
+  excel?: {
+    currencyFormat?: 'symbol' | 'plain' | 'custom';
+    customCurrencyFormat?: string; // e.g., "[$-ar-EG]#,##0.00\" ج.م\""
+    useLocaleSeparators?: boolean;
+    freezePanes?: boolean;
+    autoFilter?: boolean;
+    columnFormats?: { [columnKey: string]: string }; // Custom format per column
+  };
 }
 
 export interface UniversalTableColumn {
@@ -54,6 +63,13 @@ export interface UniversalTableColumn {
   format?: string;
   currency?: string;
   visible?: boolean;
+  // Excel-specific column options
+  excel?: {
+    format?: string; // Custom Excel number format for this column
+    currencySymbol?: string; // Custom currency symbol
+    locale?: string; // Locale for number formatting (e.g., 'ar-EG', 'en-US')
+    alignment?: 'left' | 'center' | 'right';
+  };
 }
 
 export interface UniversalTableData {
@@ -184,8 +200,10 @@ export class UniversalExportManager {
 
   /**
    * Format cell value based on column type
+   * For Excel: returns raw values to maintain data types
+   * For other formats: returns formatted strings
    */
-  private formatCellValue(value: any, column: UniversalTableColumn, exportOptions: ExportOptions): string {
+  private formatCellValue(value: any, column: UniversalTableColumn, exportOptions: ExportOptions): any {
     if (value === null || value === undefined) return '';
 
     const arabicOptions: ArabicTextOptions = {
@@ -194,6 +212,30 @@ export class UniversalExportManager {
       applyRTLMarks: exportOptions.format === 'html'
     };
 
+    // For Excel export, return raw values to preserve data types
+    if (exportOptions.format === 'excel') {
+      switch (column.type) {
+        case 'currency':
+        case 'number':
+          return Number(value) || 0;
+        case 'date':
+          // Return proper Date object for Excel
+          if (value instanceof Date) return value;
+          if (typeof value === 'string') {
+            const parsedDate = new Date(value);
+            return isNaN(parsedDate.getTime()) ? value : parsedDate;
+          }
+          return value;
+        case 'percentage':
+          return Number(value) || 0; // Excel will handle percentage formatting
+        case 'boolean':
+          return Boolean(value);
+        default:
+          return String(value);
+      }
+    }
+
+    // For other formats, return formatted strings
     switch (column.type) {
       case 'currency':
         return this.arabicEngine.formatCurrency(
@@ -297,11 +339,31 @@ export class UniversalExportManager {
       // Use the already processed headers from preprocessed data
       const headers = data.columns.map(col => col.header);
       
-      // Use the already processed data rows - no need to reprocess
+      // Process data rows maintaining proper data types for Excel
       const dataRows = data.rows.map(row => {
         return data.columns.map(col => {
           const value = row[col.key];
-          return value ?? '';
+          if (value === null || value === undefined) return null;
+          
+          // Return raw values for Excel to maintain data types
+          switch (col.type) {
+            case 'currency':
+            case 'number':
+              return Number(value) || 0;
+            case 'date':
+              if (value instanceof Date) return value;
+              if (typeof value === 'string') {
+                const parsedDate = new Date(value);
+                return isNaN(parsedDate.getTime()) ? value : parsedDate;
+              }
+              return value;
+            case 'percentage':
+              return Number(value) || 0;
+            case 'boolean':
+              return Boolean(value);
+            default:
+              return String(value);
+          }
         });
       });
 
@@ -323,6 +385,11 @@ export class UniversalExportManager {
           const cell = (worksheet as any)[cellRef];
           if (!cell) continue;
           const base = cell.s || {};
+          // Apply auto filter to the header row if requested
+          if (options.excel?.autoFilter) {
+            const lastCol = XLSXUtils.encode_col(data.columns.length - 1);
+            (worksheet as any)['!autofilter'] = { ref: `A${preRowsCount + 1}:${lastCol}${preRowsCount + 1}` };
+          }
           (worksheet as any)[cellRef].s = Object.assign({}, base, {
             font: Object.assign({}, (base as any).font || {}, { bold: true, color: { rgb: '2C3E50' } }),
             fill: { patternType: 'solid', fgColor: { rgb: 'F8F9FA' } },
@@ -331,17 +398,48 @@ export class UniversalExportManager {
         }
       } catch {}
 
-      // Attempt to freeze header row and first column (account for preheader rows)
-      try {
-        const ySplit = preRowsCount + 1; // header row index (1-based)
-        const topLeftCell = `B${ySplit + 1}`; // one row below header
-        (worksheet as any)['!freeze'] = { xSplit: 1, ySplit, topLeftCell, activePane: 'bottomRight', state: 'frozen' };
-      } catch {}
+      // Apply freeze panes if requested (account for preheader rows)
+      if (options.excel?.freezePanes !== false) {
+        try {
+          const ySplit = preRowsCount + 1; // header row index (1-based)
+          const topLeftCell = `B${ySplit + 1}`; // one row below header
+          (worksheet as any)['!freeze'] = { xSplit: 1, ySplit, topLeftCell, activePane: 'bottomRight', state: 'frozen' };
+        } catch {}
+      }
       
-      // Set column widths
-      const columnWidths = data.columns.map(col => ({
-        wch: col.width ? col.width / 8 : 15
-      }));
+      // Set column widths with intelligent defaults based on data type
+      const columnWidths = data.columns.map(col => {
+        let width = 15; // default width
+        
+        if (col.width) {
+          width = col.width / 8;
+        } else {
+          // Auto-size based on column type
+          switch (col.type) {
+            case 'currency':
+            case 'number':
+              width = 18; // Wider for numbers with currency symbols
+              break;
+            case 'date':
+              width = 12; // Standard date width
+              break;
+            case 'percentage':
+              width = 10; // Smaller for percentages
+              break;
+            case 'boolean':
+              width = 8; // Small for true/false
+              break;
+            case 'text':
+            default:
+              // Calculate width based on header length (Arabic text needs more space)
+              const headerLength = col.header ? col.header.length : 10;
+              width = Math.max(12, Math.min(30, headerLength * 1.2));
+              break;
+          }
+        }
+        
+        return { wch: width };
+      });
       (worksheet as any)['!cols'] = columnWidths;
       
       // Apply RTL formatting to the worksheet if needed
@@ -349,26 +447,164 @@ export class UniversalExportManager {
         (worksheet as any)['!dir'] = 'rtl';
       }
 
-      // Apply basic styles: currency formats and bold subtotal rows (best-effort)
+      // Apply proper cell formatting based on column types
       try {
+        // Define column type indices
         const currencyColIdx: number[] = [];
+        const numberColIdx: number[] = [];
+        const dateColIdx: number[] = [];
+        const percentageColIdx: number[] = [];
+        
         data.columns.forEach((col, idx) => {
-          if (col.type === 'currency' || col.type === 'number' || col.format === 'currency') {
-            currencyColIdx.push(idx);
+          switch (col.type) {
+            case 'currency':
+              currencyColIdx.push(idx);
+              break;
+            case 'number':
+              numberColIdx.push(idx);
+              break;
+            case 'date':
+              dateColIdx.push(idx);
+              break;
+            case 'percentage':
+              percentageColIdx.push(idx);
+              break;
           }
         });
+        
         // Iterate over data rows (1-based offset in sheet for header)
         for (let r = 0; r < dataRows.length; r++) {
-          const sheetRow = preRowsCount + 1 + r; // header at preRowsCount
+          const sheetRow = preRowsCount + 1 + r; // header at preRowsCount + 1
           const isGroupSubtotal = typeof data.rows[r]?.name === 'string' && (data.rows[r].name as string).startsWith('[مجموعة]');
+          
           for (let c = 0; c < data.columns.length; c++) {
             const cellRef = XLSXUtils.encode_cell({ r: sheetRow, c });
             const cell = (worksheet as any)[cellRef];
             if (!cell) continue;
-            // Currency / number format
-            if (currencyColIdx.includes(c) && typeof cell.v === 'number') {
-              cell.z = '#,##0.00';
+            
+            // Apply appropriate number formats based on column type
+            const col = data.columns[c];
+            const baseStyle = cell.s || {};
+            
+            if (typeof cell.v === 'number') {
+              if (currencyColIdx.includes(c)) {
+                // Advanced currency formatting based on options
+                const currencyFormat = options.excel?.currencyFormat || 'symbol';
+                const customFormat = options.excel?.columnFormats?.[col.key] || col.excel?.format;
+                
+                if (customFormat) {
+                  // Use custom format for this specific column
+                  cell.z = customFormat;
+                } else if (currencyFormat === 'plain' || col.currency === 'none') {
+                  // Plain numeric format
+                  cell.z = options.excel?.useLocaleSeparators ? '#,##0.00' : '#,##0.00';
+                } else if (currencyFormat === 'custom' && options.excel?.customCurrencyFormat) {
+                  // Use global custom currency format
+                  cell.z = options.excel.customCurrencyFormat;
+                } else {
+                  // Default symbol format with proper currency
+                  const currencySymbol = col.excel?.currencySymbol || 
+                                       (col.currency === 'EGP' ? 'ج.م' : (col.currency || 'ج.م'));
+                  
+                  // Use locale-aware format if requested
+                  if (options.excel?.useLocaleSeparators && col.excel?.locale) {
+                    cell.z = `[$-${col.excel.locale}]#,##0.00" ${currencySymbol}"`;
+                  } else {
+                    cell.z = `#,##0.00" ${currencySymbol}"`;
+                  }
+                }
+                
+                // Apply alignment (custom or default)
+                const align = col.excel?.alignment || 'right';
+                cell.s = Object.assign({}, baseStyle, {
+                  alignment: Object.assign({}, baseStyle.alignment || {}, { 
+                    horizontal: align, 
+                    vertical: 'center' 
+                  })
+                });
+              } else if (numberColIdx.includes(c)) {
+                // Custom number formatting
+                const customFormat = options.excel?.columnFormats?.[col.key] || col.excel?.format;
+                
+                if (customFormat) {
+                  cell.z = customFormat;
+                } else {
+                  // Default number format with locale support
+                  cell.z = options.excel?.useLocaleSeparators ? '#,##0.00' : '#,##0.00';
+                }
+                
+                // Apply alignment (custom or default)
+                const align = col.excel?.alignment || 'right';
+                cell.s = Object.assign({}, baseStyle, {
+                  alignment: Object.assign({}, baseStyle.alignment || {}, { 
+                    horizontal: align, 
+                    vertical: 'center' 
+                  })
+                });
+              } else if (percentageColIdx.includes(c)) {
+                // Custom percentage formatting
+                const customFormat = options.excel?.columnFormats?.[col.key] || col.excel?.format;
+                
+                if (customFormat) {
+                  cell.z = customFormat;
+                } else {
+                  // Default percentage format
+                  cell.z = '0.00%';
+                }
+                
+                cell.t = 'n'; // Ensure it's treated as number
+                
+                // Apply alignment (custom or default)
+                const align = col.excel?.alignment || 'center';
+                cell.s = Object.assign({}, baseStyle, {
+                  alignment: Object.assign({}, baseStyle.alignment || {}, { 
+                    horizontal: align, 
+                    vertical: 'center' 
+                  })
+                });
+                // Keep the value as is - Excel will multiply by 100 when displaying as %
+              }
+            } else if (dateColIdx.includes(c)) {
+              // Custom date formatting
+              const customFormat = options.excel?.columnFormats?.[col.key] || col.excel?.format;
+              
+              // Handle different date formats
+              if (cell.v instanceof Date) {
+                cell.z = customFormat || 'dd/mm/yyyy';
+                cell.t = 'd'; // Excel date type
+              } else if (typeof cell.v === 'string') {
+                // Try to parse string dates
+                const parsedDate = new Date(cell.v);
+                if (!isNaN(parsedDate.getTime())) {
+                  cell.v = parsedDate;
+                  cell.z = customFormat || 'dd/mm/yyyy';
+                  cell.t = 'd';
+                } else {
+                  // Keep as text if can't parse as date
+                  cell.z = '@'; // Text format
+                }
+              }
+              
+              // Apply alignment (custom or default)
+              const align = col.excel?.alignment || 'center';
+              cell.s = Object.assign({}, baseStyle, {
+                alignment: Object.assign({}, baseStyle.alignment || {}, { 
+                  horizontal: align, 
+                  vertical: 'center' 
+                })
+              });
+            } else {
+              // Text and other types
+              // Align text based on RTL layout and column specification
+              const textAlign = col.align || (options.rtlLayout ? 'right' : 'left');
+              cell.s = Object.assign({}, baseStyle, {
+                alignment: Object.assign({}, baseStyle.alignment || {}, { 
+                  horizontal: textAlign, 
+                  vertical: 'center' 
+                })
+              });
             }
+            
             // Bold and shade group subtotal rows (support varies by environment)
             if (isGroupSubtotal) {
               const baseStyle = cell.s || {};

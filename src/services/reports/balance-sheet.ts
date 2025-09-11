@@ -35,60 +35,28 @@ export async function fetchBalanceSheetReport(filters: BSFilters): Promise<{
   summary: BSSummary
 }> {
   try {
-    // 1. Get all accounts
-    const { data: accounts, error: accountsError } = await supabase
-      .from('accounts')
-      .select('id, code, name, name_ar, status, category, normal_balance')
-      .eq('status', 'active')
-      .order('code')
+    // Use GL Summary function directly for guaranteed consistency
+    const { data: glSummaryData, error: glError } = await supabase.rpc('get_gl_account_summary', {
+      p_date_from: null, // Balance Sheet is as-of a date, so no start date
+      p_date_to: filters.asOfDate,
+      p_org_id: filters.orgId || null,
+      p_project_id: filters.projectId || null,
+      p_posted_only: filters.postedOnly || false,
+      p_limit: null,
+      p_offset: null,
+      p_classification_id: null,
+      p_cost_center_id: null,
+      p_work_item_id: null,
+      p_expenses_category_id: null,
+      p_debit_account_id: null,
+      p_credit_account_id: null,
+      p_amount_min: null,
+      p_amount_max: null
+    })
+    
+    if (glError) throw glError
 
-    if (accountsError) throw accountsError
-
-    // 2. Get transactions up to the as-of date
-    let transactionQuery = supabase
-      .from('transactions')
-      .select(`
-        debit_account_id,
-        credit_account_id,
-        amount,
-        entry_date,
-        project_id,
-        is_posted
-      `)
-
-    if (filters.asOfDate) {
-      transactionQuery = transactionQuery.lte('entry_date', filters.asOfDate)
-    }
-    if (filters.projectId) {
-      transactionQuery = transactionQuery.eq('project_id', filters.projectId)
-    }
-    if (filters.postedOnly) {
-      transactionQuery = transactionQuery.eq('is_posted', true)
-    }
-
-    const { data: transactions, error: transactionsError } = await transactionQuery
-
-    if (transactionsError) throw transactionsError
-
-    // 3. Calculate account balances
-    const accountBalances = new Map<string, number>()
-
-    for (const tx of transactions || []) {
-      const amount = Number(tx.amount || 0)
-
-      // Standard double-entry: Debit increases assets/expenses, Credit increases liabilities/equity/revenue
-      if (tx.debit_account_id) {
-        const currentBalance = accountBalances.get(tx.debit_account_id) || 0
-        accountBalances.set(tx.debit_account_id, currentBalance + amount)
-      }
-
-      if (tx.credit_account_id) {
-        const currentBalance = accountBalances.get(tx.credit_account_id) || 0
-        accountBalances.set(tx.credit_account_id, currentBalance - amount)
-      }
-    }
-
-    // 4. Classify accounts and build Balance Sheet structure
+    // Build Balance Sheet structure using GL Summary
     const bsRows: BSRow[] = []
     let totalAssets = 0
     let totalCurrentAssets = 0
@@ -98,31 +66,27 @@ export async function fetchBalanceSheetReport(filters: BSFilters): Promise<{
     let totalLongTermLiabilities = 0
     let totalEquity = 0
 
-    for (const account of accounts || []) {
-      const balance = accountBalances.get(account.id) || 0
+    for (const row of (glSummaryData || [])) {
+      // GL Summary returns closing_debit and closing_credit - match Trial Balance format
+      const closingDebit = row.closing_debit || 0
+      const closingCredit = row.closing_credit || 0
       
-      // Skip accounts with zero balance
-      if (balance === 0) continue
+      // Skip accounts with zero activity (same as Trial Balance)
+      if (closingDebit === 0 && closingCredit === 0) continue
 
-      // Classify account type based on code
-      const accountType = classifyBSAccountType(account.code || '')
+      // Classify account type based on account code
+      const accountType = classifyBSAccountType(row.account_code)
       if (!accountType) continue // Skip if not a Balance Sheet account
 
-      // For Balance Sheet accounts, we typically show the raw balance
-      // Assets: Positive debit balance
-      // Liabilities: Positive credit balance (shown as positive)
-      // Equity: Positive credit balance (shown as positive)
-      let displayAmount = balance
-      if (accountType === 'liabilities' || accountType === 'equity') {
-        displayAmount = -balance // Credit balances shown as positive
-      }
+      // For Balance Sheet, use total activity like Trial Balance (debit + credit)
+      const displayAmount = closingDebit + closingCredit
 
       // Accumulate totals
       switch (accountType) {
         case 'assets':
           totalAssets += displayAmount
           // Sub-categorize assets based on account code
-          if (isCurrentAsset(account.code || '')) {
+          if (isCurrentAsset(row.account_code)) {
             totalCurrentAssets += displayAmount
           } else {
             totalFixedAssets += displayAmount
@@ -131,7 +95,7 @@ export async function fetchBalanceSheetReport(filters: BSFilters): Promise<{
         case 'liabilities':
           totalLiabilities += displayAmount
           // Sub-categorize liabilities
-          if (isCurrentLiability(account.code || '')) {
+          if (isCurrentLiability(row.account_code)) {
             totalCurrentLiabilities += displayAmount
           } else {
             totalLongTermLiabilities += displayAmount
@@ -143,10 +107,10 @@ export async function fetchBalanceSheetReport(filters: BSFilters): Promise<{
       }
 
       bsRows.push({
-        account_id: account.id,
-        account_code: account.code || '',
-        account_name_ar: account.name_ar,
-        account_name_en: account.name,
+        account_id: row.account_id,
+        account_code: row.account_code,
+        account_name_ar: row.account_name_ar || row.account_name_en,
+        account_name_en: row.account_name_en || row.account_name_ar,
         account_type: accountType,
         amount: displayAmount,
         sort_order: getSortOrder(accountType),
@@ -184,6 +148,26 @@ export async function fetchBalanceSheetReport(filters: BSFilters): Promise<{
     console.error('Error fetching Balance Sheet report:', error)
     throw error
   }
+}
+
+function classifyBSAccountTypeFromCategory(category: string): BSRow['account_type'] | null {
+  if (!category) return null
+
+  const categoryLower = category.toLowerCase()
+  
+  // Map canonical service categories to Balance Sheet types
+  if (categoryLower === 'assets') {
+    return 'assets'
+  }
+  if (categoryLower === 'liabilities') {
+    return 'liabilities'
+  }
+  if (categoryLower === 'equity') {
+    return 'equity'
+  }
+  
+  // Revenue and expenses are not Balance Sheet accounts
+  return null
 }
 
 function classifyBSAccountType(code: string): BSRow['account_type'] | null {

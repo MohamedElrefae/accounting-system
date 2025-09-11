@@ -8,6 +8,17 @@ import { exportToExcel, exportToCSV } from '../../utils/UniversalExportManager'
 import type { UniversalTableData, UniversalTableColumn } from '../../utils/UniversalExportManager'
 import { getCompanyConfig } from '../../services/company-config'
 import { fetchProjects, fetchOrganizations, type LookupOption } from '../../services/lookups'
+
+/**
+ * Trial Balance All Levels Report
+ * 
+ * This report uses the get_gl_account_summary stored procedure for hierarchical balance data.
+ * The stored procedure should implement the same natural balance logic as the canonical
+ * balance service (getAccountBalances) for consistency across all reports.
+ * 
+ * For simple account-level balances, consider using the canonical service:
+ * import { getAccountBalances } from '../../services/account-balances'
+ */
 import IosShare from '@mui/icons-material/IosShare'
 import TableView from '@mui/icons-material/TableView'
 import Print from '@mui/icons-material/Print'
@@ -581,8 +592,9 @@ export default function TrialBalanceAllLevels() {
     const renderNodePrint = (node: TBNode, level: number): string => {
       if (!includeZeros && isZero(node)) return ''
       
-      const debit = mode === 'range' ? node.rollup.period_debits : node.rollup.closing_debit
-      const credit = mode === 'range' ? node.rollup.period_credits : node.rollup.closing_credit
+      // Use closing_debit/closing_credit consistently for balanced display
+      const debit = node.rollup.closing_debit
+      const credit = node.rollup.closing_credit
       
       const debitAmount = debit > 0 ? formatArabicCurrency(debit, numbersOnly ? 'none' : 'EGP') : ''
       const creditAmount = credit > 0 ? formatArabicCurrency(credit, numbersOnly ? 'none' : 'EGP') : ''
@@ -619,9 +631,9 @@ export default function TrialBalanceAllLevels() {
       </table>
     `
     
-    // Grand Total Section
-    const totalDebits = roots.reduce((s, r) => s + (mode === 'range' ? r.rollup.period_debits : r.rollup.closing_debit), 0)
-    const totalCredits = roots.reduce((s, r) => s + (mode === 'range' ? r.rollup.period_credits : r.rollup.closing_credit), 0)
+    // Grand Total Section - use closing_debit/closing_credit for consistency
+    const totalDebits = roots.reduce((s, r) => s + r.rollup.closing_debit, 0)
+    const totalCredits = roots.reduce((s, r) => s + r.rollup.closing_credit, 0)
     const difference = Math.abs(totalDebits - totalCredits)
     const isBalanced = difference < 0.01
     
@@ -629,12 +641,12 @@ export default function TrialBalanceAllLevels() {
       <div class="grand-total">
         <div class="grand-total-header">${uiLang === 'ar' ? 'المجاميع العامة' : 'Grand Totals'}</div>
         <div class="total-row">
-          <div class="total-label">${mode === 'range' ? (uiLang === 'ar' ? 'إجمالي مدين الفترة' : 'Total Period Debits') : (uiLang === 'ar' ? 'إجمالي المدين الختامي' : 'Total Closing Debits')}</div>
+          <div class="total-label">${uiLang === 'ar' ? 'إجمالي المدين الختامي' : 'Total Closing Debits'}</div>
           <div class="total-debit">${formatArabicCurrency(totalDebits, numbersOnly ? 'none' : 'EGP')}</div>
           <div class="total-credit"></div>
         </div>
         <div class="total-row">
-          <div class="total-label">${mode === 'range' ? (uiLang === 'ar' ? 'إجمالي دائن الفترة' : 'Total Period Credits') : (uiLang === 'ar' ? 'إجمالي الدائن الختامي' : 'Total Closing Credits')}</div>
+          <div class="total-label">${uiLang === 'ar' ? 'إجمالي الدائن الختامي' : 'Total Closing Credits'}</div>
           <div class="total-debit"></div>
           <div class="total-credit">${formatArabicCurrency(totalCredits, numbersOnly ? 'none' : 'EGP')}</div>
         </div>
@@ -658,9 +670,8 @@ export default function TrialBalanceAllLevels() {
     return html
   }
 
-  const isZero = (n: TBNode) => (mode === 'range')
-    ? (Number(n.rollup.period_debits || 0) === 0 && Number(n.rollup.period_credits || 0) === 0)
-    : (Number(n.rollup.closing_debit || 0) === 0 && Number(n.rollup.closing_credit || 0) === 0)
+  // Use closing_debit/closing_credit consistently for zero check
+  const isZero = (n: TBNode) => (Number(n.rollup.closing_debit || 0) === 0 && Number(n.rollup.closing_credit || 0) === 0)
 
   // Group nodes by account type (first-level classification)
 
@@ -685,8 +696,9 @@ export default function TrialBalanceAllLevels() {
     const hasChildren = (node.children && node.children.length > 0)
     const toggle = () => setExpanded(prev => { const s = new Set(prev); if (s.has(node.id)) s.delete(node.id); else s.add(node.id); return s })
 
-    const debit = mode === 'range' ? node.rollup.period_debits : node.rollup.closing_debit
-    const credit = mode === 'range' ? node.rollup.period_credits : node.rollup.closing_credit
+    // Use closing_debit/closing_credit in both modes for consistency with Trial Balance Original
+    const debit = node.rollup.closing_debit
+    const credit = node.rollup.closing_credit
 
     const indentClass = styles[`indent-${Math.min(level, 6)}` as keyof typeof styles] || ''
 
@@ -780,6 +792,52 @@ export default function TrialBalanceAllLevels() {
 
         {/* Right: export/print/refresh */}
         <div className={styles.actionSection}>
+          {/* Show All button - comprehensive business view */}
+          <button
+            type="button"
+            className={`${styles.actionButton} ${styles.showAll}`}
+            onClick={() => {
+              // Reset to show all data with meaningful filters
+              setDateFrom(startOfYearISO())
+              setDateTo(todayISO())
+              setMode('range') // Show period activity
+              setProjectId('')
+              setOrgId('')
+              setIncludeZeros(false) // Hide zero balances for business view
+              setPostedOnly(false)
+              expandToLevel(2) // Show meaningful detail
+            }}
+            title={uiLang === 'ar' ? 'عرض جميع البيانات (الحسابات ذات الأرصدة فقط)' : 'Show All Data (Accounts with balances only)'}
+            aria-label={uiLang === 'ar' ? 'عرض جميع بيانات ميزان المراجعة' : 'Show all trial balance data'}
+            style={{
+              fontSize: '14px',
+              padding: '8px 16px',
+              marginRight: '8px',
+              minWidth: '100px',
+              backgroundColor: '#28a745',
+              color: 'white',
+              fontWeight: 'bold',
+              border: 'none',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = '#218838'
+              e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)'
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = '#28a745'
+              e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+          >
+            🗂️ {uiLang === 'ar' ? 'عرض الكل' : 'Show All'}
+          </button>
+          
           <div className={styles.exportGroup}>
             <button type="button" className={styles.exportButton} onClick={() => exportVisible('excel')} title={uiLang === 'ar' ? 'تصدير Excel' : 'Export Excel'}><IosShare fontSize="small" /> Excel</button>
             <button type="button" className={styles.exportButton} onClick={() => exportVisible('csv')} title={uiLang === 'ar' ? 'تصدير CSV' : 'Export CSV'}><TableView fontSize="small" /> CSV</button>
@@ -816,8 +874,9 @@ export default function TrialBalanceAllLevels() {
             {/* Render groups like original Trial Balance */}
             {roots.map(root => {
               const isCollapsed = collapsedGroups.has(root.id)
-              const debit = mode === 'range' ? root.rollup.period_debits : root.rollup.closing_debit
-              const credit = mode === 'range' ? root.rollup.period_credits : root.rollup.closing_credit
+              // Use closing_debit/closing_credit consistently for all display modes
+              const debit = root.rollup.closing_debit
+              const credit = root.rollup.closing_credit
               
               if (!includeZeros && isZero(root)) return null
               
@@ -857,17 +916,9 @@ export default function TrialBalanceAllLevels() {
             <div className="trial-balance-totals">
               <span className="totals-label">{uiLang === 'ar' ? 'الإجمالي العام' : 'Grand Total'}</span>
               <div className="totals-amounts">
-                {mode === 'range' ? (
-                  <>
-                    <span className="total-debits">{formatArabicCurrency(roots.reduce((s, r) => s + r.rollup.period_debits, 0), numbersOnly ? 'none' : 'EGP')}</span>
-                    <span className="total-credits">{formatArabicCurrency(roots.reduce((s, r) => s + r.rollup.period_credits, 0), numbersOnly ? 'none' : 'EGP')}</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="total-debits">{formatArabicCurrency(roots.reduce((s, r) => s + r.rollup.closing_debit, 0), numbersOnly ? 'none' : 'EGP')}</span>
-                    <span className="total-credits">{formatArabicCurrency(roots.reduce((s, r) => s + r.rollup.closing_credit, 0), numbersOnly ? 'none' : 'EGP')}</span>
-                  </>
-                )}
+                {/* Use closing_debit/closing_credit consistently for balanced totals */}
+                <span className="total-debits">{formatArabicCurrency(roots.reduce((s, r) => s + r.rollup.closing_debit, 0), numbersOnly ? 'none' : 'EGP')}</span>
+                <span className="total-credits">{formatArabicCurrency(roots.reduce((s, r) => s + r.rollup.closing_credit, 0), numbersOnly ? 'none' : 'EGP')}</span>
               </div>
             </div>
           </div>

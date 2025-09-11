@@ -18,7 +18,8 @@ import FormLayoutControls from './FormLayoutControls';
 
 // Lightweight validation types to keep this component standalone
 export type ValidationError = { field: string; message: string };
-export type ValidationResult = { isValid: boolean; errors: ValidationError[] };
+export type ValidationWarning = { field: string; message: string };
+export type ValidationResult = { isValid: boolean; errors: ValidationError[]; warnings?: ValidationWarning[] };
 
 // Field Types
 export type FieldType = 
@@ -75,6 +76,11 @@ export type FormConfig = {
   fields: FormField[];
   submitLabel?: string;
   cancelLabel?: string;
+  /** 
+   * Custom form-level validator that runs after field-level validation.
+   * Can return both errors (blocking submission) and warnings (user confirmable).
+   * Warnings are shown in the UI and require user confirmation to proceed.
+   */
   customValidator?: (data: Record<string, unknown>) => ValidationResult;
   autoFillLogic?: (data: Record<string, unknown>) => Record<string, unknown>;
   layout?: {
@@ -118,6 +124,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   // State Management
   const [formData, setFormData] = useState<Record<string, unknown>>(initialData);
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
+  const [validationWarnings, setValidationWarnings] = useState<ValidationWarning[]>([]);
   // removed unused fieldStates to satisfy noUnusedLocals
   const [autoFilledFields, setAutoFilledFields] = useState<string[]>([]);
   const [showPasswordFields, setShowPasswordFields] = useState<{[key: string]: boolean}>({});
@@ -305,6 +312,16 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       const filtered = prev.filter(e => e.field !== fieldId);
       return [...filtered, ...newErrors];
     });
+    
+    // Run form-level validation for warnings (but only if no errors)
+    if (config.customValidator && newErrors.length === 0) {
+      const customValidation = config.customValidator(updatedFormData);
+      if (customValidation.warnings) {
+        setValidationWarnings(customValidation.warnings);
+      } else {
+        setValidationWarnings([]);
+      }
+    }
 
     // Handle dependent fields
     config.fields.forEach((f: FormField) => {
@@ -325,43 +342,49 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
 
   // Validate form
   const validateForm = (): ValidationResult => {
-    const errors: ValidationError[] = [];
+    const errors: ValidationError[] = []
+    const warnings: ValidationWarning[] = []
 
     // Validate each field
     config.fields.forEach((field: FormField) => {
-      if (!shouldShowField(field)) return;
+      if (!shouldShowField(field)) return
 
-      const value = getFieldValue(field.id);
+      const value = getFieldValue(field.id)
 
       // Required field validation
       if (isFieldRequired(field) && (!value || (typeof value === 'string' && !value.trim()))) {
         errors.push({
           field: field.id,
           message: `${field.label} مطلوب`
-        });
+        })
       }
 
       // Custom field validation
       if (field.validation && value) {
-        const error = field.validation(value);
+        const error = field.validation(value)
         if (error) {
-          errors.push(error);
+          errors.push(error)
         }
       }
-    });
+    })
 
     // Custom form validation
     if (config.customValidator) {
-      const customValidation = config.customValidator(formData);
-      errors.push(...customValidation.errors);
+      const customValidation = config.customValidator(formData)
+      errors.push(...customValidation.errors)
+      if (customValidation.warnings) {
+        warnings.push(...customValidation.warnings)
+      }
     }
 
-    setValidationErrors(errors);
+    setValidationErrors(errors)
+    setValidationWarnings(warnings)
     return {
       isValid: errors.length === 0,
-      errors
-    };
-  };
+      errors,
+      warnings
+    }
+  }
 
   const scrollToField = (fieldId: string) => {
     const el = document.getElementById(fieldId) as HTMLElement | null;
@@ -388,6 +411,18 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       }
       try { showToast?.(`يوجد ${validation.errors.length} خطأ — تم الانتقال لأول حقل غير صالح`, { severity: 'error' }); } catch { void 0; }
       return;
+    }
+
+    // Check for warnings and confirm with user if any exist
+    if (validation.warnings && validation.warnings.length > 0) {
+      const warningsText = validation.warnings.map(w => w.message).join('\n• ');
+      const confirmMessage = `تم اكتشاف ${validation.warnings.length} تحذير:\n• ${warningsText}\n\nهل تريد المتابعة بالحفظ رغم هذه التحذيرات؟`;
+      
+      const shouldContinue = window.confirm(confirmMessage);
+      if (!shouldContinue) {
+        try { showToast?.(`تم إلغاء الحفظ بسبب التحذيرات`, { severity: 'info' }); } catch { void 0; }
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -950,6 +985,30 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
                   <button type="button" onClick={() => scrollToField(error.field)} className={styles.errorLink}>
                     {error.message}
                   </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        
+        {/* Validation Warnings Summary */}
+        {validationWarnings.length > 0 && (
+          <div style={{
+            background: '#fef3c7',
+            border: '1px solid #f59e0b',
+            borderRadius: '6px',
+            padding: '12px 16px',
+            marginBottom: '16px',
+            color: '#92400e'
+          }}>
+            <div style={{ fontWeight: '600', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Info size={16} />
+              ⚠️ تحذيرات يُنصح بمراجعتها:
+            </div>
+            <ul style={{ margin: 0, paddingLeft: '20px' }}>
+              {validationWarnings.map((warning, index) => (
+                <li key={index} style={{ marginBottom: '4px', fontSize: '13px' }}>
+                  {warning.message}
                 </li>
               ))}
             </ul>

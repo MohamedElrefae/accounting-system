@@ -104,6 +104,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
   return (
     <>
     <AppBar
+      key={`topbar-${language}`} // Force remount when language changes
       position="fixed" 
       elevation={0}
       sx={{ 
@@ -117,6 +118,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
           theme.palette.mode === 'dark' 
             ? 'rgba(18, 18, 18, 0.95)' 
             : 'rgba(255, 255, 255, 0.95)',
+        direction: isRtl ? 'rtl' : 'ltr',
       }}
     >
       <Toolbar sx={{ 
@@ -124,12 +126,20 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 2,
-        flexDirection: isRtl ? 'row-reverse' : 'row',
+        position: 'relative',
+        width: '100%'
       }}>
-        {/* Menu button - always on the sidebar side (left in LTR, right in RTL) */}
+        {/* Menu button section - positioned based on language */}
         <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center',
+          position: 'absolute !important',
+          // Force positioning based on language
+          ...(language === 'ar' 
+            ? { right: '16px !important', left: 'auto !important' } 
+            : { left: '16px !important', right: 'auto !important' }
+          ),
+          top: '50%',
+          transform: 'translateY(-50%)',
+          zIndex: 10
         }}>
           <IconButton
             edge="start"
@@ -155,20 +165,33 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
           variant="h6" 
           component="div" 
           sx={{ 
-            flexGrow: 1, 
-            textAlign: 'center',
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
             fontWeight: 500,
             letterSpacing: '-0.5px',
+            whiteSpace: 'nowrap',
+            zIndex: 1
           }}
         >
           {getCurrentGreeting()}, {getDisplayName()}!
         </Typography>
 
-        {/* Actions cluster - always opposite to menu (right in LTR, left in RTL) */}
+        {/* Actions cluster - positioned opposite to menu button */}
         <Box sx={{ 
+          position: 'absolute !important',
+          // Opposite positioning: Arabic (ar) = left side, English (en) = right side
+          ...(language === 'ar' 
+            ? { left: '16px !important', right: 'auto !important' } 
+            : { right: '16px !important', left: 'auto !important' }
+          ),
+          top: '50%',
+          transform: 'translateY(-50%)',
           display: 'flex', 
           alignItems: 'center', 
           gap: 0.5,
+          zIndex: 10
         }}>
           {/* Theme Settings - Modern Glass Effect */}
           <Tooltip title="Theme Settings" placement="bottom">

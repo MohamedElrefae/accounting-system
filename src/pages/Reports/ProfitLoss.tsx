@@ -9,6 +9,8 @@ import html2canvas from 'html2canvas'
 import { getCompanyConfig } from '../../services/company-config'
 import { fetchTransactionsDateRange } from '../../services/reports/common';
 import { fetchProfitLossReport, type PLFilters, type PLRow, type PLSummary } from '../../services/reports/profit-loss'
+import { getActiveOrgId } from '../../utils/org'
+import { fetchOrganizations, type LookupOption } from '../../services/lookups'
 import Visibility from '@mui/icons-material/Visibility'
 import VisibilityOff from '@mui/icons-material/VisibilityOff'
 import Bolt from '@mui/icons-material/Bolt'
@@ -55,6 +57,8 @@ export default function ProfitLoss() {
   const [projects, setProjects] = useState<{ id: string; code: string; name: string }[]>([])
   const [projectId, setProjectId] = useState<string>('')
   const [companyName, setCompanyName] = useState<string>('')
+  const [orgId, setOrgId] = useState<string>('')
+  const [orgOptions, setOrgOptions] = useState<LookupOption[]>([])
   const [detailedView, setDetailedView] = useState<boolean>(true)
   const [postedOnly, setPostedOnly] = useState<boolean>(false)
   // Numbers-only setting (hide currency symbol)
@@ -132,6 +136,18 @@ export default function ProfitLoss() {
     const { data } = await supabase.from('projects').select('id, code, name').eq('status', 'active').order('code')
     setProjects(data || [])
     
+    // Load organizations and set default
+    try { 
+      const orgs = await fetchOrganizations(); 
+      setOrgOptions(orgs || [])
+      // Set default org from localStorage or first available
+      const storedOrgId = getActiveOrgId()
+      if (storedOrgId) {
+        setOrgId(storedOrgId)
+      } else if (orgs && orgs.length > 0) {
+        setOrgId(orgs[0].id)
+      }
+    } catch {}
     
     try { 
       const cfg = await getCompanyConfig()
@@ -147,6 +163,7 @@ export default function ProfitLoss() {
       const filters: PLFilters = {
         dateFrom,
         dateTo,
+        orgId: orgId || null,
         projectId: projectId || null,
         postedOnly
       }
@@ -994,6 +1011,50 @@ export default function ProfitLoss() {
 
         {/* Right Section: Action Buttons */}
         <div className={styles.actionSection}>
+          {/* Show All button - comprehensive business view */}
+          <button
+            type="button"
+            className={`${styles.actionButton} ${styles.showAll}`}
+            onClick={() => {
+              // Reset to show all data with meaningful filters
+              setDateFrom(startOfYearISO())
+              setDateTo(todayISO())
+              setProjectId('')
+              setIncludeZeros(false) // Hide zero balances for business view
+              setPostedOnly(false)
+              setDetailedView(true)
+            }}
+            title={uiLang === 'ar' ? 'عرض جميع البيانات (الحسابات ذات الأرصدة فقط)' : 'Show All Data (Accounts with balances only)'}
+            aria-label={uiLang === 'ar' ? 'عرض جميع بيانات قائمة الدخل' : 'Show all profit & loss data'}
+            style={{
+              fontSize: '14px',
+              padding: '8px 16px',
+              marginRight: '8px',
+              minWidth: '100px',
+              backgroundColor: '#28a745',
+              color: 'white',
+              fontWeight: 'bold',
+              border: 'none',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = '#218838'
+              e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)'
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = '#28a745'
+              e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+          >
+            🗂️ {uiLang === 'ar' ? 'عرض الكل' : 'Show All'}
+          </button>
+          
           <div className={styles.exportGroup}>
             <button 
               type="button" 

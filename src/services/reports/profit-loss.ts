@@ -42,64 +42,28 @@ export async function fetchProfitLossReport(filters: PLFilters): Promise<{
   summary: PLSummary
 }> {
   try {
-    // 1. Get all accounts
-    const { data: accounts, error: accountsError } = await supabase
-      .from('accounts')
-      .select('id, code, name, name_ar, status, category, normal_balance')
-      .eq('status', 'active')
-      .order('code')
+    // Use GL Summary function directly for guaranteed consistency
+    const { data: glSummaryData, error: glError } = await supabase.rpc('get_gl_account_summary', {
+      p_date_from: filters.dateFrom,
+      p_date_to: filters.dateTo,
+      p_org_id: filters.orgId || null,
+      p_project_id: filters.projectId || null,
+      p_posted_only: filters.postedOnly || false,
+      p_limit: null,
+      p_offset: null,
+      p_classification_id: null,
+      p_cost_center_id: null,
+      p_work_item_id: null,
+      p_expenses_category_id: null,
+      p_debit_account_id: null,
+      p_credit_account_id: null,
+      p_amount_min: null,
+      p_amount_max: null
+    })
+    
+    if (glError) throw glError
 
-    if (accountsError) throw accountsError
-
-    // 2. Get transactions within date range
-    let transactionQuery = supabase
-      .from('transactions')
-      .select(`
-        debit_account_id,
-        credit_account_id,
-        amount,
-        entry_date,
-        project_id,
-        is_posted
-      `)
-
-    if (filters.dateFrom) {
-      transactionQuery = transactionQuery.gte('entry_date', filters.dateFrom)
-    }
-    if (filters.dateTo) {
-      transactionQuery = transactionQuery.lte('entry_date', filters.dateTo)
-    }
-    if (filters.projectId) {
-      transactionQuery = transactionQuery.eq('project_id', filters.projectId)
-    }
-    if (filters.postedOnly) {
-      transactionQuery = transactionQuery.eq('is_posted', true)
-    }
-
-    const { data: transactions, error: transactionsError } = await transactionQuery
-
-    if (transactionsError) throw transactionsError
-
-    // 3. Calculate account balances
-    const accountBalances = new Map<string, number>()
-
-    for (const tx of transactions || []) {
-      const amount = Number(tx.amount || 0)
-
-      // Debit increases expense accounts, decreases revenue accounts
-      if (tx.debit_account_id) {
-        const currentBalance = accountBalances.get(tx.debit_account_id) || 0
-        accountBalances.set(tx.debit_account_id, currentBalance + amount)
-      }
-
-      // Credit increases revenue accounts, decreases expense accounts
-      if (tx.credit_account_id) {
-        const currentBalance = accountBalances.get(tx.credit_account_id) || 0
-        accountBalances.set(tx.credit_account_id, currentBalance - amount)
-      }
-    }
-
-    // 4. Classify accounts and build P&L structure
+    // Build P&L structure using GL Summary
     const plRows: PLRow[] = []
     let totalRevenue = 0
     let totalCostOfSales = 0
@@ -107,21 +71,20 @@ export async function fetchProfitLossReport(filters: PLFilters): Promise<{
     let totalOtherIncome = 0
     let totalOtherExpenses = 0
 
-    for (const account of accounts || []) {
-      const balance = accountBalances.get(account.id) || 0
+    for (const row of (glSummaryData || [])) {
+      // GL Summary returns closing_debit and closing_credit - match Trial Balance format
+      const closingDebit = row.closing_debit || 0
+      const closingCredit = row.closing_credit || 0
       
-      // Skip accounts with zero balance
-      if (balance === 0) continue
+      // Skip accounts with zero activity (same as Trial Balance)
+      if (closingDebit === 0 && closingCredit === 0) continue
 
-      // Classify account type based on code
-      const accountType = classifyPLAccountType(account.code || '')
+      // Classify account type based on account code
+      const accountType = classifyPLAccountType(row.account_code)
       if (!accountType) continue // Skip if not a P&L account
 
-      // For revenue accounts, we need to negate the balance since credit increases revenue
-      let displayAmount = balance
-      if (accountType === 'revenue' || accountType === 'other_income') {
-        displayAmount = -balance // Revenue accounts have negative balance, show as positive
-      }
+      // For P&L, use total activity like Trial Balance (debit + credit)
+      const displayAmount = closingDebit + closingCredit
 
       // Accumulate totals
       switch (accountType) {
@@ -143,10 +106,10 @@ export async function fetchProfitLossReport(filters: PLFilters): Promise<{
       }
 
       plRows.push({
-        account_id: account.id,
-        account_code: account.code || '',
-        account_name_ar: account.name_ar,
-        account_name_en: account.name,
+        account_id: row.account_id,
+        account_code: row.account_code,
+        account_name_ar: row.account_name_ar || row.account_name_en,
+        account_name_en: row.account_name_en || row.account_name_ar,
         account_type: accountType,
         amount: displayAmount,
         parent_id: null, // Not available in current schema
@@ -192,6 +155,25 @@ export async function fetchProfitLossReport(filters: PLFilters): Promise<{
     console.error('Error fetching P&L report:', error)
     throw error
   }
+}
+
+function classifyPLAccountTypeFromCategory(category: string): PLRow['account_type'] | null {
+  if (!category) return null
+
+  const categoryLower = category.toLowerCase()
+  
+  // Map canonical service categories to P&L types
+  if (categoryLower === 'revenue') {
+    return 'revenue'
+  }
+  if (categoryLower === 'expenses') {
+    // Default expenses to operating expenses for now
+    // Could be enhanced with sub-categorization later
+    return 'expenses'
+  }
+  
+  // Assets, liabilities, and equity are not P&L accounts
+  return null
 }
 
 function classifyPLAccountType(code: string): PLRow['account_type'] | null {
