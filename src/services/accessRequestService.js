@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase } from '../utils/supabase';
 
 export const submitAccessRequest = async (requestData) => {
   console.log('Submitting access request:', requestData);
