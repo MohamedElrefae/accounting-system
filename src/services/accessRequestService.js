@@ -41,78 +41,68 @@ export const getAccessRequests = async () => {
   return data;
 };
 
-export const approveAccessRequest = async (requestId) => {
-  console.log('Approving access request:', requestId);
+export const approveAccessRequest = async (requestId, assignedRole = 'user') => {
+  console.log('Approving access request:', requestId, 'with role:', assignedRole);
   
   try {
-    // First, get the request details
-    const { data: request, error: fetchError } = await supabase
+    // First, get the access request
+    const { data: request, error: requestError } = await supabase
       .from('access_requests')
       .select('*')
       .eq('id', requestId)
       .single();
 
-    if (fetchError) {
-      console.error('Error fetching request:', fetchError);
-      throw fetchError;
-    }
-
-    if (!request) {
+    if (requestError || !request) {
       throw new Error('Access request not found');
     }
 
-    console.log('Request details:', request);
+    if (request.status !== 'pending') {
+      throw new Error('Access request has already been processed');
+    }
+
+    // Store the request data in a temporary table for profile creation later
+    const { error: tempError } = await supabase
+      .from('pending_user_profiles')
+      .upsert({
+        email: request.email,
+        full_name_ar: request.full_name_ar || request.full_name,
+        phone: request.phone,
+        department: request.department,
+        job_title: request.job_title,
+        assigned_role: assignedRole,
+        approved_at: new Date().toISOString(),
+        approved_by: (await supabase.auth.getUser()).data.user?.id
+      })
+      .select()
+      .single();
+
+    // Continue even if this fails - it's just for convenience
+    if (tempError) {
+      console.warn('Failed to store pending profile:', tempError);
+    }
 
     // Update the access request status
     const { error: updateError } = await supabase
       .from('access_requests')
-      .update({ 
+      .update({
         status: 'approved',
-        approved_at: new Date().toISOString()
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: (await supabase.auth.getUser()).data.user?.id,
+        assigned_role: assignedRole
       })
       .eq('id', requestId);
 
     if (updateError) {
-      console.error('Error updating access request:', updateError);
-      throw updateError;
+      throw new Error(`Failed to update access request: ${updateError.message}`);
     }
 
-    // Store the approved user profile for later creation
-    const { error: pendingError } = await supabase
-      .from('pending_user_profiles')
-      .insert([{
-        email: request.email,
-        full_name: request.full_name,
-        organization: request.organization,
-        role: request.role,
-        access_request_id: requestId,
-        created_at: new Date().toISOString()
-      }]);
-
-    if (pendingError) {
-      console.error('Error storing pending profile:', pendingError);
-      throw pendingError;
-    }
-
-    // Add email to approved_emails table for registration validation
-    const { error: approvedEmailError } = await supabase
-      .from('approved_emails')
-      .insert([{
-        email: request.email,
-        approved_at: new Date().toISOString()
-      }]);
-
-    // Don't throw error if email already exists (conflict is OK)
-    if (approvedEmailError && !approvedEmailError.message?.includes('duplicate key')) {
-      console.error('Error adding to approved emails:', approvedEmailError);
-      throw approvedEmailError;
-    }
-
-    console.log('Access request approved successfully');
-    return { success: true, message: 'Access request approved successfully' };
-    
+    return {
+      message: 'Access request approved successfully',
+      email: request.email,
+      requestData: request
+    };
   } catch (error) {
-    console.error('Error in approval process:', error);
+    console.error('Error approving access request:', error);
     throw error;
   }
 };
@@ -122,20 +112,19 @@ export const rejectAccessRequest = async (requestId, reason) => {
   
   const { error } = await supabase
     .from('access_requests')
-    .update({ 
+    .update({
       status: 'rejected',
-      rejection_reason: reason,
-      rejected_at: new Date().toISOString()
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: (await supabase.auth.getUser()).data.user?.id,
+      message: reason ? `${reason}` : undefined
     })
     .eq('id', requestId);
 
   if (error) {
-    console.error('Error rejecting access request:', error);
-    throw error;
+    throw new Error(`Failed to reject access request: ${error.message}`);
   }
 
   console.log('Access request rejected successfully');
-  return { success: true };
 };
 
 // New function to check if email is approved for registration
@@ -156,4 +145,50 @@ export const isEmailApproved = async (email) => {
   const isApproved = !!data;
   console.log('Email approval status:', { email, isApproved });
   return isApproved;
+};
+
+// Get all access requests (admin only)
+export const getAllAccessRequests = async () => {
+  const { data, error } = await supabase
+    .from('access_requests')
+    .select('*')
+    .order('requested_at', { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to fetch access requests: ${error.message}`);
+  }
+
+  return data || [];
+};
+
+// Get pending access requests count (for notifications)
+export const getPendingAccessRequestsCount = async () => {
+  const { count, error } = await supabase
+    .from('access_requests')
+    .select('id', { count: 'exact' })
+    .eq('status', 'pending');
+
+  if (error) {
+    throw new Error(`Failed to count pending requests: ${error.message}`);
+  }
+
+  return count || 0;
+};
+
+// Check if user has permission to manage access requests
+export const canManageAccessRequests = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) return false;
+  
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('is_super_admin, department')
+    .eq('id', user.id)
+    .single();
+    
+  if (!profile) return false;
+  
+  // Super admin can always manage requests, or Admin department users
+  return profile.is_super_admin === true || profile.department === 'Admin';
 };
