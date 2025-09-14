@@ -7,6 +7,7 @@ import PresetBar from '../../components/Common/PresetBar'
 import { fetchGLAccountSummary, type GLAccountSummaryRow } from '../../services/reports/gl-account-summary'
 import { getAccountBalances, getCategoryTotals, type AccountBalanceFilter } from '../../services/account-balances'
 import { fetchOrganizations, fetchProjects, fetchAccountsMinimal, type LookupOption } from '../../services/lookups'
+import { listAnalysisWorkItems } from '../../services/analysis-work-items'
 import type { UniversalTableData } from '../../utils/UniversalExportManager'
 import { exportToExcel, exportToCSV } from '../../utils/UniversalExportManager'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
@@ -71,6 +72,20 @@ const GeneralLedger: React.FC = () => {
   const [orgId, setOrgId] = useState<string>('')
   const [projectId, setProjectId] = useState<string>('')
   const [classificationId, setClassificationId] = useState<string>('')
+  const [analysisWorkItemId, setAnalysisWorkItemId] = useState<string>('')
+  const [expensesCategoryId, setExpensesCategoryId] = useState<string>('')
+  const [analysisItemOptions, setAnalysisItemOptions] = useState<{ id: string, code: string, name: string, name_ar?: string | null }[]>([])
+  const [expensesCategoryOptions, setExpensesCategoryOptions] = useState<{ id: string, code: string, description: string, name?: string }[]>([])
+  
+  // Debug logging for analysisItemOptions state changes
+  useEffect(() => {
+    console.log('📊 analysisItemOptions state changed:', analysisItemOptions.length, 'items:', analysisItemOptions)
+  }, [analysisItemOptions])
+  
+  // Debug logging for expensesCategoryOptions state changes  
+  useEffect(() => {
+    console.log('💰 expensesCategoryOptions state changed:', expensesCategoryOptions.length, 'items:', expensesCategoryOptions)
+  }, [expensesCategoryOptions])
 
   const [data, setData] = useState<GLRow[]>([])
   const [summaryRows, setSummaryRows] = useState<GLAccountSummaryRow[]>([])
@@ -217,20 +232,22 @@ const GeneralLedger: React.FC = () => {
     try { localStorage.setItem('gl_numbersOnly', String(numbersOnly)) } catch {}
   }, [numbersOnly])
 
-  // Auto-set default date range from first to last transaction
+  // Auto-set default date range from first to last transaction - DISABLED to show all transactions by default
+  // This ensures the report starts with all available data without date restrictions
   useEffect(() => {
-    (async () => {
-      try {
-        const r = await fetchTransactionsDateRange({
-          orgId: orgId || null,
-          projectId: projectId || null,
-          postedOnly: filters.postedOnly ?? false,
-        })
-        if (r && r.min_date && r.max_date) {
-          setFilters(prev => ({ ...prev, dateFrom: r.min_date || prev.dateFrom, dateTo: r.max_date || prev.dateTo }))
-        }
-      } catch { /* noop */ }
-    })()
+    // Commented out to show all transactions by default without date filters
+    // (async () => {
+    //   try {
+    //     const r = await fetchTransactionsDateRange({
+    //       orgId: orgId || null,
+    //       projectId: projectId || null,
+    //       postedOnly: filters.postedOnly ?? false,
+    //     })
+    //     if (r && r.min_date && r.max_date) {
+    //       setFilters(prev => ({ ...prev, dateFrom: r.min_date || prev.dateFrom, dateTo: r.max_date || prev.dateTo }))
+    //     }
+    //   } catch { /* noop */ }
+    // })()
   }, [orgId, projectId, filters.postedOnly])
 
   // Presets and columns
@@ -306,6 +323,14 @@ const GeneralLedger: React.FC = () => {
           if (activityOnly) chips.push('فلتر: حركة فقط')
           if (onlyPostable) chips.push('فلتر: قابل للترحيل فقط')
           if (onlyNonPostable) chips.push('فلتر: تجميعي فقط')
+          if (analysisWorkItemId) {
+            const ai = analysisItemOptions.find(a => a.id === analysisWorkItemId)
+            if (ai) chips.push(`بند التحليل: ${ai.code ? ai.code + ' - ' : ''}${ai.name_ar || ai.name}`)
+          }
+          if (expensesCategoryId) {
+            const ec = expensesCategoryOptions.find(e => e.id === expensesCategoryId)
+            if (ec) chips.push(`فئة المصروفات: ${ec.code ? ec.code + ' - ' : ''}${ec.description}`)
+          }
           return `ملخص دفتر الأستاذ العام — ${chips.join(' — ')}`
         })() : (() => {
           // Build details export title with account and chips
@@ -319,6 +344,14 @@ const GeneralLedger: React.FC = () => {
           const chips: string[] = []
           if (filters.postedOnly) chips.push('فلتر: قيود معتمدة فقط')
           chips.push(includeChildrenInDrilldown ? 'الوضع: مدمج' : 'الوضع: توسيع أول فرعي')
+          if (analysisWorkItemId) {
+            const ai = analysisItemOptions.find(a => a.id === analysisWorkItemId)
+            if (ai) chips.push(`بند التحليل: ${ai.code ? ai.code + ' - ' : ''}${ai.name_ar || ai.name}`)
+          }
+          if (expensesCategoryId) {
+            const ec = expensesCategoryOptions.find(e => e.id === expensesCategoryId)
+            if (ec) chips.push(`فئة المصروفات: ${ec.code ? ec.code + ' - ' : ''}${ec.description}`)
+          }
           return chips.length ? `${base} — ${chips.join(' — ')}` : base
         })(),
         orientation: 'landscape' as const,
@@ -339,6 +372,8 @@ const GeneralLedger: React.FC = () => {
             postedOnly: filters.postedOnly,
             limit,
             offset,
+            analysisWorkItemId: analysisWorkItemId || null,
+            expensesCategoryId: expensesCategoryId || null,
           })
           all.push(...rows)
           if (rows.length < limit) break
@@ -406,6 +441,8 @@ const GeneralLedger: React.FC = () => {
           postedOnly: filters.postedOnly,
           limit,
           offset,
+          analysisWorkItemId: analysisWorkItemId || null,
+          expensesCategoryId: expensesCategoryId || null,
         })
         all.push(...rows)
         if (rows.length < limit) break
@@ -483,14 +520,15 @@ const GeneralLedger: React.FC = () => {
           break
         case 'r': // Ctrl+R: Reset filters
           e.preventDefault()
-          // Reset date range filters
-          setFilters({ dateFrom: firstDayOfMonthISO(), dateTo: todayISO(), includeOpening: true, postedOnly: false })
+          // Reset date range filters - clear dates to show all transactions
+          setFilters({ dateFrom: '', dateTo: '', includeOpening: true, postedOnly: false })
           
           // Reset basic filters
           setAccountId(''); 
           setOrgId(''); 
           setProjectId('');
           setClassificationId(''); // Reset classification filter
+          setExpensesCategoryId(''); // Reset expenses category filter
           
           // Reset UI state filters
           setHideZeroAccounts(true); 
@@ -586,6 +624,10 @@ const GeneralLedger: React.FC = () => {
     const orgName = orgId ? (_orgOptions.find(o=>o.id===orgId)?.name || 'غير محدد') : 'كل المنظمات'
     const projectName = projectId ? (_projectOptions.find(o=>o.id===projectId)?.name || 'غير محدد') : 'كل المشاريع'
     const accountName = accountId ? (accountOptions.find(a=>a.id===accountId)?.name_ar || accountOptions.find(a=>a.id===accountId)?.name || 'غير محدد') : 'كل الحسابات'
+    const analysisItemName = analysisWorkItemId ? (() => {
+      const ai = analysisItemOptions.find(a => a.id === analysisWorkItemId)
+      return ai ? `${ai.code ? ai.code + ' - ' : ''}${ai.name_ar || ai.name}` : '—'
+    })() : 'كل بنود التحليل'
     
     // Build professional commercial report HTML
     const reportHTML = `
@@ -848,9 +890,10 @@ const GeneralLedger: React.FC = () => {
             <div class="report-period">الفترة: ${filters.dateFrom || '—'} إلى ${filters.dateTo || '—'}</div>
             <div class="report-filters">
               <span class="filter-item">الحساب: ${accountName}</span>
-              <span class="filter-item">المشروع: ${projectName}</span>
-              <span class="filter-item">المنظمة: ${orgName}</span>
-              <span class="filter-item">تاريخ الطباعة: ${currentDate}</span>
+              <span class=\"filter-item\">المشروع: ${projectName}</span>
+              <span class=\"filter-item\">المنظمة: ${orgName}</span>
+              <span class=\"filter-item\">بند التحليل: ${analysisItemName}</span>
+              <span class=\"filter-item\">تاريخ الطباعة: ${currentDate}</span>
               <br>
               <span class="filter-item"><strong>المرشحات النشطة:</strong></span>
               ${filters.postedOnly ? '<span class="filter-item active-filter">✓ قيود معتمدة فقط</span>' : '<span class="filter-item inactive-filter">✗ قيود معتمدة فقط</span>'}
@@ -1160,17 +1203,19 @@ const GeneralLedger: React.FC = () => {
       const qIncludeOpening = qp.get('includeOpening');
       const qDateFrom = qp.get('dateFrom');
       const qDateTo = qp.get('dateTo');
+      const qAnalysisItemId = qp.get('analysisWorkItemId') || '';
 
       if (qAccountId) setAccountId(qAccountId);
       if (qOrgId) setOrgId(qOrgId);
       if (qProjectId) setProjectId(qProjectId);
+      if (qAnalysisItemId) setAnalysisWorkItemId(qAnalysisItemId);
 
       setFilters(prev => ({
         ...prev,
         postedOnly: qPostedOnly === null ? prev.postedOnly : qPostedOnly === 'true',
         includeOpening: qIncludeOpening === null ? prev.includeOpening : qIncludeOpening !== 'false',
-        dateFrom: qDateFrom || prev.dateFrom,
-        dateTo: qDateTo || prev.dateTo,
+        dateFrom: qDateFrom !== null ? (qDateFrom || '') : prev.dateFrom,
+        dateTo: qDateTo !== null ? (qDateTo || '') : prev.dateTo,
       }));
     } catch { /* noop */ }
   }, []);
@@ -1178,14 +1223,27 @@ const GeneralLedger: React.FC = () => {
   // Load dropdown lookups
   useEffect(() => {
     (async () => {
+      console.log('🏢 Loading dropdown options...')
+      
       const [orgs, projects, accounts] = await Promise.all([
         fetchOrganizations(),
         fetchProjects(),
         fetchAccountsMinimal(),
       ])
+      
+      console.log('🏢 Loaded organizations:', orgs)
+      console.log('📁 Loaded projects:', projects)
+      console.log('💰 Loaded accounts:', accounts.length, 'items')
+      
       _setOrgOptions(orgs)
       _setProjectOptions(projects)
       setAccountOptions(accounts)
+      
+      // Auto-set orgId if not already set and orgs are available
+      if (!orgId && orgs.length > 0) {
+        console.log('🔄 Auto-setting orgId to first available org:', orgs[0].id)
+        setOrgId(orgs[0].id)
+      }
       
       // Load classifications
       try {
@@ -1195,8 +1253,135 @@ const GeneralLedger: React.FC = () => {
           .order('name')
         setClassificationOptions((classData || []).map(c => ({ id: c.id, name: c.name, name_ar: c.name, code: '' })))
       } catch { /* noop */ }
+      
+      // Load expenses categories for the first available org
+      if (orgs.length > 0) {
+        const firstOrgId = orgId || orgs[0].id
+        try {
+          console.log('💰 Loading expenses categories for org:', firstOrgId)
+          const { data: expensesData } = await supabase
+            .from('expenses_categories_full')
+            .select('id, code, description, is_active')
+            .eq('org_id', firstOrgId)
+            .eq('is_active', true)
+            .order('code')
+          
+          console.log('💰 Loaded expenses categories:', expensesData)
+          setExpensesCategoryOptions((expensesData || []).map(c => ({ 
+            id: c.id, 
+            code: c.code || '', 
+            description: c.description || '', 
+            name: c.description || ''
+          })))
+        } catch (err) {
+          console.warn('⚠️ Failed to load expenses categories:', err)
+        }
+      }
     })()
   }, [])
+
+  // Load analysis work item options when org/project changes
+  useEffect(() => {
+    (async () => {
+      console.log('🔍 Analysis Work Items Loading - orgId:', orgId, 'projectId:', projectId)
+      
+      if (!orgId) { 
+        console.log('🔍 No orgId provided, clearing analysis item options')
+        setAnalysisItemOptions([]); 
+        return 
+      }
+      
+      try {
+        console.log('🔍 First trying RPC function list_analysis_work_items')
+        
+        // Try RPC function first
+        const { data: rpcItems, error: rpcError } = await supabase.rpc('list_analysis_work_items', {
+          p_org_id: orgId,
+          p_only_with_tx: false,
+          p_project_id: projectId || null,
+          p_search: null,
+          p_include_inactive: false, // Only active items
+        })
+        
+        if (!rpcError && rpcItems) {
+          console.log('✅ RPC function succeeded - data:', rpcItems)
+          const mappedOptions = (rpcItems || []).map((i: any) => ({ 
+            id: i.id, 
+            code: i.code || '', 
+            name: i.name || i.name_ar || '', 
+            name_ar: i.name_ar 
+          }))
+          setAnalysisItemOptions(mappedOptions)
+          return
+        }
+        
+        console.warn('⚠️ RPC function failed, trying direct table access. RPC Error:', rpcError)
+        
+        // Fallback to direct table access
+        const { data: items, error } = await supabase
+          .from('analysis_work_items')
+          .select('id, code, name, name_ar, is_active')
+          .eq('org_id', orgId)
+          .eq('is_active', true)
+          .order('code')
+        
+        console.log('🔍 Direct table query result - data:', items, 'error:', error)
+        
+        if (error) {
+          console.error('🚨 Direct table access also failed:', error)
+          // If both methods fail, set an empty array but don't throw
+          setAnalysisItemOptions([])
+          return
+        }
+        
+        const mappedOptions = (items || []).map(i => ({ 
+          id: i.id, 
+          code: i.code || '', 
+          name: i.name || i.name_ar || '', 
+          name_ar: i.name_ar 
+        }))
+        
+        console.log('🔍 Setting analysis item options from direct access:', mappedOptions)
+        setAnalysisItemOptions(mappedOptions)
+        
+      } catch (err) {
+        console.error('🚨 Failed to load analysis work items:', err)
+        setAnalysisItemOptions([])
+      }
+    })()
+  }, [orgId, projectId])
+  
+  // Load expenses categories when org changes
+  useEffect(() => {
+    (async () => {
+      if (!orgId) { 
+        console.log('💰 No orgId provided, clearing expenses category options')
+        setExpensesCategoryOptions([]); 
+        return 
+      }
+      
+      try {
+        console.log('💰 Loading expenses categories for org change:', orgId)
+        const { data: expensesData } = await supabase
+          .from('expenses_categories_full')
+          .select('id, code, description, is_active')
+          .eq('org_id', orgId)
+          .eq('is_active', true)
+          .order('code')
+        
+        console.log('💰 Loaded expenses categories for org:', expensesData)
+        setExpensesCategoryOptions((expensesData || []).map(c => ({ 
+          id: c.id, 
+          code: c.code || '', 
+          description: c.description || '', 
+          name: c.description || ''
+        })))
+      } catch (err) {
+        console.warn('⚠️ Failed to load expenses categories:', err)
+        setExpensesCategoryOptions([])
+      }
+    })()
+  }, [orgId])
 
   // Load presets and auto-apply last used
   useEffect(() => {
@@ -1205,6 +1390,7 @@ const GeneralLedger: React.FC = () => {
         accountId?: string
         orgId?: string
         projectId?: string
+        analysisWorkItemId?: string
         hideZeroAccounts?: boolean
         activityOnly?: boolean
       }
@@ -1214,10 +1400,11 @@ const GeneralLedger: React.FC = () => {
       setAccountId(f.accountId || '')
       setOrgId(f.orgId || '')
       setProjectId(f.projectId || '')
+      setAnalysisWorkItemId(f.analysisWorkItemId || '')
       setFilters(prev => ({
         ...prev,
-        dateFrom: f.dateFrom || prev.dateFrom,
-        dateTo: f.dateTo || prev.dateTo,
+        dateFrom: f.dateFrom !== undefined ? f.dateFrom : prev.dateFrom,
+        dateTo: f.dateTo !== undefined ? f.dateTo : prev.dateTo,
         includeOpening: typeof f.includeOpening === 'boolean' ? f.includeOpening : prev.includeOpening,
         postedOnly: typeof f.postedOnly === 'boolean' ? f.postedOnly : prev.postedOnly,
       }))
@@ -1250,6 +1437,8 @@ const GeneralLedger: React.FC = () => {
           limit: pageSize,
           offset: (currentPage - 1) * pageSize,
           classificationId: classificationId || null,
+          analysisWorkItemId: analysisWorkItemId || null,
+          expensesCategoryId: expensesCategoryId || null,
         })
         setData(rows)
         if (rows && rows.length > 0 && typeof rows[0].total_rows === 'number') {
@@ -1265,7 +1454,7 @@ const GeneralLedger: React.FC = () => {
       }
     }
     load()
-  }, [filters.dateFrom, filters.dateTo, filters.includeOpening, filters.postedOnly, accountId, orgId, projectId, pageSize, currentPage, classificationId])
+  }, [filters.dateFrom, filters.dateTo, filters.includeOpening, filters.postedOnly, accountId, orgId, projectId, pageSize, currentPage, classificationId, analysisWorkItemId, expensesCategoryId])
 
   // Load account summary when on overview - smart pagination approach
   // Removed unused summary state variables
@@ -1286,6 +1475,8 @@ const GeneralLedger: React.FC = () => {
           limit: initialLimit,
           offset: 0, // Always start from beginning for smart pagination
           classificationId: classificationId || null,
+          analysisWorkItemId: analysisWorkItemId || null,
+          expensesCategoryId: expensesCategoryId || null,
         })
         
         // If we got fewer rows than the limit, we have all the data
@@ -1307,6 +1498,8 @@ const GeneralLedger: React.FC = () => {
               limit: batchSize,
               offset,
               classificationId: classificationId || null,
+              analysisWorkItemId: analysisWorkItemId || null,
+              expensesCategoryId: expensesCategoryId || null,
             })
             
             if (moreRows.length === 0) break
@@ -1323,7 +1516,7 @@ const GeneralLedger: React.FC = () => {
       }
     }
     loadSummary()
-  }, [view, filters.dateFrom, filters.dateTo, filters.postedOnly, orgId, projectId, classificationId])
+  }, [view, filters.dateFrom, filters.dateTo, filters.postedOnly, orgId, projectId, classificationId, analysisWorkItemId, expensesCategoryId])
 
   // Helper: derive previous period range matching the current window length
   const prevRange = useMemo(() => {
@@ -1354,6 +1547,8 @@ const GeneralLedger: React.FC = () => {
             limit: 10000, // large cap for summary
             offset: 0,
             classificationId: classificationId || null,
+            analysisWorkItemId: analysisWorkItemId || null,
+            expensesCategoryId: expensesCategoryId || null,
           }),
           fetchGLAccountSummary({
             dateFrom: prevRange.prevFrom,
@@ -1364,6 +1559,8 @@ const GeneralLedger: React.FC = () => {
             limit: 10000,
             offset: 0,
             classificationId: classificationId || null,
+            analysisWorkItemId: analysisWorkItemId || null,
+            expensesCategoryId: expensesCategoryId || null,
           }),
         ])
         const sumCurr = currRows.reduce((s, r) => s + Number(r.period_debits || 0) - Number(r.period_credits || 0), 0)
@@ -1376,7 +1573,7 @@ const GeneralLedger: React.FC = () => {
       }
     }
     run()
-  }, [compareMode, filters.dateFrom, filters.dateTo, filters.postedOnly, orgId, projectId, prevRange])
+  }, [compareMode, filters.dateFrom, filters.dateTo, filters.postedOnly, orgId, projectId, prevRange, analysisWorkItemId, expensesCategoryId])
 
   // Tooltip text for compare period explanation
   const compareTooltip = useMemo(() => {
@@ -1439,8 +1636,12 @@ const GeneralLedger: React.FC = () => {
       prependRows.push(pad(['']))
     }
 
-    return { columns, rows, metadata: { generatedAt: new Date(), filters: { ...filters, includeChildrenInDrilldown, onlyPostable, hideZeroAccounts, activityOnly }, prependRows: prependRows.length ? prependRows : undefined } }
-  }, [data, filters, visibleColumns, compareMode, compareTotals])
+    const analysisItemLabel = analysisWorkItemId ? (() => {
+      const ai = analysisItemOptions.find(a => a.id === analysisWorkItemId)
+      return ai ? `${ai.code ? ai.code + ' - ' : ''}${ai.name_ar || ai.name}` : ''
+    })() : ''
+    return { columns, rows, metadata: { generatedAt: new Date(), filters: { ...filters, includeChildrenInDrilldown, onlyPostable, hideZeroAccounts, activityOnly, analysisWorkItemId, analysisWorkItemLabel: analysisItemLabel }, prependRows: prependRows.length ? prependRows : undefined } }
+  }, [data, filters, visibleColumns, compareMode, compareTotals, analysisWorkItemId, analysisItemOptions])
 
   const filteredSummaryRows = useMemo(() => {
     let rows = summaryRows
@@ -1591,8 +1792,12 @@ const GeneralLedger: React.FC = () => {
       prependRows.push(pad(['']))
     }
 
-    return { columns: exportColumns, rows, metadata: { generatedAt: new Date(), filters: { ...filters, includeChildrenInDrilldown, onlyPostable, onlyNonPostable, hideZeroAccounts, activityOnly }, prependRows: prependRows.length ? prependRows : undefined } }
-  }, [filteredSummaryRows, filters, visibleOverviewColumns, compareMode, compareTotals, includeChildrenInDrilldown, onlyPostable, onlyNonPostable, hideZeroAccounts, activityOnly, summaryRows])
+    const analysisItemLabel = analysisWorkItemId ? (() => {
+      const ai = analysisItemOptions.find(a => a.id === analysisWorkItemId)
+      return ai ? `${ai.code ? ai.code + ' - ' : ''}${ai.name_ar || ai.name}` : ''
+    })() : ''
+    return { columns: exportColumns, rows, metadata: { generatedAt: new Date(), filters: { ...filters, includeChildrenInDrilldown, onlyPostable, onlyNonPostable, hideZeroAccounts, activityOnly, analysisWorkItemId, analysisWorkItemLabel: analysisItemLabel }, prependRows: prependRows.length ? prependRows : undefined } }
+  }, [filteredSummaryRows, filters, visibleOverviewColumns, compareMode, compareTotals, includeChildrenInDrilldown, onlyPostable, onlyNonPostable, hideZeroAccounts, activityOnly, summaryRows, analysisWorkItemId, analysisItemOptions])
 
   // Smart pagination calculation based on actual filtered data for overview
   // For overview mode, use client-side pagination with filtered results
@@ -1633,18 +1838,20 @@ const GeneralLedger: React.FC = () => {
     setDrilldown(prev => ({ ...prev, [key]: { ...state, loading: true } }))
     try {
       // Normal fetch for this account
-      const res = await fetchGeneralLedgerReport({
-        accountId: accountIdToLoad,
-        dateFrom: filters.dateFrom || null,
-        dateTo: filters.dateTo || null,
-        orgId: orgId || null,
-        projectId: projectId || null,
-        includeOpening: !!filters.includeOpening,
-        postedOnly: filters.postedOnly,
-        limit,
-        offset: state.offset,
-        classificationId: classificationId || null,
-      })
+          const res = await fetchGeneralLedgerReport({
+            accountId: accountIdToLoad,
+            dateFrom: filters.dateFrom || null,
+            dateTo: filters.dateTo || null,
+            orgId: orgId || null,
+            projectId: projectId || null,
+            includeOpening: !!filters.includeOpening,
+            postedOnly: filters.postedOnly,
+            limit,
+            offset: state.offset,
+            classificationId: classificationId || null,
+            analysisWorkItemId: analysisWorkItemId || null,
+            expensesCategoryId: expensesCategoryId || null,
+          })
 
       let rows = res
       const newState = { ...state }
@@ -1679,6 +1886,8 @@ const GeneralLedger: React.FC = () => {
             limit,
             offset: 0,
             classificationId: classificationId || null,
+            analysisWorkItemId: analysisWorkItemId || null,
+            expensesCategoryId: expensesCategoryId || null,
           })
           rows = childRows
           newState.childIndex = idx + 1
@@ -1724,7 +1933,7 @@ const GeneralLedger: React.FC = () => {
   // Auto-collapse expanded row on major context changes (tab or key filters)
   useEffect(() => {
     if (expandedAccountId) setExpandedAccountId(null)
-  }, [view, filters.dateFrom, filters.dateTo, filters.includeOpening, filters.postedOnly, orgId, projectId])
+  }, [view, filters.dateFrom, filters.dateTo, filters.includeOpening, filters.postedOnly, orgId, projectId, analysisWorkItemId, expensesCategoryId])
 
   return (
     <div className={styles.container}>
@@ -1742,6 +1951,7 @@ const GeneralLedger: React.FC = () => {
                   accountId?: string
                   orgId?: string
                   projectId?: string
+                  analysisWorkItemId?: string
                 }
                 type ColumnsPreset = { details?: string[]; overview?: string[] } | string[] | undefined
 
@@ -1749,6 +1959,7 @@ const GeneralLedger: React.FC = () => {
                 setAccountId(f.accountId || '')
                 setOrgId(f.orgId || '')
                 setProjectId(f.projectId || '')
+                setAnalysisWorkItemId(f.analysisWorkItemId || '')
                 setFilters(prev => ({
                   ...prev,
                   dateFrom: f.dateFrom || prev.dateFrom,
@@ -1777,6 +1988,7 @@ const GeneralLedger: React.FC = () => {
                   orgId,
                   projectId,
                   accountId,
+                  analysisWorkItemId,
                   hideZeroAccounts,
                   activityOnly,
                 },
@@ -1798,7 +2010,7 @@ const GeneralLedger: React.FC = () => {
           />
           
           {/* Universal Export Buttons and Print Button */}
-          <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+          <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
             {/* Print Button */}
             <button
               onClick={printGeneralLedger}
@@ -1848,6 +2060,10 @@ const GeneralLedger: React.FC = () => {
                       if (activityOnly) chips.push('فلتر: حركة فقط')
                       if (onlyPostable) chips.push('فلتر: قابل للترحيل فقط')
                       if (onlyNonPostable) chips.push('فلتر: تجميعي فقط')
+                      if (analysisWorkItemId) {
+                        const ai = analysisItemOptions.find(a => a.id === analysisWorkItemId)
+                        if (ai) chips.push(`بند التحليل: ${ai.code ? ai.code + ' - ' : ''}${ai.name_ar || ai.name}`)
+                      }
                       return `ملخص دفتر الأستاذ العام — ${chips.join(' — ')}`
                     })(),
                     orientation: 'landscape',
@@ -1874,6 +2090,10 @@ const GeneralLedger: React.FC = () => {
                       const chips: string[] = []
                       if (filters.postedOnly) chips.push('فلتر: قيود معتمدة فقط')
                       chips.push(includeChildrenInDrilldown ? 'الوضع: مدمج' : 'الوضع: توسيع أول فرعي')
+                      if (analysisWorkItemId) {
+                        const ai = analysisItemOptions.find(a => a.id === analysisWorkItemId)
+                        if (ai) chips.push(`بند التحليل: ${ai.code ? ai.code + ' - ' : ''}${ai.name_ar || ai.name}`)
+                      }
                       return chips.length ? `${base} — ${chips.join(' — ')}` : base
                     })(),
                     orientation: 'landscape',
@@ -1885,6 +2105,25 @@ const GeneralLedger: React.FC = () => {
                 />
               </div>
             )}
+
+            {/* Quick link to Analysis Item Usage report */}
+            <button
+              className={styles.presetButton}
+              onClick={() => {
+                const p = new URLSearchParams()
+                if (orgId) p.set('orgId', orgId)
+                if (projectId) p.set('projectId', projectId)
+                if (filters.dateFrom) p.set('dateFrom', filters.dateFrom)
+                if (filters.dateTo) p.set('dateTo', filters.dateTo)
+                p.set('onlyWithTx', 'true')
+                const url = `/reports/analysis-item-usage?${p.toString()}`
+                try { window.open(url, '_blank', 'noopener') } catch {}
+              }}
+              title="فتح تقرير استخدام بنود التحليل"
+              style={{ fontSize: '14px', padding: '8px 12px' }}
+            >
+              🔗 استخدام البنود التحليلية
+            </button>
           </div>
         </div>
       </div>
@@ -1926,6 +2165,50 @@ const GeneralLedger: React.FC = () => {
             </option>
           ))}
         </select>
+
+        {/* Analysis Work Item filter (details view supported) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <select className={styles.select} value={analysisWorkItemId} onChange={e => setAnalysisWorkItemId(e.target.value)} style={{maxWidth: '220px', fontSize: '12px'}}>
+            <option value=''>جميع بنود التحليل</option>
+            {analysisItemOptions.map(o => (
+              <option key={o.id} value={o.id}>
+                {`${o.code ? o.code + ' - ' : ''}${o.name_ar || o.name}`.substring(0, 60)}
+              </option>
+            ))}
+          </select>
+          {analysisWorkItemId && (
+            <button
+              className={styles.presetButton}
+              onClick={() => setAnalysisWorkItemId('')}
+              title="مسح فلتر بند التحليل"
+              style={{ fontSize: '18px', padding: '6px 10px' }}
+            >
+              ✖️
+            </button>
+          )}
+        </div>
+        
+        {/* Expenses Category filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <select className={styles.select} value={expensesCategoryId} onChange={e => setExpensesCategoryId(e.target.value)} style={{maxWidth: '220px', fontSize: '12px'}}>
+            <option value=''>جميع فئات المصروفات</option>
+            {expensesCategoryOptions.map(o => (
+              <option key={o.id} value={o.id}>
+                {`${o.code ? o.code + ' - ' : ''}${o.description || o.name}`.substring(0, 60)}
+              </option>
+            ))}
+          </select>
+          {expensesCategoryId && (
+            <button
+              className={styles.presetButton}
+              onClick={() => setExpensesCategoryId('')}
+              title="مسح فلتر فئة المصروف"
+              style={{ fontSize: '18px', padding: '6px 10px' }}
+            >
+              ✖️
+            </button>
+          )}
+        </div>
         
         {/* Account filter - only for details view */}
         {view === 'details' && (
@@ -1999,7 +2282,8 @@ const GeneralLedger: React.FC = () => {
             setAccountId('');
             setOrgId('');
             setProjectId('');
-            setClassificationId('');
+            setClassificationId(''); // Reset classification filter
+            setExpensesCategoryId(''); // Reset expenses category filter
 
             // Turn OFF all additional filters (show zero balances, no special modes)
             setHideZeroAccounts(false);

@@ -9,6 +9,8 @@ export interface GLAccountSummaryFilters {
   limit?: number | null
   offset?: number | null
   classificationId?: string | null
+  analysisWorkItemId?: string | null
+  expensesCategoryId?: string | null
 }
 
 export interface GLAccountSummaryRow {
@@ -30,7 +32,7 @@ export interface GLAccountSummaryRow {
 }
 
 export async function fetchGLAccountSummary(filters: GLAccountSummaryFilters): Promise<GLAccountSummaryRow[]> {
-  const { data, error } = await supabase.rpc('get_gl_account_summary', {
+  const { data, error } = await supabase.rpc('get_gl_account_summary_filtered', {
     p_date_from: filters.dateFrom ?? null,
     p_date_to: filters.dateTo ?? null,
     p_org_id: filters.orgId ?? null,
@@ -39,6 +41,8 @@ export async function fetchGLAccountSummary(filters: GLAccountSummaryFilters): P
     p_limit: filters.limit ?? null,
     p_offset: filters.offset ?? null,
     p_classification_id: filters.classificationId ?? null,
+    p_analysis_work_item_id: filters.analysisWorkItemId ?? null,
+    p_expenses_category_id: filters.expensesCategoryId ?? null,
   })
   if (error) throw error
   return (data as GLAccountSummaryRow[]) ?? []
@@ -62,6 +66,14 @@ export async function fetchGLTotals(filters: Omit<GLAccountSummaryFilters, 'limi
     p_project_id: filters.projectId ?? null,
     p_posted_only: filters.postedOnly ?? true,
     p_classification_id: filters.classificationId ?? null,
+    p_cost_center_id: null,
+    p_work_item_id: null,
+    p_expenses_category_id: filters.expensesCategoryId ?? null,
+    p_debit_account_id: null,
+    p_credit_account_id: null,
+    p_amount_min: null,
+    p_amount_max: null,
+    p_analysis_work_item_id: filters.analysisWorkItemId ?? null,
   })
   if (error) throw error
   const rows = (data as GLTotals[]) ?? []

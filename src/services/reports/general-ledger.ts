@@ -22,6 +22,8 @@ export interface GLFilters {
   limit?: number | null
   offset?: number | null
   classificationId?: string | null
+  analysisWorkItemId?: string | null
+  expensesCategoryId?: string | null
 }
 
 export interface GLRow {
@@ -52,8 +54,11 @@ export interface GLRow {
   total_rows?: number
 }
 
+// Add a constant for the zero-UUID sentinel
+const UNCLASSIFIED_UUID = '00000000-0000-0000-0000-000000000000';
+
 export async function fetchGeneralLedgerReport(filters: GLFilters): Promise<GLRow[]> {
-  const { data, error } = await supabase.rpc('get_general_ledger_report', {
+  const { data, error } = await supabase.rpc('get_general_ledger_report_filtered', {
     p_account_id: filters.accountId ?? null,
     p_date_from: filters.dateFrom ?? null,
     p_date_to: filters.dateTo ?? null,
@@ -63,7 +68,12 @@ export async function fetchGeneralLedgerReport(filters: GLFilters): Promise<GLRo
     p_posted_only: filters.postedOnly ?? true,
     p_limit: filters.limit ?? null,
     p_offset: filters.offset ?? null,
-    p_classification_id: filters.classificationId === '__unclassified__' ? null : (filters.classificationId ?? null),
+    // IMPORTANT: send zero-UUID sentinel for Unclassified
+    p_classification_id: filters.classificationId === '__unclassified__'
+      ? UNCLASSIFIED_UUID
+      : (filters.classificationId ?? null),
+    p_analysis_work_item_id: filters.analysisWorkItemId ?? null,
+    p_expenses_category_id: filters.expensesCategoryId ?? null,
   })
 
   if (error) throw error
