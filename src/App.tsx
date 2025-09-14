@@ -9,6 +9,7 @@ const AccountsTreeLazy = React.lazy(() => import('./pages/MainData/AccountsTree'
 const ExpensesCategoriesPage = React.lazy(() => import('./pages/MainData/ExpensesCategories'));
 const WorkItemsPage = React.lazy(() => import('./pages/MainData/WorkItems'));
 const CostCentersPage = React.lazy(() => import('./pages/MainData/CostCenters'));
+const AnalysisWorkItemsPage = React.lazy(() => import('./pages/MainData/AnalysisWorkItems'));
 const TestRTL = React.lazy(() => import('./pages/TestRTL'));
 const ExportTestPage = React.lazy(() => import('./pages/ExportTestPage'));
 const TransactionsPage = React.lazy(() => import('./pages/Transactions/Transactions'));
@@ -16,6 +17,7 @@ const GeneralLedgerPage = React.lazy(() => import('./pages/Reports/GeneralLedger
 const ProfitLossPage = React.lazy(() => import('./pages/Reports/ProfitLoss'))
 const BalanceSheetPage = React.lazy(() => import('./pages/Reports/BalanceSheet'))
 const WorkItemUsagePage = React.lazy(() => import('./pages/Reports/WorkItemUsage'))
+const AnalysisItemUsagePage = React.lazy(() => import('./pages/Reports/AnalysisItemUsage'))
 const TrialBalanceAllLevelsPage = React.lazy(() => import('./pages/Reports/TrialBalanceAllLevels'))
 const AccountExplorerReportPage = React.lazy(() => import('./pages/Reports/AccountExplorer'))
 const CustomReportsPage = React.lazy(() => import('./pages/CustomReports'))
@@ -130,6 +132,11 @@ const App: React.FC = () => {
           <Route path="/main-data/work-items" element={
             <React.Suspense fallback={<div>Loading...</div>}>
               <WorkItemsPage />
+            </React.Suspense>
+          } />
+          <Route path="/main-data/analysis-work-items" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <AnalysisWorkItemsPage />
             </React.Suspense>
           } />
           <Route path="/main-data/cost-centers" element={
@@ -248,6 +255,13 @@ const App: React.FC = () => {
               <ProtectedRoute>
                 <React.Suspense fallback={<div>Loading...</div>}>
                   <WorkItemUsagePage />
+                </React.Suspense>
+              </ProtectedRoute>
+            } />
+            <Route path="/reports/main-data/analysis-item-usage" element={
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <AnalysisItemUsagePage />
                 </React.Suspense>
               </ProtectedRoute>
             } />

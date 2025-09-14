@@ -6,6 +6,7 @@ import type { WorkItemRow } from '../../types/work-items'
 import { getOrganizations } from '../../services/organization'
 import { getAllTransactionClassifications, type TransactionClassification } from '../../services/transaction-classification'
 import { getExpensesCategoriesList } from '../../services/expenses-categories'
+import { listAnalysisWorkItems } from '../../services/analysis-work-items'
 import type { Organization } from '../../types'
 import type { ExpensesCategoryRow } from '../../types/expenses-categories'
 import { useHasPermission } from '../../hooks/useHasPermission'
@@ -49,6 +50,7 @@ const TransactionsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [categories, setCategories] = useState<ExpensesCategoryRow[]>([])
   const [workItems, setWorkItems] = useState<WorkItemRow[]>([])
+  const [analysisItemsMap, setAnalysisItemsMap] = useState<Record<string, { code: string; name: string }>>({})
   const [costCenters, setCostCenters] = useState<Array<{ id: string; code: string; name: string; name_ar?: string | null; project_id?: string | null; level: number }>>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -93,6 +95,27 @@ const TransactionsPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(20)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [userNames, setUserNames] = useState<Record<string, string>>({})
+  
+  // Refresh Analysis Work Items label cache when org/project filter changes
+  useEffect(() => {
+    (async () => {
+      try {
+        const effectiveOrgId = orgFilterId || organizations[0]?.id || ''
+        if (!effectiveOrgId) return
+        const list = await listAnalysisWorkItems({
+          orgId: effectiveOrgId,
+          projectId: projectFilterId || null,
+          onlyWithTx: false,
+          includeInactive: true,
+        })
+        const map: Record<string, { code: string; name: string }> = {}
+        for (const a of list) map[a.id] = { code: a.code, name: a.name }
+        setAnalysisItemsMap(map)
+      } catch {
+        // no-op on failure; keep previous cache
+      }
+    })()
+  }, [orgFilterId, projectFilterId, organizations])
   
   // Column configuration state
   const [columnConfigOpen, setColumnConfigOpen] = useState(false)
@@ -146,6 +169,7 @@ const TransactionsPage: React.FC = () => {
     { key: 'classification_name', label: 'التصنيف', visible: true, width: 160, minWidth: 120, maxWidth: 220, type: 'text', resizable: true },
     { key: 'expenses_category_label', label: 'فئة المصروف', visible: true, width: 200, minWidth: 140, maxWidth: 280, type: 'text', resizable: true },
     { key: 'work_item_label', label: 'عنصر العمل', visible: true, width: 200, minWidth: 140, maxWidth: 280, type: 'text', resizable: true },
+    { key: 'analysis_work_item_label', label: 'بند التحليل', visible: true, width: 200, minWidth: 140, maxWidth: 280, type: 'text', resizable: true },
     { key: 'organization_name', label: 'المؤسسة', visible: true, width: 180, minWidth: 150, maxWidth: 250, type: 'text', resizable: true },
     { key: 'project_name', label: 'المشروع', visible: true, width: 180, minWidth: 150, maxWidth: 250, type: 'text', resizable: true },
     { key: 'cost_center_label', label: 'مركز التكلفة', visible: true, width: 180, minWidth: 150, maxWidth: 250, type: 'text', resizable: true },
@@ -182,6 +206,16 @@ const TransactionsPage: React.FC = () => {
           getAllTransactionClassifications().catch(() => []), // Don't fail if classifications service isn't available
           getCurrentUserId(),
         ])
+        // Prime analysis items map for all projects (shallow) — optional light cache
+        try {
+          const defaultOrgId = orgsList[0]?.id || ''
+          if (defaultOrgId) {
+            const list = await listAnalysisWorkItems({ orgId: defaultOrgId, projectId: null, onlyWithTx: false, includeInactive: true })
+            const map: Record<string, { code: string; name: string }> = {}
+            for (const a of list) map[a.id] = { code: a.code, name: a.name }
+            setAnalysisItemsMap(map)
+          }
+        } catch {}
         setAccounts(accs)
         setProjects(projectsList)
         setOrganizations(orgsList)
@@ -231,6 +265,7 @@ const TransactionsPage: React.FC = () => {
         expensesCategoryId: expensesCategoryFilterId || undefined,
         workItemId: workItemFilterId || undefined,
         costCenterId: costCenterFilterId || undefined,
+        analysisWorkItemId: (filters as any).analysis_work_item_id || undefined,
       },
       page,
       pageSize,
@@ -349,6 +384,12 @@ const TransactionsPage: React.FC = () => {
       amount: t.amount,
       expenses_category_label: t.expenses_category_id ? (catMap[t.expenses_category_id] || '—') : '—',
       work_item_label: (() => { const wi = workItems.find(w => w.id === (t.work_item_id || '')); return wi ? `${wi.code} - ${wi.name}` : '—' })(),
+      analysis_work_item_label: (() => {
+        const id = (t as any).analysis_work_item_id || ''
+        if (!id) return '—'
+        const a = analysisItemsMap[id]
+        return a ? `${a.code} - ${a.name}` : id
+      })(),
       classification_name: t.transaction_classification?.name || '—',
       organization_name: organizations.find(o => o.id === (t.org_id || ''))?.name || '—',
       project_name: projects.find(p => p.id === (t.project_id || ''))?.name || '—',
@@ -375,6 +416,7 @@ const TransactionsPage: React.FC = () => {
       { key: 'classification_name', header: 'التصنيف', type: 'text' },
       { key: 'expenses_category', header: 'فئة المصروف', type: 'text' },
       { key: 'work_item', header: 'عنصر العمل', type: 'text' },
+      { key: 'analysis_work_item', header: 'بند التحليل', type: 'text' },
       { key: 'organization_name', header: 'المؤسسة', type: 'text' },
       { key: 'project_name', header: 'المشروع', type: 'text' },
       { key: 'cost_center', header: 'مركز التكلفة', type: 'text' },
@@ -401,6 +443,7 @@ const TransactionsPage: React.FC = () => {
       amount: t.amount,
       expenses_category: t.expenses_category_id ? (catMap[t.expenses_category_id] || '') : '',
       work_item: (() => { const wi = workItems.find(w => w.id === (t.work_item_id || '')); return wi ? `${wi.code} - ${wi.name}` : '' })(),
+      analysis_work_item: (() => { const id = (t as any).analysis_work_item_id; const a = id ? analysisItemsMap[id] : null; return a ? `${a.code} - ${a.name}` : (id || '') })(),
       classification_name: t.transaction_classification?.name || '',
       organization_name: organizations.find(o => o.id === (t.org_id || ''))?.name || '',
       project_name: projects.find(p => p.id === (t.project_id || ''))?.name || '',
@@ -535,6 +578,7 @@ const TransactionsPage: React.FC = () => {
           classification_id: data.classification_id || null,
           expenses_category_id: data.expenses_category_id || null,
           work_item_id: data.work_item_id || null,
+          analysis_work_item_id: data.analysis_work_item_id || null,
           cost_center_id: data.cost_center_id || null,
           org_id: data.organization_id || null,
           project_id: data.project_id || null,
@@ -577,7 +621,7 @@ const TransactionsPage: React.FC = () => {
         const tempEnriched = enrichTx(temp)
         setTransactions(prev => [tempEnriched as any, ...prev])
 
-        const rec = await createTransaction({
+    const rec = await createTransaction({
           entry_number: data.entry_number,
           entry_date: data.entry_date,
           description: data.description,
@@ -589,6 +633,7 @@ const TransactionsPage: React.FC = () => {
           classification_id: data.classification_id || undefined,
           expenses_category_id: data.expenses_category_id || undefined,
           work_item_id: data.work_item_id || undefined,
+          analysis_work_item_id: data.analysis_work_item_id || undefined,
           cost_center_id: data.cost_center_id || undefined,
           org_id: data.organization_id || undefined,
           project_id: data.project_id || undefined,
@@ -735,7 +780,7 @@ const TransactionsPage: React.FC = () => {
     }
   }
 
-  useEffect(() => { reload().catch(() => {}) }, [searchTerm, filters.dateFrom, filters.dateTo, filters.amountFrom, filters.amountTo, debitFilterId, creditFilterId, orgFilterId, projectFilterId, classificationFilterId, expensesCategoryFilterId, workItemFilterId, costCenterFilterId, page, pageSize, mode])
+  useEffect(() => { reload().catch(() => {}) }, [searchTerm, filters.dateFrom, filters.dateTo, filters.amountFrom, filters.amountTo, (filters as any).analysis_work_item_id, debitFilterId, creditFilterId, orgFilterId, projectFilterId, classificationFilterId, expensesCategoryFilterId, workItemFilterId, costCenterFilterId, page, pageSize, mode])
 
   if (loading) return <div className="loading-container"><div className="loading-spinner" />جاري التحميل...</div>
   if (error) return <div className="error-container">خطأ: {error}</div>
@@ -761,6 +806,9 @@ const TransactionsPage: React.FC = () => {
             size="small"
             layout="horizontal"
           />
+          <button className="ultimate-btn ultimate-btn-add" onClick={() => { try { window.open('/main-data/analysis-work-items', '_blank', 'noopener'); } catch {} }}>
+            <div className="btn-content"><span className="btn-text">+ بند تحليل جديد</span></div>
+          </button>
           <WithPermission perm="transactions.manage">
             <button className="ultimate-btn ultimate-btn-warning" onClick={() => setShowLogs(true)}>
               <div className="btn-content"><span className="btn-text">سجل الأخطاء</span></div>
@@ -921,6 +969,22 @@ const TransactionsPage: React.FC = () => {
             ))}
         </select>
 
+        {/* Analysis Work Item filter */}
+        <select
+          value={(filters as any).analysis_work_item_id || ''}
+          onChange={e => { (setFilters as any)({ ...filters, analysis_work_item_id: e.target.value }); setPage(1) }}
+          className="filter-select filter-select--analysisworkitem"
+        >
+          <option value="">جميع بنود التحليل</option>
+          {Object.entries(analysisItemsMap)
+            .sort((a, b) => `${a[1].code} - ${a[1].name}`.localeCompare(`${b[1].code} - ${b[1].name}`))
+            .map(([id, a]) => (
+              <option key={id} value={id}>
+                {`${a.code} - ${a.name}`.substring(0, 52)}
+              </option>
+            ))}
+        </select>
+        
         {/* Cost Center filter */}
         <select
           value={costCenterFilterId}

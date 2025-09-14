@@ -6,6 +6,7 @@ import type { TransactionClassification } from '../../services/transaction-class
 import type { ExpensesCategoryRow } from '../../types/expenses-categories';
 import type { WorkItemRow } from '../../types/work-items';
 import { toWorkItemOptions } from '../../services/work-items';
+import { listAnalysisWorkItems } from '../../services/analysis-work-items';
 import type { SearchableSelectOption } from '../Common/SearchableSelect';
 import { transactionValidator, type ValidationWarning } from '../../services/transaction-validation';
 
@@ -450,6 +451,29 @@ export const createTransactionFormConfig = (
       position: { row: 7, col: 1 }
     },
     {
+      id: 'analysis_work_item_id',
+      type: 'searchable-select',
+      label: 'بند التحليل',
+      required: false,
+      options: [],
+      optionsProvider: async (form) => {
+        const orgId = String((form as any)?.organization_id || '')
+        const projectId = String((form as any)?.project_id || '') || null
+        if (!orgId) return [{ value: '', label: 'اختر المؤسسة أولاً', searchText: '' }]
+        const list = await listAnalysisWorkItems({ orgId, projectId, onlyWithTx: false, includeInactive: true })
+        const opts = list.map(i => ({ value: i.id, label: `${i.code} - ${i.name}`, searchText: `${i.code} ${i.name} ${(i.name_ar||'')}`.toLowerCase() }))
+        return [{ value: '', label: 'بدون بند', searchText: '' }, ...opts]
+      },
+      icon: <Tag size={16} />,
+      helpText: 'اختياري — بند تحليل مرتبط بالمعاملة (يتم تصفيته حسب المشروع) ',
+      searchable: true,
+      clearable: true,
+      placeholder: 'اختر بند التحليل...',
+      dependsOnAny: ['organization_id', 'project_id'],
+      colSpan: 1,
+      position: { row: 7, col: 2 }
+    },
+    {
       id: 'expenses_category_id',
       type: 'searchable-select',
       label: 'فئة المصروفات',
@@ -603,6 +627,7 @@ export const createTransactionFormConfig = (
         { field: 'entry_date' },
         { field: 'description' },
         { field: 'work_item_id' },
+        { field: 'analysis_work_item_id' },
         { field: 'debit_account_id' },
         { field: 'credit_account_id' },
         { field: 'amount' },

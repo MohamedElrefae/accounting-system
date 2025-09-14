@@ -362,48 +362,50 @@ const ExpensesCategoriesPage: React.FC = () => {
                 {loading ? (
                   <Typography>Loading...</Typography>
                 ) : (
-                  <>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Code</TableCell>
-                          <TableCell>Description</TableCell>
-                          <TableCell>Level</TableCell>
-                          <TableCell>Add to Cost</TableCell>
-                          <TableCell>Active</TableCell>
-                        <TableCell>Linked Account</TableCell>
-                        <TableCell>Children</TableCell>
-                        <TableCell>Has Tx</TableCell>
-                        <TableCell align="right">Actions</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {pagedList.map(r => (
-                          <TableRow key={r.id}>
-                            <TableCell>{r.code}</TableCell>
-                            <TableCell>{r.description}</TableCell>
-                            <TableCell>{r.level}</TableCell>
-                            <TableCell><Checkbox checked={r.add_to_cost} disabled /></TableCell>
-                            <TableCell><Checkbox checked={r.is_active} disabled /></TableCell>
-                          <TableCell>{r.linked_account_code ? `${r.linked_account_code}${r.linked_account_name ? ' - ' + r.linked_account_name : ''}` : ''}</TableCell>
-                          <TableCell>{r.child_count ?? 0}</TableCell>
-                          <TableCell><Checkbox checked={!!r.has_transactions} disabled /></TableCell>
-                            <TableCell align="right">
-                              {canUpdate && r.level < 4 && (
-                                <Button size="small" onClick={() => handleAddChild(r.id)}>Add Sub</Button>
-                              )}
-                              {canUpdate && (
-                                <Button size="small" onClick={() => handleToggleActive(r)}>
-                                  {r.is_active ? 'Disable' : 'Enable'}
-                                </Button>
-                              )}
-                              {canUpdate && <Button size="small" onClick={() => openEdit(r)}>Edit</Button>}
-                              {canDelete && <Button size="small" color="error" onClick={() => handleDelete(r)}>Delete</Button>}
-                            </TableCell>
+                  <div className={styles.tableWrapper}>
+                    <div className={styles.tableScrollArea}>
+                      <Table size="small" stickyHeader>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Code</TableCell>
+                            <TableCell>Description</TableCell>
+                            <TableCell>Level</TableCell>
+                            <TableCell>Add to Cost</TableCell>
+                            <TableCell>Active</TableCell>
+                          <TableCell>Linked Account</TableCell>
+                          <TableCell>Children</TableCell>
+                          <TableCell>Has Tx</TableCell>
+                          <TableCell align="right">Actions</TableCell>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHead>
+                        <TableBody>
+                          {pagedList.map(r => (
+                            <TableRow key={r.id}>
+                              <TableCell>{r.code}</TableCell>
+                              <TableCell>{r.description}</TableCell>
+                              <TableCell>{r.level}</TableCell>
+                              <TableCell><Checkbox checked={r.add_to_cost} disabled /></TableCell>
+                              <TableCell><Checkbox checked={r.is_active} disabled /></TableCell>
+                            <TableCell>{r.linked_account_code ? `${r.linked_account_code}${r.linked_account_name ? ' - ' + r.linked_account_name : ''}` : ''}</TableCell>
+                            <TableCell>{r.child_count ?? 0}</TableCell>
+                            <TableCell><Checkbox checked={!!r.has_transactions} disabled /></TableCell>
+                              <TableCell align="right">
+                                {canUpdate && r.level < 4 && (
+                                  <Button size="small" onClick={() => handleAddChild(r.id)}>Add Sub</Button>
+                                )}
+                                {canUpdate && (
+                                  <Button size="small" onClick={() => handleToggleActive(r)}>
+                                    {r.is_active ? 'Disable' : 'Enable'}
+                                  </Button>
+                                )}
+                                {canUpdate && <Button size="small" onClick={() => openEdit(r)}>Edit</Button>}
+                                {canDelete && <Button size="small" color="error" onClick={() => handleDelete(r)}>Delete</Button>}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                     <TablePagination
                       component="div"
                       count={filteredList.length}
@@ -412,8 +414,9 @@ const ExpensesCategoriesPage: React.FC = () => {
                       rowsPerPage={rowsPerPage}
                       onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0) }}
                       rowsPerPageOptions={[10, 25, 50, 100]}
+                      className={styles.tablePagination}
                     />
-                  </>
+                  </div>
                 )}
               </div>
             )}

@@ -65,6 +65,14 @@ export const navigationItems: NavigationItem[] = [
         path: "/main-data/work-items"
       },
       {
+        id: "analysis-work-items",
+        label: "Analysis Work Items",
+        titleEn: "Analysis Work Items",
+        titleAr: "بنود الاعمال التحليلية",
+        icon: "tree-structure",
+        path: "/main-data/analysis-work-items"
+      },
+      {
         id: "cost-centers",
         label: "Cost Centers",
         titleEn: "Cost Centers",
@@ -231,6 +239,14 @@ export const navigationItems: NavigationItem[] = [
             titleAr: "استخدام عناصر الأعمال",
             icon: "activity",
             path: "/reports/main-data/work-item-usage"
+          },
+          {
+            id: "analysis-item-usage",
+            label: "Analysis Item Usage",
+            titleEn: "Analysis Item Usage",
+            titleAr: "استخدام بنود التحليل",
+            icon: "activity",
+            path: "/reports/main-data/analysis-item-usage"
           }
         ]
       }

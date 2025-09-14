@@ -226,6 +226,7 @@ export interface ListTransactionsFilters {
   classificationId?: string
   expensesCategoryId?: string
   workItemId?: string
+  analysisWorkItemId?: string
   costCenterId?: string
 }
 
@@ -293,6 +294,7 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
     if (f.classificationId) query = query.eq('classification_id', f.classificationId)
     if (f.expensesCategoryId) query = query.eq('expenses_category_id', f.expensesCategoryId)
     if (f.workItemId) query = query.eq('work_item_id', f.workItemId)
+    if (f.analysisWorkItemId) query = query.eq('analysis_work_item_id', f.analysisWorkItemId)
     if (f.costCenterId) query = query.eq('cost_center_id', f.costCenterId)
   }
 
@@ -323,6 +325,7 @@ export interface CreateTransactionInput {
   classification_id?: string
   expenses_category_id?: string
   work_item_id?: string
+  analysis_work_item_id?: string
   cost_center_id?: string
   project_id?: string
   org_id?: string
@@ -366,6 +369,7 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
     classification_id: input.classification_id || null,
     expenses_category_id: input.expenses_category_id || null,
     work_item_id: input.work_item_id || null,
+    analysis_work_item_id: input.analysis_work_item_id || null,
     cost_center_id: input.cost_center_id || null,
     project_id: input.project_id || null,
     org_id: input.org_id || null,
@@ -424,6 +428,7 @@ export async function updateTransaction(
     'classification_id',
     'expenses_category_id',
     'work_item_id',
+    'analysis_work_item_id',
     'cost_center_id',
     'project_id',
     'org_id',

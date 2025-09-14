@@ -1,4 +1,4 @@
-/* Expenses Categories Page - unified theme, no inline styles */
+/* Analysis Work Items Page - follows unified theme, no inline styles except necessary MUI props */
 .container {
   display: flex;
   flex-direction: column;
@@ -6,12 +6,10 @@
   background: var(--background);
   color: var(--text);
 }
-
 .header {
   padding: 16px 24px;
   border-bottom: 1px solid var(--border);
   background: var(--topbar_bg);
-  flex-shrink: 0;
 }
 
 .title {
@@ -26,6 +24,26 @@
   gap: 12px;
   align-items: center;
   margin-top: 8px;
+}
+
+/* Unified control sizes to match WorkItems */
+.select,
+.input,
+.button {
+  height: 36px;
+}
+
+.button {
+  background: var(--primary);
+  color: var(--on_primary);
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .content {
@@ -50,31 +68,26 @@
 
 .cardBody {
   padding: 16px;
-  flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
-}
-
-.filtersRow {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: center;
 }
 
 .tableContainer {
   flex: 1;
   overflow: auto;
   min-height: 400px;
+  max-height: 100%;
   border: 1px solid var(--border);
   border-radius: 8px;
   margin-top: 16px;
 }
 
-.sectionTitle {
-  font-weight: 600;
-  color: var(--heading);
+/* Ensure table header sticks when scrolling */
+.tableContainer :global(.MuiTable-stickyHeader) {
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .footerActions {
@@ -82,18 +95,8 @@
   gap: 8px;
 }
 
-.tableWrapper {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+.rowActions {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
 }
-
-.tableScrollArea {
-  flex: 1;
-  overflow: auto;
-}
-
-.tablePagination {
-  flex-shrink: 0;
-}
-
