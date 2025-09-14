@@ -8,7 +8,7 @@ import type { WorkItemRow } from '../../types/work-items';
 import { toWorkItemOptions } from '../../services/work-items';
 import { listAnalysisWorkItems } from '../../services/analysis-work-items';
 import type { SearchableSelectOption } from '../Common/SearchableSelect';
-import { transactionValidator, type ValidationWarning } from '../../services/transaction-validation';
+import { transactionValidator } from '../../services/transaction-validation';
 
 import { getCurrentDate, DATE_FORMATS } from '../../utils/dateHelpers';
 
