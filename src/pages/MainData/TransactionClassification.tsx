@@ -216,7 +216,7 @@ const TransactionClassificationPage: React.FC = () => {
   };
 
   const filteredAndSorted = useMemo(() => {
-    let data = classifications.filter((classification) => {
+    const data = classifications.filter((classification) => {
       const nameMatch = classification.name.toLowerCase().includes(searchTerm.toLowerCase());
       const codeMatch = classification.code.toString().includes(searchTerm);
       return nameMatch || codeMatch;

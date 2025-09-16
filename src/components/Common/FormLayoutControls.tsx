@@ -271,7 +271,7 @@ const FormLayoutControls: React.FC<FormLayoutControlsProps> = ({
                       ))}
                       
                       {/* Regular Fields */}
-                      {regularFields.map((field, _index) => (
+                      {regularFields.map((field) => (
                         <div 
                           key={`preview-${field.id}`} 
                           className={styles.previewField}
@@ -346,7 +346,7 @@ const FormLayoutControls: React.FC<FormLayoutControlsProps> = ({
                     اسحب الحقول لإعادة ترتيبها أو استخدم أزرار العرض لتغيير عرضها
                   </p>
                   <div className={styles.dragDropList}>
-                    {orderedFields.map((field, _index) => (
+                    {orderedFields.map((field) => (
                       <div
                         key={field.id}
                         data-field-id={field.id}

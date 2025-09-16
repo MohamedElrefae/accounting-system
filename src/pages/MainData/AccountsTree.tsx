@@ -556,7 +556,7 @@ const AccountsTreePage: React.FC = () => {
       console.log('📋 Falling back to view-based query...');
       
       try {
-        let viewQuery = supabase
+        const viewQuery = supabase
           .from('v_accounts_activity_rollups')
           .select('id, org_id, has_transactions, net_amount, total_debit_amount, total_credit_amount, child_count')
           .eq('org_id', orgId);
@@ -624,7 +624,7 @@ const AccountsTreePage: React.FC = () => {
   }
 
   const filteredAndSorted = useMemo(() => {
-    let data = accounts.filter((acc) => {
+    const data = accounts.filter((acc) => {
       const nameDisp = (acc.name_ar || acc.name || '').toLowerCase();
       const matchesSearch =
         acc.code.toLowerCase().includes(searchTerm.toLowerCase()) ||

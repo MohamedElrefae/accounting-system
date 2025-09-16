@@ -1484,7 +1484,7 @@ const GeneralLedger: React.FC = () => {
           setSummaryRows(rows)
         } else {
           // We might have more data, so fetch all of it
-          let allRows = [...rows]
+          const allRows = [...rows]
           let offset = initialLimit
           const batchSize = 1000
           

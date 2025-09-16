@@ -15,9 +15,6 @@ export const WithPermission: React.FC<PropsWithChildren<WithPermissionProps>> = 
   return <>{children}</>
 }
 
-// Helper: returns a boolean you can use in logic
-export function useCan(perm?: string, anyOf?: string[]) {
-  const hasPerm = useHasPermission()
-  return perm ? hasPerm(perm) : (anyOf ? anyOf.some(p => hasPerm(p)) : true)
-}
+// Re-export useCan from hooks
+export { useCan } from '../../hooks/useCan'
 

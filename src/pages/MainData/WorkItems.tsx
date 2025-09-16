@@ -95,9 +95,9 @@ const WorkItemsPage: React.FC = () => {
         ])
         setOrgs(o)
         setProjects(p)
-        let chosenOrg = orgId || o[0]?.id || ''
+        const chosenOrg = orgId || o[0]?.id || ''
         if (chosenOrg !== orgId) setOrgId(chosenOrg)
-        let chosenProject = projectId || ''
+        const chosenProject = projectId || ''
         setProjectId(chosenProject)
         if (chosenOrg) {
           const list = (!chosenProject)

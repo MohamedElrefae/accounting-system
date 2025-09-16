@@ -390,7 +390,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     const el = document.getElementById(fieldId) as HTMLElement | null;
     if (el) {
       el.focus();
-      try { (el as HTMLInputElement | HTMLTextAreaElement).select?.(); } catch {}
+      try { (el as HTMLInputElement | HTMLTextAreaElement).select?.(); } catch { /* ignore selection errors */ }
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   };

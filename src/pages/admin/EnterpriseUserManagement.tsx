@@ -229,7 +229,7 @@ export default function EnterpriseUserManagement() {
 
   // Filtered and sorted users
   const processedUsers = useMemo(() => {
-    let filtered = users.filter(user => {
+    const filtered = users.filter(user => {
       const matchesSearch = searchTerm === '' || 
         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||

@@ -346,7 +346,7 @@ const AccountExplorerReport: React.FC = () => {
 
   // Export helpers (simple CSV for now)
   function exportCSV() {
-    let cols: string[] = [uiLang === 'ar' ? 'الكود' : 'Code', uiLang === 'ar' ? 'اسم الحساب' : 'Account', uiLang === 'ar' ? 'نوع الحساب' : 'Type', uiLang === 'ar' ? 'المستوى' : 'Level']
+    const cols: string[] = [uiLang === 'ar' ? 'الكود' : 'Code', uiLang === 'ar' ? 'اسم الحساب' : 'Account', uiLang === 'ar' ? 'نوع الحساب' : 'Type', uiLang === 'ar' ? 'المستوى' : 'Level']
     if (mode === 'range') {
       if (showOpeningInRange) cols.push(uiLang === 'ar' ? 'افتتاحي مدين' : 'Opening Debit', uiLang === 'ar' ? 'افتتاحي دائن' : 'Opening Credit')
       cols.push(

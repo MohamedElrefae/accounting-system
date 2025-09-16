@@ -193,7 +193,7 @@ export async function generateProfitLossPDF(reportData: FinancialReportData): Pr
  * Generate PDF for Account Explorer reports
  */
 export async function generateAccountExplorerPDF(reportData: FinancialReportData): Promise<void> {
-  let columnKeys = ['code', 'name', 'type', 'level'];
+  const columnKeys = ['code', 'name', 'type', 'level'];
   
   if (reportData.mode === 'range') {
     columnKeys.push('opening_debit', 'opening_credit', 'period_debits', 'period_credits', 'closing_debit', 'closing_credit', 'period_net', 'final_net');
