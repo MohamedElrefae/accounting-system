@@ -40,8 +40,13 @@ import {
   TablePagination,
 } from '@mui/material'
 
-function getInitialOrgId(): string {
-  try { const { getActiveOrgId } = require('../../utils/org'); return getActiveOrgId?.() || '' } catch { return '' }
+async function getInitialOrgId(): Promise<string> {
+  try {
+    const { getActiveOrgId } = await import('../../utils/org')
+    return getActiveOrgId?.() || ''
+  } catch {
+    return ''
+  }
 }
 
 const CostCentersPage: React.FC = () => {
@@ -55,7 +60,7 @@ const CostCentersPage: React.FC = () => {
   const [tab, setTab] = useState(0)
   const [orgs, setOrgs] = useState<Organization[]>([])
   const [projects, setProjects] = useState<Project[]>([])
-  const [orgId, setOrgId] = useState<string>(getInitialOrgId())
+  const [orgId, setOrgId] = useState<string>('')
 
   const [list, setList] = useState<CostCenterRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -91,21 +96,22 @@ const CostCentersPage: React.FC = () => {
     (async () => {
       setLoading(true)
       try {
-        const [orgList, projList] = await Promise.all([
+        const [orgList, projList, initialOrgId] = await Promise.all([
           getOrganizations().catch(() => []),
-          getProjects().catch(() => ({ rows: [], total: 0 }))
+          getProjects().catch(() => ({ rows: [], total: 0 })),
+          getInitialOrgId()
         ])
         setOrgs(orgList)
         // getProjects returns a paged result; ensure we set an array
-        setProjects((projList as any).rows ?? [])
-        const chosen = orgId || orgList[0]?.id || ''
+        setProjects(Array.isArray(projList) ? projList : (projList as { rows: Project[] }).rows ?? [])
+        const chosen = orgId || initialOrgId || orgList[0]?.id || ''
         if (chosen !== orgId) setOrgId(chosen)
         if (chosen) {
           const costCenterList = await getCostCentersList(chosen, true)
           setList(costCenterList)
         }
-      } catch (e: any) {
-        showToast(e.message || 'Failed to load data', { severity: 'error' })
+      } catch (e: unknown) {
+        showToast((e as Error).message || 'Failed to load data', { severity: 'error' })
       } finally {
         setLoading(false)
       }
@@ -119,8 +125,8 @@ const CostCentersPage: React.FC = () => {
     try {
       const costCenterList = await getCostCentersList(chosen, true)
       setList(costCenterList)
-    } catch (e: any) {
-      showToast(e.message || 'Failed to reload', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'Failed to reload', { severity: 'error' })
     } finally {
       setLoading(false)
     }
@@ -173,10 +179,11 @@ const CostCentersPage: React.FC = () => {
     if (!orgId) return '1'
     try {
       return await fetchNextCostCenterCode(orgId, parentId ?? null)
-    } catch (e: any) {
+    } catch (e: unknown) {
       // Fallback to '1' and inform the user without breaking the flow
+      const error = e as Error
       showToast(
-        (e && e.message) ? `تعذر جلب الكود التالي من الخادم، سيتم استخدام 1 مؤقتاً: ${e.message}` : 'تعذر جلب الكود التالي من الخادم، سيتم استخدام 1 مؤقتاً',
+        error?.message ? `تعذر جلب الكود التالي من الخادم، سيتم استخدام 1 مؤقتاً: ${error.message}` : 'تعذر جلب الكود التالي من الخادم، سيتم استخدام 1 مؤقتاً',
         { severity: 'warning' }
       )
       return '1'
@@ -247,8 +254,8 @@ const CostCentersPage: React.FC = () => {
       }
       setOpen(false)
       await reload(orgId)
-    } catch (e: any) {
-      showToast(e.message || 'Save failed', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'Save failed', { severity: 'error' })
     }
   }
 
@@ -275,8 +282,8 @@ const CostCentersPage: React.FC = () => {
       await updateCostCenter({ id: row.id, is_active: !row.is_active, org_id: orgId })
       showToast(row.is_active ? 'تم التعطيل' : 'تم التفعيل', { severity: 'success' })
       await reload(orgId)
-    } catch (e: any) {
-      showToast(e.message || 'Toggle failed', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'Toggle failed', { severity: 'error' })
     }
   }
 
@@ -287,8 +294,8 @@ const CostCentersPage: React.FC = () => {
       await deleteCostCenter(row.id, orgId)
       showToast('تم الحذف بنجاح', { severity: 'success' })
       await reload(orgId)
-    } catch (e: any) {
-      showToast(e.message || 'Delete failed', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'Delete failed', { severity: 'error' })
     }
   }
 
@@ -312,11 +319,16 @@ const CostCentersPage: React.FC = () => {
             <Select
               label="Organization"
               value={orgId}
-              onChange={async (e) => {
+              onChange={(e) => {
                 const v = String(e.target.value)
                 setOrgId(v)
-                try { const { setActiveOrgId } = require('../../utils/org'); setActiveOrgId?.(v) } catch {}
-                await reload(v)
+                ;(async () => {
+                  try {
+                    const { setActiveOrgId } = await import('../../utils/org')
+                    setActiveOrgId?.(v)
+                  } catch {}
+                  await reload(v)
+                })()
               }}
             >
               {orgs.map(o => (
@@ -366,52 +378,52 @@ const CostCentersPage: React.FC = () => {
                       project_name: projects.find(p => p.id === r.project_id)?.name || '',
                       child_count: r.child_count ?? 0,
                       has_transactions: !!r.has_transactions,
-                    })) as any}
+                    }))}
                     extraColumns={[
                       { 
                         key: 'project', 
                         header: 'Project', 
-                        render: (n: any) => (
+                        render: (n) => (
                           <span>{n.project_name || 'Global'}</span>
                         )
                       },
                       { 
                         key: 'is_active', 
                         header: 'Active', 
-                        render: (n: any) => (
+                        render: (n) => (
                           <input type="checkbox" checked={!!n.is_active} readOnly aria-label="is_active" />
                         )
                       },
                       { 
                         key: 'children', 
                         header: 'Children', 
-                        render: (n: any) => (
+                        render: (n) => (
                           <span>{Number.isFinite(n.child_count) ? n.child_count : ''}</span>
                         )
                       },
                       { 
                         key: 'has_tx', 
                         header: 'Has Tx', 
-                        render: (n: any) => (
+                        render: (n) => (
                           <input type="checkbox" checked={!!n.has_transactions} readOnly aria-label="has_transactions" />
                         )
                       },
                     ]}
-                    onEdit={(node: any) => {
+                    onEdit={(node) => {
                       const row = list.find(r => r.id === node.id)
                       if (row) openEdit(row)
                     }}
-                    onAdd={(parentNode: any) => handleAddChild(parentNode.id)}
-                    onToggleStatus={(node: any) => {
+                    onAdd={(parentNode) => handleAddChild(parentNode.id)}
+                    onToggleStatus={(node) => {
                       const row = list.find(r => r.id === node.id)
                       if (row) handleToggleActive(row)
                     }}
-                    onDelete={(node: any) => {
+                    onDelete={(node) => {
                       const row = list.find(r => r.id === node.id)
                       if (row) handleDelete(row)
                     }}
-                    canHaveChildren={(node: any) => node.level < 4}
-                    getChildrenCount={(node: any) => list.filter(r => r.parent_id === node.id).length}
+                    canHaveChildren={(node) => node.level < 4}
+                    getChildrenCount={(node) => list.filter(r => r.parent_id === node.id).length}
                     maxLevel={4}
                   />
                 )}

@@ -10,12 +10,22 @@ import * as XLSX from 'xlsx'
 import SearchableSelect, { type SearchableSelectOption } from '../../components/Common/SearchableSelect'
 import DraggableResizablePanel from '../../components/Common/DraggableResizablePanel'
 
-const getInitialOrgId = (): string => {
-  try { const { getActiveOrgId } = require('../../utils/org'); return getActiveOrgId?.() || '' } catch { return '' }
+const getInitialOrgId = async (): Promise<string> => {
+  try {
+    const { getActiveOrgId } = await import('../../utils/org')
+    return getActiveOrgId?.() || ''
+  } catch {
+    return ''
+  }
 }
 
-const getInitialProjectId = (): string => {
-  try { const { getActiveProjectId } = require('../../utils/org'); return getActiveProjectId?.() || '' } catch { return '' }
+const getInitialProjectId = async (): Promise<string> => {
+  try {
+    const { getActiveProjectId } = await import('../../utils/org')
+    return getActiveProjectId?.() || ''
+  } catch {
+    return ''
+  }
 }
 
 const MAX_LEVEL = 5
@@ -24,8 +34,8 @@ const WorkItemsPage: React.FC = () => {
   const { showToast } = useToast()
   const [orgs, setOrgs] = useState<Organization[]>([])
   const [projects, setProjects] = useState<Project[]>([])
-  const [orgId, setOrgId] = useState<string>(getInitialOrgId())
-  const [projectId, setProjectId] = useState<string>(getInitialProjectId())
+  const [orgId, setOrgId] = useState<string>('')
+  const [projectId, setProjectId] = useState<string>('')
   const [search, setSearch] = useState('')
   const [items, setItems] = useState<WorkItemRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -89,15 +99,17 @@ const WorkItemsPage: React.FC = () => {
     (async () => {
       setLoading(true)
       try {
-        const [o, p] = await Promise.all([
+        const [o, p, initialOrgId, initialProjectId] = await Promise.all([
           getOrganizations().catch(() => []),
-          getActiveProjects().catch(() => [])
+          getActiveProjects().catch(() => []),
+          getInitialOrgId(),
+          getInitialProjectId()
         ])
         setOrgs(o)
         setProjects(p)
-        const chosenOrg = orgId || o[0]?.id || ''
+        const chosenOrg = orgId || initialOrgId || o[0]?.id || ''
         if (chosenOrg !== orgId) setOrgId(chosenOrg)
-        const chosenProject = projectId || ''
+        const chosenProject = projectId || initialProjectId || ''
         setProjectId(chosenProject)
         if (chosenOrg) {
           const list = (!chosenProject)
@@ -105,8 +117,8 @@ const WorkItemsPage: React.FC = () => {
             : await listWorkItemsUnion(chosenOrg, chosenProject || null, true)
           setItems(list)
         }
-      } catch (e: any) {
-        showToast(e.message || 'Failed to load work items', { severity: 'error' })
+      } catch (e: unknown) {
+        showToast((e as Error).message || 'Failed to load work items', { severity: 'error' })
       } finally {
         setLoading(false)
       }
@@ -121,8 +133,8 @@ const WorkItemsPage: React.FC = () => {
         ? await listWorkItemsAll(org, true)
         : await listWorkItemsUnion(org, project, true)
       setItems(list)
-    } catch (e: any) {
-      showToast(e.message || 'Failed to reload work items', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'Failed to reload work items', { severity: 'error' })
     } finally {
       setLoading(false)
     }
@@ -501,8 +513,8 @@ const WorkItemsPage: React.FC = () => {
       await deleteWorkItem(row.id, row.org_id, row.project_id)
       showToast('تم الحذف', { severity: 'success' })
       await reload(row.org_id, row.project_id)
-    } catch (e: any) {
-      showToast(e.message || 'فشل الحذف', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'فشل الحذف', { severity: 'error' })
     }
   }
 
@@ -514,11 +526,16 @@ const WorkItemsPage: React.FC = () => {
           <select
             className={`${styles.select}`}
             value={orgId}
-            onChange={async (e) => {
+            onChange={(e) => {
               const v = String(e.target.value)
               setOrgId(v)
-              try { const { setActiveOrgId } = require('../../utils/org'); setActiveOrgId?.(v) } catch {}
-              await reload(v, projectId || null)
+              ;(async () => {
+                try {
+                  const { setActiveOrgId } = await import('../../utils/org')
+                  setActiveOrgId?.(v)
+                } catch {}
+                await reload(v, projectId || null)
+              })()
             }}
           >
             <option value="">اختر المؤسسة</option>
@@ -529,11 +546,16 @@ const WorkItemsPage: React.FC = () => {
           <select
             className={`${styles.select}`}
             value={projectId}
-            onChange={async (e) => {
+            onChange={(e) => {
               const v = String(e.target.value)
               setProjectId(v)
-              try { const { setActiveProjectId } = require('../../utils/org'); setActiveProjectId?.(v) } catch {}
-              await reload(orgId, v || null)
+              ;(async () => {
+                try {
+                  const { setActiveProjectId } = await import('../../utils/org')
+                  setActiveProjectId?.(v)
+                } catch {}
+                await reload(orgId, v || null)
+              })()
             }}
           >
             <option value="">بدون مشروع (كتالوج المؤسسة)</option>
