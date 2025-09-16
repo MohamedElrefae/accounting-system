@@ -41,8 +41,13 @@ import {
   TablePagination,
 } from '@mui/material'
 
-function getInitialOrgId(): string {
-  try { const { getActiveOrgId } = require('../../utils/org'); return getActiveOrgId?.() || '' } catch { return '' }
+async function getInitialOrgId(): Promise<string> {
+  try { 
+    const { getActiveOrgId } = await import('../../utils/org'); 
+    return getActiveOrgId?.() || ''; 
+  } catch { 
+    return ''; 
+  }
 }
 
 const ExpensesCategoriesPage: React.FC = () => {
@@ -55,7 +60,7 @@ const ExpensesCategoriesPage: React.FC = () => {
 
   const [tab, setTab] = useState(0)
   const [orgs, setOrgs] = useState<Organization[]>([])
-  const [orgId, setOrgId] = useState<string>(getInitialOrgId())
+  const [orgId, setOrgId] = useState<string>('')
 
   const [_tree, setTree] = useState<ExpensesCategoryTreeNode[]>([])
   const [list, setList] = useState<ExpensesCategoryRow[]>([])
@@ -77,9 +82,12 @@ const ExpensesCategoriesPage: React.FC = () => {
     (async () => {
       setLoading(true)
       try {
-        const orgList = await getOrganizations().catch(() => [])
+        const [orgList, initialOrgId] = await Promise.all([
+          getOrganizations().catch(() => []),
+          getInitialOrgId()
+        ]);
         setOrgs(orgList)
-        const chosen = orgId || orgList[0]?.id || ''
+        const chosen = orgId || initialOrgId || orgList[0]?.id || ''
         if (chosen !== orgId) setOrgId(chosen)
         if (chosen) {
           const [t, l, accs] = await Promise.all([
@@ -276,7 +284,10 @@ const ExpensesCategoriesPage: React.FC = () => {
               onChange={async (e) => {
                 const v = String(e.target.value)
                 setOrgId(v)
-                try { const { setActiveOrgId } = require('../../utils/org'); setActiveOrgId?.(v) } catch {}
+                try { 
+                  const { setActiveOrgId } = await import('../../utils/org'); 
+                  setActiveOrgId?.(v); 
+                } catch { /* ignore org utils errors */ }
                 await reload(v)
               }}
             >

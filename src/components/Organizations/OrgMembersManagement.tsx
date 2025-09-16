@@ -3,6 +3,7 @@ import { Building2, UserPlus2, Users2, Trash2, Shield, RefreshCw } from 'lucide-
 import styles from './OrgMembersManagement.module.css';
 import { useToast } from '../../contexts/ToastContext';
 import { getOrganizations, type Organization } from '../../services/organization';
+import type { User } from '../../types/common';
 import { 
   listOrgMembers, 
   addOrgMember, 
@@ -31,7 +32,7 @@ const OrgMembersManagement: React.FC = () => {
   // Add dialog state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [userQuery, setUserQuery] = useState('');
-  const [userOptions, setUserOptions] = useState<any[]>([]);
+  const [userOptions, setUserOptions] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [selectedRole, setSelectedRole] = useState<OrgMemberRole>(getDefaultRoleForNewMember());
   const [saving, setSaving] = useState(false);
@@ -274,7 +275,7 @@ const OrgMembersManagement: React.FC = () => {
                     onChange={(e) => setSelectedUserId(e.target.value)}
                   >
                     <option value="" disabled>اختر مستخدم</option>
-                    {userOptions.map((u: any) => (
+                    {userOptions.map((u) => (
                       <option key={u.id} value={u.id}>{u.email}</option>
                     ))}
                   </select>
