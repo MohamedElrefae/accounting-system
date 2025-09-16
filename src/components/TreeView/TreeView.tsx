@@ -81,9 +81,7 @@ const TreeView: React.FC<TreeViewProps> = ({
 
   const handleButtonWithStates = async (
     buttonId: string,
-    action: () => Promise<void> | void,
-    _successMessage?: string,
-    _errorMessage?: string
+    action: () => Promise<void> | void
   ) => {
     try {
       // Set loading state
@@ -108,7 +106,7 @@ const TreeView: React.FC<TreeViewProps> = ({
           return newStates;
         });
       }, 2000);
-    } catch (error) {
+    } catch {
       // Set error state
       setButtonStates(prev => ({
         ...prev,
@@ -189,9 +187,7 @@ const TreeView: React.FC<TreeViewProps> = ({
             <button
               onClick={() => handleButtonWithStates(
                 `edit-${node.id}`,
-                async () => onEdit && onEdit(node),
-                'تم فتح نموذج التعديل',
-                'فشل في فتح النموذج'
+                async () => onEdit && onEdit(node)
               )}
               className={`ultimate-btn ultimate-btn-edit ${
                 getButtonState(`edit-${node.id}`).loading ? 'loading' : ''
@@ -226,9 +222,7 @@ const TreeView: React.FC<TreeViewProps> = ({
               <button
                 onClick={() => handleButtonWithStates(
                   `add-${node.id}`,
-                  async () => onAdd && onAdd(node),
-                  'تم إضافة حساب فرعي',
-                  'فشل في الإضافة'
+                  async () => onAdd && onAdd(node)
                 )}
                 className={`ultimate-btn ultimate-btn-add ${
                   getButtonState(`add-${node.id}`).loading ? 'loading' : ''
@@ -263,9 +257,7 @@ const TreeView: React.FC<TreeViewProps> = ({
             <button
               onClick={() => handleButtonWithStates(
                 `toggle-${node.id}`,
-                async () => onToggleStatus && onToggleStatus(node),
-                node.is_active ? 'تم التعطيل' : 'تم التفعيل',
-                'فشل في تغيير الحالة'
+                async () => onToggleStatus && onToggleStatus(node)
               )}
               className={`ultimate-btn ${node.is_active ? 'ultimate-btn-disable' : 'ultimate-btn-enable'} ${
                 getButtonState(`toggle-${node.id}`).loading ? 'loading' : ''
@@ -302,12 +294,10 @@ const TreeView: React.FC<TreeViewProps> = ({
               onClick={() => handleButtonWithStates(
                 `delete-${node.id}`,
                 async () => {
-                  if (window.confirm(`هل أنت متأكد من حذف \"${node.name_ar}\"؟`)) {
-                    onDelete && onDelete(node);
+                  if (window.confirm(`هل أنت متأكد من حذف "${node.name_ar}"؟`)) {
+                    onDelete?.(node);
                   }
-                },
-                'تم الحذف بنجاح',
-                'فشل في الحذف'
+                }
               )}
               className={`ultimate-btn ultimate-btn-delete ${
                 getButtonState(`delete-${node.id}`).loading ? 'loading' : ''

@@ -54,7 +54,7 @@ const OrgMembersManagement: React.FC = () => {
       if (data.length > 0) {
         setSelectedOrgId(data[0].id);
       }
-    } catch (e) {
+    } catch {
       showToast('فشل تحميل المؤسسات', { severity: 'error' });
     } finally {
       setLoading(false);
@@ -66,7 +66,7 @@ const OrgMembersManagement: React.FC = () => {
       setRefreshing(true);
       const list = await listOrgMembers(orgId);
       setMembers(list);
-    } catch (e) {
+    } catch {
       showToast('فشل تحميل الأعضاء', { severity: 'error' });
     } finally {
       setRefreshing(false);
@@ -86,7 +86,7 @@ const OrgMembersManagement: React.FC = () => {
     try {
       const users = await searchUsersNotInOrg(selectedOrgId, query, 20);
       setUserOptions(users);
-    } catch (e) {
+    } catch {
       setUserOptions([]);
     }
   };
@@ -99,7 +99,7 @@ const OrgMembersManagement: React.FC = () => {
       setAddDialogOpen(false);
       await loadMembers(selectedOrgId);
       showToast('تم إضافة العضو بنجاح', { severity: 'success' });
-    } catch (e) {
+    } catch {
       showToast('فشل إضافة العضو', { severity: 'error' });
     } finally {
       setSaving(false);
@@ -112,7 +112,7 @@ const OrgMembersManagement: React.FC = () => {
       await updateOrgMemberRole(selectedOrgId, userId, role);
       setMembers(prev => prev.map(m => m.user_id === userId ? { ...m, role } : m));
       showToast('تم تحديث دور العضو', { severity: 'success' });
-    } catch (e) {
+    } catch {
       showToast('فشل تحديث الدور', { severity: 'error' });
     }
   };
@@ -124,7 +124,7 @@ const OrgMembersManagement: React.FC = () => {
       await removeOrgMember(selectedOrgId, userId);
       setMembers(prev => prev.filter(m => m.user_id !== userId));
       showToast('تم إزالة العضو', { severity: 'success' });
-    } catch (e) {
+    } catch {
       showToast('فشل إزالة العضو', { severity: 'error' });
     }
   };

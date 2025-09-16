@@ -78,7 +78,15 @@ const WorkItemsTree: React.FC<WorkItemsTreeProps> = ({
   }, [command?.seq, command?.action, data])
 
   const toggleNode = useCallback((id: string) => {
-    setExpanded(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   }, [])
 
   const state = (k: string): ButtonState => buttonStates[k] || { loading: false, success: false, error: false }
@@ -207,7 +215,7 @@ const WorkItemsTree: React.FC<WorkItemsTreeProps> = ({
             )}
 
             <button
-              onClick={() => withState(`d-${n.id}`, async () => { if (window.confirm(`حذف \"${n.name_ar || n.name}\"؟`)) onDelete && onDelete(n) })}
+              onClick={() => withState(`d-${n.id}`, async () => { if (window.confirm(`حذف "${n.name_ar || n.name}"؟`)) onDelete?.(n) })}
               className={`ultimate-btn ultimate-btn-delete ${state(`d-${n.id}`).loading ? 'loading' : ''}`}
               disabled={state(`d-${n.id}`).loading || (isDeleteDisabled ? isDeleteDisabled(n) : hasChildren)}
               title={getDeleteDisabledReason ? (getDeleteDisabledReason(n) || 'حذف') : (hasChildren ? 'لا يمكن الحذف مع وجود فروع' : 'حذف')}
