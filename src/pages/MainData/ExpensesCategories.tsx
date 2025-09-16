@@ -99,8 +99,8 @@ const ExpensesCategoriesPage: React.FC = () => {
           setList(l)
           setAccounts(accs)
         }
-      } catch (e: any) {
-        showToast(e.message || 'Failed to load data', { severity: 'error' })
+      } catch (e: unknown) {
+        showToast((e as Error).message || 'Failed to load data', { severity: 'error' })
       } finally {
         setLoading(false)
       }
@@ -120,8 +120,8 @@ const ExpensesCategoriesPage: React.FC = () => {
       setTree(t)
       setList(l)
       setAccounts(accs)
-    } catch (e: any) {
-      showToast(e.message || 'Failed to reload', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'Failed to reload', { severity: 'error' })
     } finally {
       setLoading(false)
     }
@@ -220,8 +220,8 @@ const ExpensesCategoriesPage: React.FC = () => {
       }
       setOpen(false)
       await reload(orgId)
-    } catch (e: any) {
-      showToast(e.message || 'Save failed', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'Save failed', { severity: 'error' })
     }
   }
 
@@ -246,8 +246,8 @@ const ExpensesCategoriesPage: React.FC = () => {
       await updateExpensesCategory({ id: row.id, is_active: !row.is_active, org_id: orgId })
       showToast(row.is_active ? 'Deactivated' : 'Activated', { severity: 'success' })
       await reload(orgId)
-    } catch (e: any) {
-      showToast(e.message || 'Toggle failed', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'Toggle failed', { severity: 'error' })
     }
   }
 
@@ -258,8 +258,8 @@ const ExpensesCategoriesPage: React.FC = () => {
       await deleteExpensesCategory(row.id, orgId)
       showToast('Deleted successfully', { severity: 'success' })
       await reload(orgId)
-    } catch (e: any) {
-      showToast(e.message || 'Delete failed', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'Delete failed', { severity: 'error' })
     }
   }
 
@@ -330,39 +330,39 @@ const ExpensesCategoriesPage: React.FC = () => {
                       linked_account_label: r.linked_account_code ? `${r.linked_account_code}${r.linked_account_name ? ' - ' + r.linked_account_name : ''}` : '',
                       child_count: r.child_count ?? 0,
                       has_transactions: !!r.has_transactions,
-                    })) as any}
+                    }))}
                     extraColumns={[
-                      { key: 'add_to_cost', header: 'Add to Cost', render: (n: any) => (
+                      { key: 'add_to_cost', header: 'Add to Cost', render: (n: ExpensesCategoryTreeNode) => (
                         <input type="checkbox" checked={!!n.add_to_cost} readOnly aria-label="add_to_cost" />
                       )},
-                      { key: 'is_active', header: 'Active', render: (n: any) => (
+                      { key: 'is_active', header: 'Active', render: (n: ExpensesCategoryTreeNode) => (
                         <input type="checkbox" checked={!!n.is_active} readOnly aria-label="is_active" />
                       )},
-                      { key: 'linked', header: 'Linked Account', render: (n: any) => (
+                      { key: 'linked', header: 'Linked Account', render: (n: ExpensesCategoryTreeNode & { linked_account_label?: string }) => (
                         <span>{n.linked_account_label || '—'}</span>
                       )},
-                      { key: 'children', header: 'Children', render: (n: any) => (
+                      { key: 'children', header: 'Children', render: (n: ExpensesCategoryTreeNode & { child_count?: number }) => (
                         <span>{Number.isFinite(n.child_count) ? n.child_count : ''}</span>
                       )},
-                      { key: 'has_tx', header: 'Has Tx', render: (n: any) => (
+                      { key: 'has_tx', header: 'Has Tx', render: (n: ExpensesCategoryTreeNode & { has_transactions?: boolean }) => (
                         <input type="checkbox" checked={!!n.has_transactions} readOnly aria-label="has_transactions" />
                       )},
                     ]}
-                    onEdit={(node: any) => {
+                    onEdit={(node: ExpensesCategoryTreeNode) => {
                       const row = list.find(r => r.id === node.id)
                       if (row) openEdit(row)
                     }}
-                    onAdd={(parentNode: any) => handleAddChild(parentNode.id)}
-                    onToggleStatus={(node: any) => {
+                    onAdd={(parentNode: ExpensesCategoryTreeNode) => handleAddChild(parentNode.id)}
+                    onToggleStatus={(node: ExpensesCategoryTreeNode) => {
                       const row = list.find(r => r.id === node.id)
                       if (row) handleToggleActive(row)
                     }}
-                    onDelete={(node: any) => {
+                    onDelete={(node: ExpensesCategoryTreeNode) => {
                       const row = list.find(r => r.id === node.id)
                       if (row) handleDelete(row)
                     }}
-                    canHaveChildren={(node: any) => node.level < 4}
-                    getChildrenCount={(node: any) => list.filter(r => r.parent_id === node.id).length}
+                    canHaveChildren={(node: ExpensesCategoryTreeNode) => node.level < 4}
+                    getChildrenCount={(node: ExpensesCategoryTreeNode) => list.filter(r => r.parent_id === node.id).length}
                     maxLevel={4}
                   />
                 )}
