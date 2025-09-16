@@ -259,8 +259,8 @@ const WorkItemsPage: React.FC = () => {
         await reload(created.org_id, created.project_id)
       }
       setDialogOpen(false)
-    } catch (e: any) {
-      showToast(e.message || 'فشل الحفظ', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'فشل الحفظ', { severity: 'error' })
     }
   }
 
@@ -269,8 +269,8 @@ const WorkItemsPage: React.FC = () => {
       await toggleWorkItemActive(row.id, !row.is_active, row.org_id, row.project_id)
       showToast(row.is_active ? 'تم التعطيل' : 'تم التفعيل', { severity: 'success' })
       await reload(row.org_id, row.project_id)
-    } catch (e: any) {
-      showToast(e.message || 'فشل تغيير الحالة', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'فشل تغيير الحالة', { severity: 'error' })
     }
   }
 
@@ -348,7 +348,7 @@ const WorkItemsPage: React.FC = () => {
       const wb = XLSX.read(data, { type: 'array' })
       const wsName = wb.SheetNames.includes('WorkItems') ? 'WorkItems' : wb.SheetNames[0]
       const ws = wb.Sheets[wsName]
-      const rows = XLSX.utils.sheet_to_json<any>(ws, { defval: '' })
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
 
       if (!orgId) { showToast('اختر المؤسسة أولاً', { severity: 'warning' }); return }
 
@@ -867,7 +867,7 @@ const WorkItemsPage: React.FC = () => {
               showToast('تم النقل', { severity: 'success' })
               setMoveOpen(false)
               await reload(orgId, projectId || null)
-            } catch (e: any) { showToast(e.message || 'فشل النقل', { severity: 'error' }) }
+            } catch (e: unknown) { showToast((e as Error).message || 'فشل النقل', { severity: 'error' }) }
           }}>تطبيق النقل</button>
           <div className={styles.spacer}></div>
           <button className={styles.button} onClick={() => setMoveOpen(false)}>إلغاء</button>
@@ -904,7 +904,7 @@ const WorkItemsPage: React.FC = () => {
         </div>
         <div className={styles.controlsRow}>
           <label>سياسة التعارض</label>
-          <select className={styles.select} value={cloneConflictMode} onChange={(e) => { setCloneConflictMode(e.target.value as any); setClonePreview(null) }} disabled={cloneExecuting}>
+          <select className={styles.select} value={cloneConflictMode} onChange={(e) => { setCloneConflictMode(e.target.value as 'overwrite_all'|'fill_missing'|'skip_existing'); setClonePreview(null) }} disabled={cloneExecuting}>
             <option value="overwrite_all">استبدال الكل</option>
             <option value="fill_missing">إكمال الحقول الفارغة فقط</option>
             <option value="skip_existing">تخطي العناصر الموجودة</option>
@@ -950,7 +950,7 @@ const WorkItemsPage: React.FC = () => {
                     const fields: string[] = []
                     if (!existing.name || existing.name.trim() === '') fields.push('name')
                     if (!existing.name_ar || existing.name_ar.trim() === '') fields.push('name_ar')
-                    if (!(existing as any).unit_of_measure || String((existing as any).unit_of_measure || '').trim() === '') fields.push('unit_of_measure')
+                    if (!(existing as WorkItemRow & { unit_of_measure?: string }).unit_of_measure || String((existing as WorkItemRow & { unit_of_measure?: string }).unit_of_measure || '').trim() === '') fields.push('unit_of_measure')
                     if (!existing.description || existing.description.trim() === '') fields.push('description')
                     if (fields.length > 0) toUpdate.push({ code: src.code, fields })
                     else toSkip.push(src.code)
@@ -969,8 +969,8 @@ const WorkItemsPage: React.FC = () => {
               }
 
               setClonePreview({ create: toCreate, update: toUpdate, skip: toSkip, parents: Array.from(parentsSet).filter(p => !toCreate.includes(p) && !toUpdate.some(u => u.code===p) && !toSkip.includes(p)).sort((a,b)=>a.length-b.length) })
-            } catch (e: any) {
-              showToast(e.message || 'فشل المعاينة', { severity: 'error' })
+            } catch (e: unknown) {
+              showToast((e as Error).message || 'فشل المعاينة', { severity: 'error' })
             }
           }}>معاينة</button>
           <div className={styles.spacer}></div>
@@ -1010,11 +1010,11 @@ const WorkItemsPage: React.FC = () => {
                     name: src.name,
                     name_ar: src.name_ar || null,
                     description: src.description || null,
-                    unit_of_measure: (src as any).unit_of_measure || null,
+                    unit_of_measure: (src as WorkItemRow & { unit_of_measure?: string }).unit_of_measure || null,
                     is_active: src.is_active,
                   })
                   scopeMap.set(src.code, created.id)
-                  targetByCode.set(src.code, created as any)
+                  targetByCode.set(src.code, created)
                   return 'created' as const
                 }
                 // Existing override - apply according to policy
@@ -1022,10 +1022,10 @@ const WorkItemsPage: React.FC = () => {
                   return 'skipped' as const
                 }
                 if (cloneConflictMode === 'fill_missing') {
-                  const upd: any = {}
+                  const upd: Partial<{ name: string; name_ar: string | null; unit_of_measure: string | null; description: string | null }> = {}
                   if (!existing.name || existing.name.trim() === '') upd.name = src.name
                   if (!existing.name_ar || existing.name_ar.trim() === '') upd.name_ar = src.name_ar || null
-                  if (!(existing as any).unit_of_measure || String((existing as any).unit_of_measure || '').trim() === '') upd.unit_of_measure = (src as any).unit_of_measure || null
+                  if (!(existing as WorkItemRow & { unit_of_measure?: string }).unit_of_measure || String((existing as WorkItemRow & { unit_of_measure?: string }).unit_of_measure || '').trim() === '') upd.unit_of_measure = (src as WorkItemRow & { unit_of_measure?: string }).unit_of_measure || null
                   if (!existing.description || existing.description.trim() === '') upd.description = src.description || null
                   // do not change is_active or parent_id in fill_missing mode
                   if (Object.keys(upd).length === 0) return 'skipped' as const
@@ -1036,7 +1036,7 @@ const WorkItemsPage: React.FC = () => {
                 await updateWorkItem(existing.id, {
                   name: src.name,
                   name_ar: src.name_ar || null,
-                  unit_of_measure: (src as any).unit_of_measure || null,
+                  unit_of_measure: (src as WorkItemRow & { unit_of_measure?: string }).unit_of_measure || null,
                   description: src.description || null,
                   is_active: src.is_active,
                   parent_id: parentId || null,
@@ -1082,8 +1082,8 @@ const WorkItemsPage: React.FC = () => {
               setCloneOpen(false)
               setClonePreview(null)
               await reload(orgId, projectId || null)
-            } catch (e: any) {
-              showToast(e.message || 'فشل النسخ', { severity: 'error' })
+            } catch (e: unknown) {
+              showToast((e as Error).message || 'فشل النسخ', { severity: 'error' })
             } finally {
               setCloneExecuting(false)
             }
@@ -1123,7 +1123,7 @@ const WorkItemsPage: React.FC = () => {
         </div>
         <div className={styles.controlsRow}>
           <label>سياسة التعارض</label>
-          <select className={styles.select} value={bulkCloneConflictMode} onChange={(e) => { setBulkCloneConflictMode(e.target.value as any); setBulkClonePreview(null) }} disabled={bulkCloneExecuting}>
+          <select className={styles.select} value={bulkCloneConflictMode} onChange={(e) => { setBulkCloneConflictMode(e.target.value as 'overwrite_all'|'fill_missing'|'skip_existing'); setBulkClonePreview(null) }} disabled={bulkCloneExecuting}>
             <option value="overwrite_all">استبدال الكل</option>
             <option value="fill_missing">إكمال الحقول الفارغة فقط</option>
             <option value="skip_existing">تخطي العناصر الموجودة</option>
@@ -1186,7 +1186,7 @@ const WorkItemsPage: React.FC = () => {
                     const fields: string[] = []
                     if (!existing.name || existing.name.trim() === '') fields.push('name')
                     if (!existing.name_ar || existing.name_ar.trim() === '') fields.push('name_ar')
-                    if (!(existing as any).unit_of_measure || String((existing as any).unit_of_measure || '').trim() === '') fields.push('unit_of_measure')
+                    if (!(existing as WorkItemRow & { unit_of_measure?: string }).unit_of_measure || String((existing as WorkItemRow & { unit_of_measure?: string }).unit_of_measure || '').trim() === '') fields.push('unit_of_measure')
                     if (!existing.description || existing.description.trim() === '') fields.push('description')
                     if (fields.length > 0) toUpdate.push({ code: src.code, fields })
                     else toSkip.push(src.code)
@@ -1207,8 +1207,8 @@ const WorkItemsPage: React.FC = () => {
               }
 
               setBulkClonePreview({ create: toCreate, update: toUpdate, skip: toSkip, parents: Array.from(parentsSet).sort((a,b)=>a.length-b.length), ignored })
-            } catch (e: any) {
-              showToast(e.message || 'فشل المعاينة', { severity: 'error' })
+            } catch (e: unknown) {
+              showToast((e as Error).message || 'فشل المعاينة', { severity: 'error' })
             }
           }}>معاينة</button>
           <div className={styles.spacer}></div>
@@ -1285,21 +1285,21 @@ const WorkItemsPage: React.FC = () => {
                     name: src.name,
                     name_ar: src.name_ar || null,
                     description: src.description || null,
-                    unit_of_measure: (src as any).unit_of_measure || null,
+                    unit_of_measure: (src as WorkItemRow & { unit_of_measure?: string }).unit_of_measure || null,
                     is_active: src.is_active,
                   })
                   scopeMap.set(src.code, created.id)
-                  targetByCode.set(src.code, created as any)
+                  targetByCode.set(src.code, created)
                   return 'created' as const
                 }
                 if (bulkCloneConflictMode === 'skip_existing') {
                   return 'skipped' as const
                 }
                 if (bulkCloneConflictMode === 'fill_missing') {
-                  const upd: any = {}
+                  const upd: Partial<{ name: string; name_ar: string | null; unit_of_measure: string | null; description: string | null }> = {}
                   if (!existing.name || existing.name.trim() === '') upd.name = src.name
                   if (!existing.name_ar || existing.name_ar.trim() === '') upd.name_ar = src.name_ar || null
-                  if (!(existing as any).unit_of_measure || String((existing as any).unit_of_measure || '').trim() === '') upd.unit_of_measure = (src as any).unit_of_measure || null
+                  if (!(existing as WorkItemRow & { unit_of_measure?: string }).unit_of_measure || String((existing as WorkItemRow & { unit_of_measure?: string }).unit_of_measure || '').trim() === '') upd.unit_of_measure = (src as WorkItemRow & { unit_of_measure?: string }).unit_of_measure || null
                   if (!existing.description || existing.description.trim() === '') upd.description = src.description || null
                   if (Object.keys(upd).length === 0) return 'skipped' as const
                   await updateWorkItem(existing.id, upd)
@@ -1308,7 +1308,7 @@ const WorkItemsPage: React.FC = () => {
                 await updateWorkItem(existing.id, {
                   name: src.name,
                   name_ar: src.name_ar || null,
-                  unit_of_measure: (src as any).unit_of_measure || null,
+                  unit_of_measure: (src as WorkItemRow & { unit_of_measure?: string }).unit_of_measure || null,
                   description: src.description || null,
                   is_active: src.is_active,
                   parent_id: parentId || null,
@@ -1339,8 +1339,8 @@ const WorkItemsPage: React.FC = () => {
               setBulkCloneOpen(false)
               setBulkClonePreview(null)
               await reload(orgId, projectId || null)
-            } catch (e: any) {
-              showToast(e.message || 'فشل النسخ', { severity: 'error' })
+            } catch (e: unknown) {
+              showToast((e as Error).message || 'فشل النسخ', { severity: 'error' })
             } finally {
               setBulkCloneExecuting(false)
             }
