@@ -172,8 +172,8 @@ const AnalysisWorkItemsPage: React.FC = () => {
       }
       setOpen(false)
       await reload()
-    } catch (e: any) {
-      showToast(e?.message || 'Save failed', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error)?.message || 'Save failed', { severity: 'error' })
     }
   }
 
@@ -182,7 +182,7 @@ const AnalysisWorkItemsPage: React.FC = () => {
       await toggleAnalysisWorkItemActive(row.id, !row.is_active)
       showToast(row.is_active ? 'Deactivated' : 'Activated', { severity: 'success' })
       await reload()
-    } catch (e: any) { showToast(e?.message || 'Toggle failed', { severity: 'error' }) }
+    } catch (e: unknown) { showToast((e as Error)?.message || 'Toggle failed', { severity: 'error' }) }
   }
 
   const handleDelete = async (row: AnalysisWorkItemFull) => {
@@ -192,8 +192,8 @@ const AnalysisWorkItemsPage: React.FC = () => {
       await deleteAnalysisWorkItem(row.id)
       showToast('Deleted', { severity: 'success' })
       await reload()
-    } catch (e: any) {
-      showToast(e?.message || 'Delete failed', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error)?.message || 'Delete failed', { severity: 'error' })
     }
   }
 
@@ -226,7 +226,17 @@ const AnalysisWorkItemsPage: React.FC = () => {
           </FormControl>
           <FormControl size="small">
             <InputLabel>Project (filter)</InputLabel>
-            <Select label="Project (filter)" value={projectId} onChange={async (e) => { const v = String(e.target.value); setProjectId(v); try { const { setActiveProjectId } = require('../../utils/org'); setActiveProjectId?.(v) } catch {}; await reload() }}>
+            <Select label="Project (filter)" value={projectId} onChange={(e) => {
+              const v = String(e.target.value)
+              setProjectId(v)
+              ;(async () => {
+                try {
+                  const { setActiveProjectId } = await import('../../utils/org')
+                  setActiveProjectId?.(v)
+                } catch {}
+                await reload()
+              })()
+            }}>
               <MenuItem value="">All Projects</MenuItem>
               {projects.map(p => (<MenuItem key={p.id} value={p.id}>{p.code} - {p.name}</MenuItem>))}
             </Select>

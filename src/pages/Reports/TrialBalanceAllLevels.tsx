@@ -106,7 +106,7 @@ export default function TrialBalanceAllLevels() {
       try { const projs = await fetchProjects(); setProjectOptions(projs || []) } catch { /* noop */ }
       // Default org selection: prefer stored, else first
       try {
-        const { getActiveOrgId } = require('../../utils/org');
+        const { getActiveOrgId } = await import('../../utils/org');
         const stored = getActiveOrgId?.();
         if (stored) setOrgId(stored);
         else if (orgOptions.length > 0) setOrgId(orgOptions[0].id);
@@ -735,7 +735,15 @@ export default function TrialBalanceAllLevels() {
       <div className={`${styles.professionalFilterBar} ${styles.noPrint}`}>
         {/* Left: org + project + dates */}
         <div className={styles.filterSection}>
-          <select className={styles.filterSelect} value={orgId} onChange={e => { setOrgId(e.target.value); try { const { setActiveOrgId } = require('../../utils/org'); setActiveOrgId?.(e.target.value) } catch {} }} aria-label={uiLang === 'ar' ? 'المؤسسة' : 'Organization'}>
+          <select className={styles.filterSelect} value={orgId} onChange={e => {
+            setOrgId(e.target.value)
+            ;(async () => {
+              try {
+                const { setActiveOrgId } = await import('../../utils/org');
+                setActiveOrgId?.(e.target.value)
+              } catch {}
+            })()
+          }} aria-label={uiLang === 'ar' ? 'المؤسسة' : 'Organization'}>
             <option value="">{uiLang === 'ar' ? 'اختر المؤسسة' : 'Select organization'}</option>
             {orgOptions.map(o => (
               <option key={o.id} value={o.id}>{o.code ? `${o.code} — ` : ''}{o.name_ar || o.name}</option>
