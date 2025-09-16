@@ -25,9 +25,9 @@ interface TransactionClassificationItem {
   updated_at: string;
 }
 
-function getInitialOrgId(): string | '' {
+async function getInitialOrgId(): Promise<string> {
   try {
-    const { getActiveOrgId } = require('../../utils/org');
+    const { getActiveOrgId } = await import('../../utils/org');
     const v = getActiveOrgId?.();
     if (v && v.length > 0) return v;
   } catch {}
@@ -42,7 +42,7 @@ const TransactionClassificationPage: React.FC = () => {
 
   // Organizations selector
   const [organizations, setOrganizations] = useState<{ id: string; code: string; name: string }[]>([]);
-  const [orgId, setOrgId] = useState<string>(getInitialOrgId());
+  const [orgId, setOrgId] = useState<string>('');
 
   // Edit/Add dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -130,7 +130,7 @@ const TransactionClassificationPage: React.FC = () => {
           post_to_costs: Boolean(draft.post_to_costs || false),
         }
       : undefined;
-    return createTransactionClassificationFormConfig(dialogMode === 'edit', existing as any);
+    return createTransactionClassificationFormConfig(dialogMode === 'edit', existing);
   }, [dialogMode, draft]);
 
   const { showToast } = useToast();
@@ -141,10 +141,16 @@ const TransactionClassificationPage: React.FC = () => {
       try {
         const orgs = await getOrganizations();
         setOrganizations(orgs.map(o => ({ id: o.id, code: o.code, name: o.name })));
-        if (!getInitialOrgId() && orgs.length > 0) {
+        const initialOrgId = await getInitialOrgId();
+        if (!orgId && !initialOrgId && orgs.length > 0) {
           const first = orgs[0].id;
           setOrgId(first);
-          try { const { setActiveOrgId } = require('../../utils/org'); setActiveOrgId?.(first); } catch {}
+          try {
+            const { setActiveOrgId } = await import('../../utils/org');
+            setActiveOrgId?.(first);
+          } catch {}
+        } else if (initialOrgId && initialOrgId !== orgId) {
+          setOrgId(initialOrgId);
         }
       } catch {}
     })();
@@ -290,7 +296,7 @@ const TransactionClassificationPage: React.FC = () => {
             <span className="icon">🔍</span>
           </div>
 
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="filter-select">
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'code' | 'name')} className="filter-select">
             <option value="code">ترتيب حسب الكود</option>
             <option value="name">ترتيب حسب الاسم</option>
           </select>
@@ -298,9 +304,14 @@ const TransactionClassificationPage: React.FC = () => {
 
         <div className="view-mode-toggle">
           {/* Organization selector */}
-          <select value={orgId} onChange={(e) => { 
-            setOrgId(e.target.value); 
-            try { const { setActiveOrgId } = require('../../utils/org'); setActiveOrgId?.(e.target.value); } catch {} 
+          <select value={orgId} onChange={(e) => {
+            setOrgId(e.target.value);
+            (async () => {
+              try {
+                const { setActiveOrgId } = await import('../../utils/org');
+                setActiveOrgId?.(e.target.value);
+              } catch {}
+            })()
           }} className="filter-select">
             <option value="">اختر المؤسسة</option>
             {organizations.map(o => (
@@ -450,8 +461,8 @@ const TransactionClassificationPage: React.FC = () => {
                     showToast('تم إضافة تصنيف المعاملة', { severity: 'success' });
                   }
                   setDialogOpen(false);
-                } catch (error: any) {
-                  const msg = error?.message || '';
+                } catch (error: unknown) {
+                  const msg = (error as Error)?.message || '';
                   console.error('Save failed:', error);
                   showToast(`فشل حفظ التغييرات${msg ? `: ${msg}` : ''}`, { severity: 'error' });
                   throw error;

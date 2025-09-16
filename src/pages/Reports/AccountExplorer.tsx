@@ -148,7 +148,11 @@ const AccountExplorerReport: React.FC = () => {
     (async () => {
       try { const orgs = await fetchOrganizations(); setOrgOptions(orgs || []) } catch {}
       try { const projs = await fetchProjects(); setProjectOptions(projs || []) } catch {}
-      try { const { getActiveOrgId } = require('../../utils/org'); const stored = getActiveOrgId?.(); if (stored) setOrgId(stored) } catch {}
+      try {
+        const { getActiveOrgId } = await import('../../utils/org')
+        const stored = getActiveOrgId?.()
+        if (stored) setOrgId(stored)
+      } catch {}
       try { const cfg = await getCompanyConfig(); setCurrencySymbol(cfg.currency_symbol || cfg.currency_code || 'EGP'); setCompanyName(cfg?.company_name || '') } catch {}
     })()
   }, [])
@@ -169,8 +173,8 @@ const AccountExplorerReport: React.FC = () => {
           setClassifications(classes || [])
           setExpensesCategories(cats || [])
           setWorkItems(wItems || [])
-          setCostCenters((ccs || []).map((c: any) => ({ id: c.id, code: c.code, name: c.name })))
-          const accOpts: SearchableSelectOption[] = (accs || []).map((a: any) => ({ value: a.id, label: `${a.code} - ${a.name}`, searchText: `${a.code} ${a.name}` }))
+          setCostCenters((ccs || []).map((c: { id: string; code: string; name: string }) => ({ id: c.id, code: c.code, name: c.name })))
+          const accOpts: SearchableSelectOption[] = (accs || []).map((a: { id: string; code: string; name: string }) => ({ value: a.id, label: `${a.code} - ${a.name}`, searchText: `${a.code} ${a.name}` }))
           setAccountsOptions([{ value: '', label: uiLang === 'ar' ? 'كل الحسابات' : 'All Accounts', searchText: '' }, ...accOpts])
         }
       } catch { /* noop */ }
@@ -190,7 +194,17 @@ const AccountExplorerReport: React.FC = () => {
       if (orgIdRef.current) accQ = accQ.eq('org_id', orgIdRef.current)
       const accRes = await accQ
       if (accRes.error) throw accRes.error
-      const accounts = (accRes.data || []) as any[]
+      const accounts = (accRes.data || []) as Array<{
+        id: string
+        code: string
+        name: string
+        name_ar?: string
+        level: number
+        parent_id?: string
+        status: string
+        category?: string
+        org_id: string
+      }>
 
       // 2) Fetch GL summary for current filters
       const { data: summaryData, error: sumErr } = await supabase.rpc('get_gl_account_summary', {
@@ -211,7 +225,15 @@ const AccountExplorerReport: React.FC = () => {
         p_amount_max: amountMax ? Number(amountMax) : null,
       })
       if (sumErr) throw sumErr
-      const summaryRows = (summaryData || []) as any[]
+      const summaryRows = (summaryData || []) as Array<{
+        account_id: string
+        opening_debit?: number
+        opening_credit?: number
+        period_debits?: number
+        period_credits?: number
+        closing_debit?: number
+        closing_credit?: number
+      }>
       const amountsById = new Map<string, Amounts>()
       for (const r of summaryRows) {
         amountsById.set(r.account_id, {
@@ -906,7 +928,15 @@ const AccountExplorerReport: React.FC = () => {
       <div className={`${styles.professionalFilterBar} ${styles.noPrint}`}>
         {/* Left: org + project + dates */}
         <div className={styles.filterSection}>
-          <select className={styles.filterSelect} value={orgId} onChange={e => { setOrgId(e.target.value); try { const { setActiveOrgId } = require('../../utils/org'); setActiveOrgId?.(e.target.value) } catch {} }} aria-label={uiLang === 'ar' ? 'المؤسسة' : 'Organization'}>
+          <select className={styles.filterSelect} value={orgId} onChange={e => {
+            setOrgId(e.target.value)
+            ;(async () => {
+              try {
+                const { setActiveOrgId } = await import('../../utils/org')
+                setActiveOrgId?.(e.target.value)
+              } catch {}
+            })()
+          }} aria-label={uiLang === 'ar' ? 'المؤسسة' : 'Organization'}>
             <option value="">{uiLang === 'ar' ? 'اختر المؤسسة' : 'Select organization'}</option>
             {orgOptions.map(o => (
               <option key={o.id} value={o.id}>{o.code ? `${o.code} — ` : ''}{o.name_ar || o.name}</option>
