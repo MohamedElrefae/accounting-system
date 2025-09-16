@@ -18,8 +18,8 @@ import { supabase } from '../../utils/supabase';
 interface TestResult {
   name: string;
   status: 'pending' | 'running' | 'success' | 'error';
-  data?: any;
-  error?: any;
+  data?: unknown;
+  error?: string;
 }
 
 export function DatabaseDiagnostics() {
@@ -47,11 +47,11 @@ export function DatabaseDiagnostics() {
         error: !user ? 'No authenticated user found' : null
       };
       setTests([...results]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       results[0] = {
         name: 'Authentication Check',
         status: 'error',
-        error: err.message
+        error: (err as Error).message
       };
       setTests([...results]);
       setRunning(false);
@@ -88,11 +88,11 @@ export function DatabaseDiagnostics() {
         } : null
       };
       setTests([...results]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       results[1] = {
         name: 'User Profile Check',
         status: 'error',
-        error: err.message
+        error: (err as Error).message
       };
       setTests([...results]);
     }
@@ -114,11 +114,11 @@ export function DatabaseDiagnostics() {
         data: { total_users: count }
       };
       setTests([...results]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       results[2] = {
         name: 'Count User Profiles',
         status: 'error',
-        error: err.message
+        error: (err as Error).message
       };
       setTests([...results]);
     }
@@ -145,11 +145,11 @@ export function DatabaseDiagnostics() {
         }
       };
       setTests([...results]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       results[3] = {
         name: 'Fetch User Profiles (first 5)',
         status: 'error',
-        error: err.message
+        error: (err as Error).message
       };
       setTests([...results]);
     }
@@ -175,11 +175,11 @@ export function DatabaseDiagnostics() {
         }
       };
       setTests([...results]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       results[4] = {
         name: 'Fetch Roles',
         status: 'error',
-        error: err.message
+        error: (err as Error).message
       };
       setTests([...results]);
     }
@@ -205,11 +205,11 @@ export function DatabaseDiagnostics() {
         }
       };
       setTests([...results]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       results[5] = {
         name: 'Fetch User Roles',
         status: 'error',
-        error: err.message
+        error: (err as Error).message
       };
       setTests([...results]);
     }
@@ -230,11 +230,11 @@ export function DatabaseDiagnostics() {
         data: { is_super_admin: data }
       };
       setTests([...results]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       results[6] = {
         name: 'Test is_super_admin() Function',
         status: 'error',
-        error: err.message
+        error: (err as Error).message
       };
       setTests([...results]);
     }
@@ -332,9 +332,9 @@ export function DatabaseDiagnostics() {
                 setAuditStatus('success');
                 setAuditMessage(typeof data === 'object' ? JSON.stringify(data) : String(data));
               }
-            } catch (e: any) {
+            } catch (e: unknown) {
               setAuditStatus('error');
-              setAuditMessage(e?.message || String(e));
+              setAuditMessage((e as Error)?.message || String(e));
             }
           }}
         >
@@ -369,7 +369,7 @@ export function DatabaseDiagnostics() {
                 <Chip
                   label={test.status}
                   size="small"
-                  color={getStatusColor(test.status) as any}
+                  color={getStatusColor(test.status) as 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning'}
                 />
               </Stack>
 
