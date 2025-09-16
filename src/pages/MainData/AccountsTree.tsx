@@ -34,15 +34,15 @@ interface AncestorItem {
   path_text: string;
 }
 
-function getInitialOrgId(): string | '' {
+async function getInitialOrgId(): Promise<string> {
   try {
     // Centralized helper
     // Using dynamic import to avoid SSR issues or test environments
-    const { getActiveOrgId } = require('../../utils/org');
-    const v = getActiveOrgId?.();
-    if (v && v.length > 0) return v;
+    const { getActiveOrgId } = await import('../../utils/org')
+    const v = getActiveOrgId?.()
+    if (v && v.length > 0) return v
   } catch {}
-  return '';
+  return ''
 }
 
 // Enum mapping functions to convert frontend values to database enum types
@@ -77,7 +77,7 @@ const AccountsTreePage: React.FC = () => {
 
   // Organizations selector
   const [organizations, setOrganizations] = useState<{ id: string; code: string; name: string }[]>([]);
-  const [orgId, setOrgId] = useState<string>(getInitialOrgId());
+  const [orgId, setOrgId] = useState<string>('');
 
   // Edit/Add dialog state (must be before unifiedConfig)
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -182,12 +182,12 @@ const AccountsTreePage: React.FC = () => {
           statement_type: '',
           parent_id: (draft.parent_id as string) || null,
           is_active: (draft.status || 'active') === 'active',
-          allow_transactions: (typeof (draft as any).allow_transactions === 'boolean')
-            ? (draft as any).allow_transactions
+          allow_transactions: (typeof (draft as AccountItem & { allow_transactions?: boolean }).allow_transactions === 'boolean')
+            ? (draft as AccountItem & { allow_transactions?: boolean }).allow_transactions
             : (((draft.level as number) || 1) >= 3),
         }
       : undefined;
-    return createAccountFormConfig(dialogMode === 'edit', parentAccountsLite, existing as any, true, !!hasAccountsUpdate);
+    return createAccountFormConfig(dialogMode === 'edit', parentAccountsLite, existing as unknown, true, !!hasAccountsUpdate);
   }, [dialogMode, draft, parentAccountsLite, hasAccountsUpdate]);
 
   const { showToast } = useToast();
@@ -214,7 +214,7 @@ const AccountsTreePage: React.FC = () => {
             p_account_id: id,
           });
           if (!error && Array.isArray(data) && data.length > 0) {
-            const row = data[0] as any;
+            const row = data[0] as { has_transactions?: boolean; is_standard?: boolean };
             return [id, { has_transactions: !!row.has_transactions, is_standard: !!row.is_standard }] as const;
           }
         } catch {}
@@ -229,7 +229,7 @@ const AccountsTreePage: React.FC = () => {
     if (Object.keys(updates).length) {
       setDeleteFlags(prev => ({ ...prev, ...updates }));
       // Also merge onto accounts so UI logic sees them immediately
-      setAccounts(prev => prev.map(a => updates[a.id] ? { ...(a as any), ...updates[a.id] } : a));
+      setAccounts(prev => prev.map(a => updates[a.id] ? { ...a, ...updates[a.id] } : a));
     }
   }
 
@@ -239,10 +239,16 @@ const AccountsTreePage: React.FC = () => {
       try {
         const orgs = await getOrganizations();
         setOrganizations(orgs.map(o => ({ id: o.id, code: o.code, name: o.name })));
-        if (!getInitialOrgId() && orgs.length > 0) {
+        const initialOrgId = await getInitialOrgId();
+        if (!orgId && !initialOrgId && orgs.length > 0) {
           const first = orgs[0].id;
           setOrgId(first);
-          try { const { setActiveOrgId } = require('../../utils/org'); setActiveOrgId?.(first); } catch {}
+          try {
+            const { setActiveOrgId } = await import('../../utils/org');
+            setActiveOrgId?.(first);
+          } catch {}
+        } else if (initialOrgId && initialOrgId !== orgId) {
+          setOrgId(initialOrgId);
         }
       } catch {}
     })();
@@ -310,7 +316,7 @@ const AccountsTreePage: React.FC = () => {
     return mapped;
   }
 
-  function mapRow(row: any): AccountItem {
+  function mapRow(row: Record<string, unknown>): AccountItem {
     return {
       id: row.id,
       code: row.code,
@@ -319,10 +325,10 @@ const AccountsTreePage: React.FC = () => {
       level: row.level,
       status: row.status,
       parent_id: row.parent_id,
-      account_type: row.category || undefined,
-      has_children: row.has_children,
-      has_active_children: row.has_active_children,
-    } as any;
+      account_type: (row.category as string) || undefined,
+      has_children: Boolean(row.has_children),
+      has_active_children: Boolean(row.has_active_children),
+    };
   }
 
 
@@ -785,7 +791,7 @@ const AccountsTreePage: React.FC = () => {
             <option value="4">المستوى 4</option>
           </select>
 
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="filter-select">
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'code' | 'name' | 'level')} className="filter-select">
             <option value="code">ترتيب حسب الكود</option>
             <option value="name">ترتيب حسب الاسم</option>
             <option value="level">ترتيب حسب المستوى</option>
@@ -800,7 +806,7 @@ const AccountsTreePage: React.FC = () => {
           </select>
 
           {/* Balance Mode (reserved for future RPC usage) */}
-          <select value={balanceMode} onChange={(e) => setBalanceMode(e.target.value as any)} className="filter-select">
+          <select value={balanceMode} onChange={(e) => setBalanceMode(e.target.value as 'posted' | 'all')} className="filter-select">
             <option value="posted">المنشورة فقط</option>
             <option value="all">جميع العمليات</option>
           </select>
@@ -808,7 +814,15 @@ const AccountsTreePage: React.FC = () => {
 
         <div className="view-mode-toggle">
           {/* Organization selector */}
-          <select value={orgId} onChange={(e) => { setOrgId(e.target.value); try { const { setActiveOrgId } = require('../../utils/org'); setActiveOrgId?.(e.target.value); } catch {} }} className="filter-select">
+          <select value={orgId} onChange={(e) => {
+            setOrgId(e.target.value);
+            (async () => {
+              try {
+                const { setActiveOrgId } = await import('../../utils/org');
+                setActiveOrgId?.(e.target.value);
+              } catch {}
+            })()
+          }} className="filter-select">
             <option value="">اختر المؤسسة</option>
             {organizations.map(o => (
               <option key={o.id} value={o.id}>{o.code} - {o.name}</option>
@@ -825,42 +839,42 @@ const AccountsTreePage: React.FC = () => {
             data={filteredAndSorted.map(n => ({
               ...n,
               // TreeView expects name_ar field; ensure it exists
-              name_ar: (n as any).name_ar || n.name,
+              name_ar: n.name_ar || n.name,
               is_active: n.status === 'active',
-            })) as any}
-            onEdit={(node) => handleEdit(node as any)}
-            onAdd={(parent) => handleAdd(parent as any)}
-            onToggleStatus={(node) => handleToggleStatus(node as any)}
-            onDelete={(node) => handleDelete(node as any)}
-            onSelect={(node) => handleSelectAccount(node as any)}
-            onToggleExpand={async (node) => { toggleNode(node as any); }}
+            })}
+            onEdit={(node) => handleEdit(node as AccountItem)}
+            onAdd={(parent) => handleAdd(parent as AccountItem)}
+            onToggleStatus={(node) => handleToggleStatus(node as AccountItem)}
+            onDelete={(node) => handleDelete(node as AccountItem)}
+            onSelect={(node) => handleSelectAccount(node as AccountItem)}
+            onToggleExpand={async (node) => { toggleNode(node as AccountItem); }}
             canHaveChildren={(node) => {
-              const id = (node as any).id as string;
+              const id = (node as AccountItem).id;
               const item = accounts.find(a => a.id === id);
               if (!item) return false;
               return !!(item.has_active_children || item.has_children);
             }}
-            getChildrenCount={(node) => accounts.filter(a => a.parent_id === (node as any).id).length}
+            getChildrenCount={(node) => accounts.filter(a => a.parent_id === (node as AccountItem).id).length}
             isDeleteDisabled={(node) => {
-              const id = (node as any).id as string;
+              const id = (node as AccountItem).id;
               const item = accounts.find(a => a.id === id);
               if (!item) return true;
               // Disable if parent (has children) – immediate and cheap
               if (item.has_children || item.has_active_children) return true;
-              // Optional: disable if we already know it has transactions or is standard (cached on item via any extensions)
-              const anyFlags = (item as any);
-              if (anyFlags?.has_transactions === true) return true;
-              if (anyFlags?.is_standard === true) return true;
+              // Optional: disable if we already know it has transactions or is standard (cached on item via extensions)
+              const extendedItem = item as AccountItem & { has_transactions?: boolean; is_standard?: boolean };
+              if (extendedItem?.has_transactions === true) return true;
+              if (extendedItem?.is_standard === true) return true;
               return false;
             }}
             getDeleteDisabledReason={(node) => {
-              const id = (node as any).id as string;
+              const id = (node as AccountItem).id;
               const item = accounts.find(a => a.id === id);
               if (!item) return 'غير متاح';
               if (item.has_children || item.has_active_children) return 'لا يمكن حذف حساب له فروع';
-              const anyFlags = (item as any);
-              if (anyFlags?.is_standard) return 'حساب قياسي (افتراضي) لا يمكن حذفه';
-              if (anyFlags?.has_transactions) return 'لا يمكن حذف حساب لديه حركات';
+              const extendedItem = item as AccountItem & { has_transactions?: boolean; is_standard?: boolean };
+              if (extendedItem?.is_standard) return 'حساب قياسي (افتراضي) لا يمكن حذفه';
+              if (extendedItem?.has_transactions) return 'لا يمكن حذف حساب لديه حركات';
               return 'حذف';
             }}
             maxLevel={4}
@@ -912,13 +926,13 @@ const AccountsTreePage: React.FC = () => {
                             <div className="btn-content"><span className="btn-text">{isActive ? 'تعطيل' : 'تفعيل'}</span></div>
                           </button>
                           {(() => {
-                            const anyFlags = (item as any);
-                            const disabled = !!(item.has_children || item.has_active_children || anyFlags?.has_transactions || anyFlags?.is_standard);
+                            const extendedItem = item as AccountItem & { has_transactions?: boolean; is_standard?: boolean };
+                            const disabled = !!(item.has_children || item.has_active_children || extendedItem?.has_transactions || extendedItem?.is_standard);
                             const reason = item.has_children || item.has_active_children
                               ? 'لا يمكن حذف حساب له فروع'
-                              : anyFlags?.is_standard
+                              : extendedItem?.is_standard
                                 ? 'حساب قياسي (افتراضي) لا يمكن حذفه'
-                                : anyFlags?.has_transactions
+                                : extendedItem?.has_transactions
                                   ? 'لا يمكن حذف حساب لديه حركات'
                                   : 'حذف';
                             return (
