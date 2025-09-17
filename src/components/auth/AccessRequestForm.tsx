@@ -28,7 +28,7 @@ const accessRequestSchema = yup.object({
     .min(2, 'يجب أن يكون الاسم أكثر من حرفين'),
   phone: yup
     .string()
-    .matches(/^[\+]?[0-9\s\-\(\)]{10,}$/, 'رقم الهاتف غير صحيح')
+    .matches(/^[+]?[0-9\s\-()]{10,}$/, 'رقم الهاتف غير صحيح')
     .required('رقم الهاتف مطلوب'),
   department: yup.string().required('القسم مطلوب'),
   job_title: yup.string().required('المسمى الوظيفي مطلوب'),
@@ -69,7 +69,7 @@ export const AccessRequestForm: React.FC<AccessRequestFormProps> = ({ onBack }) 
   const [submitted, setSubmitted] = useState(false);
   const [submittedEmail, setSubmittedEmail] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
-  const { theme } = useAppStore();
+  const { theme: _theme } = useAppStore();
 
   const {
     register,

@@ -60,7 +60,7 @@ export async function listWorkItemsAll(orgId: string, includeInactive = true): P
     const rows = (data as WorkItemRow[]) || []
     cache.byOrgAll.set(orgId, rows)
     return rows
-  } catch (err: any) {
+  } catch {
     // Fallback if view doesn't exist: query base table
     let q = supabase.from('work_items').select('*').eq('org_id', orgId)
     if (!includeInactive) q = q.eq('is_active', true)
@@ -87,7 +87,7 @@ export async function listCatalog(orgId: string, includeInactive = true): Promis
     const rows = (data as WorkItemRow[]) || []
     cache.byOrgCatalog.set(orgId, rows)
     return rows
-  } catch (err: any) {
+  } catch {
     let q = supabase.from('work_items').select('*').eq('org_id', orgId).is('project_id', null)
     if (!includeInactive) q = q.eq('is_active', true)
     const { data, error } = await q.order('code', { ascending: true })
@@ -110,7 +110,7 @@ export async function listProjectOverrides(orgId: string, projectId: string, inc
     pmap.set(projectId, rows)
     cache.byOrgProject.set(orgId, pmap)
     return rows
-  } catch (err: any) {
+  } catch {
     let q = supabase.from('work_items').select('*').eq('org_id', orgId).eq('project_id', projectId)
     if (!includeInactive) q = q.eq('is_active', true)
     const { data, error } = await q.order('code', { ascending: true })

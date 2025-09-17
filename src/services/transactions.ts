@@ -38,7 +38,7 @@ export interface TransactionRecord {
   amount: number
   notes: string | null
   classification_id?: string | null
-  expenses_category_id?: string | null
+  sub_tree_id?: string | null
   work_item_id?: string | null
   cost_center_id?: string | null
   is_posted: boolean
@@ -57,6 +57,15 @@ export interface TransactionRecord {
   review_reason?: string | null
   created_at: string
   updated_at: string
+}
+
+/** Cancel a pending submission before any reviewer action. */
+export async function cancelSubmission(transactionId: string, reason?: string): Promise<void> {
+  const { error } = await supabase.rpc('cancel_transaction_submission', {
+    p_transaction_id: transactionId,
+    p_reason: reason ?? null,
+  } as any)
+  if (error) throw error
 }
 
 export interface TransactionAudit {
@@ -228,6 +237,7 @@ export interface ListTransactionsFilters {
   workItemId?: string
   analysisWorkItemId?: string
   costCenterId?: string
+  approvalStatus?: 'draft' | 'submitted' | 'revision_requested' | 'approved' | 'rejected' | 'cancelled' | 'posted'
 }
 
 export interface ListTransactionsOptions {
@@ -292,10 +302,17 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
     if (f.projectId) query = query.eq('project_id', f.projectId)
     if (f.orgId) query = query.eq('org_id', f.orgId)
     if (f.classificationId) query = query.eq('classification_id', f.classificationId)
-    if (f.expensesCategoryId) query = query.eq('expenses_category_id', f.expensesCategoryId)
+    if (f.expensesCategoryId) query = query.eq('sub_tree_id', f.expensesCategoryId)
     if (f.workItemId) query = query.eq('work_item_id', f.workItemId)
     if (f.analysisWorkItemId) query = query.eq('analysis_work_item_id', f.analysisWorkItemId)
     if (f.costCenterId) query = query.eq('cost_center_id', f.costCenterId)
+
+    // New: approval status filter, including "posted"
+    if (f.approvalStatus === 'posted') {
+      query = query.eq('is_posted', true)
+    } else if (f.approvalStatus) {
+      query = query.eq('approval_status', f.approvalStatus)
+    }
   }
 
   const { data, error, count } = await query.range(from, to)
@@ -323,7 +340,7 @@ export interface CreateTransactionInput {
   amount: number
   notes?: string
   classification_id?: string
-  expenses_category_id?: string
+  sub_tree_id?: string
   work_item_id?: string
   analysis_work_item_id?: string
   cost_center_id?: string
@@ -367,7 +384,7 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
     amount: input.amount,
     notes: input.notes || null,
     classification_id: input.classification_id || null,
-    expenses_category_id: input.expenses_category_id || null,
+    sub_tree_id: input.sub_tree_id || null,
     work_item_id: input.work_item_id || null,
     analysis_work_item_id: input.analysis_work_item_id || null,
     cost_center_id: input.cost_center_id || null,
@@ -426,7 +443,7 @@ export async function updateTransaction(
     'amount',
     'notes',
     'classification_id',
-    'expenses_category_id',
+    'sub_tree_id',
     'work_item_id',
     'analysis_work_item_id',
     'cost_center_id',

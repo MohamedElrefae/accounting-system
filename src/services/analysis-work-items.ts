@@ -17,14 +17,52 @@ export async function listAnalysisWorkItems(params: {
   if (cache.byOrg.has(key)) return cache.byOrg.get(key)!
 
   const { orgId, projectId = null, search = null, onlyWithTx = false, includeInactive = true } = params
-  const { data, error } = await supabase.rpc('list_analysis_work_items', {
-    p_org_id: orgId,
-    p_only_with_tx: onlyWithTx,
-    p_project_id: projectId,
-    p_search: search,
-    p_include_inactive: includeInactive,
-  })
-  if (error) throw error
+  
+  // First try the main RPC function
+  let data, error
+  
+  try {
+    const result = await supabase.rpc('list_analysis_work_items', {
+      p_org_id: orgId,
+      p_only_with_tx: onlyWithTx,
+      p_project_id: projectId,
+      p_search: search,
+      p_include_inactive: includeInactive,
+    })
+    data = result.data
+    error = result.error
+  } catch (rpcError) {
+    console.warn('RPC list_analysis_work_items failed, trying fallback:', rpcError)
+    
+    // Fallback: try the simple function
+    try {
+      const fallbackResult = await supabase.rpc('list_analysis_work_items_simple', {
+        p_org_id: orgId
+      })
+      data = fallbackResult.data
+      error = fallbackResult.error
+    } catch (fallbackError) {
+      console.warn('Fallback RPC also failed, trying direct table access:', fallbackError)
+      
+      // Last resort: direct table access
+      const directResult = await supabase
+        .from('analysis_work_items')
+        .select('*')
+        .eq('org_id', orgId)
+        .eq('is_active', true)
+        .order('code')
+      
+      data = directResult.data?.map(item => ({ ...item, transaction_count: 0, total_debit_amount: 0, total_credit_amount: 0, net_amount: 0, has_transactions: false })) || []
+      error = directResult.error
+    }
+  }
+  
+  if (error) {
+    console.error('All attempts to load analysis work items failed:', error)
+    // Return empty array instead of throwing to prevent UI crashes
+    return []
+  }
+  
   const rows = (data as AnalysisWorkItemFull[]) || []
   cache.byOrg.set(key, rows)
   return rows

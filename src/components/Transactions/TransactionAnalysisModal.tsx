@@ -51,8 +51,9 @@ const TransactionAnalysisModal: React.FC<Props> = ({ open, transactionId, onClos
           setRowsByCC(byCC || [])
           setRowsByCat(byCat || [])
         }
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || 'حدث خطأ أثناء تحميل التحليل')
+      } catch (e: unknown) {
+        const error = e as { message?: string };
+        if (!cancelled) setError(error?.message || 'حدث خطأ أثناء تحميل التحليل')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -62,7 +63,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({ open, transactionId, onClos
     const onKey = (ev: KeyboardEvent) => {
       if (!open) return
       if (ev.key === 'Escape') {
-        try { onClose() } catch {}
+        try { onClose() } catch { /* ignore close errors */ }
       }
     }
     window.addEventListener('keydown', onKey)
@@ -73,12 +74,12 @@ const TransactionAnalysisModal: React.FC<Props> = ({ open, transactionId, onClos
     return data ?? null
   }, [data])
 
-  if (!open) return null
-
-  // Totals for breakdowns
+  // Totals for breakdowns - must be called before any early returns
   const totalByItem = useMemo(() => rowsByItem.reduce((s, r) => s + (r?.amount || 0), 0), [rowsByItem])
   const totalByCC = useMemo(() => rowsByCC.reduce((s, r) => s + (r?.amount || 0), 0), [rowsByCC])
   const totalByCat = useMemo(() => rowsByCat.reduce((s, r) => s + (r?.amount || 0), 0), [rowsByCat])
+
+  if (!open) return null
 
   return (
     <div className="transaction-modal" role="dialog" aria-modal="true" dir="rtl" onClick={onClose}>
@@ -169,7 +170,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({ open, transactionId, onClos
                   { key: 'code', header: 'الكود', type: 'text' },
                   { key: 'name', header: 'اسم بند التحليل', type: 'text' },
                   { key: 'amount', header: 'المبلغ', type: 'currency' },
-                ] as any), rows: rowsByItem.map(r => ({ code: r.analysis_work_item_code, name: r.analysis_work_item_name, amount: r.amount })) }}
+                ]), rows: rowsByItem.map(r => ({ code: r.analysis_work_item_code, name: r.analysis_work_item_name, amount: r.amount })) }}
                 config={{ title: 'تحليل حسب بند التحليل', rtlLayout: true, useArabicNumerals: true }}
                 size="small"
                 layout="horizontal"
@@ -217,7 +218,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({ open, transactionId, onClos
                   { key: 'code', header: 'الكود', type: 'text' },
                   { key: 'name', header: 'اسم مركز التكلفة', type: 'text' },
                   { key: 'amount', header: 'المبلغ', type: 'currency' },
-                ] as any), rows: rowsByCC.map(r => ({ code: r.cost_center_code, name: r.cost_center_name, amount: r.amount })) }}
+                ]), rows: rowsByCC.map(r => ({ code: r.cost_center_code, name: r.cost_center_name, amount: r.amount })) }}
                 config={{ title: 'تحليل حسب مركز التكلفة', rtlLayout: true, useArabicNumerals: true }}
                 size="small"
                 layout="horizontal"
@@ -265,7 +266,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({ open, transactionId, onClos
                   { key: 'code', header: 'الكود', type: 'text' },
                   { key: 'name', header: 'فئة المصروف', type: 'text' },
                   { key: 'amount', header: 'المبلغ', type: 'currency' },
-                ] as any), rows: rowsByCat.map(r => ({ code: r.expenses_category_code, name: r.expenses_category_name, amount: r.amount })) }}
+                ]), rows: rowsByCat.map(r => ({ code: r.expenses_category_code, name: r.expenses_category_name, amount: r.amount })) }}
                 config={{ title: 'تحليل حسب فئة المصروف', rtlLayout: true, useArabicNumerals: true }}
                 size="small"
                 layout="horizontal"

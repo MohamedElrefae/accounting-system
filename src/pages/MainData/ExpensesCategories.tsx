@@ -11,8 +11,8 @@ import {
   deleteExpensesCategory,
   listAccountsForOrg,
   type AccountLite,
-} from '../../services/expenses-categories'
-import type { ExpensesCategoryTreeNode, ExpensesCategoryRow } from '../../types/expenses-categories'
+} from '../../services/sub-tree'
+import type { ExpensesCategoryTreeNode, ExpensesCategoryRow } from '../../types/sub-tree'
 import ExportButtons from '../../components/Common/ExportButtons'
 import TreeView from '../../components/TreeView/TreeView'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
@@ -53,10 +53,10 @@ async function getInitialOrgId(): Promise<string> {
 const ExpensesCategoriesPage: React.FC = () => {
   const { showToast } = useToast()
   const hasPermission = useHasPermission()
-  const canView = hasPermission('expenses_categories.view')
-  const canCreate = hasPermission('expenses_categories.create')
-  const canUpdate = hasPermission('expenses_categories.update')
-  const canDelete = hasPermission('expenses_categories.delete')
+  const canView = hasPermission('sub_tree.view')
+  const canCreate = hasPermission('sub_tree.create')
+  const canUpdate = hasPermission('sub_tree.update')
+  const canDelete = hasPermission('sub_tree.delete')
 
   const [tab, setTab] = useState(0)
   const [orgs, setOrgs] = useState<Organization[]>([])
@@ -166,9 +166,9 @@ const ExpensesCategoriesPage: React.FC = () => {
   }, [filteredList])
 
   // Fetch next code from server to ensure concurrency safety and numeric codes
-  const getNextCode = async (parentId?: string | null) => {
+const getNextCode = async (parentId?: string | null) => {
     if (!orgId) return ''
-    const { fetchNextExpensesCategoryCode } = await import('../../services/expenses-categories')
+    const { fetchNextExpensesCategoryCode } = await import('../../services/sub-tree')
     return fetchNextExpensesCategoryCode(orgId, parentId ?? null)
   }
 
@@ -274,7 +274,7 @@ const ExpensesCategoriesPage: React.FC = () => {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <Typography className={styles.title}>Expenses Categories / فئات المصروفات</Typography>
+        <Typography className={styles.title}>Sub Tree / الشجرة الفرعية</Typography>
         <div className={styles.toolbar}>
           <FormControl size="small">
             <InputLabel>Organization</InputLabel>
@@ -300,7 +300,7 @@ const ExpensesCategoriesPage: React.FC = () => {
           {canCreate && (
             <Button variant="contained" onClick={openCreate}>New / جديد</Button>
           )}
-          <ExportButtons data={exportData} config={{ title: 'Expenses Categories', rtlLayout: true }} size="small" />
+          <ExportButtons data={exportData} config={{ title: 'Sub Tree الشجرة الفرعية', rtlLayout: true }} size="small" />
         </div>
       </div>
 

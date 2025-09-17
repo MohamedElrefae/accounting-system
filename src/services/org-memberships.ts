@@ -28,7 +28,7 @@ export interface OrgMemberWithUser {
 }
 
 // Feature flag to allow using mock in development without touching DB
-const USE_MOCK = (import.meta as any).env?.VITE_USE_MOCK_ORG === '1';
+const USE_MOCK = (import.meta as { env?: { VITE_USE_MOCK_ORG?: string } }).env?.VITE_USE_MOCK_ORG === '1';
 
 // In-memory mock store (dev only)
 const mockStore: { memberships: OrgMemberWithUser[] } = {
@@ -133,7 +133,7 @@ export async function searchUsersNotInOrg(orgId: string, query: string, limit = 
     .select('user_id')
     .eq('org_id', orgId);
   if (memErr) throw memErr;
-  const memberIds = new Set((members || []).map((m: any) => m.user_id));
+  const memberIds = new Set((members || []).map((m: { user_id: string }) => m.user_id));
 
-  return (users || []).filter((u: any) => !memberIds.has(u.id));
+  return (users || []).filter((u: { id: string }) => !memberIds.has(u.id));
 }

@@ -890,10 +890,10 @@ const GeneralLedger: React.FC = () => {
             <div class="report-period">الفترة: ${filters.dateFrom || '—'} إلى ${filters.dateTo || '—'}</div>
             <div class="report-filters">
               <span class="filter-item">الحساب: ${accountName}</span>
-              <span class=\"filter-item\">المشروع: ${projectName}</span>
-              <span class=\"filter-item\">المنظمة: ${orgName}</span>
-              <span class=\"filter-item\">بند التحليل: ${analysisItemName}</span>
-              <span class=\"filter-item\">تاريخ الطباعة: ${currentDate}</span>
+              <span class="filter-item">المشروع: ${projectName}</span>
+              <span class="filter-item">المنظمة: ${orgName}</span>
+              <span class="filter-item">بند التحليل: ${analysisItemName}</span>
+              <span class="filter-item">تاريخ الطباعة: ${currentDate}</span>
               <br>
               <span class="filter-item"><strong>المرشحات النشطة:</strong></span>
               ${filters.postedOnly ? '<span class="filter-item active-filter">✓ قيود معتمدة فقط</span>' : '<span class="filter-item inactive-filter">✗ قيود معتمدة فقط</span>'}
@@ -1260,7 +1260,7 @@ const GeneralLedger: React.FC = () => {
         try {
           console.log('💰 Loading expenses categories for org:', firstOrgId)
           const { data: expensesData } = await supabase
-            .from('expenses_categories_full')
+            .from('sub_tree_full')
             .select('id, code, description, is_active')
             .eq('org_id', firstOrgId)
             .eq('is_active', true)
@@ -1363,7 +1363,7 @@ const GeneralLedger: React.FC = () => {
       try {
         console.log('💰 Loading expenses categories for org change:', orgId)
         const { data: expensesData } = await supabase
-          .from('expenses_categories_full')
+          .from('sub_tree_full')
           .select('id, code, description, is_active')
           .eq('org_id', orgId)
           .eq('is_active', true)

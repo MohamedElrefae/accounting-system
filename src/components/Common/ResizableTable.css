@@ -17,7 +17,7 @@
   position: relative;
 }
 
-.resizable-th {
+ .resizable-th {
   position: sticky;
   top: 0;
   background: var(--table_header_bg);
@@ -30,6 +30,49 @@
   z-index: 10;
   user-select: none;
   overflow: hidden;
+}
+
+/* Frozen columns: sticky to the appropriate side (LTR=left, RTL=right) */
+.resizable-th.frozen,
+.resizable-td.frozen {
+  position: sticky;
+  z-index: 20;
+  background: var(--table_row_bg);
+}
+/* Side control via direction class */
+.resizable-th.frozen.ltr,
+.resizable-td.frozen.ltr {
+  left: 0; /* actual offset set inline */
+}
+.resizable-th.frozen.rtl,
+.resizable-td.frozen.rtl {
+  right: 0; /* actual offset set inline */
+}
+.resizable-th.frozen {
+  z-index: 25;
+  background: var(--table_header_bg);
+}
+
+/* Separator line: draw on trailing edge depending on direction */
+.resizable-td.frozen.ltr::after,
+.resizable-th.frozen.ltr::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -1px;
+  width: 1px;
+  height: 100%;
+  background: var(--border);
+}
+.resizable-td.frozen.rtl::after,
+.resizable-th.frozen.rtl::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -1px;
+  width: 1px;
+  height: 100%;
+  background: var(--border);
 }
 
 .resizable-th:last-child {
@@ -104,6 +147,25 @@
   display: flex;
   align-items: center;
   min-height: 50px;
+}
+
+/* Wrap/nowrap modes controlled by table container class names */
+.resizable-table-container.wrap .td-content {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  align-items: flex-start;
+}
+.resizable-table-container.wrap {
+  overflow-x: auto;
+}
+.resizable-table-container.nowrap .td-content {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.resizable-table-container.nowrap {
+  overflow-x: auto;
 }
 
 /* Cell type styling */

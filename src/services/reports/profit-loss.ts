@@ -54,7 +54,7 @@ export async function fetchProfitLossReport(filters: PLFilters): Promise<{
       p_classification_id: null,
       p_cost_center_id: null,
       p_work_item_id: null,
-      p_expenses_category_id: null,
+        p_sub_tree_id: null,
       p_debit_account_id: null,
       p_credit_account_id: null,
       p_amount_min: null,

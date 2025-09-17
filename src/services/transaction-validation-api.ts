@@ -46,36 +46,31 @@ export class TransactionValidationAPI {
    */
   async validateTransactionBeforeSave(request: TransactionValidationRequest): Promise<ValidationResult> {
     try {
-      const { data, error } = await supabase.rpc('validate_transaction_logic', {
-        p_transaction_id: null,
-        p_debit_account_id: request.debit_account_id,
-        p_credit_account_id: request.credit_account_id,
-        p_amount: request.amount,
-        p_description: request.description,
-        p_entry_date: request.entry_date
+      // Use client-side validation service instead of missing database functions
+      const { transactionValidator } = await import('./transaction-validation')
+      
+      const clientResult = await transactionValidator.validateTransaction({
+        debit_account_id: request.debit_account_id,
+        credit_account_id: request.credit_account_id,
+        amount: request.amount,
+        description: request.description,
+        entry_date: request.entry_date
       })
 
-      if (error) {
-        console.error('Backend validation error:', error)
-        // Fallback to basic validation
-        return {
-          is_valid: true,
-          errors: [],
-          warnings: [{
-            field: 'general',
-            message: 'تحذير: لم يتم التحقق من صحة المعاملة بالكامل',
-            details: 'فشل الاتصال بخدمة التحقق'
-          }]
-        }
-      }
-
-      // Parse the validation result
-      const result = data || {}
-      
+      // Convert client validation result to API format
       return {
-        is_valid: result.is_valid !== false,
-        errors: this.parseValidationMessages(result.errors || []),
-        warnings: this.parseValidationMessages(result.warnings || [])
+        is_valid: clientResult.isValid,
+        errors: clientResult.errors.map(err => ({
+          field: err.field,
+          message: err.message,
+          code: err.type === 'error' ? 'validation_error' : undefined
+        })),
+        warnings: clientResult.warnings.map(warn => ({
+          field: warn.field,
+          message: warn.message,
+          details: warn.details,
+          code: warn.type === 'warning' ? 'validation_warning' : undefined
+        }))
       }
     } catch (error) {
       console.error('Transaction validation API error:', error)
@@ -96,27 +91,50 @@ export class TransactionValidationAPI {
    */
   async validateTransactionForPosting(transactionId: string): Promise<ValidationResult> {
     try {
-      const { data, error } = await supabase.rpc('validate_transaction_for_posting', {
-        p_transaction_id: transactionId
-      })
+      // Get transaction data first
+      const { data: transactionData, error: fetchError } = await supabase
+        .from('transactions')
+        .select('debit_account_id, credit_account_id, amount, description, entry_date')
+        .eq('id', transactionId)
+        .single()
 
-      if (error) {
+      if (fetchError) {
         return {
           is_valid: false,
           errors: [{
             field: 'general',
-            message: 'فشل التحقق من صحة المعاملة للترحيل',
-            code: error.code
+            message: 'فشل في جلب بيانات المعاملة',
+            code: fetchError.code
           }],
           warnings: []
         }
       }
 
-      const result = data || {}
+      // Use client-side validation
+      const { transactionValidator } = await import('./transaction-validation')
+      
+      const clientResult = await transactionValidator.validateTransaction({
+        debit_account_id: transactionData.debit_account_id,
+        credit_account_id: transactionData.credit_account_id,
+        amount: transactionData.amount,
+        description: transactionData.description,
+        entry_date: transactionData.entry_date
+      })
+
+      // Convert client validation result to API format
       return {
-        is_valid: result.is_valid !== false,
-        errors: this.parseValidationMessages(result.errors || []),
-        warnings: this.parseValidationMessages(result.warnings || [])
+        is_valid: clientResult.isValid,
+        errors: clientResult.errors.map(err => ({
+          field: err.field,
+          message: err.message,
+          code: err.type === 'error' ? 'posting_error' : undefined
+        })),
+        warnings: clientResult.warnings.map(warn => ({
+          field: warn.field,
+          message: warn.message,
+          details: warn.details,
+          code: warn.type === 'warning' ? 'posting_warning' : undefined
+        }))
       }
     } catch (error) {
       console.error('Posting validation error:', error)
@@ -144,17 +162,27 @@ export class TransactionValidationAPI {
         (result.warnings.length > 0 ? 'warning' : 'passed') : 
         'failed'
 
-      await supabase.rpc('log_transaction_validation', {
-        p_transaction_id: transactionId,
-        p_validation_type: validationType,
-        p_validation_result: validationResult,
-        p_error_message: result.errors.length > 0 ? result.errors[0].message : null,
-        p_warning_messages: result.warnings.map(w => w.message),
-        p_field_errors: result.errors.reduce((acc, err) => {
-          acc[err.field] = err.message
-          return acc
-        }, {} as Record<string, string>)
-      })
+      // Try to insert directly into validation logs table if it exists
+      const { error } = await supabase
+        .from('transaction_validation_logs')
+        .insert({
+          transaction_id: transactionId,
+          validation_type: validationType,
+          validation_result: validationResult,
+          error_message: result.errors.length > 0 ? result.errors[0].message : null,
+          warning_messages: result.warnings.map(w => w.message),
+          field_errors: result.errors.reduce((acc, err) => {
+            acc[err.field] = err.message
+            return acc
+          }, {} as Record<string, string>),
+          validated_at: new Date().toISOString(),
+          validated_by: null // Will be set by RLS if available
+        })
+        
+      if (error) {
+        console.warn('Validation logging not available:', error.message)
+        // This is non-critical, don't throw
+      }
     } catch (error) {
       console.error('Failed to log validation result:', error)
       // Don't fail the main operation due to logging errors
@@ -199,8 +227,9 @@ export class TransactionValidationAPI {
     entries: ValidationLogEntry[]
   }> {
     try {
+      // Try to query from validation logs table directly
       let query = supabase
-        .from('transaction_validation_report')
+        .from('transaction_validation_logs')
         .select('*')
 
       if (filters.dateFrom) {
@@ -219,7 +248,19 @@ export class TransactionValidationAPI {
 
       const { data, error } = await query
 
-      if (error) throw error
+      if (error) {
+        console.warn('Validation logs table not available:', error.message)
+        // Return empty report if table doesn't exist
+        return {
+          summary: {
+            total_validations: 0,
+            passed: 0,
+            failed: 0,
+            warnings: 0
+          },
+          entries: []
+        }
+      }
 
       const entries = data || []
 

@@ -244,6 +244,21 @@ const OrganizationSettings: React.FC = () => {
             </div>
 
             <div className={styles.section}>
+              <div className={styles.sectionHeader}><Settings size={18} /><h2>سياسة اعتماد/ترحيل المعاملات</h2></div>
+              <div className={styles.formGrid}>
+                <div className={styles.formField}>
+                  <label>
+                    <input type="checkbox" checked={(config as any)?.auto_post_on_approve || false} onChange={e=>{
+                      setConfig(c=>c? ({...c, auto_post_on_approve: e.target.checked} as any) : c);
+                      setFormData(p=>p); // no-op to trigger ui
+                    }} /> اعتماد = ترحيل تلقائي
+                  </label>
+                  <small>عند التفعيل، سيتم ترحيل المعاملة مباشرة بعد اعتمادها إن كانت صالحة.</small>
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.section}>
               <div className={styles.sectionHeader}><FolderOpen size={18} /><h2>الإعدادات الافتراضية للمؤسسة والمشاريع</h2></div>
               <div className={styles.formGrid}>
             <div className={styles.formField}>

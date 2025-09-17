@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Grid, Maximize2, Columns, RotateCcw, Eye, EyeOff, Building2, FileText, DollarSign } from 'lucide-react';
+import { Settings, Grid, Maximize2, Columns, RotateCcw, Eye, EyeOff, Building2, FileText, DollarSign, Bookmark, BookmarkCheck } from 'lucide-react';
 import styles from './FormLayoutControls.module.css';
 import type { FormField } from './UnifiedCRUDForm';
 
@@ -15,8 +15,10 @@ interface FormLayoutControlsProps {
   onVisibilityToggle: (fieldId: string) => void;
   onResetLayout: () => void;
   onSaveLayout: () => void;
+  onRememberLayout?: () => void;
   isOpen: boolean;
   onToggle: () => void;
+  showToggleButton?: boolean;
 }
 
 const FormLayoutControls: React.FC<FormLayoutControlsProps> = ({
@@ -31,11 +33,29 @@ const FormLayoutControls: React.FC<FormLayoutControlsProps> = ({
   onVisibilityToggle,
   onResetLayout,
   onSaveLayout,
+  onRememberLayout,
   isOpen,
-  onToggle
+  onToggle,
+  showToggleButton = true
 }) => {
   const [activeTab, setActiveTab] = useState<'columns' | 'fields' | 'arrange'>('columns');
   const [draggedField, setDraggedField] = useState<string | null>(null);
+  const [isLayoutRemembered, setIsLayoutRemembered] = useState(() => {
+    try {
+      const saved = localStorage.getItem('formLayoutPreferredConfig');
+      return !!saved;
+    } catch {
+      return false;
+    }
+  });
+
+  // Handle remember layout functionality
+  const handleRememberLayout = React.useCallback(() => {
+    if (onRememberLayout) {
+      onRememberLayout();
+      setIsLayoutRemembered(true);
+    }
+  }, [onRememberLayout]);
   // Remove local state - use props instead
   
   // Define filtered fields (non-internal fields)
@@ -117,17 +137,19 @@ const FormLayoutControls: React.FC<FormLayoutControlsProps> = ({
 
   return (
     <>
-      {/* Toggle Button */}
-      <button 
-        type="button"
-        className={`${styles.toggleButton} ${isOpen ? styles.active : ''}`}
-        onClick={onToggle}
-        title={isOpen ? 'إخفاء تحكم التخطيط' : 'عرض تحكم التخطيط'}
-      >
-        <Settings size={18} />
-        <span>تخطيط النموذج</span>
-        {isOpen ? <EyeOff size={16} /> : <Eye size={16} />}
-      </button>
+      {/* Toggle Button - conditionally rendered */}
+      {showToggleButton && (
+        <button 
+          type="button"
+          className={`${styles.toggleButton} ${isOpen ? styles.active : ''}`}
+          onClick={onToggle}
+          title={isOpen ? 'إخفاء تحكم التخطيط' : 'عرض تحكم التخطيط'}
+        >
+          <Settings size={18} />
+          <span>تخطيط النموذج</span>
+          {isOpen ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      )}
 
       {/* Modal Overlay */}
       {isOpen && (
@@ -176,6 +198,19 @@ const FormLayoutControls: React.FC<FormLayoutControlsProps> = ({
                 >
                   حفظ
                 </button>
+                
+                {/* Remember Layout Button - Third Button */}
+                {onRememberLayout && (
+                  <button 
+                    type="button"
+                    className={`${styles.rememberButton} ${isLayoutRemembered ? styles.remembered : ''}`}
+                    onClick={handleRememberLayout}
+                    title={isLayoutRemembered ? 'التخطيط محفوظ' : 'حفظ كتخطيط مفضل'}
+                  >
+                    {isLayoutRemembered ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
+                  </button>
+                )}
+                
                 <button 
                   type="button"
                   className={styles.resetButton}

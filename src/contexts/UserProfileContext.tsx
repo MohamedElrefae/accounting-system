@@ -64,7 +64,7 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
             .eq('is_active', true);
           
           roles = (rolesData || []).map((ur: any) => ur.roles?.name).filter(Boolean);
-        } catch (roleError) {
+        } catch {
           // Continue without roles - this is not critical
         }
       }

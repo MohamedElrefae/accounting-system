@@ -1,5 +1,5 @@
-// Types for Expenses Categories (org-scoped)
-export interface ExpensesCategoryRow {
+// Types for Sub Tree (org-scoped) - الشجرة الفرعية
+export interface SubTreeRow {
   id: string;
   org_id: string;
   parent_id: string | null;
@@ -21,11 +21,11 @@ export interface ExpensesCategoryRow {
   net_amount?: number;
 }
 
-export interface ExpensesCategoryTreeNode extends ExpensesCategoryRow {
-  children?: ExpensesCategoryTreeNode[];
+export interface SubTreeNode extends SubTreeRow {
+  children?: SubTreeNode[];
 }
 
-export interface CreateExpensesCategoryPayload {
+export interface CreateSubTreePayload {
   org_id: string;
   code: string;
   description: string;
@@ -34,7 +34,7 @@ export interface CreateExpensesCategoryPayload {
   linked_account_id?: string | null;
 }
 
-export interface UpdateExpensesCategoryPayload {
+export interface UpdateSubTreePayload {
   id: string;
   code?: string;
   description?: string;
@@ -43,3 +43,8 @@ export interface UpdateExpensesCategoryPayload {
   linked_account_id?: string | null;
 }
 
+// Legacy aliases for backward compatibility
+export type ExpensesCategoryRow = SubTreeRow;
+export type ExpensesCategoryTreeNode = SubTreeNode;
+export type CreateExpensesCategoryPayload = CreateSubTreePayload;
+export type UpdateExpensesCategoryPayload = UpdateSubTreePayload;

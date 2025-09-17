@@ -55,7 +55,7 @@ export async function getAccountBalances(filters: AccountBalanceFilter = {}): Pr
     whereClause = 'WHERE ' + conditions.join(' AND ');
   }
 
-  const canonicalQuery = `
+  const _canonicalQuery = `
     WITH tx_lines AS (
       -- Debit lines
       SELECT

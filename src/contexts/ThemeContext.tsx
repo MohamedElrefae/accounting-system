@@ -97,6 +97,7 @@ export const CustomThemeProvider: React.FC<ThemeProviderProps> = ({ children }) 
       set('--table_row_bg', p?.background?.paper);
       set('--modal_bg', p?.background?.paper);
       set('--active_tab_bg', '#343940');
+      set('--overlay_background', 'rgba(0, 0, 0, 0.6)');
     } else {
       set('--field_bg', '#F1F3F7');
       set('--selected_bg', '#E4EAFE');
@@ -108,6 +109,7 @@ export const CustomThemeProvider: React.FC<ThemeProviderProps> = ({ children }) 
       set('--table_row_bg', '#FFFFFF');
       set('--modal_bg', '#FFFFFF');
       set('--active_tab_bg', '#E4EAFE');
+      set('--overlay_background', 'rgba(0, 0, 0, 0.4)');
     }
 
     // Legacy aliases for backward compatibility

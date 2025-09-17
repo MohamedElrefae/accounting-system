@@ -93,13 +93,14 @@ export function parseDateString(dateString: string, format: string): Date {
       year = parseInt(cleaned.substring(4, 8), 10)
       break
       
-    default:
+    default: {
       // Try to parse as ISO first, then fallback to Date constructor
       const isoAttempt = new Date(dateString)
       if (!isNaN(isoAttempt.getTime())) {
         return isoAttempt
       }
       throw new Error(`Unsupported date format: ${format}`)
+    }
   }
   
   const date = new Date(year, month, day)

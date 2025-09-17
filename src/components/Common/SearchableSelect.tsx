@@ -54,7 +54,18 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   // Build visible flat list from tree with expand/collapse
   type FlatRow = SearchableSelectOption & { __depth: number; __isParent: boolean };
 
-  const normalize = (opts: SearchableSelectOption[]): SearchableSelectOption[] => opts || [];
+  const normalize = (opts: SearchableSelectOption[] | undefined | null | any): SearchableSelectOption[] => {
+    // Safety guard: if opts is a Promise (async optionsProvider), return empty array
+    if (opts && typeof opts.then === 'function') {
+      console.warn('SearchableSelect received a Promise instead of an array. This usually means an async optionsProvider is being passed synchronously.');
+      return [];
+    }
+    // Return empty array if opts is null, undefined, or not an array
+    if (!opts || !Array.isArray(opts)) {
+      return [];
+    }
+    return opts;
+  };
 
   const matches = (opt: SearchableSelectOption, term: string) => {
     if (!term) return true;

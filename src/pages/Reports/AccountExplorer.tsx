@@ -9,7 +9,7 @@ import { fetchProjects, fetchOrganizations, type LookupOption, fetchAccountsMini
 import { getCompanyConfig } from '../../services/company-config'
 import SearchableSelect, { type SearchableSelectOption } from '../../components/Common/SearchableSelect'
 import { getAllTransactionClassifications, type TransactionClassification } from '../../services/transaction-classification'
-import { getExpensesCategoriesList } from '../../services/expenses-categories'
+import { getExpensesCategoriesList } from '../../services/sub-tree'
 import { listWorkItemsAll } from '../../services/work-items'
 import { getCostCentersForSelector } from '../../services/cost-centers'
 import TableView from '@mui/icons-material/TableView'
@@ -412,7 +412,7 @@ const AccountExplorerReport: React.FC = () => {
   // Professional PDF generation function
   async function generatePDF() {
     try {
-      const projectName = projectId ? projectOptions.find(p => p.id === projectId)?.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
+      const _projectName = projectId ? projectOptions.find(p => p.id === projectId)?.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
       const reportTitle = uiLang === 'ar' ? 'مستكشف الحسابات - التقرير المالي' : 'Account Explorer - Financial Report'
       const periodText = mode === 'range' ? `${uiLang === 'ar' ? 'من' : 'From'} ${dateFrom} ${uiLang === 'ar' ? 'إلى' : 'To'} ${dateTo}` : `${uiLang === 'ar' ? 'حتى تاريخ' : 'As of'} ${dateTo}`
       

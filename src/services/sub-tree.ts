@@ -1,10 +1,15 @@
 import { supabase } from '../utils/supabase'
 import type {
+  SubTreeRow,
+  SubTreeNode,
+  CreateSubTreePayload,
+  UpdateSubTreePayload,
+  // Legacy aliases
   ExpensesCategoryRow,
   ExpensesCategoryTreeNode,
   CreateExpensesCategoryPayload,
   UpdateExpensesCategoryPayload,
-} from '../types/expenses-categories'
+} from '../types/sub-tree'
 
 export interface AccountLite {
   id: string
@@ -17,14 +22,14 @@ export interface AccountLite {
 
 // Simple in-memory cache keyed by org_id
 const cache = {
-  tree: new Map<string, ExpensesCategoryTreeNode[]>(),
-  list: new Map<string, ExpensesCategoryRow[]>(),
+  tree: new Map<string, SubTreeNode[]>(),
+  list: new Map<string, SubTreeRow[]>(),
   accounts: new Map<string, AccountLite[]>(),
 }
 
-function buildTree(rows: ExpensesCategoryRow[]): ExpensesCategoryTreeNode[] {
-  const map = new Map<string, ExpensesCategoryTreeNode>()
-  const roots: ExpensesCategoryTreeNode[] = []
+function buildTree(rows: SubTreeRow[]): SubTreeNode[] {
+  const map = new Map<string, SubTreeNode>()
+  const roots: SubTreeNode[] = []
 
   rows.forEach(r => {
     map.set(r.id, { ...r, children: [] })
@@ -42,7 +47,7 @@ function buildTree(rows: ExpensesCategoryRow[]): ExpensesCategoryTreeNode[] {
   })
 
   // Sort by code
-  const sortChildren = (nodes: ExpensesCategoryTreeNode[]) => {
+  const sortChildren = (nodes: SubTreeNode[]) => {
     nodes.sort((a, b) => a.code.localeCompare(b.code))
     nodes.forEach(n => n.children && sortChildren(n.children))
   }
@@ -50,33 +55,67 @@ function buildTree(rows: ExpensesCategoryRow[]): ExpensesCategoryTreeNode[] {
   return roots
 }
 
-export async function getExpensesCategoriesTree(orgId: string, force = false): Promise<ExpensesCategoryTreeNode[]> {
+export async function getExpensesCategoriesTree(orgId: string, force = false): Promise<SubTreeNode[]> {
   if (!force && cache.tree.has(orgId)) return cache.tree.get(orgId)!
 
-  const { data, error } = await supabase.rpc('get_expenses_categories_tree', { p_org_id: orgId })
-  if (error) throw error
-  const rows = (data as any[] | null)?.map(r => ({ ...r, path: String(r.path) })) as ExpensesCategoryRow[] || []
+  console.log('🌳 Loading sub tree for org:', orgId)
+  const { data, error } = await supabase.rpc('get_sub_tree_tree', { p_org_id: orgId })
+  if (error) {
+    console.error('❌ Sub tree RPC error:', error)
+    throw error
+  }
+  const rows = (data as any[] | null)?.map(r => ({ ...r, path: String(r.path) })) as SubTreeRow[] || []
+  console.log('🌳 Loaded sub tree rows:', rows.length)
   const tree = buildTree(rows)
   cache.tree.set(orgId, tree)
   cache.list.set(orgId, rows)
   return tree
 }
 
-export async function getExpensesCategoriesList(orgId: string, force = false): Promise<ExpensesCategoryRow[]> {
+export async function getExpensesCategoriesList(orgId: string, force = false): Promise<SubTreeRow[]> {
   if (!force && cache.list.has(orgId)) return cache.list.get(orgId)!
-  const { data, error } = await supabase
-    .from('expenses_categories_full')
+  
+  // Try the view first
+  let { data, error } = await supabase
+    .from('sub_tree_full')
     .select('*')
     .eq('org_id', orgId)
     .order('path', { ascending: true })
-  if (error) throw error
-  const rows = (data as any[] | null)?.map(r => ({ ...r, path: String(r.path) })) as ExpensesCategoryRow[] || []
+  
+  // If view fails, try direct table query
+  if (error || !data || data.length === 0) {
+    console.warn('sub_tree_full view failed, trying direct table query:', error)
+    const directResult = await supabase
+      .from('sub_tree')
+      .select(`
+        id, org_id, parent_id, code, description, add_to_cost, is_active, level, path,
+        linked_account_id, created_at, updated_at, created_by, updated_by
+      `)
+      .eq('org_id', orgId)
+      .eq('is_active', true)
+      .order('code', { ascending: true })
+    
+    if (directResult.error) throw directResult.error
+    data = directResult.data
+  }
+  
+  const rows = (data as any[] | null)?.map(r => ({ 
+    ...r, 
+    path: String(r.path || r.code),
+    // Add missing fields with defaults
+    linked_account_code: r.linked_account_code || null,
+    linked_account_name: r.linked_account_name || null,
+    child_count: r.child_count || 0,
+    has_transactions: r.has_transactions || false
+  })) as SubTreeRow[] || []
+  
+  console.log('Loaded sub_tree records:', rows.length, 'for org:', orgId)
   cache.list.set(orgId, rows)
   return rows
 }
 
 export async function fetchNextExpensesCategoryCode(orgId: string, parentId: string | null): Promise<string> {
-  const { data, error } = await supabase.rpc('rpc_expenses_categories_next_code', {
+  const { data, error } = await supabase.rpc('rpc_sub_tree_next_code', {
     p_org_id: orgId,
     p_parent_id: parentId,
   })
@@ -84,8 +123,8 @@ export async function fetchNextExpensesCategoryCode(orgId: string, parentId: str
   return data as string
 }
 
-export async function createExpensesCategory(payload: CreateExpensesCategoryPayload): Promise<string> {
-  const { data, error } = await supabase.rpc('create_expenses_category', {
+export async function createExpensesCategory(payload: CreateSubTreePayload): Promise<string> {
+  const { data, error } = await supabase.rpc('create_sub_tree', {
     p_org_id: payload.org_id,
     p_code: payload.code,
     p_description: payload.description,
@@ -100,8 +139,8 @@ export async function createExpensesCategory(payload: CreateExpensesCategoryPayl
   return data as string
 }
 
-export async function updateExpensesCategory(payload: UpdateExpensesCategoryPayload & { org_id?: string }): Promise<boolean> {
-  const { data, error } = await supabase.rpc('update_expenses_category', {
+export async function updateExpensesCategory(payload: UpdateSubTreePayload & { org_id?: string }): Promise<boolean> {
+  const { data, error } = await supabase.rpc('update_sub_tree', {
     p_id: payload.id,
     p_code: payload.code ?? null,
     p_description: payload.description ?? null,
@@ -122,7 +161,7 @@ export async function updateExpensesCategory(payload: UpdateExpensesCategoryPayl
 }
 
 export async function deleteExpensesCategory(id: string, orgId?: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('delete_expenses_category', { p_id: id })
+  const { data, error } = await supabase.rpc('delete_sub_tree', { p_id: id })
   if (error) throw error
   if (orgId) { cache.tree.delete(orgId); cache.list.delete(orgId) } else { cache.tree.clear(); cache.list.clear() }
   return data as boolean

@@ -40,7 +40,7 @@ export type AccountLite = {
   name_ar: string;
   name_en?: string | null;
   level: number;
-  account_type: string;
+  category: string;
   statement_type: string;
   parent_id?: string | null;
   is_active: boolean;
@@ -91,7 +91,7 @@ const generateSubAccountCode = (accounts: AccountLite[], parentId: string | null
 
 type AccountFormData = Partial<AccountLite> & {
   level_display?: string;
-  account_type_display?: string;
+  category_display?: string;
   is_standard?: boolean;
   code?: string;
   name_ar?: string;
@@ -120,7 +120,7 @@ const createAccountAutoFillLogic = (parentAccounts: AccountLite[]) => (formData:
         auto.code = suggested;
       }
 
-      auto.account_type = parent.account_type;
+      auto.category = parent.category;
       auto.statement_type = parent.statement_type;
       if (!fd.name_ar || fd.name_ar === '') auto.name_ar = `حساب فرعي جديد لـ ${parent.name_ar}`;
       if (!fd.name_en || fd.name_en === '') auto.name_en = `New Sub-account for ${parent.name_en || parent.name_ar}`;
@@ -152,39 +152,39 @@ export const createAccountFormConfig = (
     { id: 'name_ar', type: 'text', label: 'اسم الحساب بالعربية', placeholder: 'اسم الحساب باللغة العربية', required: true, icon: <FileText size={16} />, validation: (value: unknown) => validateArabicName(String(value ?? '')), helpText: 'اسم الحساب الرئيسي باللغة العربية' },
     { id: 'name_en', type: 'text', label: 'اسم الحساب بالإنجليزية', placeholder: 'Account name in English (optional)', icon: <Globe size={16} />, helpText: 'اسم الحساب بالإنجليزية (اختياري)' },
     // Show the editable selector ONLY when there is no parent selected
-    { id: 'account_type', type: 'select', label: 'نوع الحساب', required: true, icon: <BarChart3 size={16} />, options: [
-      { value: 'assets', label: 'أصول - Assets' },
-      { value: 'liabilities', label: 'خصوم - Liabilities' },
+    { id: 'category', type: 'select', label: 'نوع الحساب', required: true, icon: <BarChart3 size={16} />, options: [
+      { value: 'asset', label: 'أصول - Assets' },
+      { value: 'liability', label: 'خصوم - Liabilities' },
       { value: 'equity', label: 'حقوق الملكية - Equity' },
       { value: 'revenue', label: 'إيرادات - Revenue' },
-      { value: 'expenses', label: 'مصروفات - Expenses' }
+      { value: 'expense', label: 'مصروفات - Expenses' }
     ], helpText: 'تصنيف الحساب الأساسي — يتم تحديده تلقائياً من الحساب الأب عند اختياره', conditionalLogic: (formData) => {
-      // If a parent is selected, force account_type to parent's type and hide the selector
+      // If a parent is selected, force category to parent's type and hide the selector
       if (formData.parent_id) {
         const parent = parentAccounts.find(a => a.id === formData.parent_id);
-        if (parent && formData.account_type !== parent.account_type) {
-          formData.account_type = parent.account_type;
+        if (parent && formData.category !== parent.category) {
+          formData.category = parent.category;
         }
         return false; // hide selector when inherited
       }
       return true;
     } },
     // Read-only display of inherited account type when a parent is selected
-    { id: 'account_type_display', type: 'text', label: 'نوع الحساب (موروث)', disabled: true, icon: <BarChart3 size={16} />, helpText: 'هذا الحقل موروث من الحساب الأب ولا يمكن تغييره', conditionalLogic: (formData) => {
+    { id: 'category_display', type: 'text', label: 'نوع الحساب (موروث)', disabled: true, icon: <BarChart3 size={16} />, helpText: 'هذا الحقل موروث من الحساب الأب ولا يمكن تغييره', conditionalLogic: (formData) => {
       if (!formData.parent_id) return false;
       const opts = [
-        { value: 'assets', label: 'أصول - Assets' },
-        { value: 'liabilities', label: 'خصوم - Liabilities' },
+        { value: 'asset', label: 'أصول - Assets' },
+        { value: 'liability', label: 'خصوم - Liabilities' },
         { value: 'equity', label: 'حقوق الملكية - Equity' },
         { value: 'revenue', label: 'إيرادات - Revenue' },
-        { value: 'expenses', label: 'مصروفات - Expenses' }
+        { value: 'expense', label: 'مصروفات - Expenses' }
       ];
       // ensure main value is synced and show a human-friendly label in display field
       const parent = parentAccounts.find(a => a.id === formData.parent_id);
       if (parent) {
-        if (formData.account_type !== parent.account_type) formData.account_type = parent.account_type;
-        const label = opts.find(o => o.value === (formData.account_type || ''))?.label || formData.account_type || '';
-        if (formData.account_type_display !== label) formData.account_type_display = label;
+        if (formData.category !== parent.category) formData.category = parent.category;
+        const label = opts.find(o => o.value === (formData.category || ''))?.label || formData.category || '';
+        if (formData.category_display !== label) formData.category_display = label;
       }
       return true;
     } },
@@ -254,7 +254,7 @@ export const createAccountFormConfig = (
         { field: 'code' },
         { field: 'name_ar' },
         { field: 'name_en' },
-        { field: 'account_type' },
+        { field: 'category' },
         { field: 'statement_type' },
         { field: 'parent_id' },
         { field: 'level_display', fullWidth: true },

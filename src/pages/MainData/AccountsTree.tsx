@@ -85,6 +85,41 @@ const AccountsTreePage: React.FC = () => {
   const [draft, setDraft] = useState<Partial<AccountItem>>({});
   const [saving, setSaving] = useState(false);
 
+  // Selected account state for action buttons
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [configModalOpen, setConfigModalOpen] = useState(false);
+  
+  // Configuration options state
+  const [configOptions, setConfigOptions] = useState<{
+    autoExpandRoots: boolean;
+    showInactiveAccounts: boolean;
+    showTransactionCounts: boolean;
+    defaultViewMode: 'tree' | 'table';
+    exportFormat: 'excel' | 'pdf' | 'csv';
+    sortPref: 'code' | 'name' | 'level';
+  }>(() => {
+    try {
+      const saved = localStorage.getItem('accountsTreeConfig');
+      return saved ? JSON.parse(saved) : {
+        autoExpandRoots: false,
+        showInactiveAccounts: true,
+        showTransactionCounts: true,
+        defaultViewMode: 'tree' as 'tree' | 'table',
+        exportFormat: 'excel' as 'excel' | 'pdf' | 'csv',
+        sortPref: 'code' as 'code' | 'name' | 'level'
+      };
+    } catch {
+      return {
+        autoExpandRoots: false,
+        showInactiveAccounts: true,
+        showTransactionCounts: true,
+        defaultViewMode: 'tree' as 'tree' | 'table',
+        exportFormat: 'excel' as 'excel' | 'pdf' | 'csv',
+        sortPref: 'code' as 'code' | 'name' | 'level'
+      };
+    }
+  });
+
   // Draggable panel state for the unified form
   // Remember preference
   const [rememberPanel, setRememberPanel] = useState<boolean>(() => {
@@ -115,6 +150,13 @@ const AccountsTreePage: React.FC = () => {
   }, [accounts]);
 
   const formRef = React.useRef<UnifiedCRUDFormHandle>(null);
+
+  // Persist config options
+  useEffect(() => {
+    try {
+      localStorage.setItem('accountsTreeConfig', JSON.stringify(configOptions));
+    } catch {}
+  }, [configOptions]);
 
   // Persist remember preference
   useEffect(() => {
@@ -356,12 +398,56 @@ const AccountsTreePage: React.FC = () => {
   }
 
   async function handleSelectAccount(node: AccountItem) {
-      const { data, error } = await supabase.rpc('get_account_ancestors', {
-        p_org_id: orgId,
+    setSelectedAccountId(node.id);
+    const { data, error } = await supabase.rpc('get_account_ancestors', {
+      p_org_id: orgId,
       p_account_id: node.id,
     });
     if (!error) setBreadcrumbs((data || []) as AncestorItem[]);
   }
+
+  // Helper functions for action buttons
+  const getSelectedAccount = () => {
+    if (!selectedAccountId) return null;
+    return accounts.find(a => a.id === selectedAccountId) || null;
+  };
+
+  const handleTopLevelAdd = () => {
+    if (!orgId) {
+      showToast('يرجى اختيار منظمة أولاً', { severity: 'warning' });
+      return;
+    }
+    setDialogMode('add');
+    setDraft({
+      id: undefined,
+      code: '',
+      name: '',
+      name_ar: '',
+      level: 1,
+      status: 'active',
+      parent_id: null,
+      account_type: ''
+    });
+    setDialogOpen(true);
+  };
+
+  const handleEditSelected = () => {
+    const selected = getSelectedAccount();
+    if (!selected) {
+      showToast('يرجى اختيار حساب للتعديل', { severity: 'warning' });
+      return;
+    }
+    handleEdit(selected);
+  };
+
+  const handleDeleteSelected = () => {
+    const selected = getSelectedAccount();
+    if (!selected) {
+      showToast('يرجى اختيار حساب للحذف', { severity: 'warning' });
+      return;
+    }
+    handleDelete(selected);
+  };
 
   // Shared action handlers for both views (Tree and Table)
   const handleEdit = async (node: AccountItem) => {
@@ -688,9 +774,42 @@ const AccountsTreePage: React.FC = () => {
           <h1 className="page-title">شجرة الحسابات</h1>
         </div>
         <div className="page-actions">
-          <button className="ultimate-btn ultimate-btn-add" title="إضافة حساب جديد">
-            <div className="btn-content"><span className="btn-text">+ حساب</span></div>
+          {/* Config Button */}
+          <button 
+            className="ultimate-btn ultimate-btn-primary" 
+            title="إعدادات العرض" 
+            onClick={() => setConfigModalOpen(true)}
+          >
+            <div className="btn-content"><span className="btn-text">⚙️ إعدادات</span></div>
           </button>
+          
+          {/* Main Action Buttons */}
+          <button 
+            className="ultimate-btn ultimate-btn-add" 
+            title="إضافة حساب جديد" 
+            onClick={handleTopLevelAdd}
+          >
+            <div className="btn-content"><span className="btn-text">إضافة حساب جديد</span></div>
+          </button>
+          
+          <button 
+            className="ultimate-btn ultimate-btn-edit" 
+            title="تعديل الحساب المحدد" 
+            onClick={handleEditSelected}
+            disabled={!selectedAccountId}
+          >
+            <div className="btn-content"><span className="btn-text">تعديل الحساب المحدد</span></div>
+          </button>
+          
+          <button 
+            className="ultimate-btn ultimate-btn-delete" 
+            title="حذف الحساب المحدد" 
+            onClick={handleDeleteSelected}
+            disabled={!selectedAccountId}
+          >
+            <div className="btn-content"><span className="btn-text">حذف الحساب المحدد</span></div>
+          </button>
+          
           <ExportButtons
             data={exportData}
             config={{ title: 'تقرير الحسابات', orientation: 'landscape', useArabicNumerals: true, rtlLayout: true }}
@@ -841,7 +960,7 @@ const AccountsTreePage: React.FC = () => {
               // TreeView expects name_ar field; ensure it exists
               name_ar: n.name_ar || n.name,
               is_active: n.status === 'active',
-            })}
+            }))}
             onEdit={(node) => handleEdit(node as AccountItem)}
             onAdd={(parent) => handleAdd(parent as AccountItem)}
             onToggleStatus={(node) => handleToggleStatus(node as AccountItem)}
@@ -1151,6 +1270,143 @@ const AccountsTreePage: React.FC = () => {
           />
           </div>
         </DraggableResizablePanel>
+      )}
+      
+      {/* Configuration Modal */}
+      {configModalOpen && (
+        <div className="config-modal-backdrop" onClick={() => setConfigModalOpen(false)}>
+          <div className="config-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="config-modal-header">
+              <h3>إعدادات عرض شجرة الحسابات</h3>
+              <button 
+                className="config-modal-close" 
+                onClick={() => setConfigModalOpen(false)}
+                title="إغلاق"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="config-modal-body">
+              <div className="config-section">
+                <h4>إعدادات العرض</h4>
+                
+                <div className="config-field">
+                  <label className="config-label">
+                    <input 
+                      type="checkbox" 
+                      checked={configOptions.autoExpandRoots}
+                      onChange={(e) => setConfigOptions(prev => ({ ...prev, autoExpandRoots: e.target.checked }))}
+                    />
+                    توسيع الحسابات الرئيسية تلقائياً
+                  </label>
+                </div>
+                
+                <div className="config-field">
+                  <label className="config-label">
+                    <input 
+                      type="checkbox" 
+                      checked={configOptions.showInactiveAccounts}
+                      onChange={(e) => setConfigOptions(prev => ({ ...prev, showInactiveAccounts: e.target.checked }))}
+                    />
+                    إظهار الحسابات المعطلة
+                  </label>
+                </div>
+                
+                <div className="config-field">
+                  <label className="config-label">
+                    <input 
+                      type="checkbox" 
+                      checked={configOptions.showTransactionCounts}
+                      onChange={(e) => setConfigOptions(prev => ({ ...prev, showTransactionCounts: e.target.checked }))}
+                    />
+                    إظهار عدد العمليات المالية
+                  </label>
+                </div>
+                
+                <div className="config-field">
+                  <label className="config-label-block">
+                    وضع العرض الافتراضي:
+                    <select 
+                      value={configOptions.defaultViewMode}
+                      onChange={(e) => setConfigOptions(prev => ({ ...prev, defaultViewMode: e.target.value as 'tree' | 'table' }))}
+                      className="config-select"
+                    >
+                      <option value="tree">عرض شجرة</option>
+                      <option value="table">عرض جدول</option>
+                    </select>
+                  </label>
+                </div>
+                
+                <div className="config-field">
+                  <label className="config-label-block">
+                    الترتيب الافتراضي:
+                    <select 
+                      value={configOptions.sortPref}
+                      onChange={(e) => setConfigOptions(prev => ({ ...prev, sortPref: e.target.value as 'code' | 'name' | 'level' }))}
+                      className="config-select"
+                    >
+                      <option value="code">ترتيب حسب الكود</option>
+                      <option value="name">ترتيب حسب الاسم</option>
+                      <option value="level">ترتيب حسب المستوى</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              
+              <div className="config-section">
+                <h4>إعدادات التصدير</h4>
+                
+                <div className="config-field">
+                  <label className="config-label-block">
+                    تنسيق التصدير الافتراضي:
+                    <select 
+                      value={configOptions.exportFormat}
+                      onChange={(e) => setConfigOptions(prev => ({ ...prev, exportFormat: e.target.value as 'excel' | 'pdf' | 'csv' }))}
+                      className="config-select"
+                    >
+                      <option value="excel">Excel (.xlsx)</option>
+                      <option value="pdf">PDF (.pdf)</option>
+                      <option value="csv">CSV (.csv)</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+            </div>
+            
+            <div className="config-modal-footer">
+              <button 
+                className="ultimate-btn ultimate-btn-add"
+                onClick={() => setConfigModalOpen(false)}
+              >
+                <div className="btn-content"><span className="btn-text">حفظ الإعدادات</span></div>
+              </button>
+              
+              <button 
+                className="ultimate-btn ultimate-btn-warning"
+                onClick={() => {
+                  setConfigOptions({
+                    autoExpandRoots: false,
+                    showInactiveAccounts: true,
+                    showTransactionCounts: true,
+                    defaultViewMode: 'tree',
+                    exportFormat: 'excel',
+                    sortPref: 'code'
+                  });
+                }}
+              >
+                <div className="btn-content"><span className="btn-text">إعادة تعيين</span></div>
+              </button>
+              
+              <button 
+                className="ultimate-btn ultimate-btn-delete"
+                onClick={() => setConfigModalOpen(false)}
+              >
+                <div className="btn-content"><span className="btn-text">إلغاء</span></div>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

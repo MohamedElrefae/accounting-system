@@ -63,12 +63,6 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
         case 'csv':
           await exportMethods.exportToCSV(data, config);
           break;
-        case 'html':
-          await exportMethods.exportToHTML(data, config);
-          break;
-        case 'json':
-          await exportMethods.exportToJSON(data, config);
-          break;
       case 'customized-pdf':
           setCustomizedPDFModalOpen(true);
           break;
@@ -109,20 +103,6 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
       label: 'تصدير CSV',
       icon: '📋',
       className: 'export-btn-csv',
-      show: showAllFormats
-    },
-    {
-      format: 'html',
-      label: 'تصدير HTML',
-      icon: '🌐',
-      className: 'export-btn-html',
-      show: showAllFormats
-    },
-    {
-      format: 'json',
-      label: 'تصدير JSON',
-      icon: '🔧',
-      className: 'export-btn-json',
       show: showAllFormats
     }
   ];
