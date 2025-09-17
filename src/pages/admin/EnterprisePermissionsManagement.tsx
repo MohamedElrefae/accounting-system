@@ -215,7 +215,7 @@ export default function EnterprisePermissionsManagement() {
 
   // Filtered and sorted permissions
   const processedPermissions = useMemo(() => {
-    let filtered = permissions.filter(permission => {
+    const filtered = permissions.filter(permission => {
       const matchesSearch = searchTerm === '' || 
         permission.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         permission.resource.toLowerCase().includes(searchTerm.toLowerCase()) ||

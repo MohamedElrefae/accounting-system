@@ -42,7 +42,7 @@ export async function fetchGLAccountSummary(filters: GLAccountSummaryFilters): P
     p_offset: filters.offset ?? null,
     p_classification_id: filters.classificationId ?? null,
     p_analysis_work_item_id: filters.analysisWorkItemId ?? null,
-    p_expenses_category_id: filters.expensesCategoryId ?? null,
+        p_sub_tree_id: filters.expensesCategoryId,
   })
   if (error) throw error
   return (data as GLAccountSummaryRow[]) ?? []
@@ -68,7 +68,7 @@ export async function fetchGLTotals(filters: Omit<GLAccountSummaryFilters, 'limi
     p_classification_id: filters.classificationId ?? null,
     p_cost_center_id: null,
     p_work_item_id: null,
-    p_expenses_category_id: filters.expensesCategoryId ?? null,
+        p_sub_tree_id: filters.expensesCategoryId ?? null,
     p_debit_account_id: null,
     p_credit_account_id: null,
     p_amount_min: null,

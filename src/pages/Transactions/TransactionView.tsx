@@ -25,6 +25,21 @@ const TransactionView: React.FC<Props> = ({ transaction, audit, userNames, onClo
     return ''
   }, [audit])
 
+  // Unified approval status (includes posted)
+  const unifiedStatus = React.useMemo(() => {
+    const st = transaction.is_posted ? 'posted' : String((transaction as any).approval_status || 'draft')
+    const map: Record<string, { label: string; cls: string; tip: string }> = {
+      draft: { label: 'مسودة', cls: 'ultimate-btn-neutral', tip: 'لم يتم إرسالها للمراجعة بعد' },
+      submitted: { label: 'مُرسلة', cls: 'ultimate-btn-edit', tip: 'بإنتظار المراجعة' },
+      revision_requested: { label: 'طلب تعديل', cls: 'ultimate-btn-warning', tip: 'أُعيدت للتعديل — أعد الإرسال بعد التصحيح' },
+      approved: { label: 'معتمدة', cls: 'ultimate-btn-success', tip: 'تم الاعتماد' },
+      rejected: { label: 'مرفوضة', cls: 'ultimate-btn-delete', tip: 'تم الرفض' },
+      cancelled: { label: 'ملغاة', cls: 'ultimate-btn-neutral', tip: 'ألغى المُرسل الإرسال' },
+      posted: { label: 'مرحلة', cls: 'ultimate-btn-posted', tip: 'تم الترحيل (مُثبت في الدفاتر)' },
+    }
+    return map[st] || map['draft']
+  }, [transaction])
+
   return (
     <div className="transaction-modal" onClick={onClose}>
       <div className="transaction-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -37,7 +52,12 @@ const TransactionView: React.FC<Props> = ({ transaction, audit, userNames, onClo
         <div>فئة المصروف: {categoryLabel || '—'}</div>
         <div>أنشئت بواسطة: {transaction.created_by ? (userNames[transaction.created_by] || transaction.created_by) : '—'}</div>
         <div>مرحلة بواسطة: {transaction.posted_by ? (userNames[transaction.posted_by] || transaction.posted_by) : '—'}</div>
-        <div>الحالة: {transaction.is_posted ? 'مرحلة' : 'غير مرحلة'}</div>
+        <div>
+          <span style={{ marginLeft: 8 }}>حالة الاعتماد:</span>
+          <span className={`ultimate-btn ${unifiedStatus.cls}`} style={{ cursor: 'default', padding: '4px 8px', minHeight: 28 }} title={unifiedStatus.tip}>
+            <span className="btn-text">{unifiedStatus.label}</span>
+          </span>
+        </div>
 
         {submitNote && (
           <div className="submit-note-box">

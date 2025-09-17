@@ -7,6 +7,7 @@ import PresetBar from '../../components/Common/PresetBar'
 import { useReportPresets } from '../../hooks/useReportPresets'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
 import { Button, Card, CardContent, FormControl, InputLabel, MenuItem, Select, TextField, Checkbox, Table, TableHead, TableRow, TableCell, TableBody, Typography } from '@mui/material'
+import '../../components/Common/UltimateButtons.css'
 
 const AnalysisItemUsagePage: React.FC = () => {
   const [orgs, setOrgs] = useState<Organization[]>([])
@@ -151,6 +152,7 @@ const AnalysisItemUsagePage: React.FC = () => {
       const rangeLabel = (dateFrom || dateTo) ? `Range: ${dateFrom || '—'} → ${dateTo || '—'}` : 'Range: All'
       return `Analysis Item Usage — Top ${topLimit} — ${metricLabels[topMetric]} — ${orgLabel} — ${projLabel} — ${rangeLabel}`
     })()
+    const { exportToExcel, exportToCSV } = await import('../../utils/UniversalExportManager')
     if (format === 'excel') await exportToExcel(data, { title, rtlLayout: true, useArabicNumerals: true })
     else await exportToCSV(data, { title, rtlLayout: true, useArabicNumerals: true })
   }
@@ -214,8 +216,12 @@ const AnalysisItemUsagePage: React.FC = () => {
           </Select>
           <TextField size="small" type="number" value={topLimit} onChange={e => setTopLimit(Math.max(1, parseInt(e.target.value||'10', 10) || 10))} label="N" inputProps={{ min: 1, style: { width: 70 } }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Button variant="outlined" size="small" onClick={() => handleServerTopExport('excel')} title="Export Top-N (Server) Excel">Top-N (Server) Excel</Button>
-            <Button variant="outlined" size="small" onClick={() => handleServerTopExport('csv')} title="Export Top-N (Server) CSV">Top-N (Server) CSV</Button>
+            <button className="ultimate-btn ultimate-btn-edit" onClick={() => handleServerTopExport('excel')} title="Export Top-N (Server) Excel">
+              <div className="btn-content"><span className="btn-text">Top-N (Server) Excel</span></div>
+            </button>
+            <button className="ultimate-btn ultimate-btn-edit" onClick={() => handleServerTopExport('csv')} title="Export Top-N (Server) CSV">
+              <div className="btn-content"><span className="btn-text">Top-N (Server) CSV</span></div>
+            </button>
           </div>
         </div>
         <ExportButtons

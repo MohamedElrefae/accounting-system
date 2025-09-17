@@ -9,7 +9,7 @@ import { fetchProjects, fetchOrganizations, type LookupOption, fetchAccountsMini
 import { getCompanyConfig } from '../../services/company-config'
 import SearchableSelect, { type SearchableSelectOption } from '../../components/Common/SearchableSelect'
 import { getAllTransactionClassifications, type TransactionClassification } from '../../services/transaction-classification'
-import { getExpensesCategoriesList } from '../../services/expenses-categories'
+import { getExpensesCategoriesList } from '../../services/sub-tree'
 import { listWorkItemsAll } from '../../services/work-items'
 import { getCostCentersForSelector } from '../../services/cost-centers'
 import TableView from '@mui/icons-material/TableView'
@@ -148,7 +148,11 @@ const AccountExplorerReport: React.FC = () => {
     (async () => {
       try { const orgs = await fetchOrganizations(); setOrgOptions(orgs || []) } catch {}
       try { const projs = await fetchProjects(); setProjectOptions(projs || []) } catch {}
-      try { const { getActiveOrgId } = require('../../utils/org'); const stored = getActiveOrgId?.(); if (stored) setOrgId(stored) } catch {}
+      try {
+        const { getActiveOrgId } = await import('../../utils/org')
+        const stored = getActiveOrgId?.()
+        if (stored) setOrgId(stored)
+      } catch {}
       try { const cfg = await getCompanyConfig(); setCurrencySymbol(cfg.currency_symbol || cfg.currency_code || 'EGP'); setCompanyName(cfg?.company_name || '') } catch {}
     })()
   }, [])
@@ -169,8 +173,8 @@ const AccountExplorerReport: React.FC = () => {
           setClassifications(classes || [])
           setExpensesCategories(cats || [])
           setWorkItems(wItems || [])
-          setCostCenters((ccs || []).map((c: any) => ({ id: c.id, code: c.code, name: c.name })))
-          const accOpts: SearchableSelectOption[] = (accs || []).map((a: any) => ({ value: a.id, label: `${a.code} - ${a.name}`, searchText: `${a.code} ${a.name}` }))
+          setCostCenters((ccs || []).map((c: any) => ({ id: String(c.id), code: String(c.code), name: String(c.name) })))
+          const accOpts: SearchableSelectOption[] = (accs || []).map((a: any) => ({ value: String(a.id), label: `${String(a.code)} - ${String(a.name)}`, searchText: `${String(a.code)} ${String(a.name)}` }))
           setAccountsOptions([{ value: '', label: uiLang === 'ar' ? 'كل الحسابات' : 'All Accounts', searchText: '' }, ...accOpts])
         }
       } catch { /* noop */ }
@@ -190,7 +194,17 @@ const AccountExplorerReport: React.FC = () => {
       if (orgIdRef.current) accQ = accQ.eq('org_id', orgIdRef.current)
       const accRes = await accQ
       if (accRes.error) throw accRes.error
-      const accounts = (accRes.data || []) as any[]
+      const accounts = (accRes.data || []) as Array<{
+        id: string
+        code: string
+        name: string
+        name_ar?: string
+        level: number
+        parent_id?: string
+        status: string
+        category?: string
+        org_id: string
+      }>
 
       // 2) Fetch GL summary for current filters
       const { data: summaryData, error: sumErr } = await supabase.rpc('get_gl_account_summary', {
@@ -211,7 +225,15 @@ const AccountExplorerReport: React.FC = () => {
         p_amount_max: amountMax ? Number(amountMax) : null,
       })
       if (sumErr) throw sumErr
-      const summaryRows = (summaryData || []) as any[]
+      const summaryRows = (summaryData || []) as Array<{
+        account_id: string
+        opening_debit?: number
+        opening_credit?: number
+        period_debits?: number
+        period_credits?: number
+        closing_debit?: number
+        closing_credit?: number
+      }>
       const amountsById = new Map<string, Amounts>()
       for (const r of summaryRows) {
         amountsById.set(r.account_id, {
@@ -234,7 +256,7 @@ const AccountExplorerReport: React.FC = () => {
           name: a.name,
           name_ar: a.name_ar || null,
           level: Number(a.level || 1),
-          parent_id: a.parent_id,
+          parent_id: a.parent_id ?? null,
           status: a.status || 'active',
           category: a.category || null,
           children: [],
@@ -346,7 +368,7 @@ const AccountExplorerReport: React.FC = () => {
 
   // Export helpers (simple CSV for now)
   function exportCSV() {
-    let cols: string[] = [uiLang === 'ar' ? 'الكود' : 'Code', uiLang === 'ar' ? 'اسم الحساب' : 'Account', uiLang === 'ar' ? 'نوع الحساب' : 'Type', uiLang === 'ar' ? 'المستوى' : 'Level']
+    const cols: string[] = [uiLang === 'ar' ? 'الكود' : 'Code', uiLang === 'ar' ? 'اسم الحساب' : 'Account', uiLang === 'ar' ? 'نوع الحساب' : 'Type', uiLang === 'ar' ? 'المستوى' : 'Level']
     if (mode === 'range') {
       if (showOpeningInRange) cols.push(uiLang === 'ar' ? 'افتتاحي مدين' : 'Opening Debit', uiLang === 'ar' ? 'افتتاحي دائن' : 'Opening Credit')
       cols.push(
@@ -362,7 +384,7 @@ const AccountExplorerReport: React.FC = () => {
     }
 
     const rows = visibleFlat.map(n => {
-      const row: (string|number)[] = [n.code, (n.name_ar || n.name), (n.category || ''), String(n.level)]
+          const row: (string|number)[] = [String(n.code), String(n.name_ar || n.name), String(n.category || ''), String(n.level)]
       const openingDebit = Number(n.rollup.opening_debit || 0)
       const openingCredit = Number(n.rollup.opening_credit || 0)
       const periodDebits = Number(n.rollup.period_debits || 0)
@@ -390,12 +412,12 @@ const AccountExplorerReport: React.FC = () => {
   // Professional PDF generation function
   async function generatePDF() {
     try {
-      const projectName = projectId ? projectOptions.find(p => p.id === projectId)?.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
+      // const _projectName = projectId ? projectOptions.find(p => p.id === projectId)?.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
       const reportTitle = uiLang === 'ar' ? 'مستكشف الحسابات - التقرير المالي' : 'Account Explorer - Financial Report'
       const periodText = mode === 'range' ? `${uiLang === 'ar' ? 'من' : 'From'} ${dateFrom} ${uiLang === 'ar' ? 'إلى' : 'To'} ${dateTo}` : `${uiLang === 'ar' ? 'حتى تاريخ' : 'As of'} ${dateTo}`
       
       // Build PDF table structure
-      const pdfColumns: PDFTableColumn[] = [
+          const pdfColumns: import('../../services/pdf-generator').PDFTableColumn[] = [
         { key: 'code', header: uiLang === 'ar' ? 'رمز الحساب' : 'Account Code', width: '100px', align: 'center', type: 'text' },
         { key: 'name', header: uiLang === 'ar' ? 'اسم الحساب' : 'Account Name', width: '300px', align: 'right', type: 'text' },
         { key: 'type', header: uiLang === 'ar' ? 'نوع الحساب' : 'Account Type', width: '120px', align: 'center', type: 'text' },
@@ -906,7 +928,15 @@ const AccountExplorerReport: React.FC = () => {
       <div className={`${styles.professionalFilterBar} ${styles.noPrint}`}>
         {/* Left: org + project + dates */}
         <div className={styles.filterSection}>
-          <select className={styles.filterSelect} value={orgId} onChange={e => { setOrgId(e.target.value); try { const { setActiveOrgId } = require('../../utils/org'); setActiveOrgId?.(e.target.value) } catch {} }} aria-label={uiLang === 'ar' ? 'المؤسسة' : 'Organization'}>
+          <select className={styles.filterSelect} value={orgId} onChange={e => {
+            setOrgId(e.target.value)
+            ;(async () => {
+              try {
+                const { setActiveOrgId } = await import('../../utils/org')
+                setActiveOrgId?.(e.target.value)
+              } catch {}
+            })()
+          }} aria-label={uiLang === 'ar' ? 'المؤسسة' : 'Organization'}>
             <option value="">{uiLang === 'ar' ? 'اختر المؤسسة' : 'Select organization'}</option>
             {orgOptions.map(o => (
               <option key={o.id} value={o.id}>{o.code ? `${o.code} — ` : ''}{o.name_ar || o.name}</option>

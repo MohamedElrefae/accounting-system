@@ -4,13 +4,11 @@
 import createCacheEsm from '@emotion/cache'
 
 // Optional probe to confirm shim executes in production
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ;(globalThis as any).EMOTION_CACHE_SHIM = 'active'
-// eslint-disable-next-line no-console
+ 
 console.log('[shim] emotion-cache default normalized (esm)')
 
 // Normalize in case interop changes
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const anyCache: any = createCacheEsm as any
 const normalized = typeof anyCache === 'function' ? anyCache : (anyCache?.default ?? anyCache?.createCache)
 

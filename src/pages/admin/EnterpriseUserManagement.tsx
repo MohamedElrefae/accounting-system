@@ -229,7 +229,7 @@ export default function EnterpriseUserManagement() {
 
   // Filtered and sorted users
   const processedUsers = useMemo(() => {
-    let filtered = users.filter(user => {
+    const filtered = users.filter(user => {
       const matchesSearch = searchTerm === '' || 
         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -253,27 +253,32 @@ export default function EnterpriseUserManagement() {
       let comparison = 0;
       
       switch (sortField) {
-        case 'name':
+        case 'name': {
           const nameA = a.full_name_ar || `${a.first_name} ${a.last_name}` || a.email;
           const nameB = b.full_name_ar || `${b.first_name} ${b.last_name}` || b.email;
           comparison = nameA.localeCompare(nameB, 'ar');
           break;
-        case 'email':
+        }
+        case 'email': {
           comparison = a.email.localeCompare(b.email);
           break;
-        case 'role':
+        }
+        case 'role': {
           const roleA = a.role?.name_ar || '';
           const roleB = b.role?.name_ar || '';
           comparison = roleA.localeCompare(roleB, 'ar');
           break;
-        case 'last_login':
+        }
+        case 'last_login': {
           const loginA = new Date(a.last_login || 0).getTime();
           const loginB = new Date(b.last_login || 0).getTime();
           comparison = loginA - loginB;
           break;
-        case 'created':
+        }
+        case 'created': {
           comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
           break;
+        }
       }
       
       return sortDirection === 'desc' ? -comparison : comparison;
@@ -927,7 +932,8 @@ export default function EnterpriseUserManagement() {
                         </IconButton>
                         <IconButton size="small" color="info" onClick={() => {
                           setSelectedUser(user);
-                          setPermissionDialogOpen(true);
+                          // Permissions dialog not wired yet
+                          alert('عرض صلاحيات المستخدم قادم قريبًا');
                         }}>
                           <SecurityIcon />
                         </IconButton>

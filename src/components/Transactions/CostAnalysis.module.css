@@ -1,0 +1,123 @@
+/* CostAnalysis.module.css - tokens-based, RTL-first, no inline styles */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay, rgba(0,0,0,0.55));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4, 16px);
+  z-index: 1000;
+}
+
+.modal {
+  background: var(--surface, #0f0f0f);
+  color: var(--text, #eaeaea);
+  width: min(1100px, 95vw);
+  max-height: 90vh;
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: var(--shadow-lg, 0 16px 48px rgba(0,0,0,0.35));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  border-bottom: 1px solid var(--border, rgba(255,255,255,0.12));
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-lg, 18px);
+  font-weight: 700;
+}
+
+.meta {
+  padding: var(--space-2, 8px) var(--space-4, 16px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2, 8px);
+}
+
+.metaRow {
+  display: flex;
+  gap: var(--space-2, 8px);
+}
+
+.metaLabel {
+  color: var(--muted, #a3a3a3);
+  min-width: 80px;
+}
+
+.content {
+  padding: var(--space-2, 8px) var(--space-4, 16px);
+  overflow: auto;
+  flex: 1;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  border-top: 1px solid var(--border, rgba(255,255,255,0.12));
+}
+
+.spacer { flex: 1; }
+
+.tableWrapper {
+  overflow: auto;
+  border: 1px solid var(--border, rgba(255,255,255,0.12));
+  border-radius: var(--radius-md, 10px);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid var(--border, rgba(255,255,255,0.08));
+  padding: var(--space-2, 8px);
+  text-align: right;
+}
+
+.cellWide { min-width: 220px; }
+
+.input, .select, .inputNumber {
+  width: 100%;
+  padding: var(--space-1, 6px) var(--space-2, 8px);
+  border: 1px solid var(--border, rgba(255,255,255,0.12));
+  border-radius: var(--radius-sm, 8px);
+  background: var(--surface-1, #151515);
+  color: var(--text, #eaeaea);
+}
+
+.inputNumber { font-variant-numeric: tabular-nums; }
+
+.totalCell { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+.loading { padding: var(--space-4, 16px); text-align: center; }
+
+.summary {
+  margin-top: var(--space-3, 12px);
+  padding: var(--space-3, 12px);
+  border: 1px solid var(--border, rgba(255,255,255,0.12));
+  border-radius: var(--radius-md, 10px);
+  background: var(--surface-1, #151515);
+}
+
+.summaryRow { display: flex; gap: var(--space-2, 8px); margin-bottom: var(--space-1, 6px); }
+
+.summaryLabel { color: var(--muted, #a3a3a3); min-width: 120px; }
+
+.ok { color: var(--success-strong, #22c55e); }
+
+.under { color: var(--warning-strong, #f59e0b); }
+
+.over { color: var(--danger-strong, #ef4444); }

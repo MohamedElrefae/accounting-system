@@ -9,7 +9,8 @@ import {
   Info,
   Star,
   Lightbulb,
-  CheckCircle
+  CheckCircle,
+  Settings
 } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import styles from './UnifiedCRUDForm.module.css';
@@ -45,7 +46,7 @@ export interface FormField {
   disabled?: boolean;
   options?: SearchableSelectOption[];
   // Dynamically compute options based on current form data (overrides static options when provided)
-  optionsProvider?: (formData: Record<string, unknown>) => SearchableSelectOption[];
+  optionsProvider?: (formData: Record<string, unknown>) => SearchableSelectOption[] | Promise<SearchableSelectOption[]>;
   validation?: (value: unknown) => ValidationError | null;
   autoComplete?: string;
   min?: number;
@@ -157,17 +158,61 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     try {
       const raw = localStorage.getItem(storageKeyPrefix + 'fieldOrder');
       const arr = raw ? JSON.parse(raw) as string[] : [];
-      return arr.length > 0 ? arr : config.fields.map(f => f.id);
+      const defaultOrder = config.fields.map(f => f.id);
+      
+      // Debug logging for transaction forms
+      const isTransactionForm = config.title && (config.title.includes('معاملة') || config.title.includes('transaction'));
+      if (isTransactionForm) {
+        console.log('🌳 Transaction form field order - stored:', arr.length, 'default:', defaultOrder.length);
+        console.log('🌳 Default fields include sub_tree_id:', defaultOrder.includes('sub_tree_id'));
+        console.log('🌳 Stored fields include sub_tree_id:', arr.includes('sub_tree_id'));
+      }
+      
+      return arr.length > 0 ? arr : defaultOrder;
     } catch { return config.fields.map(f => f.id); }
   });
   const [visibleFields, setVisibleFields] = useState<Set<string>>(() => {
     try {
       const raw = localStorage.getItem(storageKeyPrefix + 'visibleFields');
       const arr = raw ? JSON.parse(raw) as string[] : [];
-      return arr.length > 0 ? new Set(arr) : new Set(config.fields.map(f => f.id));
-    } catch { return new Set(config.fields.map(f => f.id)); }
+      const defaultFields = new Set(config.fields.map(f => f.id));
+      
+      // Migration: Ensure sub_tree_id is always visible in transaction forms
+      const isTransactionForm = config.title && (config.title.includes('معاملة') || config.title.includes('transaction'));
+      if (isTransactionForm) {
+        defaultFields.add('sub_tree_id');
+        console.log('🌳 Transaction form detected - ensuring sub_tree_id visibility:', config.title);
+      }
+      
+      if (arr.length > 0) {
+        const storedFields = new Set(arr);
+        // Ensure sub_tree_id is in stored fields too for transaction forms  
+        if (isTransactionForm) {
+          storedFields.add('sub_tree_id');
+          console.log('🌳 Stored visible fields updated - sub_tree_id added:', storedFields.has('sub_tree_id'));
+          console.log('🌳 Total visible fields:', storedFields.size);
+        }
+        return storedFields;
+      }
+      console.log('🌳 Using default visible fields - sub_tree_id included:', defaultFields.has('sub_tree_id'));
+      return defaultFields;
+    } catch { 
+      const defaultFields = new Set(config.fields.map(f => f.id));
+      // Ensure sub_tree_id is always visible for transaction forms
+      const isTransactionFormCatch = config.title && (config.title.includes('معاملة') || config.title.includes('transaction'));
+      if (isTransactionFormCatch) {
+        defaultFields.add('sub_tree_id');
+        console.log('🌳 Transaction form detected (catch) - ensuring sub_tree_id visibility:', config.title);
+      }
+      return defaultFields;
+    }
   });
   const [layoutControlsOpen, setLayoutControlsOpen] = useState(false);
+  
+  // Async options management - track loading states and resolved options per field
+  const [fieldOptions, setFieldOptions] = useState<Record<string, any>>({});
+  const [fieldOptionsLoading, setFieldOptionsLoading] = useState<Set<string>>(new Set());
+  const [fieldOptionsErrors, setFieldOptionsErrors] = useState<Record<string, string>>({});
 
   // Load saved layout configuration on component mount
   useEffect(() => {
@@ -262,6 +307,59 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     }
   }, [config.autoFillLogic, formData.parent_id, formData.code]); // Only trigger on parent or code changes
 
+  // Handle async options loading for fields with optionsProvider
+  useEffect(() => {
+    const loadAsyncOptions = async (field: FormField) => {
+      if (!field.optionsProvider || !shouldShowField(field)) return;
+      
+      // Build dependency key to determine when to reload options
+      const dependencies = field.dependsOnAny || (field.dependsOn ? [field.dependsOn] : []);
+      const dependencyValues = dependencies.map(depId => formData[depId]).join('|');
+      const currentKey = `${field.id}:${dependencyValues}`;
+      
+      // Check if we already have options for this field+dependency combo
+      const existingKey = fieldOptions[field.id + '_key'] as string | undefined;
+      if (existingKey === currentKey && Array.isArray(fieldOptions[field.id])) {
+        return; // Already loaded for these dependencies
+      }
+      
+      // Mark as loading
+      setFieldOptionsLoading(prev => new Set(prev).add(field.id));
+      setFieldOptionsErrors(prev => ({ ...prev, [field.id]: '' }));
+      
+      try {
+        const result = await field.optionsProvider(formData);
+        const options = Array.isArray(result) ? result : [];
+        
+        setFieldOptions(prev => ({
+          ...prev,
+          [field.id]: options as SearchableSelectOption[],
+          [field.id + '_key']: currentKey
+        }));
+      } catch (error) {
+        console.error(`Failed to load options for field ${field.id}:`, error);
+        setFieldOptionsErrors(prev => ({ 
+          ...prev, 
+          [field.id]: error instanceof Error ? error.message : 'Failed to load options'
+        }));
+        setFieldOptions(prev => ({ ...prev, [field.id]: [] }));
+      } finally {
+        setFieldOptionsLoading(prev => {
+          const next = new Set(prev);
+          next.delete(field.id);
+          return next;
+        });
+      }
+    };
+    
+    // Load options for all fields that have optionsProvider
+    config.fields
+      .filter(field => field.optionsProvider && shouldShowField(field))
+      .forEach(field => {
+        loadAsyncOptions(field);
+      });
+  }, [config.fields, formData]);
+
   // Get field error
   const getFieldError = (fieldId: string): ValidationError | null => {
     return validationErrors.find(error => error.field === fieldId) || null;
@@ -280,13 +378,29 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   // Check if field should be shown
   const shouldShowField = (field: FormField): boolean => {
     // Check visibility setting first
-    if (!visibleFields.has(field.id)) {
+    const isVisible = visibleFields.has(field.id);
+    if (!isVisible) {
+      // Debug logging for sub_tree_id specifically
+      if (field.id === 'sub_tree_id') {
+        console.log('🌳 sub_tree_id field not visible - visibleFields:', Array.from(visibleFields));
+        console.log('🌳 Form title:', config.title);
+      }
       return false;
     }
     // Then check conditional logic
     if (field.conditionalLogic) {
-      return field.conditionalLogic(formData);
+      const conditionalResult = field.conditionalLogic(formData);
+      if (field.id === 'sub_tree_id') {
+        console.log('🌳 sub_tree_id conditional logic result:', conditionalResult);
+      }
+      return conditionalResult;
     }
+    
+    // Debug logging for sub_tree_id when it should be visible
+    if (field.id === 'sub_tree_id') {
+      console.log('🌳 sub_tree_id field should be visible');
+    }
+    
     return true;
   };
 
@@ -316,7 +430,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     // Run form-level validation for warnings (but only if no errors)
     if (config.customValidator && newErrors.length === 0) {
       const customValidation = config.customValidator(updatedFormData);
-      if (customValidation.warnings) {
+      if (customValidation && customValidation.warnings && Array.isArray(customValidation.warnings)) {
         setValidationWarnings(customValidation.warnings);
       } else {
         setValidationWarnings([]);
@@ -371,8 +485,11 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     // Custom form validation
     if (config.customValidator) {
       const customValidation = config.customValidator(formData)
-      errors.push(...customValidation.errors)
-      if (customValidation.warnings) {
+      // Safely handle errors array - ensure it exists and is iterable
+      if (customValidation.errors && Array.isArray(customValidation.errors)) {
+        errors.push(...customValidation.errors)
+      }
+      if (customValidation.warnings && Array.isArray(customValidation.warnings)) {
         warnings.push(...customValidation.warnings)
       }
     }
@@ -390,7 +507,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     const el = document.getElementById(fieldId) as HTMLElement | null;
     if (el) {
       el.focus();
-      try { (el as HTMLInputElement | HTMLTextAreaElement).select?.(); } catch {}
+      try { (el as HTMLInputElement | HTMLTextAreaElement).select?.(); } catch { /* ignore selection errors */ }
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   };
@@ -546,7 +663,16 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
 
   // Render field based on type
   const renderField = (field: FormField) => {
-    if (!shouldShowField(field)) return null;
+    if (!shouldShowField(field)) {
+      if (field.id === 'sub_tree_id') {
+        console.log('🌳 sub_tree_id field filtered out in renderField');
+      }
+      return null;
+    }
+    
+    if (field.id === 'sub_tree_id') {
+      console.log('🌳 Rendering sub_tree_id field - type:', field.type, 'hasOptionsProvider:', !!field.optionsProvider);
+    }
 
     const value = getFieldValue(field.id);
     const error = getFieldError(field.id);
@@ -555,8 +681,10 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     const showError = error && isTouched;
     const showSuccess = isTouched && !error;
 
-    // Resolve options: prefer dynamic optionsProvider when present
-    const fieldOptions = field.optionsProvider ? (field.optionsProvider(formData) || []) : (field.options || []);
+    // Resolve options: use preloaded async options if available, otherwise static options
+    const resolvedOptions = field.optionsProvider ? (fieldOptions[field.id] || []) : (field.options || []);
+    const isLoadingOptions = fieldOptionsLoading.has(field.id);
+    const optionsError = fieldOptionsErrors[field.id];
     
     // Check if this field should span full width
     // const isFullWidth = _breakpoint?.fullWidth;
@@ -579,7 +707,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
           className={[inputClasses, styles.inputSelect, (field.disabled || isLoading) ? styles.inputDisabled : ''].filter(Boolean).join(' ')}
         >
           <option value="">{field.placeholder || `اختر ${field.label}`}</option>
-          {fieldOptions.map(option => (
+          {resolvedOptions.map((option: SearchableSelectOption) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
@@ -593,13 +721,13 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
         <SearchableSelect
           id={field.id}
           value={value as string}
-          options={fieldOptions}
+          options={resolvedOptions}
           onChange={(selectedValue) => handleFieldChange(field.id, selectedValue, field)}
-          placeholder={field.placeholder}
-          disabled={field.disabled || isLoading}
+          placeholder={isLoadingOptions ? 'جاري التحميل...' : (optionsError ? 'خطأ في تحميل الخيارات' : field.placeholder)}
+          disabled={field.disabled || isLoading || isLoadingOptions}
           clearable={field.isClearable !== false}
           required={isFieldRequired(field)}
-          error={!!showError}
+          error={!!showError || !!optionsError}
           // Drilldown modal support (if provided by field)
           showDrilldownModal={!!field.drilldownOptions}
           treeOptions={field.drilldownOptions}
@@ -735,12 +863,34 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
               </p>
             )}
           </div>
-          {validationErrors.length > 0 && (
-            <div className={styles.errorChip}>
-              <AlertCircle size={14} />
-              🚨 {validationErrors.length} خطأ في البيانات
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {validationErrors.length > 0 && (
+              <div className={styles.errorChip}>
+                <AlertCircle size={14} />
+                🚨 {validationErrors.length} خطأ في البيانات
+              </div>
+            )}
+            {/* Configuration Button */}
+            <button 
+              type="button"
+              onClick={() => setLayoutControlsOpen(!layoutControlsOpen)}
+              className="ultimate-btn ultimate-btn-secondary"
+              style={{ 
+                padding: '8px 12px',
+                minHeight: 'auto',
+                fontSize: '13px',
+                background: layoutControlsOpen ? 'var(--accent-primary)' : 'var(--surface)',
+                color: layoutControlsOpen ? 'var(--button-text)' : 'var(--text-secondary)',
+                border: '1px solid var(--border-light)'
+              }}
+              title="إعدادات النموذج والتخطيط"
+            >
+              <div className="btn-content" style={{ gap: '6px' }}>
+                <Settings size={16} />
+                <span className="btn-text">الإعدادات</span>
+              </div>
+            </button>
+          </div>
         </div>
 
         {/* Layout Controls */}
@@ -803,6 +953,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
           }}
           isOpen={layoutControlsOpen}
           onToggle={() => setLayoutControlsOpen(!layoutControlsOpen)}
+          showToggleButton={false}
         />
         
         {/* Form Fields with Column Layout */}

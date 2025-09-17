@@ -193,7 +193,7 @@ export async function generateProfitLossPDF(reportData: FinancialReportData): Pr
  * Generate PDF for Account Explorer reports
  */
 export async function generateAccountExplorerPDF(reportData: FinancialReportData): Promise<void> {
-  let columnKeys = ['code', 'name', 'type', 'level'];
+  const columnKeys = ['code', 'name', 'type', 'level'];
   
   if (reportData.mode === 'range') {
     columnKeys.push('opening_debit', 'opening_credit', 'period_debits', 'period_credits', 'closing_debit', 'closing_credit', 'period_net', 'final_net');
@@ -218,7 +218,7 @@ export async function generateGenericFinancialPDF(
   const pdfColumns: PDFTableColumn[] = columnKeys
     .map(key => {
       const config = COMMON_COLUMNS[key];
-      if (!config) return null;
+      if (!config) return undefined as unknown as PDFTableColumn; // filter below
       
       // Check if column should be shown in current mode
       const shouldShow = mode === 'range' ? config.showInRange : config.showInAsof;
@@ -232,7 +232,7 @@ export async function generateGenericFinancialPDF(
         align: config.align
       };
     })
-    .filter((col): col is PDFTableColumn => col !== null);
+    .filter((col): col is PDFTableColumn => !!col);
 
   // Build rows
   const pdfRows = reportData.data.map(item => {

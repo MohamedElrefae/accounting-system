@@ -204,7 +204,7 @@ export default function EnterpriseRoleManagement() {
 
   // Filtered and sorted roles
   const processedRoles = useMemo(() => {
-    let filtered = roles.filter(role => {
+    const filtered = roles.filter(role => {
       const matchesSearch = searchTerm === '' || 
         role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         role.name_ar.includes(searchTerm) ||

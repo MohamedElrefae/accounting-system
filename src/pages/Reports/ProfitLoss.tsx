@@ -58,7 +58,7 @@ export default function ProfitLoss() {
   const [projectId, setProjectId] = useState<string>('')
   const [companyName, setCompanyName] = useState<string>('')
   const [orgId, setOrgId] = useState<string>('')
-  const [orgOptions, setOrgOptions] = useState<LookupOption[]>([])
+  const [_orgOptions, _setOrgOptions] = useState<LookupOption[]>([])
   const [detailedView, setDetailedView] = useState<boolean>(true)
   const [postedOnly, setPostedOnly] = useState<boolean>(false)
   // Numbers-only setting (hide currency symbol)
@@ -139,7 +139,7 @@ export default function ProfitLoss() {
     // Load organizations and set default
     try { 
       const orgs = await fetchOrganizations(); 
-      setOrgOptions(orgs || [])
+      _setOrgOptions(orgs || [])
       // Set default org from localStorage or first available
       const storedOrgId = getActiveOrgId()
       if (storedOrgId) {

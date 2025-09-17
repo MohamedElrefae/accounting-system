@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import './ColumnConfiguration.css'
 
 // Column configuration interface - defined inline to avoid import issues
@@ -11,7 +11,9 @@ export interface ColumnConfig {
   maxWidth?: number
   resizable?: boolean
   sortable?: boolean
-  type?: 'text' | 'number' | 'date' | 'currency' | 'boolean' | 'actions'
+  type?: 'text' | 'number' | 'date' | 'currency' | 'boolean' | 'badge' | 'actions'
+  frozen?: boolean
+  pinPriority?: number // Higher number = higher priority (pins first)
 }
 
 interface ColumnConfigurationProps {
@@ -33,29 +35,50 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null)
   const dragCounter = useRef(0)
 
-  if (!isOpen) return null
+  // Working copy for edits (apply on Save)
+  const [working, setWorking] = useState<ColumnConfig[]>(columns)
+  const [query, setQuery] = useState('')
+
+  useEffect(() => {
+    if (isOpen) {
+      setWorking(columns.map(c => ({ ...c })))
+      setQuery('')
+      setDraggedIndex(null)
+      setDropTargetIndex(null)
+      dragCounter.current = 0
+    }
+  }, [isOpen, columns])
+
+  const filteredWorking = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return working
+    return working.filter(c => (c.label || '').toLowerCase().includes(q) || c.key.toLowerCase().includes(q))
+  }, [working, query])
 
   const handleVisibilityChange = (index: number, visible: boolean) => {
-    const newColumns = [...columns]
-    newColumns[index] = { ...newColumns[index], visible }
-    onConfigChange(newColumns)
+    const idx = working.findIndex(c => c.key === filteredWorking[index].key)
+    if (idx < 0) return
+    const next = [...working]
+    next[idx] = { ...next[idx], visible }
+    setWorking(next)
   }
 
   const handleWidthChange = (index: number, width: number) => {
-    const newColumns = [...columns]
-    const column = newColumns[index]
+    const idx = working.findIndex(c => c.key === filteredWorking[index].key)
+    if (idx < 0) return
+    const next = [...working]
+    const column = next[idx]
     const minWidth = column.minWidth || 80
     const maxWidth = column.maxWidth || 500
     const constrainedWidth = Math.max(minWidth, Math.min(maxWidth, width))
-    
-    newColumns[index] = { ...newColumns[index], width: constrainedWidth }
-    onConfigChange(newColumns)
+    next[idx] = { ...next[idx], width: constrainedWidth }
+    setWorking(next)
   }
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index)
     e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/html', e.currentTarget.outerHTML)
+    e.dataTransfer.setData('text/plain', filteredWorking[index].key)
     if (e.currentTarget instanceof HTMLElement) {
       e.currentTarget.style.opacity = '0.5'
     }
@@ -98,24 +121,28 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
       return
     }
 
-    const newColumns = [...columns]
-    const draggedItem = newColumns[draggedIndex]
-    
-    // Remove the dragged item
-    newColumns.splice(draggedIndex, 1)
-    
-    // Insert at the target position
-    const insertIndex = draggedIndex < targetIndex ? targetIndex - 1 : targetIndex
-    newColumns.splice(insertIndex, 0, draggedItem)
-    
-    onConfigChange(newColumns)
+    const listKeys = filteredWorking.map(c => c.key)
+    const draggedKey = listKeys[draggedIndex]
+    const globalFrom = working.findIndex(c => c.key === draggedKey)
+    if (globalFrom < 0) return
+
+    const targetKey = listKeys[targetIndex]
+    const globalTo = working.findIndex(c => c.key === targetKey)
+    if (globalTo < 0) return
+
+    const next = [...working]
+    const [moved] = next.splice(globalFrom, 1)
+    const insertIndex = globalFrom < globalTo ? globalTo : globalTo
+    next.splice(insertIndex, 0, moved)
+
+    setWorking(next)
     setDropTargetIndex(null)
     dragCounter.current = 0
   }
 
   const toggleAll = (visible: boolean) => {
-    const newColumns = columns.map(col => ({ ...col, visible }))
-    onConfigChange(newColumns)
+    const next = working.map(col => ({ ...col, visible }))
+    setWorking(next)
   }
 
   const resetToDefaults = () => {
@@ -124,11 +151,36 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
     }
   }
 
+  const handleFreezeToggle = (index: number, frozen: boolean) => {
+    const idx = working.findIndex(c => c.key === filteredWorking[index].key)
+    if (idx < 0) return
+    const next = [...working]
+    next[idx] = { ...next[idx], frozen, pinPriority: frozen ? (next[idx].pinPriority || 1) : undefined }
+    setWorking(next)
+  }
+
+  const handlePinPriorityChange = (index: number, priority: number) => {
+    const idx = working.findIndex(c => c.key === filteredWorking[index].key)
+    if (idx < 0) return
+    const next = [...working]
+    next[idx] = { ...next[idx], pinPriority: priority, frozen: priority > 0 }
+    setWorking(next)
+  }
+
+  const applyChanges = () => {
+    onConfigChange(working)
+    onClose()
+  }
+
+  if (!isOpen) return null
   return (
     <div className="column-config-overlay" onClick={onClose}>
-      <div className="column-config-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="column-config-modal resizable-modal" onClick={(e) => e.stopPropagation()}>
         <div className="column-config-header">
-          <h3>إعدادات الأعمدة</h3>
+          <div>
+            <h3>إعدادات الأعمدة</h3>
+            <p className="config-subtitle">تكوين الرؤية وترتيب وعرض الأعمدة وأولوية التثبيت</p>
+          </div>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
 
@@ -155,18 +207,28 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
               </button>
             )}
           </div>
+          <div className="search-box">
+            <input
+              className="config-search-input"
+              placeholder="بحث عن عمود..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
         </div>
 
         <div className="column-config-content">
           <div className="config-list-header">
             <div className="header-drag">ترتيب</div>
             <div className="header-visibility">مرئي</div>
+            <div className="header-freeze">تثبيت</div>
             <div className="header-label">اسم العمود</div>
             <div className="header-width">العرض (px)</div>
+            <div className="header-priority">أولوية التثبيت</div>
           </div>
 
           <div className="column-config-list">
-            {columns.map((column, index) => (
+            {filteredWorking.map((column, index) => (
               <div
                 key={column.key}
                 className={`column-config-item ${
@@ -196,8 +258,22 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
                   <label htmlFor={`col-${column.key}`} className="checkbox-label"></label>
                 </div>
 
+                <div className="freeze-control" title="تثبيت هذا العمود">
+                  <input
+                    type="checkbox"
+                    checked={!!column.frozen}
+                    onChange={(e) => handleFreezeToggle(index, e.target.checked)}
+                    id={`col-freeze-${column.key}`}
+                  />
+                  <label htmlFor={`col-freeze-${column.key}`} className="checkbox-label"></label>
+                </div>
+
                 <div className="column-label" title={column.label}>
-                  {column.label}
+                  <div className="label-content">
+                    {column.frozen && <span className="pin-icon" title="مثبت">📌</span>}
+                    {column.label}
+                  </div>
+                  <div className="column-key">{column.key}</div>
                 </div>
 
                 <div className="width-control">
@@ -212,15 +288,48 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
                     className="width-input"
                   />
                 </div>
+
+                <div className="priority-control">
+                  <select
+                    value={column.pinPriority || 0}
+                    onChange={(e) => handlePinPriorityChange(index, parseInt(e.target.value))}
+                    disabled={!column.frozen}
+                    className="priority-select"
+                    title="أعلى رقم = أولوية أعلى (يثبت أولاً)"
+                  >
+                    <option value={0}>لا يوجد</option>
+                    <option value={1}>منخفض (1)</option>
+                    <option value={2}>متوسط (2)</option>
+                    <option value={3}>عالي (3)</option>
+                    <option value={4}>عالي جداً (4)</option>
+                  </select>
+                </div>
               </div>
             ))}
           </div>
         </div>
 
+        {/* Summary */}
+        <div className="column-config-summary">
+          <div className="summary-stats">
+            <div className="stat-item">
+              <span className="stat-value">{working.filter(c => c.visible).length}</span>
+              <span className="stat-label">مرئي</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-value">{working.filter(c => c.frozen).length}</span>
+              <span className="stat-label">مثبت</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-value">{working.filter(c => c.width && c.width > 0).length}</span>
+              <span className="stat-label">عرض مخصص</span>
+            </div>
+          </div>
+        </div>
+
         <div className="column-config-footer">
-          <button className="config-btn config-btn-primary" onClick={onClose}>
-            تطبيق
-          </button>
+          <button className="config-btn config-btn-secondary" onClick={onClose}>إلغاء</button>
+          <button className="config-btn config-btn-success" onClick={applyChanges}>حفظ التغييرات</button>
         </div>
       </div>
     </div>

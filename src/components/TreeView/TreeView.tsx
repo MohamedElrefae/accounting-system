@@ -13,6 +13,7 @@ interface TreeNode {
   is_active: boolean;
   account_type?: string;
   children?: TreeNode[];
+  [key: string]: any;
 }
 
 interface ButtonState {
@@ -27,25 +28,25 @@ interface ExtraColumn {
   render: (node: any) => React.ReactNode;
 }
 
-interface TreeViewProps {
-  data: TreeNode[];
-  onEdit?: (node: TreeNode) => void;
-  onAdd?: (parentNode: TreeNode) => void;
-  onToggleStatus?: (node: TreeNode) => void;
-  onDelete?: (node: TreeNode) => void;
-  onSelect?: (node: TreeNode) => void;
-  onToggleExpand?: (node: TreeNode) => void | Promise<void>;
-  canHaveChildren?: (node: TreeNode) => boolean;
-  getChildrenCount?: (node: TreeNode) => number | null | undefined;
+interface TreeViewProps<T extends TreeNode = TreeNode> {
+  data: T[];
+  onEdit?: (node: T) => void;
+  onAdd?: (parentNode: T) => void;
+  onToggleStatus?: (node: T) => void;
+  onDelete?: (node: T) => void;
+  onSelect?: (node: T) => void;
+  onToggleExpand?: (node: T) => void | Promise<void>;
+  canHaveChildren?: (node: T) => boolean;
+  getChildrenCount?: (node: T) => number | null | undefined;
   // New: allow parent to control deletion disabled state and tooltip reason
-  isDeleteDisabled?: (node: TreeNode) => boolean;
-  getDeleteDisabledReason?: (node: TreeNode) => string | undefined;
+  isDeleteDisabled?: (node: T) => boolean;
+  getDeleteDisabledReason?: (node: T) => string | undefined;
   maxLevel?: number;
   // New: extra columns to display between level and actions
   extraColumns?: ExtraColumn[];
 }
 
-const TreeView: React.FC<TreeViewProps> = ({ 
+const TreeView = <T extends TreeNode = TreeNode>({ 
   data, 
   onEdit, 
   onAdd, 
@@ -59,7 +60,7 @@ const TreeView: React.FC<TreeViewProps> = ({
   getDeleteDisabledReason,
   maxLevel = 4,
   extraColumns = []
-}) => {
+}: TreeViewProps<T>) => {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [buttonStates, setButtonStates] = useState<{[key: string]: ButtonState}>({});
 
@@ -81,9 +82,7 @@ const TreeView: React.FC<TreeViewProps> = ({
 
   const handleButtonWithStates = async (
     buttonId: string,
-    action: () => Promise<void> | void,
-    _successMessage?: string,
-    _errorMessage?: string
+    action: () => Promise<void> | void
   ) => {
     try {
       // Set loading state
@@ -108,7 +107,7 @@ const TreeView: React.FC<TreeViewProps> = ({
           return newStates;
         });
       }, 2000);
-    } catch (error) {
+    } catch {
       // Set error state
       setButtonStates(prev => ({
         ...prev,
@@ -126,7 +125,7 @@ const TreeView: React.FC<TreeViewProps> = ({
     }
   };
 
-  const renderTreeNode = (node: TreeNode, depth: number = 0): React.ReactNode => {
+  const renderTreeNode = (node: T, depth: number = 0): React.ReactNode => {
     const isExpanded = expandedNodes.has(node.id);
     const hasLoadedChildren = node.children && node.children.length > 0;
     const mayHaveChildren = hasLoadedChildren || (canHaveChildren ? !!canHaveChildren(node) : false);
@@ -189,9 +188,7 @@ const TreeView: React.FC<TreeViewProps> = ({
             <button
               onClick={() => handleButtonWithStates(
                 `edit-${node.id}`,
-                async () => onEdit && onEdit(node),
-                'تم فتح نموذج التعديل',
-                'فشل في فتح النموذج'
+                async () => onEdit && onEdit(node)
               )}
               className={`ultimate-btn ultimate-btn-edit ${
                 getButtonState(`edit-${node.id}`).loading ? 'loading' : ''
@@ -226,9 +223,7 @@ const TreeView: React.FC<TreeViewProps> = ({
               <button
                 onClick={() => handleButtonWithStates(
                   `add-${node.id}`,
-                  async () => onAdd && onAdd(node),
-                  'تم إضافة حساب فرعي',
-                  'فشل في الإضافة'
+                  async () => onAdd && onAdd(node)
                 )}
                 className={`ultimate-btn ultimate-btn-add ${
                   getButtonState(`add-${node.id}`).loading ? 'loading' : ''
@@ -263,9 +258,7 @@ const TreeView: React.FC<TreeViewProps> = ({
             <button
               onClick={() => handleButtonWithStates(
                 `toggle-${node.id}`,
-                async () => onToggleStatus && onToggleStatus(node),
-                node.is_active ? 'تم التعطيل' : 'تم التفعيل',
-                'فشل في تغيير الحالة'
+                async () => onToggleStatus && onToggleStatus(node)
               )}
               className={`ultimate-btn ${node.is_active ? 'ultimate-btn-disable' : 'ultimate-btn-enable'} ${
                 getButtonState(`toggle-${node.id}`).loading ? 'loading' : ''
@@ -302,12 +295,10 @@ const TreeView: React.FC<TreeViewProps> = ({
               onClick={() => handleButtonWithStates(
                 `delete-${node.id}`,
                 async () => {
-                  if (window.confirm(`هل أنت متأكد من حذف \"${node.name_ar}\"؟`)) {
-                    onDelete && onDelete(node);
+                  if (window.confirm(`هل أنت متأكد من حذف "${node.name_ar}"؟`)) {
+                    onDelete?.(node);
                   }
-                },
-                'تم الحذف بنجاح',
-                'فشل في الحذف'
+                }
               )}
               className={`ultimate-btn ultimate-btn-delete ${
                 getButtonState(`delete-${node.id}`).loading ? 'loading' : ''
@@ -348,7 +339,7 @@ const TreeView: React.FC<TreeViewProps> = ({
         
         {isExpanded && hasLoadedChildren && (
           <div className="tree-node-children">
-            {node.children!.map(child => renderTreeNode(child, depth + 1))}
+            {(node.children || []).map(child => renderTreeNode(child as any as T, depth + 1))}
           </div>
         )}
       </div>
@@ -414,7 +405,7 @@ const TreeView: React.FC<TreeViewProps> = ({
         </div>
       </div>
       {/* Tree Nodes */}
-      {treeData.map(node => renderTreeNode(node))}
+      {treeData.map(node => renderTreeNode(node as any as T))}
     </div>
   );
 };

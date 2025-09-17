@@ -1,5 +1,6 @@
 import React from 'react'
 import type { ReportPreset } from '../../services/user-presets'
+import './UltimateButtons.css'
 
 interface PresetBarProps {
   presets: ReportPreset[]
@@ -34,15 +35,25 @@ const PresetBar: React.FC<PresetBarProps> = ({
   saveLabel = 'حفظ',
   deleteLabel = 'حذف',
 }) => {
+  const wrapCls = wrapperClassName || 'presetbar-wrap'
+  const selectCls = selectClassName || 'filter-select'
+  const inputCls = inputClassName || 'filter-input'
+  const saveBtnCls = `ultimate-btn ultimate-btn-success ${buttonClassName || ''}`.trim()
+  const delBtnCls = `ultimate-btn ultimate-btn-delete ${buttonClassName || ''}`.trim()
+
   return (
-    <div className={wrapperClassName}>
-      <select className={selectClassName} value={selectedPresetId} onChange={(e) => onChangePreset(e.target.value)}>
+    <div className={wrapCls}>
+      <select className={selectCls} value={selectedPresetId} onChange={(e) => onChangePreset(e.target.value)}>
         <option value=''>اختر تهيئة محفوظة</option>
         {presets.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
       </select>
-      <input className={inputClassName} placeholder={placeholder} value={newPresetName} onChange={e => onChangeName(e.target.value)} />
-      <button className={buttonClassName} onClick={() => onSave()}>{saveLabel}</button>
-      <button className={buttonClassName} onClick={() => onDelete()}>{deleteLabel}</button>
+      <input className={inputCls} placeholder={placeholder} value={newPresetName} onChange={e => onChangeName(e.target.value)} />
+      <button className={saveBtnCls} onClick={() => onSave()}>
+        <div className="btn-content"><span className="btn-text">{saveLabel}</span></div>
+      </button>
+      <button className={delBtnCls} onClick={() => onDelete()}>
+        <div className="btn-content"><span className="btn-text">{deleteLabel}</span></div>
+      </button>
     </div>
   )
 }

@@ -60,7 +60,7 @@ export function useHasPermission() {
       } catch {
         setIsSuperAdmin(false)
       }
-    } catch (e) {
+    } catch {
       // Silent fail; default no extra perms
       setPerms(new Set())
       setIsSuperAdmin(false)

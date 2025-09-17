@@ -7,8 +7,8 @@ import SearchableSelect from '../../components/Common/SearchableSelect'
 import { getOrganizations, type Organization } from '../../services/organization'
 import { getActiveProjects, type Project } from '../../services/projects'
 import { getAllTransactionClassifications, type TransactionClassification } from '../../services/transaction-classification'
-import { getExpensesCategoriesList } from '../../services/expenses-categories'
-import type { ExpensesCategoryRow } from '../../types/expenses-categories'
+import { getExpensesCategoriesList } from '../../services/sub-tree'
+import type { ExpensesCategoryRow } from '../../types/sub-tree'
 import { getCostCentersForSelector } from '../../services/cost-centers'
 import { getAccounts, type Account } from '../../services/transactions'
 import { listWorkItemsAll } from '../../services/work-items'
@@ -167,7 +167,7 @@ const ExportDatabasePage: React.FC = () => {
             projectId: projectId || undefined,
             orgId: orgId || undefined,
             classificationId: classificationId || undefined,
-            expensesCategoryId: expensesCategoryId || undefined,
+            subTreeId: expensesCategoryId || undefined,
             workItemId: workItemId || undefined,
             costCenterId: costCenterId || undefined,
             status: (isPosted === 'posted' || isPosted === 'unposted') ? (isPosted as 'posted'|'unposted') : 'all',

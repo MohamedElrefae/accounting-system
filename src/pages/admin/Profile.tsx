@@ -5,6 +5,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { useUserProfile as useUserProfileCtx } from '../../contexts/UserProfileContext';
+import type { DatabaseId } from '../../types/database';
+
+// Error interface for proper error handling
+interface AppError {
+  message: string;
+  code?: string;
+  details?: unknown;
+}
 
 interface NotificationPrefs {
   email_notifications: boolean;
@@ -16,6 +24,28 @@ interface SecuritySettings {
   two_factor_enabled: boolean;
   login_alerts: boolean;
   session_timeout: number;
+}
+
+// Activity Log interface for user actions
+interface ActivityLog {
+  id: DatabaseId;
+  action: string;
+  created_at: string;
+  details?: unknown;
+}
+
+// User profile update payload
+interface UserProfileUpdate {
+  first_name?: string | null;
+  last_name?: string | null;
+  full_name_ar?: string | null;
+  department?: string | null;
+  phone?: string | null;
+  avatar_url?: string | null;
+  bio?: string | null;
+  updated_at?: string;
+  notification_preferences?: NotificationPrefs;
+  security_settings?: SecuritySettings;
 }
 
 const defaultPrefs: NotificationPrefs = {
@@ -51,7 +81,7 @@ const Profile: React.FC = () => {
   const [prefs, setPrefs] = useState<NotificationPrefs>(defaultPrefs);
   const [sec, setSec] = useState<SecuritySettings>(defaultSecurity);
 
-  const [activity, setActivity] = useState<{ id: string; action: string; created_at: string; details?: any }[]>([]);
+  const [activity, setActivity] = useState<ActivityLog[]>([]);
 
   useEffect(() => {
     if (profile) {
@@ -60,8 +90,8 @@ const Profile: React.FC = () => {
       setFullNameAr(profile.full_name_ar || '');
       setDepartment(profile.department || '');
       setPhone(profile.phone || '');
-      // @ts-ignore bio may not exist until SQL migration
-      setBio((profile as any).bio || '');
+      // Bio field may not exist until SQL migration
+      setBio((profile as Record<string, unknown>).bio as string || '');
       setAvatarUrl(profile.avatar_url || null);
     }
   }, [profile]);
@@ -80,7 +110,10 @@ const Profile: React.FC = () => {
         const ss = (data?.security_settings as SecuritySettings) || defaultSecurity;
         setPrefs({ ...defaultPrefs, ...np });
         setSec({ ...defaultSecurity, ...ss });
-      } catch {}
+      } catch (error) {
+        // Silently ignore errors when loading preferences - they're optional
+        console.debug('[Profile] Could not load preferences:', error);
+      }
     };
     loadExtras();
   }, [user?.id]);
@@ -101,7 +134,7 @@ const Profile: React.FC = () => {
           console.warn('[Profile] Audit logs table not available:', error.message);
           setActivity([]); // Set empty array if table doesn't exist
         } else {
-          setActivity((data as any) || []);
+          setActivity(data as ActivityLog[] || []);
         }
       } catch (e) {
         console.warn('[Profile] Could not load activity logs:', e);
@@ -138,8 +171,9 @@ const Profile: React.FC = () => {
       const { data } = supabase.storage.from('user-avatars').getPublicUrl(filePath);
       const publicUrl = data.publicUrl;
       setAvatarUrl(publicUrl);
-    } catch (e: any) {
-      setError(e.message || 'فشل رفع الصورة');
+    } catch (e: unknown) {
+      const error = e as AppError;
+      setError(error.message || 'فشل رفع الصورة');
     } finally {
       setUploading(false);
     }
@@ -152,7 +186,7 @@ const Profile: React.FC = () => {
     setSuccess(null);
     
     try {
-      const update: any = {
+      const update: UserProfileUpdate = {
         first_name: firstName,
         last_name: lastName,
         full_name_ar: fullNameAr,
@@ -179,8 +213,9 @@ const { error: upErr } = await supabase
       
       setSuccess('تم حفظ البيانات الشخصية');
       showToast('تم حفظ البيانات الشخصية', { severity: 'success' });
-    } catch (e: any) {
-      const msg = e.message || 'فشل حفظ البيانات';
+    } catch (e: unknown) {
+      const error = e as AppError;
+      const msg = error.message || 'فشل حفظ البيانات';
       setError(msg);
       showToast(msg, { severity: 'error' });
     } finally {
@@ -205,8 +240,9 @@ const { error: upErr } = await supabase
       if (upErr) throw upErr;
       setSuccess('تم حفظ التفضيلات الأمنية والإشعارات');
       showToast('تم حفظ التفضيلات', { severity: 'success' });
-    } catch (e: any) {
-      const msg = e.message || 'فشل حفظ التفضيلات';
+    } catch (e: unknown) {
+      const error = e as AppError;
+      const msg = error.message || 'فشل حفظ التفضيلات';
       setError(msg);
       showToast(msg, { severity: 'error' });
     } finally {
@@ -233,8 +269,9 @@ const { error: upErr } = await supabase
       setConfirmPassword('');
       setSuccess('تم تغيير كلمة المرور');
       showToast('تم تغيير كلمة المرور', { severity: 'success' });
-    } catch (e: any) {
-      const msg = e.message || 'فشل تغيير كلمة المرور';
+    } catch (e: unknown) {
+      const error = e as AppError;
+      const msg = error.message || 'فشل تغيير كلمة المرور';
       setError(msg);
       showToast(msg, { severity: 'error' });
     } finally {
@@ -255,8 +292,9 @@ const { error: upErr } = await supabase
       if (authErr) throw authErr;
       setSuccess('تم إرسال رسالة تأكيد إلى البريد الإلكتروني الجديد');
       showToast('تم إرسال رسالة تأكيد إلى البريد الإلكتروني الجديد', { severity: 'success' });
-    } catch (e: any) {
-      const msg = e.message || 'فشل تغيير البريد الإلكتروني';
+    } catch (e: unknown) {
+      const error = e as AppError;
+      const msg = error.message || 'فشل تغيير البريد الإلكتروني';
       setError(msg);
       showToast(msg, { severity: 'error' });
     } finally {

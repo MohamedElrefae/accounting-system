@@ -1,20 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { getAccounts, getTransactions, createTransaction, deleteTransaction, updateTransaction, getTransactionAudit, getCurrentUserId, getProjects, approveTransaction, requestRevision, rejectTransaction, submitTransaction, getUserDisplayMap, type Account, type TransactionRecord, type TransactionAudit, type Project } from '../../services/transactions'
+import { getAccounts, getTransactions, createTransaction, deleteTransaction, updateTransaction, getTransactionAudit, getCurrentUserId, getProjects, approveTransaction, requestRevision, rejectTransaction, submitTransaction, cancelSubmission, postTransaction, getUserDisplayMap, type Account, type TransactionRecord, type TransactionAudit, type Project } from '../../services/transactions'
 import { listWorkItemsAll } from '../../services/work-items'
 import type { WorkItemRow } from '../../types/work-items'
 import { getOrganizations } from '../../services/organization'
 import { getAllTransactionClassifications, type TransactionClassification } from '../../services/transaction-classification'
-import { getExpensesCategoriesList } from '../../services/expenses-categories'
+import { getExpensesCategoriesList } from '../../services/sub-tree'
 import { listAnalysisWorkItems } from '../../services/analysis-work-items'
 import type { Organization } from '../../types'
-import type { ExpensesCategoryRow } from '../../types/expenses-categories'
+import type { ExpensesCategoryRow } from '../../types/sub-tree'
 import { useHasPermission } from '../../hooks/useHasPermission'
 import './Transactions.css'
 import { useToast } from '../../contexts/ToastContext'
 import ExportButtons from '../../components/Common/ExportButtons'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
-import TransactionView from './TransactionView'
+import UnifiedTransactionDetailsPanel from '../../components/Transactions/UnifiedTransactionDetailsPanel'
 import { getApprovalHistoryByTransactionId, type ApprovalHistoryRow } from '../../services/approvals'
 import ClientErrorLogs from '../admin/ClientErrorLogs'
 import PermissionBadge from '../../components/Common/PermissionBadge'
@@ -31,11 +31,11 @@ import useColumnPreferences from '../../hooks/useColumnPreferences'
 import SearchableSelect, { type SearchableSelectOption } from '../../components/Common/SearchableSelect'
 import { supabase } from '../../utils/supabase'
 import { transactionValidationAPI } from '../../services/transaction-validation-api'
+import { getCompanyConfig } from '../../services/company-config'
 
 interface FilterState {
   dateFrom: string
   dateTo: string
-  isPosted: string
   amountFrom: string
   amountTo: string
 }
@@ -67,19 +67,43 @@ const TransactionsPage: React.FC = () => {
   const [audit, setAudit] = useState<TransactionAudit[]>([])
   const [approvalHistory, setApprovalHistory] = useState<ApprovalHistoryRow[]>([])
   
-  // Unified form panel state
-  const [panelPosition, setPanelPosition] = useState<{ x: number; y: number }>({ x: 100, y: 100 })
-  const [panelSize, setPanelSize] = useState<{ width: number; height: number }>({ width: 800, height: 700 })
-  const [panelMax, setPanelMax] = useState<boolean>(false)
-  const [panelDocked, setPanelDocked] = useState<boolean>(false)
-  const [panelDockPos, setPanelDockPos] = useState<'left' | 'right' | 'top' | 'bottom'>('right')
+  // Unified form panel state with persistence
+  const [panelPosition, setPanelPosition] = useState<{ x: number; y: number }>(() => {
+    try {
+      const saved = localStorage.getItem('transactionFormPanel:position');
+      return saved ? JSON.parse(saved) : { x: 100, y: 100 };
+    } catch { return { x: 100, y: 100 }; }
+  })
+  const [panelSize, setPanelSize] = useState<{ width: number; height: number }>(() => {
+    try {
+      const saved = localStorage.getItem('transactionFormPanel:size');
+      return saved ? JSON.parse(saved) : { width: 800, height: 700 };
+    } catch { return { width: 800, height: 700 }; }
+  })
+  const [panelMax, setPanelMax] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('transactionFormPanel:maximized');
+      return saved === 'true';
+    } catch { return false; }
+  })
+  const [panelDocked, setPanelDocked] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('transactionFormPanel:docked');
+      return saved === 'true';
+    } catch { return false; }
+  })
+  const [panelDockPos, setPanelDockPos] = useState<'left' | 'right' | 'top' | 'bottom'>(() => {
+    try {
+      const saved = localStorage.getItem('transactionFormPanel:dockPosition');
+      return (saved as 'left' | 'right' | 'top' | 'bottom') || 'right';
+    } catch { return 'right'; }
+  })
   
   const formRef = React.useRef<UnifiedCRUDFormHandle>(null)
 
   const [filters, setFilters] = useState<FilterState>({
     dateFrom: '',
     dateTo: '',
-    isPosted: '',
     amountFrom: '',
     amountTo: '',
   })
@@ -95,6 +119,46 @@ const TransactionsPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(20)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [userNames, setUserNames] = useState<Record<string, string>>({})
+  // Quick approval status filter (client-side)
+  const [approvalFilter, setApprovalFilter] = useState<'all' | 'draft' | 'submitted' | 'revision_requested' | 'approved' | 'rejected' | 'cancelled'>(() => {
+    try {
+      return (localStorage.getItem('transactions_approval_filter') as any) || 'all'
+    } catch { return 'all' }
+  })
+  // Wrap mode preference (persisted per user locally)
+  const [wrapMode, setWrapMode] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem('transactions_table_wrap')
+      return raw ? raw === '1' : false
+    } catch { return false }
+  })
+  
+  // Persist wrapMode to server when available
+  useEffect(() => {
+    if (!currentUserId) return
+    ;(async () => {
+      try {
+        const mod = await import('../../services/column-preferences')
+        if (mod.isColumnPreferencesRpcDisabled()) return
+        await mod.upsertUserColumnPreferences({
+          tableKey: 'transactions_table',
+          columnConfig: { wrapMode },
+          version: 1,
+        })
+      } catch {
+        // best-effort
+      }
+    })()
+  }, [wrapMode, currentUserId])
+
+  // Persist approval filter selection
+  useEffect(() => {
+    try { localStorage.setItem('transactions_approval_filter', approvalFilter) } catch {}
+  }, [approvalFilter])
+  // Persist wrap mode selection
+  useEffect(() => {
+    try { localStorage.setItem('transactions_table_wrap', wrapMode ? '1' : '0') } catch {}
+  }, [wrapMode])
   
   // Refresh Analysis Work Items label cache when org/project filter changes
   useEffect(() => {
@@ -119,6 +183,91 @@ const TransactionsPage: React.FC = () => {
   
   // Column configuration state
   const [columnConfigOpen, setColumnConfigOpen] = useState(false)
+  
+  // Transactions config modal state
+  const [transactionsConfigOpen, setTransactionsConfigOpen] = useState(false)
+  
+  // Configuration options state
+  const [transactionsConfig, setTransactionsConfig] = useState<{
+    showAuditInfo: boolean;
+    showApprovalBadges: boolean;
+    defaultAmountFilter: 'all' | 'positive' | 'negative';
+    defaultDateRange: 'all' | 'month' | 'quarter' | 'year';
+    defaultPageSize: number;
+    autoRefresh: boolean;
+    exportFormat: 'excel' | 'pdf' | 'csv';
+    groupByOrganization: boolean;
+    highlightPostedTransactions: boolean;
+  }>(() => {
+    try {
+      const saved = localStorage.getItem('transactionsConfig');
+      return saved ? JSON.parse(saved) : {
+        showAuditInfo: true,
+        showApprovalBadges: true,
+        defaultAmountFilter: 'all' as 'all' | 'positive' | 'negative',
+        defaultDateRange: 'all' as 'all' | 'month' | 'quarter' | 'year',
+        defaultPageSize: 20,
+        autoRefresh: false,
+        exportFormat: 'excel' as 'excel' | 'pdf' | 'csv',
+        groupByOrganization: false,
+        highlightPostedTransactions: true
+      };
+    } catch {
+      return {
+        showAuditInfo: true,
+        showApprovalBadges: true,
+        defaultAmountFilter: 'all' as 'all' | 'positive' | 'negative',
+        defaultDateRange: 'all' as 'all' | 'month' | 'quarter' | 'year',
+        defaultPageSize: 20,
+        autoRefresh: false,
+        exportFormat: 'excel' as 'excel' | 'pdf' | 'csv',
+        groupByOrganization: false,
+        highlightPostedTransactions: true
+      };
+    }
+  })
+  
+  // Persist transactions config
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionsConfig', JSON.stringify(transactionsConfig));
+    } catch {}
+  }, [transactionsConfig])
+  
+  // Persist form panel position
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionFormPanel:position', JSON.stringify(panelPosition));
+    } catch {}
+  }, [panelPosition])
+  
+  // Persist form panel size
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionFormPanel:size', JSON.stringify(panelSize));
+    } catch {}
+  }, [panelSize])
+  
+  // Persist form panel maximized state
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionFormPanel:maximized', String(panelMax));
+    } catch {}
+  }, [panelMax])
+  
+  // Persist form panel docked state
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionFormPanel:docked', String(panelDocked));
+    } catch {}
+  }, [panelDocked])
+  
+  // Persist form panel dock position
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionFormPanel:dockPosition', panelDockPos);
+    } catch {}
+  }, [panelDockPos])
 
   const location = useLocation()
   // Apply workItemId from URL query (drill-through)
@@ -137,6 +286,94 @@ const TransactionsPage: React.FC = () => {
   const { showToast } = useToast()
   const [showDiag, setShowDiag] = useState(false)
   const [showLogs, setShowLogs] = useState(false)
+  const [autoPostOnApprove, setAutoPostOnApprove] = useState<boolean>(false)
+
+  // Notify user if server-backed preferences are unavailable (local-only fallback)
+  useEffect(() => {
+    (async () => {
+      try {
+        const mod = await import('../../services/column-preferences')
+        if (mod.isColumnPreferencesRpcDisabled()) {
+          const warned = (() => { try { return sessionStorage.getItem('column_prefs_rpc_warned') === '1' } catch { return false } })()
+          if (!warned) {
+            showToast('سيتم حفظ إعدادات الأعمدة محلياً فقط مؤقتاً — سيتم المزامنة تلقائياً عند توفر الخادم.', { severity: 'warning' })
+            try { sessionStorage.setItem('column_prefs_rpc_warned', '1') } catch {}
+          }
+        }
+      } catch {/* silent */}
+    })()
+  }, [])
+
+  // Helper: unify Supabase error text for user-facing toasts
+  const formatSupabaseError = (e: any): string => {
+    try {
+      const { message, details, hint, code } = e || {}
+      const parts = [message, details, hint, code ? `code: ${code}` : ''].filter(Boolean)
+      return parts.join(' — ')
+    } catch {
+      return (e?.message || 'خطأ غير متوقع') as string
+    }
+  }
+
+  // Helper: small retry wrapper for flaky RPCs (e.g., 400 from transient state)
+  const withRetry = async <T,>(fn: () => Promise<T>, attempts = 2, delayMs = 400): Promise<T> => {
+    let lastErr: any
+    for (let i = 0; i < attempts; i++) {
+      try {
+        return await fn()
+      } catch (e: any) {
+        lastErr = e
+        if (i < attempts - 1) {
+          await new Promise(res => setTimeout(res, delayMs))
+        }
+      }
+    }
+    throw lastErr
+  }
+  
+  // Save current form panel layout and size as preferred
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleSaveFormPanelLayout = () => {
+    try {
+      const panelPreference = {
+        position: panelPosition,
+        size: panelSize,
+        maximized: panelMax,
+        docked: panelDocked,
+        dockPosition: panelDockPos,
+        savedTimestamp: Date.now(),
+        userPreferred: true
+      };
+      localStorage.setItem('transactionFormPanel:preferred', JSON.stringify(panelPreference));
+      console.log('✅ تم حفظ تخطيط مودال النموذج كمفضل');
+      showToast('✅ تم حفظ تخطيط النموذج', { severity: 'success' });
+    } catch (error) {
+      console.error('Failed to save form panel layout:', error);
+      showToast('⚠️ فشل في حفظ تخطيط النموذج', { severity: 'error' });
+    }
+  }
+  
+  // Reset form panel to default layout and size
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleResetFormPanelLayout = () => {
+    setPanelPosition({ x: 100, y: 100 });
+    setPanelSize({ width: 800, height: 700 });
+    setPanelMax(false);
+    setPanelDocked(false);
+    setPanelDockPos('right');
+    
+    // Clear saved preferences
+    try {
+      localStorage.removeItem('transactionFormPanel:preferred');
+      localStorage.removeItem('transactionFormPanel:position');
+      localStorage.removeItem('transactionFormPanel:size');
+      localStorage.removeItem('transactionFormPanel:maximized');
+      localStorage.removeItem('transactionFormPanel:docked');
+      localStorage.removeItem('transactionFormPanel:dockPosition');
+      console.log('🔄 تم إعادة تعيين تخطيط مودال النموذج');
+      showToast('🔄 تم إعادة تعيين تخطيط النموذج', { severity: 'info' });
+    } catch {}
+  }
 
   // Review modal state
   const [reviewOpen, setReviewOpen] = useState(false)
@@ -158,6 +395,16 @@ const TransactionsPage: React.FC = () => {
     ? 'pending'
     : 'all'
 
+  // Load company config to know if auto-post-on-approve is enabled
+  useEffect(() => {
+    (async () => {
+      try {
+        const cfg = await getCompanyConfig()
+        setAutoPostOnApprove(Boolean((cfg as any)?.auto_post_on_approve))
+      } catch {}
+    })()
+  }, [])
+
   // Default column configuration for transactions table
   const defaultColumns: ColumnConfig[] = useMemo(() => [
     { key: 'entry_number', label: 'رقم القيد', visible: true, width: 120, minWidth: 100, maxWidth: 200, type: 'text', resizable: true },
@@ -167,7 +414,7 @@ const TransactionsPage: React.FC = () => {
     { key: 'credit_account_label', label: 'الحساب الدائن', visible: true, width: 200, minWidth: 150, maxWidth: 300, type: 'text', resizable: true },
     { key: 'amount', label: 'المبلغ', visible: true, width: 140, minWidth: 120, maxWidth: 200, type: 'currency', resizable: true },
     { key: 'classification_name', label: 'التصنيف', visible: true, width: 160, minWidth: 120, maxWidth: 220, type: 'text', resizable: true },
-    { key: 'expenses_category_label', label: 'فئة المصروف', visible: true, width: 200, minWidth: 140, maxWidth: 280, type: 'text', resizable: true },
+    { key: 'sub_tree_label', label: 'الشجرة الفرعية', visible: true, width: 200, minWidth: 140, maxWidth: 280, type: 'text', resizable: true },
     { key: 'work_item_label', label: 'عنصر العمل', visible: true, width: 200, minWidth: 140, maxWidth: 280, type: 'text', resizable: true },
     { key: 'analysis_work_item_label', label: 'بند التحليل', visible: true, width: 200, minWidth: 140, maxWidth: 280, type: 'text', resizable: true },
     { key: 'organization_name', label: 'المؤسسة', visible: true, width: 180, minWidth: 150, maxWidth: 250, type: 'text', resizable: true },
@@ -177,8 +424,8 @@ const TransactionsPage: React.FC = () => {
     { key: 'notes', label: 'الملاحظات', visible: false, width: 200, minWidth: 150, maxWidth: 300, type: 'text', resizable: true },
     { key: 'created_by_name', label: 'أنشئت بواسطة', visible: false, width: 140, minWidth: 120, maxWidth: 200, type: 'text', resizable: true },
     { key: 'posted_by_name', label: 'مرحلة بواسطة', visible: false, width: 140, minWidth: 120, maxWidth: 200, type: 'text', resizable: true },
-    { key: 'status', label: 'الحالة', visible: true, width: 100, minWidth: 80, maxWidth: 150, type: 'text', resizable: true },
-    { key: 'actions', label: 'الإجراءات', visible: true, width: 200, minWidth: 180, maxWidth: 250, type: 'actions', resizable: false }
+    { key: 'approval_status', label: 'حالة الاعتماد', visible: true, width: 140, minWidth: 120, maxWidth: 200, type: 'badge', resizable: false },
+    { key: 'actions', label: 'الإجراءات', visible: true, width: 220, minWidth: 180, maxWidth: 400, type: 'actions', resizable: true }
   ], [])
 
   // Column preferences hook
@@ -188,10 +435,36 @@ const TransactionsPage: React.FC = () => {
     handleColumnConfigChange,
     resetToDefaults
   } = useColumnPreferences({
-    storageKey: 'transactions_table_columns',
+    storageKey: 'transactions_table',
     defaultColumns,
     userId: currentUserId || undefined
   })
+
+  // Refetch transactions whenever filters/scope/pagination change
+  useEffect(() => {
+    // Note: reload() uses current state (including mode and filters)
+    reload().catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    searchTerm,
+    filters.dateFrom,
+    filters.dateTo,
+    filters.amountFrom,
+    filters.amountTo,
+    (filters as any).analysis_work_item_id,
+    debitFilterId,
+    creditFilterId,
+    orgFilterId,
+    projectFilterId,
+    classificationFilterId,
+    expensesCategoryFilterId,
+    workItemFilterId,
+    costCenterFilterId,
+    page,
+    pageSize,
+    mode,
+    approvalFilter, // now server-side filtered
+  ])
 
   // Server-side load
   const [totalCount, setTotalCount] = useState(0)
@@ -221,6 +494,30 @@ const TransactionsPage: React.FC = () => {
         setOrganizations(orgsList)
         setClassifications(classificationsList)
         setCurrentUserId(uid)
+
+        // Load server preferences (wrapMode + columns + frozenCount) when user is known
+        try {
+          if (uid) {
+            const mod = await import('../../services/column-preferences')
+            if (!mod.isColumnPreferencesRpcDisabled()) {
+              const res = await mod.getUserColumnPreferences('transactions_table')
+              if (res && res.column_config) {
+              // Apply wrapMode if provided
+              if (typeof res.column_config.wrapMode === 'boolean') {
+                setWrapMode(!!res.column_config.wrapMode)
+                try { localStorage.setItem('transactions_table_wrap', res.column_config.wrapMode ? '1' : '0') } catch {}
+              }
+              // Apply columns if present by updating via hook handler
+              if (Array.isArray(res.column_config.columns) && res.column_config.columns.length > 0) {
+                try {
+                  // useColumnPreferences hook will merge and persist locally when it loads server columns
+                } catch {}
+              }
+            }
+          }
+        }
+        } catch {}
+
         await reload()
       } catch (e: any) {
         setError(e.message || 'فشل تحميل البيانات')
@@ -235,13 +532,41 @@ const TransactionsPage: React.FC = () => {
   useEffect(() => {
     if (!formOpen) return
     getAccounts().then(setAccounts).catch(() => {})
-    // Load expenses categories for the org used in the form (editing's org or default MAIN or first org)
-    const orgIdForForm = editingTx?.org_id || organizations.find(org => org.code === 'MAIN')?.id || organizations[0]?.id || ''
-    if (orgIdForForm) {
-      getExpensesCategoriesList(orgIdForForm).then(setCategories).catch(() => setCategories([]))
-      // Load cost centers for the selected organization
-      getCostCentersForSelector(orgIdForForm).then(setCostCenters).catch(() => setCostCenters([]))
+    
+    // Load categories for ALL organizations to ensure dropdown works for any selected org
+    // This is more robust than loading just for one org
+    if (organizations.length > 0) {
+      console.log('🌳 Form opened - loading categories for all orgs:', organizations.length);
+      Promise.all(organizations.map(org => 
+        getExpensesCategoriesList(org.id).catch(err => {
+          console.warn('Failed to load categories for org', org.id, err);
+          return [];
+        })
+      )).then(orgCategoriesLists => {
+        // Merge all categories from all organizations
+        const merged: Record<string, ExpensesCategoryRow> = {}
+        let totalCategories = 0;
+        for (const catList of orgCategoriesLists) {
+          for (const cat of catList) {
+            merged[cat.id] = cat;
+            totalCategories++;
+          }
+        }
+        const allCategories = Object.values(merged);
+        console.log('🌳 Categories loaded for form - total:', totalCategories, 'unique:', allCategories.length);
+        setCategories(allCategories);
+      }).catch(err => {
+        console.error('🌳 Failed to load categories for form:', err);
+        setCategories([]);
+      });
+      
+      // Load cost centers for the form's organization
+      const orgIdForForm = editingTx?.org_id || organizations.find(org => org.code === 'MAIN')?.id || organizations[0]?.id || ''
+      if (orgIdForForm) {
+        getCostCentersForSelector(orgIdForForm).then(setCostCenters).catch(() => setCostCenters([]))
+      }
     } else {
+      console.log('🌳 No organizations available, clearing categories');
       setCategories([])
       setCostCenters([])
     }
@@ -266,6 +591,7 @@ const TransactionsPage: React.FC = () => {
         workItemId: workItemFilterId || undefined,
         costCenterId: costCenterFilterId || undefined,
         analysisWorkItemId: (filters as any).analysis_work_item_id || undefined,
+approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted' | 'approved' | 'draft' | 'rejected' | 'revision_requested' | 'cancelled' | 'posted')) : undefined,
       },
       page,
       pageSize,
@@ -316,10 +642,8 @@ const TransactionsPage: React.FC = () => {
     } catch {}
   }
 
-  // With server-side, filtered equals transactions
-  const filtered = transactions
-
-  // Pagination handled server-side; local page shows fetched rows
+  // Client-side status filter (other filters are server-side)
+  // Server-side approval filter now applied; no extra client filtering
   const paged = transactions
 
   // Build account options for filters: all accounts (including non-postable) + drilldown tree
@@ -382,7 +706,7 @@ const TransactionsPage: React.FC = () => {
       debit_account_label: accLabel(t.debit_account_id),
       credit_account_label: accLabel(t.credit_account_id),
       amount: t.amount,
-      expenses_category_label: t.expenses_category_id ? (catMap[t.expenses_category_id] || '—') : '—',
+      sub_tree_label: t.sub_tree_id ? (catMap[t.sub_tree_id] || '—') : '—',
       work_item_label: (() => { const wi = workItems.find(w => w.id === (t.work_item_id || '')); return wi ? `${wi.code} - ${wi.name}` : '—' })(),
       analysis_work_item_label: (() => {
         const id = (t as any).analysis_work_item_id || ''
@@ -398,7 +722,7 @@ const TransactionsPage: React.FC = () => {
       notes: t.notes || '—',
       created_by_name: t.created_by ? (userNames[t.created_by] || t.created_by.substring(0, 8)) : '—',
       posted_by_name: t.posted_by ? (userNames[t.posted_by] || t.posted_by.substring(0, 8)) : '—',
-      status: t.is_posted ? 'مرحلة' : 'غير مرحلة',
+      approval_status: t.is_posted ? 'posted' : ((t as any).approval_status || 'draft'),
       actions: null, // Will be handled by renderCell
       original: t // Keep reference to original transaction for actions
     }))
@@ -414,7 +738,7 @@ const TransactionsPage: React.FC = () => {
       { key: 'credit_account', header: 'الحساب الدائن', type: 'text' },
       { key: 'amount', header: 'المبلغ', type: 'currency' },
       { key: 'classification_name', header: 'التصنيف', type: 'text' },
-      { key: 'expenses_category', header: 'فئة المصروف', type: 'text' },
+      { key: 'sub_tree', header: 'الشجرة الفرعية', type: 'text' },
       { key: 'work_item', header: 'عنصر العمل', type: 'text' },
       { key: 'analysis_work_item', header: 'بند التحليل', type: 'text' },
       { key: 'organization_name', header: 'المؤسسة', type: 'text' },
@@ -425,7 +749,7 @@ const TransactionsPage: React.FC = () => {
       { key: 'created_by', header: 'أنشئت بواسطة', type: 'text' },
       { key: 'posted_by', header: 'مرحلة بواسطة', type: 'text' },
       { key: 'posted_at', header: 'تاريخ الترحيل', type: 'date' },
-      { key: 'status', header: 'الحالة', type: 'text' },
+      { key: 'approval_status', header: 'حالة الاعتماد', type: 'text' },
     ])
     const accLabel = (id?: string | null) => {
       if (!id) return ''
@@ -434,14 +758,14 @@ const TransactionsPage: React.FC = () => {
     }
     const catMap: Record<string, string> = {}
     for (const c of categories) { catMap[c.id] = `${c.code} - ${c.description}` }
-    const rows = filtered.map((t: any) => ({
+    const rows = paged.map((t: any) => ({
       entry_number: t.entry_number,
       entry_date: t.entry_date,
       description: t.description,
       debit_account: accLabel(t.debit_account_id),
       credit_account: accLabel(t.credit_account_id),
       amount: t.amount,
-      expenses_category: t.expenses_category_id ? (catMap[t.expenses_category_id] || '') : '',
+      sub_tree: t.sub_tree_id ? (catMap[t.sub_tree_id] || '') : '',
       work_item: (() => { const wi = workItems.find(w => w.id === (t.work_item_id || '')); return wi ? `${wi.code} - ${wi.name}` : '' })(),
       analysis_work_item: (() => { const id = (t as any).analysis_work_item_id; const a = id ? analysisItemsMap[id] : null; return a ? `${a.code} - ${a.name}` : (id || '') })(),
       classification_name: t.transaction_classification?.name || '',
@@ -453,10 +777,12 @@ const TransactionsPage: React.FC = () => {
       created_by: t.created_by ? (userNames[t.created_by] || t.created_by) : '',
       posted_by: t.posted_by ? (userNames[t.posted_by] || t.posted_by) : '',
       posted_at: t.posted_at || null,
-      status: t.is_posted ? 'مرحلة' : 'غير مرحلة',
+      approval_status: t.is_posted
+        ? 'مرحلة'
+        : (({ draft: 'مسودة', submitted: 'مُرسلة', revision_requested: 'طلب تعديل', approved: 'معتمدة', rejected: 'مرفوضة', cancelled: 'ملغاة' } as any)[(t as any).approval_status || 'draft'] || 'مسودة'),
     }))
     return prepareTableData(columns, rows)
-  }, [transactions, userNames, accounts])
+  }, [paged, userNames, accounts, categories, workItems, analysisItemsMap, organizations, projects])
 
   // Create unified form configuration
   const transactionFormConfig = useMemo(() => {
@@ -487,8 +813,9 @@ const TransactionsPage: React.FC = () => {
     reference_number: tx.reference_number || '',
     notes: tx.notes || '',
     classification_id: tx.classification_id || '',
-    expenses_category_id: (tx as any).expenses_category_id || '',
+    sub_tree_id: (tx as any).sub_tree_id || '',
     work_item_id: (tx as any).work_item_id || '',
+    analysis_work_item_id: (tx as any).analysis_work_item_id || '',
     cost_center_id: tx.cost_center_id || '',
     organization_id: tx.org_id || '',
     project_id: tx.project_id || ''
@@ -498,6 +825,10 @@ const TransactionsPage: React.FC = () => {
     // Default organization (MAIN) and project (GENERAL)
     const defaultOrg = organizations.find(org => org.code === 'MAIN');
     const defaultProject = projects.find(project => project.code === 'GENERAL');
+    
+    console.log('🌳 buildInitialFormDataForCreate - organizations available:', organizations.length);
+    console.log('🌳 Default org found:', defaultOrg ? { id: defaultOrg.id, code: defaultOrg.code, name: defaultOrg.name } : null);
+    
     // Restore last selected debit/credit if available
     let lastDebit = ''
     let lastCredit = ''
@@ -505,7 +836,8 @@ const TransactionsPage: React.FC = () => {
       lastDebit = localStorage.getItem('tx_last_debit_account_id') || ''
       lastCredit = localStorage.getItem('tx_last_credit_account_id') || ''
     } catch {}
-    return {
+    
+    const initialData = {
       entry_number: 'سيتم توليده تلقائياً',
       entry_date: new Date().toISOString().split('T')[0],
       description: '',
@@ -517,6 +849,9 @@ const TransactionsPage: React.FC = () => {
       organization_id: defaultOrg?.id || '',
       project_id: defaultProject?.id || ''
     }
+    
+    console.log('🌳 Initial form data created with org_id:', initialData.organization_id);
+    return initialData;
   }
 
   // Helper to enrich a transaction with display fields so UI reflects org/project immediately
@@ -534,6 +869,11 @@ const TransactionsPage: React.FC = () => {
 
       // Perform backend validation before saving
       try {
+        if (!transactionValidationAPI || typeof transactionValidationAPI.validateTransactionBeforeSave !== 'function') {
+          console.warn('Transaction validation API not available, skipping backend validation')
+          throw new Error('Validation API not available')
+        }
+        
         const validationResult = await transactionValidationAPI.validateTransactionBeforeSave({
           debit_account_id: data.debit_account_id,
           credit_account_id: data.credit_account_id,
@@ -576,7 +916,7 @@ const TransactionsPage: React.FC = () => {
           amount: parseFloat(data.amount),
           notes: data.notes || null,
           classification_id: data.classification_id || null,
-          expenses_category_id: data.expenses_category_id || null,
+          sub_tree_id: data.sub_tree_id || null,
           work_item_id: data.work_item_id || null,
           analysis_work_item_id: data.analysis_work_item_id || null,
           cost_center_id: data.cost_center_id || null,
@@ -631,7 +971,7 @@ const TransactionsPage: React.FC = () => {
           amount: parseFloat(data.amount),
           notes: data.notes || undefined,
           classification_id: data.classification_id || undefined,
-          expenses_category_id: data.expenses_category_id || undefined,
+          sub_tree_id: data.sub_tree_id || undefined,
           work_item_id: data.work_item_id || undefined,
           analysis_work_item_id: data.analysis_work_item_id || undefined,
           cost_center_id: data.cost_center_id || undefined,
@@ -670,7 +1010,7 @@ const TransactionsPage: React.FC = () => {
           amount: parseFloat(data.amount),
           notes: data.notes || null,
           classification_id: data.classification_id || null,
-          expenses_category_id: data.expenses_category_id || null,
+          sub_tree_id: data.sub_tree_id || null,
           work_item_id: data.work_item_id || null,
           cost_center_id: data.cost_center_id || null,
           org_id: data.organization_id || null,
@@ -732,7 +1072,7 @@ const TransactionsPage: React.FC = () => {
     setReviewBusy(true)
     try {
       if (reviewAction === 'approve') {
-        await approveTransaction(reviewTargetId, reviewReason || null as any)
+        await withRetry(() => approveTransaction(reviewTargetId, reviewReason || null as any))
         // After approval, check whether posting actually happened. If posting permissions
         // are missing, the RPC succeeds (approved) but posting is skipped gracefully.
         let posted = false
@@ -744,10 +1084,17 @@ const TransactionsPage: React.FC = () => {
             .single()
           posted = Boolean(data?.is_posted)
         } catch {}
+        if (!posted && autoPostOnApprove) {
+          // Client-side fallback auto-post (best-effort)
+          try {
+            await postTransaction(reviewTargetId)
+            posted = true
+          } catch {}
+        }
         if (posted) {
           showToast('تم اعتماد المعاملة (وتم ترحيلها)', { severity: 'success' })
         } else {
-          showToast('تم اعتماد المعاملة (لم تُرحَّل — صلاحية الترحيل مطلوبة)', { severity: 'warning' as any })
+          showToast(autoPostOnApprove ? 'تم الاعتماد — جارٍ انتظار الترحيل (تحقق من الصلاحيات)' : 'تم اعتماد المعاملة (لم تُرحَّل — صلاحية الترحيل مطلوبة)', { severity: 'warning' as any })
         }
       } else if (reviewAction === 'revise') {
         if (!reviewReason.trim()) {
@@ -755,7 +1102,7 @@ const TransactionsPage: React.FC = () => {
           setReviewBusy(false)
           return
         }
-        await requestRevision(reviewTargetId, reviewReason)
+        await withRetry(() => requestRevision(reviewTargetId, reviewReason))
         showToast('تم إرجاع المعاملة للتعديل', { severity: 'success' })
       } else if (reviewAction === 'reject') {
         if (!reviewReason.trim()) {
@@ -763,7 +1110,7 @@ const TransactionsPage: React.FC = () => {
           setReviewBusy(false)
           return
         }
-        await rejectTransaction(reviewTargetId, reviewReason)
+        await withRetry(() => rejectTransaction(reviewTargetId, reviewReason))
         showToast('تم رفض المعاملة', { severity: 'success' })
       }
       setReviewOpen(false)
@@ -772,7 +1119,7 @@ const TransactionsPage: React.FC = () => {
       setReviewReason('')
       await reload()
     } catch (e: any) {
-      const msg = e?.message || 'فشل إجراء المراجعة'
+      const msg = formatSupabaseError(e) || 'فشل إجراء المراجعة'
       showToast(msg, { severity: 'error' })
       logClientError({ context: `transactions.review.${reviewAction}`, message: msg, extra: { id: reviewTargetId, reason: reviewReason } })
     } finally {
@@ -806,9 +1153,6 @@ const TransactionsPage: React.FC = () => {
             size="small"
             layout="horizontal"
           />
-          <button className="ultimate-btn ultimate-btn-add" onClick={() => { try { window.open('/main-data/analysis-work-items', '_blank', 'noopener'); } catch {} }}>
-            <div className="btn-content"><span className="btn-text">+ بند تحليل جديد</span></div>
-          </button>
           <WithPermission perm="transactions.manage">
             <button className="ultimate-btn ultimate-btn-warning" onClick={() => setShowLogs(true)}>
               <div className="btn-content"><span className="btn-text">سجل الأخطاء</span></div>
@@ -854,16 +1198,31 @@ const TransactionsPage: React.FC = () => {
           className="filter-input filter-input--date"
         />
         
-        {/* Status filter */}
-        <select
-          value={filters.isPosted}
-          onChange={e => { setFilters({ ...filters, isPosted: e.target.value }); setPage(1) }}
-          className="filter-select filter-select--status"
-        >
-          <option value="">الحالة</option>
-          <option value="posted">مرحلة</option>
-          <option value="unposted">غير مرحلة</option>
-        </select>
+
+        {/* Quick approval status chips */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          {/* Indicator for auto-post policy */}
+          <span className={`ultimate-btn ${autoPostOnApprove ? 'ultimate-btn-success' : 'ultimate-btn-neutral'}`} title={autoPostOnApprove ? 'اعتماد = ترحيل تلقائي مفعّل' : 'اعتماد = ترحيل تلقائي غير مفعّل'} style={{ minHeight: 28, padding: '4px 8px' }}>
+            <span className="btn-text">{autoPostOnApprove ? 'Auto-post: On' : 'Auto-post: Off'}</span>
+          </span>
+          <select
+            value={approvalFilter === 'all' ? '' : approvalFilter}
+            onChange={e => { const v = e.target.value || 'all'; setApprovalFilter(v as any); setPage(1) }}
+            className="filter-select filter-select--approval"
+            title="تصفية حسب حالة الاعتماد"
+          >
+            <option value="">حالة الاعتماد</option>
+            {/* Priority group */}
+            <option value="approved">معتمدة</option>
+            <option value="posted">مرحلة</option>
+            {/* Other statuses */}
+            <option value="submitted">مُرسلة</option>
+            <option value="revision_requested">طلب تعديل</option>
+            <option value="draft">مسودة</option>
+            <option value="rejected">مرفوضة</option>
+            <option value="cancelled">ملغاة</option>
+          </select>
+        </div>
         
         {/* Organization filter */}
         <select
@@ -941,7 +1300,7 @@ const TransactionsPage: React.FC = () => {
           onChange={e => { setExpensesCategoryFilterId(e.target.value); setPage(1) }}
           className="filter-select filter-select--expenses"
         >
-          <option value="">جميع فئات المصروف</option>
+          <option value="">جميع الشجرة الفرعية</option>
           {categories
             .slice()
             .sort((a, b) => `${a.code} - ${a.description}`.localeCompare(`${b.code} - ${b.description}`))
@@ -1022,7 +1381,7 @@ const TransactionsPage: React.FC = () => {
         <button
           onClick={() => {
             setSearchTerm('')
-            setFilters({ dateFrom: '', dateTo: '', isPosted: '', amountFrom: '', amountTo: '' })
+            setFilters({ dateFrom: '', dateTo: '', amountFrom: '', amountTo: '' })
             setDebitFilterId('')
             setCreditFilterId('')
             setOrgFilterId('')
@@ -1044,8 +1403,42 @@ const TransactionsPage: React.FC = () => {
         <div className="transactions-tablebar">
           <div className="transactions-toolbar">
             <span className="transactions-count">عدد السجلات: {totalCount}</span>
+            <label className="wrap-toggle">
+              <input
+                type="checkbox"
+                checked={wrapMode}
+                onChange={(e) => setWrapMode(e.target.checked)}
+              />
+              <span>التفاف النص</span>
+            </label>
             <button className="ultimate-btn" onClick={() => reload().catch(() => {})}>
               <div className="btn-content"><span className="btn-text">تحديث</span></div>
+            </button>
+            <button
+              className="ultimate-btn ultimate-btn-warning"
+              onClick={async () => {
+                try {
+                  // reset local
+                  setWrapMode(false)
+                  try { localStorage.setItem('transactions_table_wrap', '0') } catch {}
+                  handleColumnConfigChange(defaultColumns)
+                  // reset server (best effort)
+                  if (currentUserId) {
+                    const mod = await import('../../services/column-preferences')
+                    await mod.upsertUserColumnPreferences({
+                      tableKey: 'transactions_table',
+                      columnConfig: { columns: defaultColumns, wrapMode: false },
+                      version: 1,
+                    })
+                  }
+                  showToast('تمت استعادة الإعدادات الافتراضية للجدول', { severity: 'success' })
+                } catch (e: any) {
+                  showToast('فشل استعادة الإعدادات الافتراضية — تمت إعادة تحميل الإعدادات المحلية فقط', { severity: 'error' })
+                }
+              }}
+              title="استعادة الإعدادات الافتراضية"
+            >
+              <div className="btn-content"><span className="btn-text">استعادة الافتراضي</span></div>
             </button>
           </div>
           <div className="transactions-pagination">
@@ -1064,10 +1457,28 @@ const TransactionsPage: React.FC = () => {
           columns={columns}
           data={tableData}
           onColumnResize={handleColumnResize}
-          className="transactions-resizable-table"
+          className={`transactions-resizable-table ${wrapMode ? 'wrap' : 'nowrap'}`}
           isLoading={loading}
           emptyMessage="لا توجد معاملات"
           renderCell={(_value, column, row, _rowIndex) => {
+            if (column.key === 'approval_status') {
+              const st = row.original.is_posted ? 'posted' : String((row.original as any).approval_status || 'draft')
+              const map: Record<string, { label: string; cls: string; tip: string }> = {
+                draft: { label: 'مسودة', cls: 'ultimate-btn-neutral', tip: 'لم يتم إرسالها للمراجعة بعد' },
+                submitted: { label: 'مُرسلة', cls: 'ultimate-btn-edit', tip: 'بإنتظار المراجعة' },
+                revision_requested: { label: 'طلب تعديل', cls: 'ultimate-btn-warning', tip: 'أُعيدت للتعديل — أعد الإرسال بعد التصحيح' },
+                approved: { label: 'معتمدة', cls: 'ultimate-btn-success', tip: autoPostOnApprove ? 'تم الاعتماد — قد يتم الترحيل تلقائياً بحسب الإعداد' : 'تم الاعتماد (الترحيل يتطلب صلاحية)' },
+                rejected: { label: 'مرفوضة', cls: 'ultimate-btn-delete', tip: 'تم الرفض' },
+                cancelled: { label: 'ملغاة', cls: 'ultimate-btn-neutral', tip: 'ألغى المُرسل الإرسال' },
+                posted: { label: 'مرحلة', cls: 'ultimate-btn-posted', tip: 'تم الترحيل (مُثبت في الدفاتر)' },
+              }
+              const conf = map[st] || map['draft']
+              return (
+                <span className={`ultimate-btn ${conf.cls}`} style={{ cursor: 'default', padding: '4px 8px', minHeight: 28 }} title={conf.tip}>
+                  <span className="btn-text">{conf.label}</span>
+                </span>
+              )
+            }
             if (column.key === 'actions') {
               return (
                 <div className="tree-node-actions">
@@ -1084,22 +1495,31 @@ const TransactionsPage: React.FC = () => {
                     } catch {}
                     setDetailsOpen(true)
                   }}><div className="btn-content"><span className="btn-text">تفاصيل</span></div></button>
-                  {/* Test workflow shortcut */}
-                  <WithPermission perm="transactions.manage">
-                    <button className="ultimate-btn" title="اختبار المسار" onClick={() => {
-                      try { window.open(`/approvals/test?txId=${row.original.id}`, '_blank', 'noopener') } catch {}
-                    }}>
-                      <div className="btn-content"><span className="btn-text">اختبار</span></div>
-                    </button>
-                  </WithPermission>
                   {/* Review actions in pending mode if permitted */}
                   {mode === 'pending' && !row.original.is_posted && (
                     <>
-                      <WithPermission perm="transactions.review">
-                        <button className="ultimate-btn ultimate-btn-success" onClick={() => openReview('approve', row.original.id)}>
-                          <div className="btn-content"><span className="btn-text">اعتماد</span></div>
+                      {/* Resubmit if revision requested (owner or manager) */}
+                      {((row.original as any).approval_status === 'revision_requested') && (
+                        ((row.original.created_by === currentUserId) || hasPerm('transactions.manage')) && (
+                          <button className="ultimate-btn ultimate-btn-success" onClick={() => { setSubmitTargetId(row.original.id); setSubmitNote(''); setSubmitOpen(true) }}>
+                            <div className="btn-content"><span className="btn-text">إرسال مجددًا</span></div>
+                          </button>
+                        )
+                      )}
+                      {/* Show approve only if not already approved */}
+                      {(row.original as any).approval_status !== 'approved' && (
+                        <WithPermission perm="transactions.review">
+                          <button className="ultimate-btn ultimate-btn-success" title="اعتماد المعاملة" onClick={() => openReview('approve', row.original.id)}>
+                            <div className="btn-content"><span className="btn-text">اعتماد</span></div>
+                          </button>
+                        </WithPermission>
+                      )}
+                      {/* If user has post permission and tx is approved but not posted, show Post button */}
+                      {hasPerm('transactions.post') && (row.original as any).approval_status === 'approved' && !row.original.is_posted && (
+                        <button className="ultimate-btn ultimate-btn-warning" title="ترحيل المعاملة (يتطلب صلاحية)" onClick={async () => { try { await withRetry(() => postTransaction(row.original.id)); showToast('تم الترحيل', { severity: 'success' }); await reload(); } catch (e: any) { showToast(formatSupabaseError(e) || 'فشل ترحيل المعاملة', { severity: 'error' }); } }}>
+                          <div className="btn-content"><span className="btn-text">ترحيل</span></div>
                         </button>
-                      </WithPermission>
+                      )}
                       <WithPermission perm="transactions.review">
                         <button className="ultimate-btn ultimate-btn-edit" onClick={() => openReview('revise', row.original.id)}>
                           <div className="btn-content"><span className="btn-text">إرجاع للتعديل</span></div>
@@ -1112,8 +1532,12 @@ const TransactionsPage: React.FC = () => {
                       </WithPermission>
                     </>
                   )}
-                  {/* Submit for review (my) - Temporarily disabled */}
-                  {/*mode === 'my' && !row.original.is_posted && row.original.created_by === currentUserId && !['submitted','approved','rejected'].includes((row.original as any).approval_status || 'draft') && (
+                  {/* Submit for review (my) */}
+                  {(!row.original.is_posted &&
+                    (((mode === 'my' && row.original.created_by === currentUserId) ||
+                      (mode === 'all' && hasPerm('transactions.manage')))) &&
+                    !['submitted','approved','rejected'].includes(((row.original as any).approval_status || 'draft'))
+                  ) && (
                     <button className="ultimate-btn ultimate-btn-success" onClick={() => {
                       setSubmitTargetId(row.original.id)
                       setSubmitNote('')
@@ -1121,7 +1545,33 @@ const TransactionsPage: React.FC = () => {
                     }}>
                       <div className="btn-content"><span className="btn-text">إرسال للمراجعة</span></div>
                     </button>
-                  )*/}
+                  )}
+                  {/* Cancel submission for own submitted tx (before review) or managers in All view */}
+                  {(!row.original.is_posted &&
+                    ((row.original as any).approval_status === 'submitted') &&
+                    (((mode === 'my' && row.original.created_by === currentUserId) ||
+                      (mode === 'all' && hasPerm('transactions.manage'))))
+                  ) && (
+                    <button className="ultimate-btn ultimate-btn-warning" onClick={async () => {
+                      try {
+                        await withRetry(() => cancelSubmission(row.original.id))
+                        showToast('تم إلغاء الإرسال', { severity: 'success' })
+                        await reload()
+                      } catch (e: any) {
+                        const msg = formatSupabaseError(e)
+                        showToast(msg || 'تعذر إلغاء الإرسال', { severity: 'error' })
+                        logClientError({ context: 'transactions.cancelSubmission', message: msg || (e?.message || ''), extra: { id: row.original.id } })
+                      }
+                    }}>
+                      <div className="btn-content"><span className="btn-text">إلغاء الإرسال</span></div>
+                    </button>
+                  )}
+                  {/* If approved and not posted, allow posting in All/My when user has permission */}
+                  {hasPerm('transactions.post') && (row.original as any).approval_status === 'approved' && !row.original.is_posted && (
+                    <button className="ultimate-btn ultimate-btn-warning" title="ترحيل المعاملة (يتطلب صلاحية)" onClick={async () => { try { await withRetry(() => postTransaction(row.original.id)); showToast('تم الترحيل', { severity: 'success' }); await reload(); } catch (e: any) { showToast(formatSupabaseError(e) || 'فشل ترحيل المعاملة', { severity: 'error' }); } }}>
+                      <div className="btn-content"><span className="btn-text">ترحيل</span></div>
+                    </button>
+                  )}
                   {/* Edit (my) */}
                   {mode === 'my' && !row.original.is_posted && hasPerm('transactions.update') && row.original.created_by === currentUserId && (
                     <button className="ultimate-btn ultimate-btn-edit" onClick={() => {
@@ -1198,6 +1648,32 @@ const TransactionsPage: React.FC = () => {
             >
               <div className="btn-content"><span className="btn-text">+ شجرة الحسابات</span></div>
             </button>
+            
+            {/* Save Form Panel Layout Button */}
+            <button
+              className="ultimate-btn ultimate-btn-success"
+              title="حفظ حجم وموضع نموذج المعاملة كمفضل"
+              onClick={handleSaveFormPanelLayout}
+              style={{
+                fontSize: '12px',
+                padding: '6px 10px'
+              }}
+            >
+              <div className="btn-content"><span className="btn-text">💾 حفظ التخطيط</span></div>
+            </button>
+            
+            {/* Reset Form Panel Layout Button */}
+            <button
+              className="ultimate-btn ultimate-btn-warning"
+              title="إعادة تعيين حجم وموضع نموذج المعاملة"
+              onClick={handleResetFormPanelLayout}
+              style={{
+                fontSize: '12px',
+                padding: '6px 10px'
+              }}
+            >
+              <div className="btn-content"><span className="btn-text">🔄 إعادة تعيين</span></div>
+            </button>
           </div>
           <UnifiedCRUDForm
             ref={formRef}
@@ -1210,19 +1686,97 @@ const TransactionsPage: React.FC = () => {
           />
       </DraggableResizablePanel>
       
-      {/* Details Drawer */}
+      {/* Details Panel */}
       {detailsOpen && detailsFor && (
-        <TransactionView
+        <UnifiedTransactionDetailsPanel
           transaction={detailsFor}
           audit={audit}
           approvalHistory={approvalHistory}
           userNames={userNames}
-          categoryLabel={(detailsFor as any).expenses_category_id ? (() => {
+          categoryLabel={(detailsFor as any).sub_tree_id ? (() => {
             const m: Record<string,string> = {}
             for (const c of categories) { m[c.id] = `${c.code} - ${c.description}` }
-            return m[(detailsFor as any).expenses_category_id] || '—'
+            return m[(detailsFor as any).sub_tree_id] || '—'
           })() : '—'}
+          
+          // Data for editing
+          accounts={accounts}
+          projects={projects}
+          organizations={organizations}
+          classifications={classifications}
+          categories={categories}
+          workItems={workItems}
+          costCenters={costCenters}
+          analysisItemsMap={analysisItemsMap}
+          
+          // Callbacks
           onClose={() => setDetailsOpen(false)}
+          onUpdate={async (updatedTransaction) => {
+            try {
+              const updateData = {
+                entry_date: updatedTransaction.entry_date,
+                description: updatedTransaction.description,
+                reference_number: updatedTransaction.reference_number || null,
+                debit_account_id: updatedTransaction.debit_account_id,
+                credit_account_id: updatedTransaction.credit_account_id,
+                amount: updatedTransaction.amount,
+                notes: updatedTransaction.notes || null,
+                classification_id: updatedTransaction.classification_id || null,
+                sub_tree_id: (updatedTransaction as any).sub_tree_id || null,
+                work_item_id: (updatedTransaction as any).work_item_id || null,
+                analysis_work_item_id: (updatedTransaction as any).analysis_work_item_id || null,
+                cost_center_id: updatedTransaction.cost_center_id || null,
+                org_id: updatedTransaction.org_id || null,
+                project_id: updatedTransaction.project_id || null,
+              }
+              const updated = await updateTransaction(updatedTransaction.id, updateData as any)
+              const enrichedUpdated = enrichTx(updated)
+              setTransactions(prev => prev.map(t => t.id === updated.id ? enrichedUpdated : t))
+              showToast('تم تحديث المعاملة', { severity: 'success' })
+              await reload()
+            } catch (e: any) {
+              throw new Error(e?.message || 'فشل في تحديث المعاملة')
+            }
+          }}
+          onDelete={async (transactionId) => {
+            await handleDelete(transactionId)
+          }}
+          onSubmitForReview={async (transactionId, note) => {
+            await withRetry(() => submitTransaction(transactionId, note))
+            showToast('تم إرسال المعاملة للمراجعة بنجاح', { severity: 'success' })
+            await reload()
+          }}
+          onApprove={async (transactionId, reason) => {
+            await withRetry(() => approveTransaction(transactionId, reason || null as any))
+            showToast('تم اعتماد المعاملة', { severity: 'success' })
+            await reload()
+          }}
+          onReject={async (transactionId, reason) => {
+            await withRetry(() => rejectTransaction(transactionId, reason))
+            showToast('تم رفض المعاملة', { severity: 'success' })
+            await reload()
+          }}
+          onRequestRevision={async (transactionId, reason) => {
+            await withRetry(() => requestRevision(transactionId, reason))
+            showToast('تم إرجاع المعاملة للتعديل', { severity: 'success' })
+            await reload()
+          }}
+          onPost={async (transactionId) => {
+            await withRetry(() => postTransaction(transactionId))
+            showToast('تم ترحيل المعاملة', { severity: 'success' })
+            await reload()
+          }}
+          
+          // Permissions
+          canEdit={hasPerm('transactions.update')}
+          canDelete={hasPerm('transactions.delete')}
+          canReview={hasPerm('transactions.review')}
+          canPost={hasPerm('transactions.post')}
+          canManage={hasPerm('transactions.manage')}
+          
+          // UI state
+          currentUserId={currentUserId}
+          mode={mode}
         />
       )}
 
@@ -1283,7 +1837,7 @@ const TransactionsPage: React.FC = () => {
               </button>
             </div>
             <div>
-              <label className="modal-title modal-label">ملاحظات الإرسال (إلزامي)</label>
+              <label className="modal-title modal-label">ملاحظات الإرسال (اختياري)</label>
               <textarea
                 className="textarea-field"
                 placeholder={'أدخل سبب/ملاحظات الإرسال'}
@@ -1293,10 +1847,6 @@ const TransactionsPage: React.FC = () => {
               <div className="button-container">
                 <button className="ultimate-btn ultimate-btn-success" onClick={async () => {
                   if (!submitTargetId) return
-                  if (!submitNote.trim()) {
-                    showToast('يرجى إدخال ملاحظات الإرسال', { severity: 'error' })
-                    return
-                  }
                   setSubmitBusy(true)
                   try {
                     await submitTransaction(submitTargetId, submitNote)
@@ -1305,19 +1855,212 @@ const TransactionsPage: React.FC = () => {
                     setSubmitTargetId(null)
                     setSubmitNote('')
                     await reload()
+                    try { window.location.href = '/transactions/pending' } catch { /* ignore navigation error */ }
                   } catch (e: any) {
                     showToast(e?.message || 'فشل إرسال المعاملة للمراجعة', { severity: 'error' })
                     logClientError({ context: 'transactions.submit', message: e?.message || '', extra: { id: submitTargetId, note: submitNote } })
-                  }
+                  } finally {
                     setSubmitBusy(false)
                   }
-                } disabled={submitBusy}>
+                }} disabled={submitBusy}>
                   <div className="btn-content"><span className="btn-text">تأكيد الإرسال</span></div>
                 </button>
                 <button className="ultimate-btn ultimate-btn-warning" onClick={() => !submitBusy && setSubmitOpen(false)} disabled={submitBusy}>
                   <div className="btn-content"><span className="btn-text">إلغاء</span></div>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transactions Configuration Modal */}
+      {transactionsConfigOpen && (
+        <div className="transaction-modal" onClick={() => setTransactionsConfigOpen(false)}>
+          <div className="config-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header-row">
+              <h3 className="modal-title">تخطيط عرض المعاملات</h3>
+              <button className="ultimate-btn ultimate-btn-delete" onClick={() => setTransactionsConfigOpen(false)}>
+                <div className="btn-content"><span className="btn-text">إغلاق</span></div>
+              </button>
+            </div>
+            
+            <div className="config-modal-body">
+              <div className="config-section">
+                <h4>إعدادات العرض</h4>
+                
+                <div className="config-field">
+                  <label className="config-label">
+                    <input 
+                      type="checkbox" 
+                      checked={transactionsConfig.showAuditInfo}
+                      onChange={(e) => setTransactionsConfig(prev => ({ ...prev, showAuditInfo: e.target.checked }))}
+                    />
+                    عرض معلومات التدقيق
+                  </label>
+                </div>
+                
+                <div className="config-field">
+                  <label className="config-label">
+                    <input 
+                      type="checkbox" 
+                      checked={transactionsConfig.showApprovalBadges}
+                      onChange={(e) => setTransactionsConfig(prev => ({ ...prev, showApprovalBadges: e.target.checked }))}
+                    />
+                    عرض رموز حالة الاعتماد
+                  </label>
+                </div>
+                
+                <div className="config-field">
+                  <label className="config-label">
+                    <input 
+                      type="checkbox" 
+                      checked={transactionsConfig.highlightPostedTransactions}
+                      onChange={(e) => setTransactionsConfig(prev => ({ ...prev, highlightPostedTransactions: e.target.checked }))}
+                    />
+                    تمييز المعاملات المرحلة
+                  </label>
+                </div>
+                
+                <div className="config-field">
+                  <label className="config-label">
+                    <input 
+                      type="checkbox" 
+                      checked={transactionsConfig.groupByOrganization}
+                      onChange={(e) => setTransactionsConfig(prev => ({ ...prev, groupByOrganization: e.target.checked }))}
+                    />
+                    تجميع حسب المؤسسة
+                  </label>
+                </div>
+                
+                <div className="config-field">
+                  <label className="config-label">
+                    <input 
+                      type="checkbox" 
+                      checked={transactionsConfig.autoRefresh}
+                      onChange={(e) => setTransactionsConfig(prev => ({ ...prev, autoRefresh: e.target.checked }))}
+                    />
+                    تحديث تلقائي
+                  </label>
+                </div>
+                
+                <div className="config-field">
+                  <label className="config-label-block">
+                    حجم الصفحة الافتراضي:
+                    <select 
+                      value={transactionsConfig.defaultPageSize}
+                      onChange={(e) => setTransactionsConfig(prev => ({ ...prev, defaultPageSize: parseInt(e.target.value) }))}
+                      className="config-select"
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </label>
+                </div>
+                
+                <div className="config-field">
+                  <label className="config-label-block">
+                    فلتر المبلغ الافتراضي:
+                    <select 
+                      value={transactionsConfig.defaultAmountFilter}
+                      onChange={(e) => setTransactionsConfig(prev => ({ ...prev, defaultAmountFilter: e.target.value as 'all' | 'positive' | 'negative' }))}
+                      className="config-select"
+                    >
+                      <option value="all">جميع المبالغ</option>
+                      <option value="positive">مبالغ موجبة</option>
+                      <option value="negative">مبالغ سالبة</option>
+                    </select>
+                  </label>
+                </div>
+                
+                <div className="config-field">
+                  <label className="config-label-block">
+                    نطاق التاريخ الافتراضي:
+                    <select 
+                      value={transactionsConfig.defaultDateRange}
+                      onChange={(e) => setTransactionsConfig(prev => ({ ...prev, defaultDateRange: e.target.value as 'all' | 'month' | 'quarter' | 'year' }))}
+                      className="config-select"
+                    >
+                      <option value="all">جميع التواريخ</option>
+                      <option value="month">الشهر الحالي</option>
+                      <option value="quarter">الربع الحالي</option>
+                      <option value="year">العام الحالي</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              
+              <div className="config-section">
+                <h4>إعدادات التصدير</h4>
+                
+                <div className="config-field">
+                  <label className="config-label-block">
+                    تنسيق التصدير الافتراضي:
+                    <select 
+                      value={transactionsConfig.exportFormat}
+                      onChange={(e) => setTransactionsConfig(prev => ({ ...prev, exportFormat: e.target.value as 'excel' | 'pdf' | 'csv' }))}
+                      className="config-select"
+                    >
+                      <option value="excel">Excel (.xlsx)</option>
+                      <option value="pdf">PDF (.pdf)</option>
+                      <option value="csv">CSV (.csv)</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              
+              <div className="config-section">
+                <h4>عرض تحكم التخطيط</h4>
+                <div className="layout-control-section">
+                  <button 
+                    className="ultimate-btn ultimate-btn-primary"
+                    onClick={() => {
+                      setTransactionsConfigOpen(false);
+                      setColumnConfigOpen(true);
+                    }}
+                  >
+                    <div className="btn-content"><span className="btn-text">فتح تعديل الأعمدة</span></div>
+                  </button>
+                  <p className="config-help-text">يمكنك تخصيص عرض وترتيب وعرض الأعمدة</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="modal-actions">
+              <button 
+                className="ultimate-btn ultimate-btn-success"
+                onClick={() => setTransactionsConfigOpen(false)}
+              >
+                <div className="btn-content"><span className="btn-text">حفظ الإعدادات</span></div>
+              </button>
+              
+              <button 
+                className="ultimate-btn ultimate-btn-warning"
+                onClick={() => {
+                  setTransactionsConfig({
+                    showAuditInfo: true,
+                    showApprovalBadges: true,
+                    defaultAmountFilter: 'all',
+                    defaultDateRange: 'all',
+                    defaultPageSize: 20,
+                    autoRefresh: false,
+                    exportFormat: 'excel',
+                    groupByOrganization: false,
+                    highlightPostedTransactions: true
+                  });
+                }}
+              >
+                <div className="btn-content"><span className="btn-text">إعادة تعيين</span></div>
+              </button>
+              
+              <button 
+                className="ultimate-btn ultimate-btn-delete"
+                onClick={() => setTransactionsConfigOpen(false)}
+              >
+                <div className="btn-content"><span className="btn-text">إلغاء</span></div>
+              </button>
             </div>
           </div>
         </div>

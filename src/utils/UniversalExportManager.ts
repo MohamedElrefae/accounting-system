@@ -245,20 +245,22 @@ export class UniversalExportManager {
         );
       case 'date':
         return this.arabicEngine.formatDate(value, arabicOptions);
-      case 'percentage':
+      case 'percentage': {
         const percentageValue = `${(Number(value) * 100).toFixed(2)}%`;
         if (exportOptions.useWesternNumerals !== true) {
           return this.arabicEngine.convertNumerals(percentageValue, true);
         }
         return percentageValue;
+      }
       case 'boolean':
         return formatForExport(value ? 'نعم' : 'لا', exportOptions);
-      case 'number':
+      case 'number': {
         const numberValue = String(value);
         if (exportOptions.useWesternNumerals !== true) {
           return this.arabicEngine.convertNumerals(numberValue, true);
         }
         return numberValue;
+      }
       case 'text':
       default:
         return formatForExport(String(value), exportOptions);
@@ -430,11 +432,12 @@ export class UniversalExportManager {
               width = 8; // Small for true/false
               break;
             case 'text':
-            default:
+            default: {
               // Calculate width based on header length (Arabic text needs more space)
               const headerLength = col.header ? col.header.length : 10;
               width = Math.max(12, Math.min(30, headerLength * 1.2));
               break;
+            }
           }
         }
         
@@ -945,7 +948,7 @@ export class UniversalExportManager {
     const useArabicNumerals = options.useArabicNumerals !== false;
     
     switch (column.type) {
-      case 'currency':
+      case 'currency': {
         const currencyValue = Number(value) || 0;
         let formatted = currencyValue.toLocaleString('en-US', {
           minimumFractionDigits: 2,
@@ -955,22 +958,23 @@ export class UniversalExportManager {
           formatted = this.arabicEngine.convertNumerals(formatted, true);
         }
         return formatted;
-        
-      case 'number':
+      }
+      case 'number': {
         const numberValue = Number(value) || 0;
         let numFormatted = numberValue.toLocaleString('en-US');
         if (useArabicNumerals) {
           numFormatted = this.arabicEngine.convertNumerals(numFormatted, true);
         }
         return numFormatted;
+      }
         
       case 'date':
         return this.formatDateForLocale(new Date(value), options);
         
-      case 'percentage':
+      case 'percentage': {
         const percentValue = `${(Number(value) * 100).toFixed(2)}%`;
         return useArabicNumerals ? this.arabicEngine.convertNumerals(percentValue, true) : percentValue;
-        
+      }
       case 'boolean':
         return value ? 'نعم' : 'لا';
         

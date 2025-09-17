@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import DraggableResizablePanel from '../../components/Common/DraggableResizablePanel';
 import UnifiedCRUDForm from '../../components/Common/UnifiedCRUDForm';
-import createAccountFormConfig, { type AccountLite } from '../../components/Accounts/AccountFormConfig';
+import { createAccountFormConfig, type AccountLite } from '../../components/Accounts/AccountFormConfig';
 
 const AccountFormDemo: React.FC = () => {
   const [isOpen, setIsOpen] = useState(true);
@@ -14,18 +14,18 @@ const AccountFormDemo: React.FC = () => {
   });
 
   const parentAccounts: AccountLite[] = [
-    { id: 'p1', code: '1', name_ar: 'الأصول', level: 1, account_type: 'assets', statement_type: 'balance_sheet', is_active: true },
-    { id: 'p2', code: '2', name_ar: 'الخصوم', level: 1, account_type: 'liabilities', statement_type: 'balance_sheet', is_active: true },
+    { id: 'p1', code: '1', name_ar: 'الأصول', level: 1, category: 'asset', statement_type: 'balance_sheet', is_active: true },
+    { id: 'p2', code: '2', name_ar: 'الخصوم', level: 1, category: 'liability', statement_type: 'balance_sheet', is_active: true },
   ];
 
-  const formConfig = createAccountFormConfig(true, parentAccounts, { id: 'x', code: '1-1', name_ar: 'حساب فرعي جديد لـ الأصول', level: 2, account_type: 'assets', statement_type: 'balance_sheet', is_active: true });
+  const formConfig = createAccountFormConfig(true, parentAccounts, { id: 'x', code: '1-1', name_ar: 'حساب فرعي جديد لـ الأصول', level: 2, category: 'asset', statement_type: 'balance_sheet', is_active: true });
 
   const initialData = {
     code: '',
     name_ar: '',
     name_en: '',
     level: 1,
-    account_type: '',
+    category: '',
     statement_type: '',
     parent_id: '',
     is_active: true,

@@ -44,7 +44,7 @@ if (React && !React.Children) {
       enumerable: true,
       configurable: false
     })
-  } catch (error) {
+  } catch {
     console.warn('Could not assign React.Children, using fallback')
   }
 }

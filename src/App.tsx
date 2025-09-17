@@ -122,8 +122,8 @@ const App: React.FC = () => {
           
           {/* Main Data */}
           <Route path="/main-data/accounts-tree" element={<React.Suspense fallback={<>Loading...</>}><AccountsTreeLazy /></React.Suspense>} />
-          <Route path="/main-data/expenses-categories" element={
-            <RequirePermission perm="expenses_categories.view">
+          <Route path="/main-data/sub-tree" element={
+            <RequirePermission perm="sub_tree.view">
               <React.Suspense fallback={<div>Loading...</div>}>
                 <ExpensesCategoriesPage />
               </React.Suspense>

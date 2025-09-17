@@ -49,12 +49,13 @@ export const navigationItems: NavigationItem[] = [
         path: "/main-data/transaction-classification"
       },
       {
-        id: "expenses-categories",
-        label: "Expenses Categories",
-        titleEn: "Expenses Categories",
-        titleAr: "فئات المصروفات",
+        id: "sub-tree",
+        label: "Sub Tree",
+        titleEn: "Sub Tree",
+        titleAr: "الشجرة الفرعية",
         icon: "Category",
-        path: "/main-data/expenses-categories"
+        path: "/main-data/sub-tree",
+        requiredPermission: "sub_tree.view"
       },
       {
         id: "work-items",

@@ -58,7 +58,7 @@ const OrganizationSettings: React.FC = () => {
         default_project_id: currentConfig.default_project_id || '',
         shortcutsJSON: JSON.stringify((currentConfig as any).shortcuts || [], null, 2)
       });
-    } catch (e) {
+    } catch {
       showToast('فشل تحميل إعدادات المؤسسة', { severity: 'error' });
     } finally {
       setLoading(false);
@@ -75,7 +75,7 @@ const OrganizationSettings: React.FC = () => {
       try {
         parsedShortcuts = JSON.parse(formData.shortcutsJSON || '[]');
         if (!Array.isArray(parsedShortcuts)) throw new Error('Shortcuts must be an array');
-      } catch (err) {
+      } catch {
         showToast('صيغة الاختصارات غير صحيحة. يجب إدخال مصفوفة JSON.', { severity: 'error' });
         setSaving(false);
         return;
@@ -85,7 +85,7 @@ const OrganizationSettings: React.FC = () => {
       clearDateFormatCache();
       showToast('تم حفظ الإعدادات بنجاح', { severity: 'success' });
       await loadConfig();
-    } catch (e) {
+    } catch {
       showToast('فشل حفظ الإعدادات', { severity: 'error' });
     } finally {
       setSaving(false);
@@ -239,6 +239,21 @@ const OrganizationSettings: React.FC = () => {
                     style={{ width: '100%', fontFamily: 'monospace' }}
                   />
                   <small>أدخل مصفوفة من العناصر: label, path, icon (اختياري), accessKey (اختياري)</small>
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.section}>
+              <div className={styles.sectionHeader}><Settings size={18} /><h2>سياسة اعتماد/ترحيل المعاملات</h2></div>
+              <div className={styles.formGrid}>
+                <div className={styles.formField}>
+                  <label>
+                    <input type="checkbox" checked={(config as any)?.auto_post_on_approve || false} onChange={e=>{
+                      setConfig(c=>c? ({...c, auto_post_on_approve: e.target.checked} as any) : c);
+                      setFormData(p=>p); // no-op to trigger ui
+                    }} /> اعتماد = ترحيل تلقائي
+                  </label>
+                  <small>عند التفعيل، سيتم ترحيل المعاملة مباشرة بعد اعتمادها إن كانت صالحة.</small>
                 </div>
               </div>
             </div>

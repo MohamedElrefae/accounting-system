@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useEffect, useMemo, useState, useContext } from 'react';
 import { supabase } from '../utils/supabase';
 
 export type Profile = {
@@ -27,15 +27,15 @@ interface AuthContextValue {
   refreshProfile: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (ctx === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
-  return context;
-};
+  return ctx;
+}
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<any | null>(null);
@@ -52,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(session.user);
           await loadProfile(session.user.id);
         }
-      } catch (e) {
+      } catch {
         // Silent error handling
       } finally {
         setLoading(false);
@@ -78,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
         try {
           await loadProfile(session.user.id);
-        } catch (e) {
+        } catch {
           // Profile load failed, continuing anyway
         }
         // Ensure redirect after successful sign-in only
@@ -178,14 +178,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(result.data as Profile);
         // Persist super admin flag if present on profile row
         try {
-          // @ts-ignore allow dynamic prop
+          // Using dynamic property read; profile may have is_super_admin if available
           const isSuper = (result.data as any)?.is_super_admin === true;
           if (typeof isSuper === 'boolean') {
             localStorage.setItem('is_super_admin', isSuper ? 'true' : 'false');
           }
         } catch {}
       }
-    } catch (e: any) {
+    } catch {
       // Profile load failed/timeout, continuing anyway
     }
   };
@@ -212,7 +212,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (data.user) {
       try {
         await supabase.from('user_profiles').insert({ id: data.user.id, email: data.user.email!, ...extra });
-      } catch (_) {
+      } catch {
         // Ignore if table/policy not ready yet
       }
     }

@@ -34,15 +34,15 @@ interface AncestorItem {
   path_text: string;
 }
 
-function getInitialOrgId(): string | '' {
+async function getInitialOrgId(): Promise<string> {
   try {
     // Centralized helper
     // Using dynamic import to avoid SSR issues or test environments
-    const { getActiveOrgId } = require('../../utils/org');
-    const v = getActiveOrgId?.();
-    if (v && v.length > 0) return v;
+    const { getActiveOrgId } = await import('../../utils/org')
+    const v = getActiveOrgId?.()
+    if (v && v.length > 0) return v
   } catch {}
-  return '';
+  return ''
 }
 
 // Enum mapping functions to convert frontend values to database enum types
@@ -77,13 +77,48 @@ const AccountsTreePage: React.FC = () => {
 
   // Organizations selector
   const [organizations, setOrganizations] = useState<{ id: string; code: string; name: string }[]>([]);
-  const [orgId, setOrgId] = useState<string>(getInitialOrgId());
+  const [orgId, setOrgId] = useState<string>('');
 
   // Edit/Add dialog state (must be before unifiedConfig)
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'edit' | 'add'>('edit');
   const [draft, setDraft] = useState<Partial<AccountItem>>({});
   const [saving, setSaving] = useState(false);
+
+  // Selected account state for action buttons
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [configModalOpen, setConfigModalOpen] = useState(false);
+  
+  // Configuration options state
+  const [configOptions, setConfigOptions] = useState<{
+    autoExpandRoots: boolean;
+    showInactiveAccounts: boolean;
+    showTransactionCounts: boolean;
+    defaultViewMode: 'tree' | 'table';
+    exportFormat: 'excel' | 'pdf' | 'csv';
+    sortPref: 'code' | 'name' | 'level';
+  }>(() => {
+    try {
+      const saved = localStorage.getItem('accountsTreeConfig');
+      return saved ? JSON.parse(saved) : {
+        autoExpandRoots: false,
+        showInactiveAccounts: true,
+        showTransactionCounts: true,
+        defaultViewMode: 'tree' as 'tree' | 'table',
+        exportFormat: 'excel' as 'excel' | 'pdf' | 'csv',
+        sortPref: 'code' as 'code' | 'name' | 'level'
+      };
+    } catch {
+      return {
+        autoExpandRoots: false,
+        showInactiveAccounts: true,
+        showTransactionCounts: true,
+        defaultViewMode: 'tree' as 'tree' | 'table',
+        exportFormat: 'excel' as 'excel' | 'pdf' | 'csv',
+        sortPref: 'code' as 'code' | 'name' | 'level'
+      };
+    }
+  });
 
   // Draggable panel state for the unified form
   // Remember preference
@@ -106,7 +141,7 @@ const AccountsTreePage: React.FC = () => {
       name_ar: a.name_ar || a.name,
       name_en: a.name,
       level: a.level,
-      account_type: (a.account_type || '') as string,
+      category: (a.account_type || '') as string,
       statement_type: '',
       parent_id: a.parent_id,
       is_active: a.status === 'active',
@@ -115,6 +150,13 @@ const AccountsTreePage: React.FC = () => {
   }, [accounts]);
 
   const formRef = React.useRef<UnifiedCRUDFormHandle>(null);
+
+  // Persist config options
+  useEffect(() => {
+    try {
+      localStorage.setItem('accountsTreeConfig', JSON.stringify(configOptions));
+    } catch {}
+  }, [configOptions]);
 
   // Persist remember preference
   useEffect(() => {
@@ -178,16 +220,16 @@ const AccountsTreePage: React.FC = () => {
           name_ar: String(draft.name_ar || draft.name || ''),
           name_en: draft.name || '',
           level: Number(draft.level || 1),
-          account_type: String(draft.account_type || ''),
+          category: String(draft.account_type || ''),
           statement_type: '',
           parent_id: (draft.parent_id as string) || null,
           is_active: (draft.status || 'active') === 'active',
-          allow_transactions: (typeof (draft as any).allow_transactions === 'boolean')
-            ? (draft as any).allow_transactions
+          allow_transactions: (typeof (draft as AccountItem & { allow_transactions?: boolean }).allow_transactions === 'boolean')
+            ? (draft as AccountItem & { allow_transactions?: boolean }).allow_transactions
             : (((draft.level as number) || 1) >= 3),
         }
       : undefined;
-    return createAccountFormConfig(dialogMode === 'edit', parentAccountsLite, existing as any, true, !!hasAccountsUpdate);
+    return createAccountFormConfig(dialogMode === 'edit', parentAccountsLite, existing as (import('../../components/Accounts/AccountFormConfig').AccountLite | null | undefined), true, !!hasAccountsUpdate);
   }, [dialogMode, draft, parentAccountsLite, hasAccountsUpdate]);
 
   const { showToast } = useToast();
@@ -214,7 +256,7 @@ const AccountsTreePage: React.FC = () => {
             p_account_id: id,
           });
           if (!error && Array.isArray(data) && data.length > 0) {
-            const row = data[0] as any;
+            const row = data[0] as { has_transactions?: boolean; is_standard?: boolean };
             return [id, { has_transactions: !!row.has_transactions, is_standard: !!row.is_standard }] as const;
           }
         } catch {}
@@ -229,7 +271,7 @@ const AccountsTreePage: React.FC = () => {
     if (Object.keys(updates).length) {
       setDeleteFlags(prev => ({ ...prev, ...updates }));
       // Also merge onto accounts so UI logic sees them immediately
-      setAccounts(prev => prev.map(a => updates[a.id] ? { ...(a as any), ...updates[a.id] } : a));
+      setAccounts(prev => prev.map(a => updates[a.id] ? { ...a, ...updates[a.id] } : a));
     }
   }
 
@@ -239,10 +281,16 @@ const AccountsTreePage: React.FC = () => {
       try {
         const orgs = await getOrganizations();
         setOrganizations(orgs.map(o => ({ id: o.id, code: o.code, name: o.name })));
-        if (!getInitialOrgId() && orgs.length > 0) {
+        const initialOrgId = await getInitialOrgId();
+        if (!orgId && !initialOrgId && orgs.length > 0) {
           const first = orgs[0].id;
           setOrgId(first);
-          try { const { setActiveOrgId } = require('../../utils/org'); setActiveOrgId?.(first); } catch {}
+          try {
+            const { setActiveOrgId } = await import('../../utils/org');
+            setActiveOrgId?.(first);
+          } catch {}
+        } else if (initialOrgId && initialOrgId !== orgId) {
+          setOrgId(initialOrgId);
         }
       } catch {}
     })();
@@ -310,19 +358,19 @@ const AccountsTreePage: React.FC = () => {
     return mapped;
   }
 
-  function mapRow(row: any): AccountItem {
+  function mapRow(row: Record<string, unknown>): AccountItem {
     return {
-      id: row.id,
-      code: row.code,
-      name: row.name,
-      name_ar: row.name_ar || row.name,
-      level: row.level,
-      status: row.status,
-      parent_id: row.parent_id,
-      account_type: row.category || undefined,
-      has_children: row.has_children,
-      has_active_children: row.has_active_children,
-    } as any;
+      id: String(row.id || ''),
+      code: String(row.code || ''),
+      name: String((row as any).name || ''),
+      name_ar: String((row as any).name_ar || (row as any).name || ''),
+      level: Number(row.level || 1),
+      status: String(row.status || 'active') as any,
+      parent_id: (row.parent_id as string | null) ?? null,
+      account_type: ((row as any).category ? String((row as any).category) : undefined),
+      has_children: Boolean((row as any).has_children),
+      has_active_children: Boolean((row as any).has_active_children),
+    };
   }
 
 
@@ -350,12 +398,56 @@ const AccountsTreePage: React.FC = () => {
   }
 
   async function handleSelectAccount(node: AccountItem) {
-      const { data, error } = await supabase.rpc('get_account_ancestors', {
-        p_org_id: orgId,
+    setSelectedAccountId(node.id);
+    const { data, error } = await supabase.rpc('get_account_ancestors', {
+      p_org_id: orgId,
       p_account_id: node.id,
     });
     if (!error) setBreadcrumbs((data || []) as AncestorItem[]);
   }
+
+  // Helper functions for action buttons
+  const getSelectedAccount = () => {
+    if (!selectedAccountId) return null;
+    return accounts.find(a => a.id === selectedAccountId) || null;
+  };
+
+  const handleTopLevelAdd = () => {
+    if (!orgId) {
+      showToast('يرجى اختيار منظمة أولاً', { severity: 'warning' });
+      return;
+    }
+    setDialogMode('add');
+    setDraft({
+      id: undefined,
+      code: '',
+      name: '',
+      name_ar: '',
+      level: 1,
+      status: 'active',
+      parent_id: null,
+      account_type: ''
+    });
+    setDialogOpen(true);
+  };
+
+  const handleEditSelected = () => {
+    const selected = getSelectedAccount();
+    if (!selected) {
+      showToast('يرجى اختيار حساب للتعديل', { severity: 'warning' });
+      return;
+    }
+    handleEdit(selected);
+  };
+
+  const handleDeleteSelected = () => {
+    const selected = getSelectedAccount();
+    if (!selected) {
+      showToast('يرجى اختيار حساب للحذف', { severity: 'warning' });
+      return;
+    }
+    handleDelete(selected);
+  };
 
   // Shared action handlers for both views (Tree and Table)
   const handleEdit = async (node: AccountItem) => {
@@ -556,7 +648,7 @@ const AccountsTreePage: React.FC = () => {
       console.log('📋 Falling back to view-based query...');
       
       try {
-        let viewQuery = supabase
+        const viewQuery = supabase
           .from('v_accounts_activity_rollups')
           .select('id, org_id, has_transactions, net_amount, total_debit_amount, total_credit_amount, child_count')
           .eq('org_id', orgId);
@@ -624,7 +716,7 @@ const AccountsTreePage: React.FC = () => {
   }
 
   const filteredAndSorted = useMemo(() => {
-    let data = accounts.filter((acc) => {
+    const data = accounts.filter((acc) => {
       const nameDisp = (acc.name_ar || acc.name || '').toLowerCase();
       const matchesSearch =
         acc.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -682,9 +774,42 @@ const AccountsTreePage: React.FC = () => {
           <h1 className="page-title">شجرة الحسابات</h1>
         </div>
         <div className="page-actions">
-          <button className="ultimate-btn ultimate-btn-add" title="إضافة حساب جديد">
-            <div className="btn-content"><span className="btn-text">+ حساب</span></div>
+          {/* Config Button */}
+          <button 
+            className="ultimate-btn ultimate-btn-primary" 
+            title="إعدادات العرض" 
+            onClick={() => setConfigModalOpen(true)}
+          >
+            <div className="btn-content"><span className="btn-text">⚙️ إعدادات</span></div>
           </button>
+          
+          {/* Main Action Buttons */}
+          <button 
+            className="ultimate-btn ultimate-btn-add" 
+            title="إضافة حساب جديد" 
+            onClick={handleTopLevelAdd}
+          >
+            <div className="btn-content"><span className="btn-text">إضافة حساب جديد</span></div>
+          </button>
+          
+          <button 
+            className="ultimate-btn ultimate-btn-edit" 
+            title="تعديل الحساب المحدد" 
+            onClick={handleEditSelected}
+            disabled={!selectedAccountId}
+          >
+            <div className="btn-content"><span className="btn-text">تعديل الحساب المحدد</span></div>
+          </button>
+          
+          <button 
+            className="ultimate-btn ultimate-btn-delete" 
+            title="حذف الحساب المحدد" 
+            onClick={handleDeleteSelected}
+            disabled={!selectedAccountId}
+          >
+            <div className="btn-content"><span className="btn-text">حذف الحساب المحدد</span></div>
+          </button>
+          
           <ExportButtons
             data={exportData}
             config={{ title: 'تقرير الحسابات', orientation: 'landscape', useArabicNumerals: true, rtlLayout: true }}
@@ -785,7 +910,7 @@ const AccountsTreePage: React.FC = () => {
             <option value="4">المستوى 4</option>
           </select>
 
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="filter-select">
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'code' | 'name' | 'level')} className="filter-select">
             <option value="code">ترتيب حسب الكود</option>
             <option value="name">ترتيب حسب الاسم</option>
             <option value="level">ترتيب حسب المستوى</option>
@@ -800,7 +925,7 @@ const AccountsTreePage: React.FC = () => {
           </select>
 
           {/* Balance Mode (reserved for future RPC usage) */}
-          <select value={balanceMode} onChange={(e) => setBalanceMode(e.target.value as any)} className="filter-select">
+          <select value={balanceMode} onChange={(e) => setBalanceMode(e.target.value as 'posted' | 'all')} className="filter-select">
             <option value="posted">المنشورة فقط</option>
             <option value="all">جميع العمليات</option>
           </select>
@@ -808,7 +933,15 @@ const AccountsTreePage: React.FC = () => {
 
         <div className="view-mode-toggle">
           {/* Organization selector */}
-          <select value={orgId} onChange={(e) => { setOrgId(e.target.value); try { const { setActiveOrgId } = require('../../utils/org'); setActiveOrgId?.(e.target.value); } catch {} }} className="filter-select">
+          <select value={orgId} onChange={(e) => {
+            setOrgId(e.target.value);
+            (async () => {
+              try {
+                const { setActiveOrgId } = await import('../../utils/org');
+                setActiveOrgId?.(e.target.value);
+              } catch {}
+            })()
+          }} className="filter-select">
             <option value="">اختر المؤسسة</option>
             {organizations.map(o => (
               <option key={o.id} value={o.id}>{o.code} - {o.name}</option>
@@ -825,42 +958,42 @@ const AccountsTreePage: React.FC = () => {
             data={filteredAndSorted.map(n => ({
               ...n,
               // TreeView expects name_ar field; ensure it exists
-              name_ar: (n as any).name_ar || n.name,
+              name_ar: n.name_ar || n.name,
               is_active: n.status === 'active',
-            })) as any}
-            onEdit={(node) => handleEdit(node as any)}
-            onAdd={(parent) => handleAdd(parent as any)}
-            onToggleStatus={(node) => handleToggleStatus(node as any)}
-            onDelete={(node) => handleDelete(node as any)}
-            onSelect={(node) => handleSelectAccount(node as any)}
-            onToggleExpand={async (node) => { toggleNode(node as any); }}
+            }))}
+            onEdit={(node) => handleEdit(node as AccountItem)}
+            onAdd={(parent) => handleAdd(parent as AccountItem)}
+            onToggleStatus={(node) => handleToggleStatus(node as AccountItem)}
+            onDelete={(node) => handleDelete(node as AccountItem)}
+            onSelect={(node) => handleSelectAccount(node as AccountItem)}
+            onToggleExpand={async (node) => { toggleNode(node as AccountItem); }}
             canHaveChildren={(node) => {
-              const id = (node as any).id as string;
+              const id = (node as AccountItem).id;
               const item = accounts.find(a => a.id === id);
               if (!item) return false;
               return !!(item.has_active_children || item.has_children);
             }}
-            getChildrenCount={(node) => accounts.filter(a => a.parent_id === (node as any).id).length}
+            getChildrenCount={(node) => accounts.filter(a => a.parent_id === (node as AccountItem).id).length}
             isDeleteDisabled={(node) => {
-              const id = (node as any).id as string;
+              const id = (node as AccountItem).id;
               const item = accounts.find(a => a.id === id);
               if (!item) return true;
               // Disable if parent (has children) – immediate and cheap
               if (item.has_children || item.has_active_children) return true;
-              // Optional: disable if we already know it has transactions or is standard (cached on item via any extensions)
-              const anyFlags = (item as any);
-              if (anyFlags?.has_transactions === true) return true;
-              if (anyFlags?.is_standard === true) return true;
+              // Optional: disable if we already know it has transactions or is standard (cached on item via extensions)
+              const extendedItem = item as AccountItem & { has_transactions?: boolean; is_standard?: boolean };
+              if (extendedItem?.has_transactions === true) return true;
+              if (extendedItem?.is_standard === true) return true;
               return false;
             }}
             getDeleteDisabledReason={(node) => {
-              const id = (node as any).id as string;
+              const id = (node as AccountItem).id;
               const item = accounts.find(a => a.id === id);
               if (!item) return 'غير متاح';
               if (item.has_children || item.has_active_children) return 'لا يمكن حذف حساب له فروع';
-              const anyFlags = (item as any);
-              if (anyFlags?.is_standard) return 'حساب قياسي (افتراضي) لا يمكن حذفه';
-              if (anyFlags?.has_transactions) return 'لا يمكن حذف حساب لديه حركات';
+              const extendedItem = item as AccountItem & { has_transactions?: boolean; is_standard?: boolean };
+              if (extendedItem?.is_standard) return 'حساب قياسي (افتراضي) لا يمكن حذفه';
+              if (extendedItem?.has_transactions) return 'لا يمكن حذف حساب لديه حركات';
               return 'حذف';
             }}
             maxLevel={4}
@@ -912,13 +1045,13 @@ const AccountsTreePage: React.FC = () => {
                             <div className="btn-content"><span className="btn-text">{isActive ? 'تعطيل' : 'تفعيل'}</span></div>
                           </button>
                           {(() => {
-                            const anyFlags = (item as any);
-                            const disabled = !!(item.has_children || item.has_active_children || anyFlags?.has_transactions || anyFlags?.is_standard);
+                            const extendedItem = item as AccountItem & { has_transactions?: boolean; is_standard?: boolean };
+                            const disabled = !!(item.has_children || item.has_active_children || extendedItem?.has_transactions || extendedItem?.is_standard);
                             const reason = item.has_children || item.has_active_children
                               ? 'لا يمكن حذف حساب له فروع'
-                              : anyFlags?.is_standard
+                              : extendedItem?.is_standard
                                 ? 'حساب قياسي (افتراضي) لا يمكن حذفه'
-                                : anyFlags?.has_transactions
+                                : extendedItem?.has_transactions
                                   ? 'لا يمكن حذف حساب لديه حركات'
                                   : 'حذف';
                             return (
@@ -1137,6 +1270,143 @@ const AccountsTreePage: React.FC = () => {
           />
           </div>
         </DraggableResizablePanel>
+      )}
+      
+      {/* Configuration Modal */}
+      {configModalOpen && (
+        <div className="config-modal-backdrop" onClick={() => setConfigModalOpen(false)}>
+          <div className="config-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="config-modal-header">
+              <h3>إعدادات عرض شجرة الحسابات</h3>
+              <button 
+                className="config-modal-close" 
+                onClick={() => setConfigModalOpen(false)}
+                title="إغلاق"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="config-modal-body">
+              <div className="config-section">
+                <h4>إعدادات العرض</h4>
+                
+                <div className="config-field">
+                  <label className="config-label">
+                    <input 
+                      type="checkbox" 
+                      checked={configOptions.autoExpandRoots}
+                      onChange={(e) => setConfigOptions(prev => ({ ...prev, autoExpandRoots: e.target.checked }))}
+                    />
+                    توسيع الحسابات الرئيسية تلقائياً
+                  </label>
+                </div>
+                
+                <div className="config-field">
+                  <label className="config-label">
+                    <input 
+                      type="checkbox" 
+                      checked={configOptions.showInactiveAccounts}
+                      onChange={(e) => setConfigOptions(prev => ({ ...prev, showInactiveAccounts: e.target.checked }))}
+                    />
+                    إظهار الحسابات المعطلة
+                  </label>
+                </div>
+                
+                <div className="config-field">
+                  <label className="config-label">
+                    <input 
+                      type="checkbox" 
+                      checked={configOptions.showTransactionCounts}
+                      onChange={(e) => setConfigOptions(prev => ({ ...prev, showTransactionCounts: e.target.checked }))}
+                    />
+                    إظهار عدد العمليات المالية
+                  </label>
+                </div>
+                
+                <div className="config-field">
+                  <label className="config-label-block">
+                    وضع العرض الافتراضي:
+                    <select 
+                      value={configOptions.defaultViewMode}
+                      onChange={(e) => setConfigOptions(prev => ({ ...prev, defaultViewMode: e.target.value as 'tree' | 'table' }))}
+                      className="config-select"
+                    >
+                      <option value="tree">عرض شجرة</option>
+                      <option value="table">عرض جدول</option>
+                    </select>
+                  </label>
+                </div>
+                
+                <div className="config-field">
+                  <label className="config-label-block">
+                    الترتيب الافتراضي:
+                    <select 
+                      value={configOptions.sortPref}
+                      onChange={(e) => setConfigOptions(prev => ({ ...prev, sortPref: e.target.value as 'code' | 'name' | 'level' }))}
+                      className="config-select"
+                    >
+                      <option value="code">ترتيب حسب الكود</option>
+                      <option value="name">ترتيب حسب الاسم</option>
+                      <option value="level">ترتيب حسب المستوى</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              
+              <div className="config-section">
+                <h4>إعدادات التصدير</h4>
+                
+                <div className="config-field">
+                  <label className="config-label-block">
+                    تنسيق التصدير الافتراضي:
+                    <select 
+                      value={configOptions.exportFormat}
+                      onChange={(e) => setConfigOptions(prev => ({ ...prev, exportFormat: e.target.value as 'excel' | 'pdf' | 'csv' }))}
+                      className="config-select"
+                    >
+                      <option value="excel">Excel (.xlsx)</option>
+                      <option value="pdf">PDF (.pdf)</option>
+                      <option value="csv">CSV (.csv)</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+            </div>
+            
+            <div className="config-modal-footer">
+              <button 
+                className="ultimate-btn ultimate-btn-add"
+                onClick={() => setConfigModalOpen(false)}
+              >
+                <div className="btn-content"><span className="btn-text">حفظ الإعدادات</span></div>
+              </button>
+              
+              <button 
+                className="ultimate-btn ultimate-btn-warning"
+                onClick={() => {
+                  setConfigOptions({
+                    autoExpandRoots: false,
+                    showInactiveAccounts: true,
+                    showTransactionCounts: true,
+                    defaultViewMode: 'tree',
+                    exportFormat: 'excel',
+                    sortPref: 'code'
+                  });
+                }}
+              >
+                <div className="btn-content"><span className="btn-text">إعادة تعيين</span></div>
+              </button>
+              
+              <button 
+                className="ultimate-btn ultimate-btn-delete"
+                onClick={() => setConfigModalOpen(false)}
+              >
+                <div className="btn-content"><span className="btn-text">إلغاء</span></div>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

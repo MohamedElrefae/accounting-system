@@ -10,7 +10,7 @@ export interface ColumnConfig {
   maxWidth?: number
   resizable?: boolean
   sortable?: boolean
-  type?: 'text' | 'number' | 'date' | 'currency' | 'boolean' | 'actions'
+  type?: 'text' | 'number' | 'date' | 'currency' | 'boolean' | 'badge' | 'actions'
 }
 
 // Local interfaces for this hook
@@ -35,6 +35,7 @@ export const useColumnPreferences = ({
   userId
 }: UseColumnPreferencesOptions) => {
   const [columns, setColumns] = useState<ColumnConfig[]>(defaultColumns)
+  const [serverKey] = useState<string>(storageKey)
 
   // Generate the full storage key including user ID if provided
   const getStorageKey = useCallback(() => {
@@ -107,17 +108,61 @@ export const useColumnPreferences = ({
         : col
     )
     savePreferences(updatedColumns)
-  }, [columns, savePreferences])
+    // Fire-and-forget server upsert if user is known
+    if (userId) {
+      ;(async () => {
+        try {
+          const mod = await import('../services/column-preferences')
+          await mod.upsertUserColumnPreferences({ tableKey: serverKey, columnConfig: { columns: updatedColumns }, version: PREFERENCES_VERSION })
+        } catch (e) {
+          console.warn('Failed to upsert column resize to server:', e)
+        }
+      })()
+    }
+  }, [columns, savePreferences, userId, serverKey])
 
   // Handle column configuration changes
   const handleColumnConfigChange = useCallback((newColumns: ColumnConfig[]) => {
     savePreferences(newColumns)
-  }, [savePreferences])
+    if (userId) {
+      ;(async () => {
+        try {
+          const mod = await import('../services/column-preferences')
+          await mod.upsertUserColumnPreferences({ tableKey: serverKey, columnConfig: { columns: newColumns }, version: PREFERENCES_VERSION })
+        } catch (e) {
+          console.warn('Failed to upsert column config to server:', e)
+        }
+      })()
+    }
+  }, [savePreferences, userId, serverKey])
 
-  // Load preferences on mount or when dependencies change
+  // Load preferences on mount or when dependencies change (local first)
   useEffect(() => {
     loadPreferences()
   }, [loadPreferences])
+
+  // Also try to pull from server when userId is available
+  useEffect(() => {
+    let cancelled = false
+    async function loadServer() {
+      if (!userId) return
+      try {
+        const mod = await import('../services/column-preferences')
+        if (mod.isColumnPreferencesRpcDisabled()) return
+        const res = await mod.getUserColumnPreferences(serverKey)
+        if (cancelled) return
+        if (res && res.column_config && Array.isArray(res.column_config.columns)) {
+          const merged = mergeWithDefaults(res.column_config.columns as ColumnConfig[], defaultColumns)
+          setColumns(merged)
+          savePreferences(merged)
+        }
+      } catch {
+        // Silent: fall back to local
+      }
+    }
+    loadServer()
+    return () => { cancelled = true }
+  }, [userId, serverKey, defaultColumns, savePreferences])
 
   return {
     columns,

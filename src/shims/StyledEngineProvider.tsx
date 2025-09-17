@@ -2,9 +2,8 @@ import React from 'react';
 import PropTypes from 'prop-types';
 
 // Probe so we can confirm this shim is executing in production (NO-OP version)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ;(globalThis as any).SHIM_SEP = 'active'
-// eslint-disable-next-line no-console
+ 
 console.log('[shim] StyledEngineProvider NO-OP active')
 
 export default function StyledEngineProvider(props: { injectFirst?: boolean; children?: React.ReactNode }) {

@@ -27,6 +27,7 @@ export interface AccountBalance {
 export async function getAccountBalances(filters: AccountBalanceFilter = {}): Promise<AccountBalance[]> {
   // Build the canonical SQL query with filters
   let whereClause = '';
+  void whereClause; // silence unused for now
   const params: any[] = [];
   
   const conditions = [];
@@ -55,68 +56,6 @@ export async function getAccountBalances(filters: AccountBalanceFilter = {}): Pr
     whereClause = 'WHERE ' + conditions.join(' AND ');
   }
 
-  const canonicalQuery = `
-    WITH tx_lines AS (
-      -- Debit lines
-      SELECT
-        t.id AS transaction_id,
-        t.entry_date,
-        t.amount,
-        t.is_posted,
-        a.id AS account_id,
-        a.code AS account_code,
-        a.name AS account_name,
-        a.category AS account_category,
-        a.normal_balance AS account_normal_balance,
-        'debit' AS leg
-      FROM transactions t
-      JOIN accounts a ON a.id = t.debit_account_id
-      ${whereClause}
-
-      UNION ALL
-
-      -- Credit lines  
-      SELECT
-        t.id AS transaction_id,
-        t.entry_date,
-        t.amount,
-        t.is_posted,
-        a.id AS account_id,
-        a.code AS account_code,
-        a.name AS account_name,
-        a.category AS account_category,
-        a.normal_balance AS account_normal_balance,
-        'credit' AS leg
-      FROM transactions t
-      JOIN accounts a ON a.id = t.credit_account_id
-      ${whereClause}
-    ),
-    tx_lines_signed AS (
-      SELECT
-        *,
-        CASE
-          WHEN account_normal_balance = 'debit'  AND leg = 'debit'  THEN amount
-          WHEN account_normal_balance = 'debit'  AND leg = 'credit' THEN -amount
-          WHEN account_normal_balance = 'credit' AND leg = 'credit' THEN amount
-          WHEN account_normal_balance = 'credit' AND leg = 'debit'  THEN -amount
-          ELSE 0
-        END AS natural_amount
-      FROM tx_lines
-    )
-    SELECT
-      account_id,
-      account_code,
-      account_name,
-      account_category,
-      account_normal_balance,
-      SUM(natural_amount) AS balance,
-      COUNT(*) AS movement_count,
-      SUM(CASE WHEN leg = 'debit' THEN amount ELSE 0 END) AS total_debits,
-      SUM(CASE WHEN leg = 'credit' THEN amount ELSE 0 END) AS total_credits
-    FROM tx_lines_signed
-    GROUP BY account_id, account_code, account_name, account_category, account_normal_balance
-    ORDER BY account_code;
-  `;
 
   // For now, let's implement the canonical logic using multiple Supabase queries
   // This approach ensures compatibility while maintaining the canonical calculation

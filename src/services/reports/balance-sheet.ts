@@ -47,7 +47,7 @@ export async function fetchBalanceSheetReport(filters: BSFilters): Promise<{
       p_classification_id: null,
       p_cost_center_id: null,
       p_work_item_id: null,
-      p_expenses_category_id: null,
+        p_sub_tree_id: null,
       p_debit_account_id: null,
       p_credit_account_id: null,
       p_amount_min: null,
@@ -150,25 +150,25 @@ export async function fetchBalanceSheetReport(filters: BSFilters): Promise<{
   }
 }
 
-function classifyBSAccountTypeFromCategory(category: string): BSRow['account_type'] | null {
-  if (!category) return null
+// function classifyBSAccountTypeFromCategory(category: string): BSRow['account_type'] | null {
+//   if (!category) return null
 
-  const categoryLower = category.toLowerCase()
+//   const categoryLower = category.toLowerCase()
   
   // Map canonical service categories to Balance Sheet types
-  if (categoryLower === 'assets') {
-    return 'assets'
-  }
-  if (categoryLower === 'liabilities') {
-    return 'liabilities'
-  }
-  if (categoryLower === 'equity') {
-    return 'equity'
-  }
+//   if (categoryLower === 'assets') {
+//     return 'assets'
+//   }
+//   if (categoryLower === 'liabilities') {
+//     return 'liabilities'
+//   }
+//   if (categoryLower === 'equity') {
+//     return 'equity'
+//   }
   
-  // Revenue and expenses are not Balance Sheet accounts
-  return null
-}
+//   // Revenue and expenses are not Balance Sheet accounts
+//   return null
+// }
 
 function classifyBSAccountType(code: string): BSRow['account_type'] | null {
   if (!code) return null

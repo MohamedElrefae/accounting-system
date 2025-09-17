@@ -203,38 +203,38 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ]
   },
   {
-    key: 'expenses_categories',
-    name: 'Expenses Categories',
-    nameAr: 'فئات المصروفات',
+    key: 'sub_tree',
+    name: 'Sub Tree',
+    nameAr: 'الشجرة الفرعية',
     icon: 'Category',
     permissions: [
       {
-        name: 'expenses_categories.view',
-        nameAr: 'عرض فئات المصروفات',
-        description: 'View expenses categories',
-        descriptionAr: 'عرض فئات المصروفات',
-        category: 'expenses_categories'
+        name: 'sub_tree.view',
+        nameAr: 'عرض الشجرة الفرعية',
+        description: 'View sub tree',
+        descriptionAr: 'عرض الشجرة الفرعية',
+        category: 'sub_tree'
       },
       {
-        name: 'expenses_categories.create',
-        nameAr: 'إنشاء فئة مصروفات',
-        description: 'Create new expenses categories',
-        descriptionAr: 'إنشاء فئات مصروفات جديدة',
-        category: 'expenses_categories'
+        name: 'sub_tree.create',
+        nameAr: 'إنشاء عقدة فرعية',
+        description: 'Create new sub tree nodes',
+        descriptionAr: 'إنشاء عقد فرعية جديدة',
+        category: 'sub_tree'
       },
       {
-        name: 'expenses_categories.update',
-        nameAr: 'تعديل فئات المصروفات',
-        description: 'Update expenses categories',
-        descriptionAr: 'تعديل فئات المصروفات',
-        category: 'expenses_categories'
+        name: 'sub_tree.update',
+        nameAr: 'تعديل الشجرة الفرعية',
+        description: 'Update sub tree nodes',
+        descriptionAr: 'تعديل عقد الشجرة الفرعية',
+        category: 'sub_tree'
       },
       {
-        name: 'expenses_categories.delete',
-        nameAr: 'حذف فئات المصروفات',
-        description: 'Delete expenses categories',
-        descriptionAr: 'حذف فئات المصروفات',
-        category: 'expenses_categories'
+        name: 'sub_tree.delete',
+        nameAr: 'حذف عقد الشجرة',
+        description: 'Delete sub tree nodes',
+        descriptionAr: 'حذف عقد الشجرة الفرعية',
+        category: 'sub_tree'
       }
     ]
   },

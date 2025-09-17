@@ -11,8 +11,8 @@ import {
   deleteExpensesCategory,
   listAccountsForOrg,
   type AccountLite,
-} from '../../services/expenses-categories'
-import type { ExpensesCategoryTreeNode, ExpensesCategoryRow } from '../../types/expenses-categories'
+} from '../../services/sub-tree'
+import type { ExpensesCategoryTreeNode, ExpensesCategoryRow } from '../../types/sub-tree'
 import ExportButtons from '../../components/Common/ExportButtons'
 import TreeView from '../../components/TreeView/TreeView'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
@@ -41,21 +41,26 @@ import {
   TablePagination,
 } from '@mui/material'
 
-function getInitialOrgId(): string {
-  try { const { getActiveOrgId } = require('../../utils/org'); return getActiveOrgId?.() || '' } catch { return '' }
+async function getInitialOrgId(): Promise<string> {
+  try { 
+    const { getActiveOrgId } = await import('../../utils/org'); 
+    return getActiveOrgId?.() || ''; 
+  } catch { 
+    return ''; 
+  }
 }
 
 const ExpensesCategoriesPage: React.FC = () => {
   const { showToast } = useToast()
   const hasPermission = useHasPermission()
-  const canView = hasPermission('expenses_categories.view')
-  const canCreate = hasPermission('expenses_categories.create')
-  const canUpdate = hasPermission('expenses_categories.update')
-  const canDelete = hasPermission('expenses_categories.delete')
+  const canView = hasPermission('sub_tree.view')
+  const canCreate = hasPermission('sub_tree.create')
+  const canUpdate = hasPermission('sub_tree.update')
+  const canDelete = hasPermission('sub_tree.delete')
 
   const [tab, setTab] = useState(0)
   const [orgs, setOrgs] = useState<Organization[]>([])
-  const [orgId, setOrgId] = useState<string>(getInitialOrgId())
+  const [orgId, setOrgId] = useState<string>('')
 
   const [_tree, setTree] = useState<ExpensesCategoryTreeNode[]>([])
   const [list, setList] = useState<ExpensesCategoryRow[]>([])
@@ -77,9 +82,12 @@ const ExpensesCategoriesPage: React.FC = () => {
     (async () => {
       setLoading(true)
       try {
-        const orgList = await getOrganizations().catch(() => [])
+        const [orgList, initialOrgId] = await Promise.all([
+          getOrganizations().catch(() => []),
+          getInitialOrgId()
+        ]);
         setOrgs(orgList)
-        const chosen = orgId || orgList[0]?.id || ''
+        const chosen = orgId || initialOrgId || orgList[0]?.id || ''
         if (chosen !== orgId) setOrgId(chosen)
         if (chosen) {
           const [t, l, accs] = await Promise.all([
@@ -91,8 +99,8 @@ const ExpensesCategoriesPage: React.FC = () => {
           setList(l)
           setAccounts(accs)
         }
-      } catch (e: any) {
-        showToast(e.message || 'Failed to load data', { severity: 'error' })
+      } catch (e: unknown) {
+        showToast((e as Error).message || 'Failed to load data', { severity: 'error' })
       } finally {
         setLoading(false)
       }
@@ -112,8 +120,8 @@ const ExpensesCategoriesPage: React.FC = () => {
       setTree(t)
       setList(l)
       setAccounts(accs)
-    } catch (e: any) {
-      showToast(e.message || 'Failed to reload', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'Failed to reload', { severity: 'error' })
     } finally {
       setLoading(false)
     }
@@ -158,9 +166,9 @@ const ExpensesCategoriesPage: React.FC = () => {
   }, [filteredList])
 
   // Fetch next code from server to ensure concurrency safety and numeric codes
-  const getNextCode = async (parentId?: string | null) => {
+const getNextCode = async (parentId?: string | null) => {
     if (!orgId) return ''
-    const { fetchNextExpensesCategoryCode } = await import('../../services/expenses-categories')
+    const { fetchNextExpensesCategoryCode } = await import('../../services/sub-tree')
     return fetchNextExpensesCategoryCode(orgId, parentId ?? null)
   }
 
@@ -212,8 +220,8 @@ const ExpensesCategoriesPage: React.FC = () => {
       }
       setOpen(false)
       await reload(orgId)
-    } catch (e: any) {
-      showToast(e.message || 'Save failed', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'Save failed', { severity: 'error' })
     }
   }
 
@@ -238,8 +246,8 @@ const ExpensesCategoriesPage: React.FC = () => {
       await updateExpensesCategory({ id: row.id, is_active: !row.is_active, org_id: orgId })
       showToast(row.is_active ? 'Deactivated' : 'Activated', { severity: 'success' })
       await reload(orgId)
-    } catch (e: any) {
-      showToast(e.message || 'Toggle failed', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'Toggle failed', { severity: 'error' })
     }
   }
 
@@ -250,8 +258,8 @@ const ExpensesCategoriesPage: React.FC = () => {
       await deleteExpensesCategory(row.id, orgId)
       showToast('Deleted successfully', { severity: 'success' })
       await reload(orgId)
-    } catch (e: any) {
-      showToast(e.message || 'Delete failed', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'Delete failed', { severity: 'error' })
     }
   }
 
@@ -266,7 +274,7 @@ const ExpensesCategoriesPage: React.FC = () => {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <Typography className={styles.title}>Expenses Categories / فئات المصروفات</Typography>
+        <Typography className={styles.title}>Sub Tree / الشجرة الفرعية</Typography>
         <div className={styles.toolbar}>
           <FormControl size="small">
             <InputLabel>Organization</InputLabel>
@@ -276,7 +284,10 @@ const ExpensesCategoriesPage: React.FC = () => {
               onChange={async (e) => {
                 const v = String(e.target.value)
                 setOrgId(v)
-                try { const { setActiveOrgId } = require('../../utils/org'); setActiveOrgId?.(v) } catch {}
+                try { 
+                  const { setActiveOrgId } = await import('../../utils/org'); 
+                  setActiveOrgId?.(v); 
+                } catch { /* ignore org utils errors */ }
                 await reload(v)
               }}
             >
@@ -289,7 +300,7 @@ const ExpensesCategoriesPage: React.FC = () => {
           {canCreate && (
             <Button variant="contained" onClick={openCreate}>New / جديد</Button>
           )}
-          <ExportButtons data={exportData} config={{ title: 'Expenses Categories', rtlLayout: true }} size="small" />
+          <ExportButtons data={exportData} config={{ title: 'Sub Tree الشجرة الفرعية', rtlLayout: true }} size="small" />
         </div>
       </div>
 
@@ -319,21 +330,21 @@ const ExpensesCategoriesPage: React.FC = () => {
                       linked_account_label: r.linked_account_code ? `${r.linked_account_code}${r.linked_account_name ? ' - ' + r.linked_account_name : ''}` : '',
                       child_count: r.child_count ?? 0,
                       has_transactions: !!r.has_transactions,
-                    })) as any}
+                    }))}
                     extraColumns={[
-                      { key: 'add_to_cost', header: 'Add to Cost', render: (n: any) => (
+                      { key: 'add_to_cost', header: 'Add to Cost', render: (n: ExpensesCategoryTreeNode) => (
                         <input type="checkbox" checked={!!n.add_to_cost} readOnly aria-label="add_to_cost" />
                       )},
-                      { key: 'is_active', header: 'Active', render: (n: any) => (
+                      { key: 'is_active', header: 'Active', render: (n: ExpensesCategoryTreeNode) => (
                         <input type="checkbox" checked={!!n.is_active} readOnly aria-label="is_active" />
                       )},
-                      { key: 'linked', header: 'Linked Account', render: (n: any) => (
+                      { key: 'linked', header: 'Linked Account', render: (n: ExpensesCategoryTreeNode & { linked_account_label?: string }) => (
                         <span>{n.linked_account_label || '—'}</span>
                       )},
-                      { key: 'children', header: 'Children', render: (n: any) => (
+                      { key: 'children', header: 'Children', render: (n: ExpensesCategoryTreeNode & { child_count?: number }) => (
                         <span>{Number.isFinite(n.child_count) ? n.child_count : ''}</span>
                       )},
-                      { key: 'has_tx', header: 'Has Tx', render: (n: any) => (
+                      { key: 'has_tx', header: 'Has Tx', render: (n: ExpensesCategoryTreeNode & { has_transactions?: boolean }) => (
                         <input type="checkbox" checked={!!n.has_transactions} readOnly aria-label="has_transactions" />
                       )},
                     ]}
@@ -341,7 +352,7 @@ const ExpensesCategoriesPage: React.FC = () => {
                       const row = list.find(r => r.id === node.id)
                       if (row) openEdit(row)
                     }}
-                    onAdd={(parentNode: any) => handleAddChild(parentNode.id)}
+                    onAdd={async (parentNode: any) => handleAddChild(parentNode.id)}
                     onToggleStatus={(node: any) => {
                       const row = list.find(r => r.id === node.id)
                       if (row) handleToggleActive(row)

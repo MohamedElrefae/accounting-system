@@ -4,7 +4,7 @@
  * Ensures consistency in formatting, Arabic support, and user experience
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { 
   exportToPDF, 
   exportToExcel, 
@@ -58,7 +58,7 @@ export interface ExportMethods {
 export const useUniversalExport = (options: ExportHookOptions = {}): ExportMethods => {
   const [isExporting, setIsExporting] = useState(false);
 
-  const defaultConfig: ExportConfig = {
+  const defaultConfig: ExportConfig = useMemo(() => ({
     title: 'تقرير البيانات',
     useArabicNumerals: true,
     rtlLayout: true,
@@ -67,7 +67,7 @@ export const useUniversalExport = (options: ExportHookOptions = {}): ExportMetho
     includeFooter: true,
     fontSize: 12,
     ...options.defaultConfig
-  };
+  }), [options.defaultConfig]);
 
   const executeExport = useCallback(async (
     exportFunction: (data: UniversalTableData, options: Omit<UniversalExportOptions, 'format'>) => Promise<void>,
@@ -146,7 +146,7 @@ export const useUniversalExport = (options: ExportHookOptions = {}): ExportMetho
         if (exportFunction) {
           await executeExport(exportFunction, format, data, finalConfig);
         }
-      } catch (error) {
+      } catch {
         // Silent error handling for batch export
       }
     }

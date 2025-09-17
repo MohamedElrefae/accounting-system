@@ -3,7 +3,7 @@ import type { FormConfig, FormField } from '../Common/UnifiedCRUDForm';
 import type { Account, TransactionRecord, Project } from '../../services/transactions';
 import type { Organization } from '../../types';
 import type { TransactionClassification } from '../../services/transaction-classification';
-import type { ExpensesCategoryRow } from '../../types/expenses-categories';
+import type { ExpensesCategoryRow } from '../../types/sub-tree';
 import type { WorkItemRow } from '../../types/work-items';
 import { toWorkItemOptions } from '../../services/work-items';
 import { listAnalysisWorkItems } from '../../services/analysis-work-items';
@@ -133,6 +133,18 @@ export const createTransactionFormConfig = (
   costCenters: Array<{ id: string; code: string; name: string; name_ar?: string | null; project_id?: string | null; level: number }> = []
 ): FormConfig => {
   
+  console.log('🌳 createTransactionFormConfig called with:', {
+    isEditing,
+    accountsCount: accounts.length,
+    projectsCount: projects.length,
+    organizationsCount: organizations.length,
+    classificationsCount: classifications.length,
+    expensesCategoriesCount: expensesCategories.length,
+    workItemsCount: workItems.length,
+    costCentersCount: costCenters.length,
+    existingTransaction: !!existingTransaction
+  });
+  
   // Build hierarchical (level-based) options with real tree nodes and level headers
   const byParent: Record<string, Account[]> = {};
   const allById: Record<string, Account> = {};
@@ -237,20 +249,79 @@ export const createTransactionFormConfig = (
     list.push({ value: ec.id, label: `${ec.code} - ${ec.description}`, searchText: `${ec.code} ${ec.description}`.toLowerCase() });
     optionsByAccount[ec.linked_account_id] = list;
   }
-  // Helper to build union options for selected debit/credit accounts
+  // Helper to build union options for selected debit/credit accounts and organization
   const getCategoryOptionsForSelection = (form: Record<string, unknown>) => {
+    const orgId = (form as { organization_id?: string })?.organization_id || '';
     const debitId = (form as { debit_account_id?: string })?.debit_account_id || '';
     const creditId = (form as { credit_account_id?: string })?.credit_account_id || '';
-    const res: SearchableSelectOption[] = [];
-    const seen = new Set<string>();
-    const pushAll = (arr?: { value: string; label: string; searchText?: string }[]) => {
-      for (const o of arr || []) { if (!seen.has(o.value)) { seen.add(o.value); res.push(o); } }
-    };
-    if (debitId) pushAll(optionsByAccount[debitId]);
-    if (creditId) pushAll(optionsByAccount[creditId]);
-    // Optional: sort by label for stable UX
-    res.sort((a, b) => a.label.localeCompare(b.label));
-    return res;
+    
+    console.log('🌳 getCategoryOptionsForSelection called with:', { 
+      orgId, 
+      debitId: debitId ? debitId.substring(0, 8) + '...' : '', 
+      creditId: creditId ? creditId.substring(0, 8) + '...' : '', 
+      totalCategories: expensesCategories.length,
+      activeCategoriesCount: activeCategories.length
+    });
+    
+    // If no organization selected, return empty options with helper text
+    if (!orgId) {
+      console.log('🌳 No org selected, returning helper text');
+      return [{ value: '', label: 'اختر المؤسسة أولاً لعرض عقد الشجرة الفرعية', searchText: '' }];
+    }
+    
+    // Filter expenses categories by organization first
+    const orgCategories = activeCategories.filter(ec => 
+      ec.org_id === orgId
+    );
+    
+    console.log('🌳 Org categories found:', orgCategories.length, 'for org:', orgId);
+    if (orgCategories.length > 0) {
+      console.log('🌳 Sample categories:', orgCategories.slice(0, 3).map(c => ({ id: c.id, code: c.code, desc: c.description })));
+    }
+    
+    if (orgCategories.length === 0) {
+      console.log('🌳 No categories for org, returning no items message');
+      console.log('🌳 Available org IDs in all categories:', [...new Set(activeCategories.map(c => c.org_id))]);
+      return [{ value: '', label: 'لا توجد عقد شجرة فرعية للمؤسسة المختارة', searchText: '' }];
+    }
+    
+    // If accounts are selected, filter by linked accounts too
+    if (debitId || creditId) {
+      const filteredByAccount = orgCategories.filter(ec => 
+        ec.linked_account_id && (
+          ec.linked_account_id === debitId || 
+          ec.linked_account_id === creditId
+        )
+      );
+      
+      if (filteredByAccount.length > 0) {
+        const options = filteredByAccount.map(ec => ({
+          value: ec.id,
+          label: `${ec.code} - ${ec.description}`,
+          searchText: `${ec.code} ${ec.description}`.toLowerCase()
+        }));
+        options.sort((a, b) => a.label.localeCompare(b.label));
+        return [{ value: '', label: 'بدون عقدة شجرة فرعية', searchText: '' }, ...options];
+      } else {
+        // No categories linked to selected accounts, show all org categories
+        const allOptions = orgCategories.map(ec => ({
+          value: ec.id,
+          label: `${ec.code} - ${ec.description}`,
+          searchText: `${ec.code} ${ec.description}`.toLowerCase()
+        }));
+        allOptions.sort((a, b) => a.label.localeCompare(b.label));
+        return [{ value: '', label: 'بدون عقدة شجرة فرعية', searchText: '' }, ...allOptions];
+      }
+    } else {
+      // No accounts selected, show all org categories
+      const allOptions = orgCategories.map(ec => ({
+        value: ec.id,
+        label: `${ec.code} - ${ec.description}`,
+        searchText: `${ec.code} ${ec.description}`.toLowerCase()
+      }));
+      allOptions.sort((a, b) => a.label.localeCompare(b.label));
+      return [{ value: '', label: 'بدون عقدة شجرة فرعية', searchText: '' }, ...allOptions];
+    }
   };
   
 
@@ -471,21 +542,26 @@ export const createTransactionFormConfig = (
       placeholder: 'اختر بند التحليل...',
       dependsOnAny: ['organization_id', 'project_id'],
       colSpan: 1,
-      position: { row: 7, col: 2 }
+      position: { row: 8, col: 1 }
     },
     {
-      id: 'expenses_category_id',
+      id: 'sub_tree_id',
       type: 'searchable-select',
-      label: 'فئة المصروفات',
+      label: 'الشجرة الفرعية',
       required: false,
-      options: [],
-      optionsProvider: (form) => getCategoryOptionsForSelection(form),
+      options: [{ value: '', label: 'تحميل عقد الشجرة الفرعية...', searchText: '' }],
+      optionsProvider: (form) => {
+        console.log('🌳 sub_tree_id optionsProvider called with form data:', { orgId: (form as any)?.organization_id, hasCategories: expensesCategories.length });
+        const result = getCategoryOptionsForSelection(form);
+        console.log('🌳 sub_tree_id optionsProvider returning:', result.length, 'options');
+        return result;
+      },
       icon: <Tag size={16} />,
-      helpText: 'يتم تصفية الفئات حسب الحساب المدين/الدائن المحدد',
+      helpText: 'يتم تصفية عقد الشجرة حسب المؤسسة والحساب المدين/الدائن المحدد',
       searchable: true,
       clearable: true,
-      placeholder: 'اختر فئة المصروفات...',
-      dependsOnAny: ['debit_account_id', 'credit_account_id'],
+      placeholder: 'اختر عقدة الشجرة الفرعية...',
+      dependsOnAny: ['organization_id', 'debit_account_id', 'credit_account_id'],
       colSpan: 1,
       position: { row: 7, col: 2 }
     },
@@ -498,7 +574,7 @@ export const createTransactionFormConfig = (
       icon: <MessageSquare size={16} />,
       helpText: 'أي ملاحظات إضافية حول المعاملة',
       colSpan: 1,
-      position: { row: 8, col: 1 }
+      position: { row: 8, col: 2 }
     }
   ];
 
@@ -515,8 +591,9 @@ export const createTransactionFormConfig = (
     // notes: existingTransaction?.notes || '',
     // project_id: existingTransaction?.project_id || ''
   // };
-  return {
-    title: isEditing ? '✏️ تعديل المعاملة' : '➕ معاملة جديدة',
+  // Debug: Log final form configuration
+  const finalConfig = {
+    title: isEditing ? '✐️ تعديل المعاملة' : '➕ معاملة جديدة',
     subtitle: isEditing 
       ? `تعديل المعاملة: ${existingTransaction?.entry_number || ''}`
       : 'إضافة معاملة مالية جديدة',
@@ -533,7 +610,7 @@ export const createTransactionFormConfig = (
         debit_account_id?: string; 
         credit_account_id?: string; 
         amount?: string | number; 
-        expenses_category_id?: string;
+        sub_tree_id?: string;
         classification_id?: string;
         cost_center_id?: string;
         description?: string;
@@ -555,35 +632,29 @@ export const createTransactionFormConfig = (
         });
       }
 
-      // Smart validation using the new validation service
-      if (fd.debit_account_id && fd.credit_account_id && amountVal > 0 && fd.description) {
+      // Smart validation using the safe validation wrapper
+      if (fd.debit_account_id && fd.credit_account_id && amountVal > 0) {
         try {
-          const validationResult = await transactionValidator.validateTransaction({
-            debit_account_id: fd.debit_account_id,
-            credit_account_id: fd.credit_account_id,
-            amount: amountVal,
-            description: fd.description,
-            entry_date: fd.entry_date || new Date().toISOString().split('T')[0]
-          });
-
-          // Add validation errors
-          for (const error of validationResult.errors) {
-            errors.push({
-              field: error.field,
-              message: error.message
-            });
-          }
-
-          // Add validation warnings (as warnings, not errors)
-          for (const warning of validationResult.warnings) {
-            warnings.push({
-              field: warning.field,
-              message: `⚠️ ${warning.message}${warning.details ? ' - ' + warning.details : ''}`
-            });
-          }
+          const validationValidator = transactionValidator.createCustomValidator();
+          // Run asynchronously but do not block the sync validator contract
+          void validationValidator(data).then((smartValidation) => {
+            try {
+              if (smartValidation.errors) {
+                // Surface via console for now; UI can display on submit
+                console.warn('Async validation errors', smartValidation.errors)
+              }
+              if (smartValidation.warnings) {
+                console.info('Async validation warnings', smartValidation.warnings)
+              }
+            } catch {}
+          }).catch(() => {})
         } catch (validationError) {
           console.error('Transaction validation failed:', validationError);
-          // Don't fail form submission due to validation service errors
+          // Add a warning that validation service is unavailable
+          warnings.push({
+            field: 'description',
+            message: '⚠️ نظام التحقق الذكي من المعاملات غير متوفر حالياً'
+          });
         }
       }
 
@@ -594,10 +665,10 @@ export const createTransactionFormConfig = (
         const c = (acc?.category || '').toLowerCase();
         return c === 'expense' || c === 'expenses';
       };
-      if ((isExpense(debit) || isExpense(credit)) && (!fd.expenses_category_id || String(fd.expenses_category_id).trim() === '')) {
+      if ((isExpense(debit) || isExpense(credit)) && (!fd.sub_tree_id || String(fd.sub_tree_id).trim() === '')) {
         errors.push({
-          field: 'expenses_category_id',
-          message: 'فئة المصروف مطلوبة عند اختيار حساب مصروف على أي من الجانبين'
+          field: 'sub_tree_id',
+          message: 'عقدة الشجرة الفرعية مطلوبة عند اختيار حساب مصروف على أي من الجانبين'
         });
       }
       
@@ -626,16 +697,46 @@ export const createTransactionFormConfig = (
         { field: 'entry_number' },
         { field: 'entry_date' },
         { field: 'description' },
-        { field: 'work_item_id' },
-        { field: 'analysis_work_item_id' },
         { field: 'debit_account_id' },
         { field: 'credit_account_id' },
         { field: 'amount' },
         { field: 'reference_number' },
         { field: 'organization_id' },
         { field: 'project_id' },
+        { field: 'classification_id' },
+        { field: 'cost_center_id' },
+        { field: 'work_item_id' },
+        { field: 'analysis_work_item_id' },
+        { field: 'sub_tree_id' },
         { field: 'notes' }
       ]
     }
   };
+  
+  // Debug: Log final configuration details
+  console.log('🌳 Final form config created:', {
+    title: finalConfig.title,
+    fieldsCount: finalConfig.fields.length,
+    fieldIds: finalConfig.fields.map(f => f.id),
+    hasSubTreeField: finalConfig.fields.some(f => f.id === 'sub_tree_id'),
+    layoutFieldsCount: finalConfig.layout?.columnBreakpoints?.length,
+    layoutFields: finalConfig.layout?.columnBreakpoints?.map(b => b.field)
+  });
+  
+  const subTreeField = finalConfig.fields.find(f => f.id === 'sub_tree_id');
+  if (subTreeField) {
+    console.log('🌳 sub_tree_id field details:', {
+      id: subTreeField.id,
+      type: subTreeField.type,
+      label: subTreeField.label,
+      hasOptionsProvider: !!subTreeField.optionsProvider,
+      hasOptions: !!subTreeField.options,
+      position: subTreeField.position,
+      dependsOnAny: subTreeField.dependsOnAny
+    });
+  } else {
+    console.error('🌳 ERROR: sub_tree_id field NOT FOUND in final config!');
+  }
+  
+  return finalConfig;
 };

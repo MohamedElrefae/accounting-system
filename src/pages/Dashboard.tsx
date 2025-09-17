@@ -428,11 +428,11 @@ const Dashboard: React.FC = () => {
       const expensesByMonth: number[] = Array(6).fill(0);
 
       // Initialize totals using unified category totals
-      let totalAssets = Math.abs(categoryTotals['asset'] || 0);
-      let totalLiabilities = Math.abs(categoryTotals['liability'] || 0);
-      let totalEquity = Math.abs(categoryTotals['equity'] || 0);
-      let totalRevenue = Math.abs(categoryTotals['revenue'] || 0);
-      let totalExpenses = Math.abs(categoryTotals['expense'] || 0);
+      const totalAssets = Math.abs(categoryTotals['asset'] || 0);
+      const totalLiabilities = Math.abs(categoryTotals['liability'] || 0);
+      const totalEquity = Math.abs(categoryTotals['equity'] || 0);
+      const totalRevenue = Math.abs(categoryTotals['revenue'] || 0);
+      const totalExpenses = Math.abs(categoryTotals['expense'] || 0);
 
       // Build revenue/expenses by month from transactions (informational)
       for (const r of txs) {

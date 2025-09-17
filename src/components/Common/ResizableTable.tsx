@@ -13,7 +13,9 @@ export interface ColumnConfig {
   maxWidth?: number
   resizable?: boolean
   sortable?: boolean
-  type?: 'text' | 'number' | 'date' | 'currency' | 'boolean' | 'actions'
+  type?: 'text' | 'number' | 'date' | 'currency' | 'boolean' | 'badge' | 'actions'
+  frozen?: boolean
+  pinPriority?: number // Higher number = higher priority (pins first)
 }
 
 type RowRecord = Record<string, unknown>
@@ -29,6 +31,7 @@ interface ResizableTableProps<T extends RowRecord> {
   onRowClick?: (row: T, index: number) => void
   isLoading?: boolean
   emptyMessage?: string
+  frozenLeftCount?: number
 }
 
 function ResizableTable<T extends RowRecord>({
@@ -41,14 +44,76 @@ function ResizableTable<T extends RowRecord>({
   renderCell,
   onRowClick,
   isLoading = false,
-  emptyMessage = 'لا توجد بيانات'
+  emptyMessage = 'لا توجد بيانات',
+  frozenLeftCount = 0,
 }: ResizableTableProps<T>) {
   const [isResizing, setIsResizing] = useState<string | null>(null)
   const tableRef = useRef<HTMLTableElement>(null)
   const resizeRef = useRef<{ column: string; startX: number; startWidth: number } | null>(null)
 
-  // Filter visible columns and maintain their order
-  const visibleColumns = columns.filter(col => col.visible)
+  // Filter visible columns and sort by pin priority
+  const visibleColumns = columns
+    .filter(col => col.visible)
+    .sort((a, b) => {
+      // First sort by frozen status and pin priority
+      const aFrozen = a.frozen ? 1 : 0
+      const bFrozen = b.frozen ? 1 : 0
+      
+      if (aFrozen !== bFrozen) {
+        return bFrozen - aFrozen // Frozen columns first
+      }
+      
+      // If both are frozen, sort by pin priority (higher first)
+      if (a.frozen && b.frozen) {
+        const aPriority = a.pinPriority || 0
+        const bPriority = b.pinPriority || 0
+        if (aPriority !== bPriority) {
+          return bPriority - aPriority // Higher priority first
+        }
+      }
+      
+      // Maintain original order for same priority/frozen status
+      const aIndex = columns.indexOf(a)
+      const bIndex = columns.indexOf(b)
+      return aIndex - bIndex
+    })
+
+  // Determine direction (rtl/ltr) for freeze side
+  const tableDir = (tableRef.current?.closest('[dir]') as HTMLElement | null)?.getAttribute('dir') || document.documentElement.getAttribute('dir') || 'ltr'
+  const isRTL = tableDir.toLowerCase() === 'rtl'
+
+  // Build arrays for per-column freeze flags and compute offsets for sticky side
+  const frozenByFlag = visibleColumns.map(c => Boolean(c.frozen))
+
+  // Support legacy count-based freezing as a base (first N in DOM order)
+  const frozenCount = Math.max(0, Math.min(frozenLeftCount || 0, visibleColumns.length))
+  for (let i = 0; i < frozenCount; i++) frozenByFlag[i] = true
+
+  // Compute offsets for left or right depending on language direction
+  const stickyLeftOffsets: number[] = new Array(visibleColumns.length).fill(0)
+  const stickyRightOffsets: number[] = new Array(visibleColumns.length).fill(0)
+
+  if (frozenByFlag.some(Boolean)) {
+    if (!isRTL) {
+      // LTR: accumulate from left
+      let acc = 0
+      for (let i = 0; i < visibleColumns.length; i++) {
+        if (frozenByFlag[i]) {
+          stickyLeftOffsets[i] = acc
+          acc += visibleColumns[i].width
+        }
+      }
+    } else {
+      // RTL: accumulate from right
+      let acc = 0
+      for (let i = visibleColumns.length - 1; i >= 0; i--) {
+        if (frozenByFlag[i]) {
+          stickyRightOffsets[i] = acc
+          acc += visibleColumns[i].width
+        }
+      }
+    }
+  }
 
   // Define move/up handlers BEFORE the mousedown handler to avoid TDZ/runtime init issues
   const handleMouseMove = useCallback((e: MouseEvent) => {
@@ -135,14 +200,16 @@ function ResizableTable<T extends RowRecord>({
       <table ref={tableRef} className="resizable-table">
         <thead>
           <tr style={{ height: `${headerHeight}px` }}>
-            {visibleColumns.map((column) => (
+            {visibleColumns.map((column, idx) => (
               <th
                 key={column.key}
-                className="resizable-th"
+                className={`resizable-th ${column.type || 'text'}-cell ${frozenByFlag[idx] ? 'frozen' : ''} ${isRTL ? 'rtl' : 'ltr'}`}
                 style={{ 
                   width: `${column.width}px`,
                   minWidth: `${column.minWidth || 80}px`,
-                  maxWidth: `${column.maxWidth || 500}px`
+                  maxWidth: `${column.maxWidth || 500}px`,
+                  ...(frozenByFlag[idx] && !isRTL ? { left: `${stickyLeftOffsets[idx]}px` } : {}),
+                  ...(frozenByFlag[idx] && isRTL ? { right: `${stickyRightOffsets[idx]}px` } : {}),
                 }}
               >
                 <div className="th-content">
@@ -175,14 +242,16 @@ function ResizableTable<T extends RowRecord>({
                 style={{ height: `${rowHeight}px` }}
                 onClick={() => onRowClick?.(row, rowIndex)}
               >
-                {visibleColumns.map((column) => (
+                {visibleColumns.map((column, cidx) => (
                   <td
                     key={column.key}
-                    className={`resizable-td ${column.type || 'text'}-cell`}
+                    className={`resizable-td ${column.type || 'text'}-cell ${frozenByFlag[cidx] ? 'frozen' : ''} ${isRTL ? 'rtl' : 'ltr'}`}
                     style={{ 
                       width: `${column.width}px`,
                       minWidth: `${column.minWidth || 80}px`,
-                      maxWidth: `${column.maxWidth || 500}px`
+                      maxWidth: `${column.maxWidth || 500}px`,
+                      ...(frozenByFlag[cidx] && !isRTL ? { left: `${stickyLeftOffsets[cidx]}px` } : {}),
+                      ...(frozenByFlag[cidx] && isRTL ? { right: `${stickyRightOffsets[cidx]}px` } : {}),
                     }}
                   >
                     <div className="td-content">

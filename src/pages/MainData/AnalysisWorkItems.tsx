@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import styles from './AnalysisWorkItems.module.css'
 import { useToast } from '../../contexts/ToastContext'
 import { getOrganizations, type Organization } from '../../services/organization'
@@ -36,8 +36,23 @@ import {
 import ExportButtons from '../../components/Common/ExportButtons'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
 
-function getInitialOrgId(): string { try { const { getActiveOrgId } = require('../../utils/org'); return getActiveOrgId?.() || '' } catch { return '' } }
-function getInitialProjectId(): string { try { const { getActiveProjectId } = require('../../utils/org'); return getActiveProjectId?.() || '' } catch { return '' } }
+async function getInitialOrgId(): Promise<string> { 
+  try { 
+    const { getActiveOrgId } = await import('../../utils/org'); 
+    return getActiveOrgId?.() || ''; 
+  } catch { 
+    return ''; 
+  } 
+}
+
+async function getInitialProjectId(): Promise<string> { 
+  try { 
+    const { getActiveProjectId } = await import('../../utils/org'); 
+    return getActiveProjectId?.() || ''; 
+  } catch { 
+    return ''; 
+  } 
+}
 
 const AnalysisWorkItemsPage: React.FC = () => {
   const { showToast } = useToast()
@@ -49,8 +64,8 @@ const AnalysisWorkItemsPage: React.FC = () => {
 
   const [orgs, setOrgs] = useState<Organization[]>([])
   const [projects, setProjects] = useState<Project[]>([])
-  const [orgId, setOrgId] = useState<string>(getInitialOrgId())
-  const [projectId, setProjectId] = useState<string>(getInitialProjectId())
+  const [orgId, setOrgId] = useState<string>('')
+  const [projectId, setProjectId] = useState<string>('')
 
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
@@ -68,13 +83,18 @@ const AnalysisWorkItemsPage: React.FC = () => {
     ;(async () => {
       setLoading(true)
       try {
-        const orgList = await getOrganizations().catch(() => [])
+        const [orgList, initialOrgId, initialProjectId] = await Promise.all([
+          getOrganizations().catch(() => []),
+          getInitialOrgId(),
+          getInitialProjectId()
+        ]);
         setOrgs(orgList)
-        const chosenOrg = orgId || orgList[0]?.id || ''
+        const chosenOrg = orgId || initialOrgId || orgList[0]?.id || ''
         if (chosenOrg !== orgId) setOrgId(chosenOrg)
         const projs = await getActiveProjects().catch(() => [])
         setProjects(projs)
-        if (!projectId && projs.length > 0) setProjectId(projs[0].id)
+        const chosenProject = projectId || initialProjectId || (projs.length > 0 ? projs[0].id : '')
+        if (chosenProject !== projectId) setProjectId(chosenProject)
       } finally {
         setLoading(false)
       }
@@ -86,7 +106,7 @@ const AnalysisWorkItemsPage: React.FC = () => {
     if (!orgId) return
     setLoading(true)
     try {
-      const list = await listAnalysisWorkItems({ orgId, projectId: projectId || null, search: (search || '').trim() || null, onlyWithTx: false, includeInactive: true })
+      const list = await listAnalysisWorkItems({ orgId, projectId: projectId || null, search: (search || '').trim() || undefined, onlyWithTx: false, includeInactive: true })
       setRows(list)
     } catch (e: any) {
       showToast(e?.message || 'Failed to load', { severity: 'error' })
@@ -152,8 +172,8 @@ const AnalysisWorkItemsPage: React.FC = () => {
       }
       setOpen(false)
       await reload()
-    } catch (e: any) {
-      showToast(e?.message || 'Save failed', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error)?.message || 'Save failed', { severity: 'error' })
     }
   }
 
@@ -162,7 +182,7 @@ const AnalysisWorkItemsPage: React.FC = () => {
       await toggleAnalysisWorkItemActive(row.id, !row.is_active)
       showToast(row.is_active ? 'Deactivated' : 'Activated', { severity: 'success' })
       await reload()
-    } catch (e: any) { showToast(e?.message || 'Toggle failed', { severity: 'error' }) }
+    } catch (e: unknown) { showToast((e as Error)?.message || 'Toggle failed', { severity: 'error' }) }
   }
 
   const handleDelete = async (row: AnalysisWorkItemFull) => {
@@ -172,8 +192,8 @@ const AnalysisWorkItemsPage: React.FC = () => {
       await deleteAnalysisWorkItem(row.id)
       showToast('Deleted', { severity: 'success' })
       await reload()
-    } catch (e: any) {
-      showToast(e?.message || 'Delete failed', { severity: 'error' })
+    } catch (e: unknown) {
+      showToast((e as Error)?.message || 'Delete failed', { severity: 'error' })
     }
   }
 
@@ -192,13 +212,31 @@ const AnalysisWorkItemsPage: React.FC = () => {
         <div className={styles.toolbar}>
           <FormControl size="small">
             <InputLabel>Organization</InputLabel>
-            <Select label="Organization" value={orgId} onChange={async (e) => { const v = String(e.target.value); setOrgId(v); try { const { setActiveOrgId } = require('../../utils/org'); setActiveOrgId?.(v) } catch {}; await reload() }}>
+            <Select label="Organization" value={orgId} onChange={async (e) => { 
+              const v = String(e.target.value); 
+              setOrgId(v); 
+              try { 
+                const { setActiveOrgId } = await import('../../utils/org'); 
+                setActiveOrgId?.(v); 
+              } catch { /* ignore org utils errors */ }
+              await reload();
+            }}>
               {orgs.map(o => (<MenuItem key={o.id} value={o.id}>{o.code} - {o.name}</MenuItem>))}
             </Select>
           </FormControl>
           <FormControl size="small">
             <InputLabel>Project (filter)</InputLabel>
-            <Select label="Project (filter)" value={projectId} onChange={async (e) => { const v = String(e.target.value); setProjectId(v); try { const { setActiveProjectId } = require('../../utils/org'); setActiveProjectId?.(v) } catch {}; await reload() }}>
+            <Select label="Project (filter)" value={projectId} onChange={(e) => {
+              const v = String(e.target.value)
+              setProjectId(v)
+              ;(async () => {
+                try {
+                  const { setActiveProjectId } = await import('../../utils/org')
+                  setActiveProjectId?.(v)
+                } catch {}
+                await reload()
+              })()
+            }}>
               <MenuItem value="">All Projects</MenuItem>
               {projects.map(p => (<MenuItem key={p.id} value={p.id}>{p.code} - {p.name}</MenuItem>))}
             </Select>

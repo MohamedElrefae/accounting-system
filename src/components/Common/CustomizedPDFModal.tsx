@@ -75,7 +75,7 @@ const CustomizedPDFModal: React.FC<CustomizedPDFModalProps> = ({
 
   const [isExporting, setIsExporting] = useState(false);
 
-  const handleSettingChange = useCallback((key: keyof PDFSettings, value: any) => {
+  const handleSettingChange = useCallback((key: keyof PDFSettings, value: unknown) => {
     setSettings(prev => ({
       ...prev,
       [key]: value

@@ -5,7 +5,7 @@ export type { Organization };
 
 export async function getOrganizations(): Promise<Organization[]> {
   // Try with status filter first (if column exists)
-  let { data, error } = await supabase
+  const { data, error } = await supabase
     .from('organizations')
     .select('*')
     .eq('status', 'active')

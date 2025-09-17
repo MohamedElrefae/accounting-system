@@ -3,6 +3,7 @@ import { Building2, UserPlus2, Users2, Trash2, Shield, RefreshCw } from 'lucide-
 import styles from './OrgMembersManagement.module.css';
 import { useToast } from '../../contexts/ToastContext';
 import { getOrganizations, type Organization } from '../../services/organization';
+import type { User } from '../../types/common';
 import { 
   listOrgMembers, 
   addOrgMember, 
@@ -31,7 +32,7 @@ const OrgMembersManagement: React.FC = () => {
   // Add dialog state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [userQuery, setUserQuery] = useState('');
-  const [userOptions, setUserOptions] = useState<any[]>([]);
+  const [userOptions, setUserOptions] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [selectedRole, setSelectedRole] = useState<OrgMemberRole>(getDefaultRoleForNewMember());
   const [saving, setSaving] = useState(false);
@@ -54,7 +55,7 @@ const OrgMembersManagement: React.FC = () => {
       if (data.length > 0) {
         setSelectedOrgId(data[0].id);
       }
-    } catch (e) {
+    } catch {
       showToast('فشل تحميل المؤسسات', { severity: 'error' });
     } finally {
       setLoading(false);
@@ -66,7 +67,7 @@ const OrgMembersManagement: React.FC = () => {
       setRefreshing(true);
       const list = await listOrgMembers(orgId);
       setMembers(list);
-    } catch (e) {
+    } catch {
       showToast('فشل تحميل الأعضاء', { severity: 'error' });
     } finally {
       setRefreshing(false);
@@ -86,7 +87,7 @@ const OrgMembersManagement: React.FC = () => {
     try {
       const users = await searchUsersNotInOrg(selectedOrgId, query, 20);
       setUserOptions(users);
-    } catch (e) {
+    } catch {
       setUserOptions([]);
     }
   };
@@ -99,7 +100,7 @@ const OrgMembersManagement: React.FC = () => {
       setAddDialogOpen(false);
       await loadMembers(selectedOrgId);
       showToast('تم إضافة العضو بنجاح', { severity: 'success' });
-    } catch (e) {
+    } catch {
       showToast('فشل إضافة العضو', { severity: 'error' });
     } finally {
       setSaving(false);
@@ -112,7 +113,7 @@ const OrgMembersManagement: React.FC = () => {
       await updateOrgMemberRole(selectedOrgId, userId, role);
       setMembers(prev => prev.map(m => m.user_id === userId ? { ...m, role } : m));
       showToast('تم تحديث دور العضو', { severity: 'success' });
-    } catch (e) {
+    } catch {
       showToast('فشل تحديث الدور', { severity: 'error' });
     }
   };
@@ -124,7 +125,7 @@ const OrgMembersManagement: React.FC = () => {
       await removeOrgMember(selectedOrgId, userId);
       setMembers(prev => prev.filter(m => m.user_id !== userId));
       showToast('تم إزالة العضو', { severity: 'success' });
-    } catch (e) {
+    } catch {
       showToast('فشل إزالة العضو', { severity: 'error' });
     }
   };
@@ -274,7 +275,7 @@ const OrgMembersManagement: React.FC = () => {
                     onChange={(e) => setSelectedUserId(e.target.value)}
                   >
                     <option value="" disabled>اختر مستخدم</option>
-                    {userOptions.map((u: any) => (
+                    {userOptions.map((u) => (
                       <option key={u.id} value={u.id}>{u.email}</option>
                     ))}
                   </select>

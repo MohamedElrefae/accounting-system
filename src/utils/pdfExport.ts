@@ -64,7 +64,7 @@ const formatForDirectPDFTable = (value: any, type: string = 'text'): string => {
   if (value === null || value === undefined) return '-';
   
   switch (type) {
-    case 'currency':
+    case 'currency': {
       // Use the same currency formatting as the UI - no Arabic numeral conversion
       if (value === 0) return '-';
       const numericAmount = typeof value === 'string' ? parseFloat(value) : Number(value);
@@ -77,6 +77,7 @@ const formatForDirectPDFTable = (value: any, type: string = 'text'): string => {
       
       const currencyText = `${formattedAmount} ج.م`;
       return numericAmount < 0 ? `-${currencyText}` : currencyText;
+    }
     case 'date':
       return formatArabicDate(value, { forExport: true });
     case 'number':

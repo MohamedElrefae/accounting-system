@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Paper,
@@ -85,15 +85,23 @@ export const AccessRequestManagement: React.FC = () => {
     processing: false
   });
 
-  useEffect(() => {
-    checkPermissionsAndLoadData();
+  const loadRequests = useCallback(async () => {
+    try {
+      const [requestsData, pendingCountData] = await Promise.all([
+        getAllAccessRequests(),
+        getPendingAccessRequestsCount()
+      ]);
+      setRequests(requestsData);
+      setPendingCount(pendingCountData);
+    } catch (err: any) {
+      setError(err.message || 'فشل في تحميل الطلبات');
+    }
   }, []);
 
-  const checkPermissionsAndLoadData = async () => {
+  const checkPermissionsAndLoadData = useCallback(async () => {
     try {
       const hasPermission = await canManageAccessRequests();
       setCanManage(hasPermission);
-      
       if (hasPermission) {
         await loadRequests();
       }
@@ -102,21 +110,11 @@ export const AccessRequestManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loadRequests]);
 
-  const loadRequests = async () => {
-    try {
-      const [requestsData, pendingCountData] = await Promise.all([
-        getAllAccessRequests(),
-        getPendingAccessRequestsCount()
-      ]);
-      
-      setRequests(requestsData);
-      setPendingCount(pendingCountData);
-    } catch (err: any) {
-      setError(err.message || 'فشل في تحميل الطلبات');
-    }
-  };
+  useEffect(() => {
+    checkPermissionsAndLoadData();
+  }, [checkPermissionsAndLoadData]);
 
   const handleApprove = async () => {
     if (!approveDialog.request) return;
@@ -127,7 +125,6 @@ export const AccessRequestManagement: React.FC = () => {
       const result = await approveAccessRequest(approveDialog.request.id, approveDialog.selectedRole);
       
       const signupUrl = `${window.location.origin}/register`;
-      const loginUrl = `${window.location.origin}/login`;
       
       // Show success message with contact instructions
       alert(`✅ تم الموافقة على الطلب بنجاح!

@@ -54,7 +54,7 @@ export async function fetchProfitLossReport(filters: PLFilters): Promise<{
       p_classification_id: null,
       p_cost_center_id: null,
       p_work_item_id: null,
-      p_expenses_category_id: null,
+        p_sub_tree_id: null,
       p_debit_account_id: null,
       p_credit_account_id: null,
       p_amount_min: null,
@@ -157,24 +157,24 @@ export async function fetchProfitLossReport(filters: PLFilters): Promise<{
   }
 }
 
-function classifyPLAccountTypeFromCategory(category: string): PLRow['account_type'] | null {
-  if (!category) return null
+// function classifyPLAccountTypeFromCategory(category: string): PLRow['account_type'] | null {
+//   if (!category) return null
 
-  const categoryLower = category.toLowerCase()
+//   const categoryLower = category.toLowerCase()
   
   // Map canonical service categories to P&L types
-  if (categoryLower === 'revenue') {
-    return 'revenue'
-  }
-  if (categoryLower === 'expenses') {
-    // Default expenses to operating expenses for now
-    // Could be enhanced with sub-categorization later
-    return 'expenses'
-  }
+//   if (categoryLower === 'revenue') {
+//     return 'revenue'
+//   }
+//   if (categoryLower === 'expenses') {
+//     // Default expenses to operating expenses for now
+//     // Could be enhanced with sub-categorization later
+//     return 'expenses'
+//   }
   
-  // Assets, liabilities, and equity are not P&L accounts
-  return null
-}
+//   // Assets, liabilities, and equity are not P&L accounts
+//   return null
+// }
 
 function classifyPLAccountType(code: string): PLRow['account_type'] | null {
   if (!code) return null
@@ -212,7 +212,7 @@ function classifyPLAccountType(code: string): PLRow['account_type'] | null {
       return 'cost_of_sales' // Cost of sales/COGS
     }
     if (firstTwo >= '53' && firstTwo <= '58') {
-      return 'expenses' // Operating expenses
+//     return 'expenses' // Operating expenses
     }
     if (firstTwo === '59') {
       return 'other_expenses' // Other expenses

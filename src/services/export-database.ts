@@ -18,7 +18,7 @@ const DEFAULT_TABLE_ALLOWLIST: string[] = [
   'cost_centers',
   'work_items',
   'transaction_classifications',
-  'expenses_categories',
+  'sub_tree',
 ]
 
 export async function listExportableTables(): Promise<ExportableTableMeta[]> {
@@ -51,7 +51,7 @@ export interface TransactionsFilter {
   projectId?: string
   orgId?: string
   classificationId?: string
-  expensesCategoryId?: string
+  subTreeId?: string
   workItemId?: string
   costCenterId?: string
   status?: 'all' | 'posted' | 'unposted'
@@ -74,7 +74,7 @@ export async function fetchTransactionsAll(filters: TransactionsFilter = {}, bat
         p_project_id: toNull(filters.projectId),
         p_org_id: toNull(filters.orgId),
         p_classification_id: toNull(filters.classificationId),
-        p_expenses_category_id: toNull(filters.expensesCategoryId),
+        p_sub_tree_id: toNull(filters.subTreeId),
         p_work_item_id: toNull(filters.workItemId),
         p_cost_center_id: toNull(filters.costCenterId),
         p_status: (filters.status && ['all','posted','unposted'].includes(filters.status)) ? filters.status : 'all',
@@ -88,7 +88,7 @@ export async function fetchTransactionsAll(filters: TransactionsFilter = {}, bat
       chunk.forEach((j: any) => all.push(j))
       if (chunk.length < batchSize) break
       offset += batchSize
-    } catch (err) {
+    } catch {
       // Fallback: use client-side service if RPC missing; fetch via transactions service
       // We intentionally keep the fallback simple: stop if RPC unavailable
       // The UI can still use generic table export for `transactions` whole table
@@ -123,7 +123,7 @@ export function buildColumnsForTransactions(lang: ExportLanguage): UniversalTabl
     { key: 'credit_account', header: isAr ? 'الحساب الدائن' : 'Credit Account', type: 'text' },
     { key: 'amount', header: isAr ? 'المبلغ' : 'Amount', type: 'currency' },
     { key: 'classification_name', header: isAr ? 'التصنيف' : 'Classification', type: 'text' },
-    { key: 'expenses_category', header: isAr ? 'فئة المصروف' : 'Expenses Category', type: 'text' },
+    { key: 'sub_tree', header: isAr ? 'الشجرة الفرعية' : 'Sub Tree', type: 'text' },
     { key: 'work_item', header: isAr ? 'عنصر العمل' : 'Work Item', type: 'text' },
     { key: 'organization_name', header: isAr ? 'المؤسسة' : 'Organization', type: 'text' },
     { key: 'project_name', header: isAr ? 'المشروع' : 'Project', type: 'text' },

@@ -39,6 +39,7 @@
 
 /* Select width constraints */
 .filter-select--status { min-width: 90px; }
+.filter-select--approval { min-width: 120px; }
 .filter-select--org { max-width: 180px; }
 .filter-select--project { max-width: 180px; }
 .filter-select--account { max-width: 200px; }
@@ -68,6 +69,7 @@
 .transactions-tablebar { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.1)); background: var(--surface, #0f0f0f); border-radius: 8px; }
 .transactions-toolbar { display: inline-flex; align-items: center; gap: 8px; }
 .transactions-count { color: var(--text-secondary, #a3a3a3); font-weight: 600; }
+.wrap-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
 .transactions-pagination { display: inline-flex; align-items: center; gap: 8px; }
 
 .transactions-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -85,6 +87,8 @@
 .ultimate-btn-success { background: linear-gradient(135deg,#10b981,#059669); }
 .ultimate-btn-warning { background: linear-gradient(135deg,#f97316,#ea580c); }
 .ultimate-btn-delete { background: linear-gradient(135deg,#ef4444,#dc2626); }
+/* New: Posted badge distinct styling */
+.ultimate-btn-posted { background: linear-gradient(135deg,#14b8a6,#06b6d4); }
 .ultimate-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,.15); }
 
 /* Modal aligned to theme */
@@ -119,4 +123,138 @@
 
 /* Dev debug chip (dev only) */
 .dev-debug-chip { position: fixed; top: 10px; left: 10px; background: #ef4444; color: #fff; padding: 5px 8px; border-radius: 6px; z-index: 9999; font-size: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.25); }
+
+/* Configuration Modal Styles */
+.config-modal-content {
+  background: var(--surface, #0f0f0f);
+  border: 1px solid var(--border, rgba(255,255,255,0.2));
+  border-radius: 12px;
+  width: min(700px, 95vw);
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+  color: var(--text-primary, #eaeaea);
+}
+
+.config-modal-body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.config-section {
+  margin-bottom: 1.5rem;
+}
+
+.config-section:last-child {
+  margin-bottom: 0;
+}
+
+.config-section h4 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary, #eaeaea);
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--accent-primary, #3b82f6);
+}
+
+.config-field {
+  margin-bottom: 1rem;
+}
+
+.config-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--text-primary, #eaeaea);
+  font-size: 0.95rem;
+  padding: 0.5rem;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.config-label:hover {
+  background: var(--surface-elevated, rgba(255,255,255,0.05));
+}
+
+.config-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent-primary, #3b82f6);
+  cursor: pointer;
+}
+
+.config-label-block {
+  display: block;
+  font-weight: 500;
+  color: var(--text-primary, #eaeaea);
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.config-select {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border, rgba(255,255,255,0.2));
+  border-radius: 8px;
+  background: var(--field-bg, rgba(255,255,255,0.05));
+  color: var(--text-primary, #eaeaea);
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.config-select:focus {
+  outline: none;
+  border-color: var(--accent-primary, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.layout-control-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--surface-elevated, rgba(255,255,255,0.03));
+  border: 1px solid var(--border-light, rgba(255,255,255,0.1));
+  border-radius: 8px;
+}
+
+.config-help-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #a3a3a3);
+  margin: 0;
+  font-style: italic;
+}
+
+.modal-actions {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-light, rgba(255,255,255,0.1));
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  background: var(--surface-elevated, rgba(255,255,255,0.02));
+}
+
+.modal-actions .ultimate-btn {
+  min-width: 120px;
+}
+
+/* Primary button variant for config functionality */
+.ultimate-btn-primary {
+  background: linear-gradient(135deg, var(--accent-primary, #3b82f6), #1d4ed8);
+  color: #fff;
+}
+
+/* Neutral button variant */
+.ultimate-btn-neutral {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+  color: #fff;
+}
 

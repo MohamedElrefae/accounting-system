@@ -523,7 +523,7 @@ export class PDFGenerator {
     `;
     
     // Build rows
-    tableData.rows.forEach((row, index) => {
+    tableData.rows.forEach((row, _index) => {
       const level = row.level || 0;
       const isGroupHeader = row.isGroupHeader || false;
       const rowClass = isGroupHeader ? 'group-header' : `level-${Math.min(level, 3)}`;
