@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, X, Search } from 'lucide-react';
 import styles from './SearchableSelect.module.css';
 
@@ -73,7 +73,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
     return text.includes(term.toLowerCase());
   };
 
-  const buildVisible = (
+  const buildVisible = useCallback((
     opts: SearchableSelectOption[],
     depth: number,
     out: FlatRow[],
@@ -110,13 +110,13 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
         }
       }
     }
-  };
+  }, [expanded]);
 
   const visibleFlatOptions: FlatRow[] = React.useMemo(() => {
     const list: FlatRow[] = [];
     buildVisible(options, 0, list, true, searchTerm);
     return list;
-  }, [options, expanded, searchTerm]);
+  }, [options, searchTerm, buildVisible]);
 
   // Collect all nodes that have children (parents)
   const collectAllParents = (opts: SearchableSelectOption[], out: Set<string>) => {
@@ -253,7 +253,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   };
 
   // Find ancestry path of current value in the tree
-  const findPath = (opts: SearchableSelectOption[], target: string, trail: string[] = []): string[] | null => {
+  const findPath = useCallback((opts: SearchableSelectOption[], target: string, trail: string[] = []): string[] | null => {
     for (const opt of opts || []) {
       const nextTrail = [...trail, opt.value];
       if (opt.value === target) return nextTrail;
@@ -263,7 +263,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
       }
     }
     return null;
-  };
+  }, []);
 
   // On open (and when not searching), expand only the ancestry of the selected value
   // If no selection, restore persisted expansion (if available)
@@ -293,7 +293,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
       const ancestors = path.slice(0, Math.max(0, path.length - 1));
       setExpanded(new Set(ancestors));
     }
-  }, [isOpen, value, options, searchTerm, storageKey]);
+  }, [isOpen, value, options, searchTerm, storageKey, findPath]);
 
   const toggleExpand = (val: string) => {
     setExpanded(prev => {

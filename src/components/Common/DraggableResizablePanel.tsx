@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Maximize, 
   Minimize, 
@@ -65,7 +65,7 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
     });
   };
 
-  const handleMouseMove = (e: MouseEvent) => {
+  const handleMouseMove = useCallback((e: MouseEvent) => {
     if (isDragging && !isMaximized && !isDocked) {
       const newPosition = {
         x: Math.max(0, Math.min(window.innerWidth - size.width, e.clientX - dragStart.x)),
@@ -77,12 +77,12 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
       const newHeight = Math.max(300, resizeStart.height + (e.clientY - resizeStart.y));
       onResize({ width: newWidth, height: newHeight });
     }
-  };
+  }, [isDragging, isMaximized, isDocked, size.width, size.height, dragStart.x, dragStart.y, onMove, isResizing, resizeStart.width, resizeStart.height, resizeStart.x, resizeStart.y, onResize]);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     setIsDragging(false);
     setIsResizing(false);
-  };
+  }, []);
 
   // Handle resizing
   const handleResizeStart = (e: React.MouseEvent) => {
@@ -109,7 +109,7 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
       };
     }
     return undefined;
-  }, [isDragging, isResizing]);
+  }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
 
   // Calculate panel style based on state
   const getPanelStyle = (): React.CSSProperties => {

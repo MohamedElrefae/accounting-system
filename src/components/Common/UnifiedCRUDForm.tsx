@@ -245,7 +245,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       // Silently handle layout loading errors
       void 0;
     }
-  }, [config.title, config.fields]);
+  }, [config.title, config.fields, fieldOrder.length]);
 
   // Initialize form data
   useEffect(() => {
@@ -305,7 +305,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
         }
       }
     }
-  }, [config.autoFillLogic, formData.parent_id, formData.code]); // Only trigger on parent or code changes
+  }, [config.autoFillLogic, formData]); // Trigger on full form data to satisfy exhaustive-deps
 
   // Handle async options loading for fields with optionsProvider
   useEffect(() => {
