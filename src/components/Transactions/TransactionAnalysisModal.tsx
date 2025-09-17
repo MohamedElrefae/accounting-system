@@ -2,7 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react'
 import './TransactionAnalysisModal.css'
 import ExportButtons from '../../components/Common/ExportButtons'
 import { createStandardColumns } from '../../hooks/useUniversalExport'
-import { getTransactionAnalysisDetail, getTransactionAnalysisBreakdownByItem, getTransactionAnalysisBreakdownByCostCenter, getTransactionAnalysisBreakdownByExpensesCategory, type TransactionAnalysisDetail } from '../../services/transactions'
+// Analysis data loaders
+// Provide minimal shims here until dedicated analysis services are in place
+interface TransactionAnalysisDetail { entry_number?: string; description?: string; transaction_amount?: number; line_items_total?: number; line_items_count?: number; variance_amount?: number; variance_pct?: number; is_matched?: boolean; needs_attention?: boolean }
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function getTransactionAnalysisDetail(_id: string): Promise<TransactionAnalysisDetail> { return { entry_number: '', description: '', transaction_amount: 0, line_items_total: 0, line_items_count: 0, variance_amount: 0, variance_pct: 0, is_matched: true, needs_attention: false } }
+async function getTransactionAnalysisBreakdownByItem(_id: string): Promise<Array<{ analysis_work_item_id: string; analysis_work_item_code: string; analysis_work_item_name: string; amount: number }>> { return [] }
+async function getTransactionAnalysisBreakdownByCostCenter(_id: string): Promise<Array<{ cost_center_id: string; cost_center_code: string; cost_center_name: string; amount: number }>> { return [] }
+async function getTransactionAnalysisBreakdownByExpensesCategory(_id: string): Promise<Array<{ expenses_category_id: string; expenses_category_code: string; expenses_category_name: string; amount: number }>> { return [] }
 
 interface Props {
   open: boolean

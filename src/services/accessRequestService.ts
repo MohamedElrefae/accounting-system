@@ -160,17 +160,15 @@ export const rejectAccessRequest = async (
 };
 
 // Get approved user email for notification (to inform admin who to contact)
-export const getApprovedUserEmail = (requestId: string): Promise<string | null> => {
-  return supabase
+export const getApprovedUserEmail = async (requestId: string): Promise<string | null> => {
+  const { data, error } = await supabase
     .from('access_requests')
     .select('email')
     .eq('id', requestId)
     .eq('status', 'approved')
-    .single()
-    .then(({ data, error }) => {
-      if (error || !data) return null;
-      return data.email;
-    });
+    .single();
+  if (error || !data) return null;
+  return data.email as string | null;
 };
 
 // Check if user has permission to manage access requests

@@ -178,7 +178,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(result.data as Profile);
         // Persist super admin flag if present on profile row
         try {
-          // @ts-expect-error allow dynamic prop
+          // Using dynamic property read; profile may have is_super_admin if available
           const isSuper = (result.data as any)?.is_super_admin === true;
           if (typeof isSuper === 'boolean') {
             localStorage.setItem('is_super_admin', isSuper ? 'true' : 'false');

@@ -67,12 +67,37 @@ const TransactionsPage: React.FC = () => {
   const [audit, setAudit] = useState<TransactionAudit[]>([])
   const [approvalHistory, setApprovalHistory] = useState<ApprovalHistoryRow[]>([])
   
-  // Unified form panel state
-  const [panelPosition, setPanelPosition] = useState<{ x: number; y: number }>({ x: 100, y: 100 })
-  const [panelSize, setPanelSize] = useState<{ width: number; height: number }>({ width: 800, height: 700 })
-  const [panelMax, setPanelMax] = useState<boolean>(false)
-  const [panelDocked, setPanelDocked] = useState<boolean>(false)
-  const [panelDockPos, setPanelDockPos] = useState<'left' | 'right' | 'top' | 'bottom'>('right')
+  // Unified form panel state with persistence
+  const [panelPosition, setPanelPosition] = useState<{ x: number; y: number }>(() => {
+    try {
+      const saved = localStorage.getItem('transactionFormPanel:position');
+      return saved ? JSON.parse(saved) : { x: 100, y: 100 };
+    } catch { return { x: 100, y: 100 }; }
+  })
+  const [panelSize, setPanelSize] = useState<{ width: number; height: number }>(() => {
+    try {
+      const saved = localStorage.getItem('transactionFormPanel:size');
+      return saved ? JSON.parse(saved) : { width: 800, height: 700 };
+    } catch { return { width: 800, height: 700 }; }
+  })
+  const [panelMax, setPanelMax] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('transactionFormPanel:maximized');
+      return saved === 'true';
+    } catch { return false; }
+  })
+  const [panelDocked, setPanelDocked] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('transactionFormPanel:docked');
+      return saved === 'true';
+    } catch { return false; }
+  })
+  const [panelDockPos, setPanelDockPos] = useState<'left' | 'right' | 'top' | 'bottom'>(() => {
+    try {
+      const saved = localStorage.getItem('transactionFormPanel:dockPosition');
+      return (saved as 'left' | 'right' | 'top' | 'bottom') || 'right';
+    } catch { return 'right'; }
+  })
   
   const formRef = React.useRef<UnifiedCRUDFormHandle>(null)
 
@@ -208,6 +233,41 @@ const TransactionsPage: React.FC = () => {
       localStorage.setItem('transactionsConfig', JSON.stringify(transactionsConfig));
     } catch {}
   }, [transactionsConfig])
+  
+  // Persist form panel position
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionFormPanel:position', JSON.stringify(panelPosition));
+    } catch {}
+  }, [panelPosition])
+  
+  // Persist form panel size
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionFormPanel:size', JSON.stringify(panelSize));
+    } catch {}
+  }, [panelSize])
+  
+  // Persist form panel maximized state
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionFormPanel:maximized', String(panelMax));
+    } catch {}
+  }, [panelMax])
+  
+  // Persist form panel docked state
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionFormPanel:docked', String(panelDocked));
+    } catch {}
+  }, [panelDocked])
+  
+  // Persist form panel dock position
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionFormPanel:dockPosition', panelDockPos);
+    } catch {}
+  }, [panelDockPos])
 
   const location = useLocation()
   // Apply workItemId from URL query (drill-through)
@@ -269,6 +329,50 @@ const TransactionsPage: React.FC = () => {
       }
     }
     throw lastErr
+  }
+  
+  // Save current form panel layout and size as preferred
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleSaveFormPanelLayout = () => {
+    try {
+      const panelPreference = {
+        position: panelPosition,
+        size: panelSize,
+        maximized: panelMax,
+        docked: panelDocked,
+        dockPosition: panelDockPos,
+        savedTimestamp: Date.now(),
+        userPreferred: true
+      };
+      localStorage.setItem('transactionFormPanel:preferred', JSON.stringify(panelPreference));
+      console.log('✅ تم حفظ تخطيط مودال النموذج كمفضل');
+      showToast('✅ تم حفظ تخطيط النموذج', { severity: 'success' });
+    } catch (error) {
+      console.error('Failed to save form panel layout:', error);
+      showToast('⚠️ فشل في حفظ تخطيط النموذج', { severity: 'error' });
+    }
+  }
+  
+  // Reset form panel to default layout and size
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleResetFormPanelLayout = () => {
+    setPanelPosition({ x: 100, y: 100 });
+    setPanelSize({ width: 800, height: 700 });
+    setPanelMax(false);
+    setPanelDocked(false);
+    setPanelDockPos('right');
+    
+    // Clear saved preferences
+    try {
+      localStorage.removeItem('transactionFormPanel:preferred');
+      localStorage.removeItem('transactionFormPanel:position');
+      localStorage.removeItem('transactionFormPanel:size');
+      localStorage.removeItem('transactionFormPanel:maximized');
+      localStorage.removeItem('transactionFormPanel:docked');
+      localStorage.removeItem('transactionFormPanel:dockPosition');
+      console.log('🔄 تم إعادة تعيين تخطيط مودال النموذج');
+      showToast('🔄 تم إعادة تعيين تخطيط النموذج', { severity: 'info' });
+    } catch {}
   }
 
   // Review modal state
@@ -487,7 +591,7 @@ const TransactionsPage: React.FC = () => {
         workItemId: workItemFilterId || undefined,
         costCenterId: costCenterFilterId || undefined,
         analysisWorkItemId: (filters as any).analysis_work_item_id || undefined,
-        approvalStatus: approvalFilter !== 'all' ? (approvalFilter as string) : undefined,
+approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted' | 'approved' | 'draft' | 'rejected' | 'revision_requested' | 'cancelled' | 'posted')) : undefined,
       },
       page,
       pageSize,
@@ -1543,6 +1647,32 @@ const TransactionsPage: React.FC = () => {
               }}
             >
               <div className="btn-content"><span className="btn-text">+ شجرة الحسابات</span></div>
+            </button>
+            
+            {/* Save Form Panel Layout Button */}
+            <button
+              className="ultimate-btn ultimate-btn-success"
+              title="حفظ حجم وموضع نموذج المعاملة كمفضل"
+              onClick={handleSaveFormPanelLayout}
+              style={{
+                fontSize: '12px',
+                padding: '6px 10px'
+              }}
+            >
+              <div className="btn-content"><span className="btn-text">💾 حفظ التخطيط</span></div>
+            </button>
+            
+            {/* Reset Form Panel Layout Button */}
+            <button
+              className="ultimate-btn ultimate-btn-warning"
+              title="إعادة تعيين حجم وموضع نموذج المعاملة"
+              onClick={handleResetFormPanelLayout}
+              style={{
+                fontSize: '12px',
+                padding: '6px 10px'
+              }}
+            >
+              <div className="btn-content"><span className="btn-text">🔄 إعادة تعيين</span></div>
             </button>
           </div>
           <UnifiedCRUDForm

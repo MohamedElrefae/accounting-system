@@ -295,33 +295,6 @@ export class TransactionValidationAPI {
     }
   }
 
-  /**
-   * Parse validation messages from database response
-   */
-  private parseValidationMessages(messages: any[]): Array<{
-    field: string
-    message: string
-    details?: string
-    code?: string
-  }> {
-    if (!Array.isArray(messages)) return []
-
-    return messages.map(msg => {
-      if (typeof msg === 'string') {
-        return {
-          field: 'general',
-          message: msg
-        }
-      }
-      
-      return {
-        field: msg.field || 'general',
-        message: msg.message || String(msg),
-        details: msg.details,
-        code: msg.code
-      }
-    })
-  }
 
   /**
    * Test transaction validation (for debugging)

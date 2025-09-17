@@ -1,13 +1,10 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import styles from './GeneralLedger.module.css'
 import { fetchGeneralLedgerReport, type GLFilters, type GLRow } from '../../services/reports/general-ledger'
-import { fetchTransactionsDateRange } from '../../services/reports/common'
 import ExportButtons from '../../components/Common/ExportButtons'
 import PresetBar from '../../components/Common/PresetBar'
 import { fetchGLAccountSummary, type GLAccountSummaryRow } from '../../services/reports/gl-account-summary'
-import { getAccountBalances, getCategoryTotals, type AccountBalanceFilter } from '../../services/account-balances'
 import { fetchOrganizations, fetchProjects, fetchAccountsMinimal, type LookupOption } from '../../services/lookups'
-import { listAnalysisWorkItems } from '../../services/analysis-work-items'
 import type { UniversalTableData } from '../../utils/UniversalExportManager'
 import { exportToExcel, exportToCSV } from '../../utils/UniversalExportManager'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
@@ -19,11 +16,6 @@ import { supabase } from '../../utils/supabase'
 import './StandardFinancialStatements.css'
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
-const firstDayOfMonthISO = () => {
-  const date = new Date()
-  date.setDate(1) // First day of current month
-  return date.toISOString().slice(0, 10)
-}
 
 type ViewMode = 'overview' | 'details'
 type DensityMode = 'normal' | 'dense'

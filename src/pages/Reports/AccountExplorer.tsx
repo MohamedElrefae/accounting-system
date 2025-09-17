@@ -173,8 +173,8 @@ const AccountExplorerReport: React.FC = () => {
           setClassifications(classes || [])
           setExpensesCategories(cats || [])
           setWorkItems(wItems || [])
-          setCostCenters((ccs || []).map((c: { id: string; code: string; name: string }) => ({ id: c.id, code: c.code, name: c.name })))
-          const accOpts: SearchableSelectOption[] = (accs || []).map((a: { id: string; code: string; name: string }) => ({ value: a.id, label: `${a.code} - ${a.name}`, searchText: `${a.code} ${a.name}` }))
+          setCostCenters((ccs || []).map((c: any) => ({ id: String(c.id), code: String(c.code), name: String(c.name) })))
+          const accOpts: SearchableSelectOption[] = (accs || []).map((a: any) => ({ value: String(a.id), label: `${String(a.code)} - ${String(a.name)}`, searchText: `${String(a.code)} ${String(a.name)}` }))
           setAccountsOptions([{ value: '', label: uiLang === 'ar' ? 'كل الحسابات' : 'All Accounts', searchText: '' }, ...accOpts])
         }
       } catch { /* noop */ }
@@ -256,7 +256,7 @@ const AccountExplorerReport: React.FC = () => {
           name: a.name,
           name_ar: a.name_ar || null,
           level: Number(a.level || 1),
-          parent_id: a.parent_id,
+          parent_id: a.parent_id ?? null,
           status: a.status || 'active',
           category: a.category || null,
           children: [],
@@ -384,7 +384,7 @@ const AccountExplorerReport: React.FC = () => {
     }
 
     const rows = visibleFlat.map(n => {
-      const row: (string|number)[] = [n.code, (n.name_ar || n.name), (n.category || ''), String(n.level)]
+          const row: (string|number)[] = [String(n.code), String(n.name_ar || n.name), String(n.category || ''), String(n.level)]
       const openingDebit = Number(n.rollup.opening_debit || 0)
       const openingCredit = Number(n.rollup.opening_credit || 0)
       const periodDebits = Number(n.rollup.period_debits || 0)
@@ -412,12 +412,12 @@ const AccountExplorerReport: React.FC = () => {
   // Professional PDF generation function
   async function generatePDF() {
     try {
-      const _projectName = projectId ? projectOptions.find(p => p.id === projectId)?.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
+      // const _projectName = projectId ? projectOptions.find(p => p.id === projectId)?.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
       const reportTitle = uiLang === 'ar' ? 'مستكشف الحسابات - التقرير المالي' : 'Account Explorer - Financial Report'
       const periodText = mode === 'range' ? `${uiLang === 'ar' ? 'من' : 'From'} ${dateFrom} ${uiLang === 'ar' ? 'إلى' : 'To'} ${dateTo}` : `${uiLang === 'ar' ? 'حتى تاريخ' : 'As of'} ${dateTo}`
       
       // Build PDF table structure
-      const pdfColumns: PDFTableColumn[] = [
+          const pdfColumns: import('../../services/pdf-generator').PDFTableColumn[] = [
         { key: 'code', header: uiLang === 'ar' ? 'رمز الحساب' : 'Account Code', width: '100px', align: 'center', type: 'text' },
         { key: 'name', header: uiLang === 'ar' ? 'اسم الحساب' : 'Account Name', width: '300px', align: 'right', type: 'text' },
         { key: 'type', header: uiLang === 'ar' ? 'نوع الحساب' : 'Account Type', width: '120px', align: 'center', type: 'text' },

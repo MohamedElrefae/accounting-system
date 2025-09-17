@@ -106,7 +106,7 @@ const AnalysisWorkItemsPage: React.FC = () => {
     if (!orgId) return
     setLoading(true)
     try {
-      const list = await listAnalysisWorkItems({ orgId, projectId: projectId || null, search: (search || '').trim() || null, onlyWithTx: false, includeInactive: true })
+      const list = await listAnalysisWorkItems({ orgId, projectId: projectId || null, search: (search || '').trim() || undefined, onlyWithTx: false, includeInactive: true })
       setRows(list)
     } catch (e: any) {
       showToast(e?.message || 'Failed to load', { severity: 'error' })

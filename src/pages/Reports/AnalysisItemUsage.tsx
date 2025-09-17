@@ -152,6 +152,7 @@ const AnalysisItemUsagePage: React.FC = () => {
       const rangeLabel = (dateFrom || dateTo) ? `Range: ${dateFrom || '—'} → ${dateTo || '—'}` : 'Range: All'
       return `Analysis Item Usage — Top ${topLimit} — ${metricLabels[topMetric]} — ${orgLabel} — ${projLabel} — ${rangeLabel}`
     })()
+    const { exportToExcel, exportToCSV } = await import('../../utils/UniversalExportManager')
     if (format === 'excel') await exportToExcel(data, { title, rtlLayout: true, useArabicNumerals: true })
     else await exportToCSV(data, { title, rtlLayout: true, useArabicNumerals: true })
   }

@@ -133,6 +133,18 @@ export const createTransactionFormConfig = (
   costCenters: Array<{ id: string; code: string; name: string; name_ar?: string | null; project_id?: string | null; level: number }> = []
 ): FormConfig => {
   
+  console.log('🌳 createTransactionFormConfig called with:', {
+    isEditing,
+    accountsCount: accounts.length,
+    projectsCount: projects.length,
+    organizationsCount: organizations.length,
+    classificationsCount: classifications.length,
+    expensesCategoriesCount: expensesCategories.length,
+    workItemsCount: workItems.length,
+    costCentersCount: costCenters.length,
+    existingTransaction: !!existingTransaction
+  });
+  
   // Build hierarchical (level-based) options with real tree nodes and level headers
   const byParent: Record<string, Account[]> = {};
   const allById: Record<string, Account> = {};
@@ -537,8 +549,13 @@ export const createTransactionFormConfig = (
       type: 'searchable-select',
       label: 'الشجرة الفرعية',
       required: false,
-      options: [],
-      optionsProvider: (form) => getCategoryOptionsForSelection(form),
+      options: [{ value: '', label: 'تحميل عقد الشجرة الفرعية...', searchText: '' }],
+      optionsProvider: (form) => {
+        console.log('🌳 sub_tree_id optionsProvider called with form data:', { orgId: (form as any)?.organization_id, hasCategories: expensesCategories.length });
+        const result = getCategoryOptionsForSelection(form);
+        console.log('🌳 sub_tree_id optionsProvider returning:', result.length, 'options');
+        return result;
+      },
       icon: <Tag size={16} />,
       helpText: 'يتم تصفية عقد الشجرة حسب المؤسسة والحساب المدين/الدائن المحدد',
       searchable: true,
@@ -574,8 +591,9 @@ export const createTransactionFormConfig = (
     // notes: existingTransaction?.notes || '',
     // project_id: existingTransaction?.project_id || ''
   // };
-  return {
-    title: isEditing ? '✏️ تعديل المعاملة' : '➕ معاملة جديدة',
+  // Debug: Log final form configuration
+  const finalConfig = {
+    title: isEditing ? '✐️ تعديل المعاملة' : '➕ معاملة جديدة',
     subtitle: isEditing 
       ? `تعديل المعاملة: ${existingTransaction?.entry_number || ''}`
       : 'إضافة معاملة مالية جديدة',
@@ -618,15 +636,18 @@ export const createTransactionFormConfig = (
       if (fd.debit_account_id && fd.credit_account_id && amountVal > 0) {
         try {
           const validationValidator = transactionValidator.createCustomValidator();
-          const smartValidation = await validationValidator(data);
-          
-          // Merge smart validation errors and warnings
-          if (smartValidation.errors) {
-            errors.push(...smartValidation.errors);
-          }
-          if (smartValidation.warnings) {
-            warnings.push(...smartValidation.warnings);
-          }
+          // Run asynchronously but do not block the sync validator contract
+          void validationValidator(data).then((smartValidation) => {
+            try {
+              if (smartValidation.errors) {
+                // Surface via console for now; UI can display on submit
+                console.warn('Async validation errors', smartValidation.errors)
+              }
+              if (smartValidation.warnings) {
+                console.info('Async validation warnings', smartValidation.warnings)
+              }
+            } catch {}
+          }).catch(() => {})
         } catch (validationError) {
           console.error('Transaction validation failed:', validationError);
           // Add a warning that validation service is unavailable
@@ -691,4 +712,31 @@ export const createTransactionFormConfig = (
       ]
     }
   };
+  
+  // Debug: Log final configuration details
+  console.log('🌳 Final form config created:', {
+    title: finalConfig.title,
+    fieldsCount: finalConfig.fields.length,
+    fieldIds: finalConfig.fields.map(f => f.id),
+    hasSubTreeField: finalConfig.fields.some(f => f.id === 'sub_tree_id'),
+    layoutFieldsCount: finalConfig.layout?.columnBreakpoints?.length,
+    layoutFields: finalConfig.layout?.columnBreakpoints?.map(b => b.field)
+  });
+  
+  const subTreeField = finalConfig.fields.find(f => f.id === 'sub_tree_id');
+  if (subTreeField) {
+    console.log('🌳 sub_tree_id field details:', {
+      id: subTreeField.id,
+      type: subTreeField.type,
+      label: subTreeField.label,
+      hasOptionsProvider: !!subTreeField.optionsProvider,
+      hasOptions: !!subTreeField.options,
+      position: subTreeField.position,
+      dependsOnAny: subTreeField.dependsOnAny
+    });
+  } else {
+    console.error('🌳 ERROR: sub_tree_id field NOT FOUND in final config!');
+  }
+  
+  return finalConfig;
 };

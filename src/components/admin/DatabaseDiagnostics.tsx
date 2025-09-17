@@ -44,7 +44,7 @@ export function DatabaseDiagnostics() {
         name: 'Authentication Check',
         status: user ? 'success' : 'error',
         data: user ? { id: user.id, email: user.email } : null,
-        error: !user ? 'No authenticated user found' : null
+        error: !user ? 'No authenticated user found' : undefined
       };
       setTests([...results]);
     } catch (err: unknown) {
@@ -58,7 +58,7 @@ export function DatabaseDiagnostics() {
       return;
     }
 
-    const userId = results[0].data?.id;
+    const userId = (results[0].data as any)?.id;
     if (!userId) {
       setRunning(false);
       return;
@@ -381,7 +381,7 @@ export function DatabaseDiagnostics() {
                 </Alert>
               )}
 
-              {test.data && (
+              {test.data != null && (
                 <Box sx={{ mt: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
                   <Typography variant="body2" component="pre" sx={{ 
                     fontFamily: 'monospace',

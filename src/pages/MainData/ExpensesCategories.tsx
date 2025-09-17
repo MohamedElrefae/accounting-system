@@ -348,21 +348,21 @@ const getNextCode = async (parentId?: string | null) => {
                         <input type="checkbox" checked={!!n.has_transactions} readOnly aria-label="has_transactions" />
                       )},
                     ]}
-                    onEdit={(node: ExpensesCategoryTreeNode) => {
+                    onEdit={(node: any) => {
                       const row = list.find(r => r.id === node.id)
                       if (row) openEdit(row)
                     }}
-                    onAdd={(parentNode: ExpensesCategoryTreeNode) => handleAddChild(parentNode.id)}
-                    onToggleStatus={(node: ExpensesCategoryTreeNode) => {
+                    onAdd={async (parentNode: any) => handleAddChild(parentNode.id)}
+                    onToggleStatus={(node: any) => {
                       const row = list.find(r => r.id === node.id)
                       if (row) handleToggleActive(row)
                     }}
-                    onDelete={(node: ExpensesCategoryTreeNode) => {
+                    onDelete={(node: any) => {
                       const row = list.find(r => r.id === node.id)
                       if (row) handleDelete(row)
                     }}
-                    canHaveChildren={(node: ExpensesCategoryTreeNode) => node.level < 4}
-                    getChildrenCount={(node: ExpensesCategoryTreeNode) => list.filter(r => r.parent_id === node.id).length}
+                    canHaveChildren={(node: any) => node.level < 4}
+                    getChildrenCount={(node: any) => list.filter(r => r.parent_id === node.id).length}
                     maxLevel={4}
                   />
                 )}

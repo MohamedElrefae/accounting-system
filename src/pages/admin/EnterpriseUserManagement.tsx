@@ -932,7 +932,8 @@ export default function EnterpriseUserManagement() {
                         </IconButton>
                         <IconButton size="small" color="info" onClick={() => {
                           setSelectedUser(user);
-                          setPermissionDialogOpen(true);
+                          // Permissions dialog not wired yet
+                          alert('عرض صلاحيات المستخدم قادم قريبًا');
                         }}>
                           <SecurityIcon />
                         </IconButton>

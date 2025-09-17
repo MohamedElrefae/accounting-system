@@ -141,7 +141,7 @@ const AccountsTreePage: React.FC = () => {
       name_ar: a.name_ar || a.name,
       name_en: a.name,
       level: a.level,
-      account_type: (a.account_type || '') as string,
+      category: (a.account_type || '') as string,
       statement_type: '',
       parent_id: a.parent_id,
       is_active: a.status === 'active',
@@ -220,7 +220,7 @@ const AccountsTreePage: React.FC = () => {
           name_ar: String(draft.name_ar || draft.name || ''),
           name_en: draft.name || '',
           level: Number(draft.level || 1),
-          account_type: String(draft.account_type || ''),
+          category: String(draft.account_type || ''),
           statement_type: '',
           parent_id: (draft.parent_id as string) || null,
           is_active: (draft.status || 'active') === 'active',
@@ -229,7 +229,7 @@ const AccountsTreePage: React.FC = () => {
             : (((draft.level as number) || 1) >= 3),
         }
       : undefined;
-    return createAccountFormConfig(dialogMode === 'edit', parentAccountsLite, existing as unknown, true, !!hasAccountsUpdate);
+    return createAccountFormConfig(dialogMode === 'edit', parentAccountsLite, existing as (import('../../components/Accounts/AccountFormConfig').AccountLite | null | undefined), true, !!hasAccountsUpdate);
   }, [dialogMode, draft, parentAccountsLite, hasAccountsUpdate]);
 
   const { showToast } = useToast();
@@ -360,16 +360,16 @@ const AccountsTreePage: React.FC = () => {
 
   function mapRow(row: Record<string, unknown>): AccountItem {
     return {
-      id: row.id,
-      code: row.code,
-      name: row.name,
-      name_ar: row.name_ar || row.name,
-      level: row.level,
-      status: row.status,
-      parent_id: row.parent_id,
-      account_type: (row.category as string) || undefined,
-      has_children: Boolean(row.has_children),
-      has_active_children: Boolean(row.has_active_children),
+      id: String(row.id || ''),
+      code: String(row.code || ''),
+      name: String((row as any).name || ''),
+      name_ar: String((row as any).name_ar || (row as any).name || ''),
+      level: Number(row.level || 1),
+      status: String(row.status || 'active') as any,
+      parent_id: (row.parent_id as string | null) ?? null,
+      account_type: ((row as any).category ? String((row as any).category) : undefined),
+      has_children: Boolean((row as any).has_children),
+      has_active_children: Boolean((row as any).has_active_children),
     };
   }
 

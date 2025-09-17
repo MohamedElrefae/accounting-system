@@ -13,6 +13,7 @@ interface TreeNode {
   is_active: boolean;
   account_type?: string;
   children?: TreeNode[];
+  [key: string]: any;
 }
 
 interface ButtonState {
@@ -27,25 +28,25 @@ interface ExtraColumn {
   render: (node: any) => React.ReactNode;
 }
 
-interface TreeViewProps {
-  data: TreeNode[];
-  onEdit?: (node: TreeNode) => void;
-  onAdd?: (parentNode: TreeNode) => void;
-  onToggleStatus?: (node: TreeNode) => void;
-  onDelete?: (node: TreeNode) => void;
-  onSelect?: (node: TreeNode) => void;
-  onToggleExpand?: (node: TreeNode) => void | Promise<void>;
-  canHaveChildren?: (node: TreeNode) => boolean;
-  getChildrenCount?: (node: TreeNode) => number | null | undefined;
+interface TreeViewProps<T extends TreeNode = TreeNode> {
+  data: T[];
+  onEdit?: (node: T) => void;
+  onAdd?: (parentNode: T) => void;
+  onToggleStatus?: (node: T) => void;
+  onDelete?: (node: T) => void;
+  onSelect?: (node: T) => void;
+  onToggleExpand?: (node: T) => void | Promise<void>;
+  canHaveChildren?: (node: T) => boolean;
+  getChildrenCount?: (node: T) => number | null | undefined;
   // New: allow parent to control deletion disabled state and tooltip reason
-  isDeleteDisabled?: (node: TreeNode) => boolean;
-  getDeleteDisabledReason?: (node: TreeNode) => string | undefined;
+  isDeleteDisabled?: (node: T) => boolean;
+  getDeleteDisabledReason?: (node: T) => string | undefined;
   maxLevel?: number;
   // New: extra columns to display between level and actions
   extraColumns?: ExtraColumn[];
 }
 
-const TreeView: React.FC<TreeViewProps> = ({ 
+const TreeView = <T extends TreeNode = TreeNode>({ 
   data, 
   onEdit, 
   onAdd, 
@@ -59,7 +60,7 @@ const TreeView: React.FC<TreeViewProps> = ({
   getDeleteDisabledReason,
   maxLevel = 4,
   extraColumns = []
-}) => {
+}: TreeViewProps<T>) => {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [buttonStates, setButtonStates] = useState<{[key: string]: ButtonState}>({});
 
@@ -124,7 +125,7 @@ const TreeView: React.FC<TreeViewProps> = ({
     }
   };
 
-  const renderTreeNode = (node: TreeNode, depth: number = 0): React.ReactNode => {
+  const renderTreeNode = (node: T, depth: number = 0): React.ReactNode => {
     const isExpanded = expandedNodes.has(node.id);
     const hasLoadedChildren = node.children && node.children.length > 0;
     const mayHaveChildren = hasLoadedChildren || (canHaveChildren ? !!canHaveChildren(node) : false);
@@ -338,7 +339,7 @@ const TreeView: React.FC<TreeViewProps> = ({
         
         {isExpanded && hasLoadedChildren && (
           <div className="tree-node-children">
-            {node.children!.map(child => renderTreeNode(child, depth + 1))}
+            {(node.children || []).map(child => renderTreeNode(child as any as T, depth + 1))}
           </div>
         )}
       </div>
@@ -404,7 +405,7 @@ const TreeView: React.FC<TreeViewProps> = ({
         </div>
       </div>
       {/* Tree Nodes */}
-      {treeData.map(node => renderTreeNode(node))}
+      {treeData.map(node => renderTreeNode(node as any as T))}
     </div>
   );
 };

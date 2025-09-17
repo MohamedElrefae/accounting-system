@@ -86,12 +86,37 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
-  // Panel state
-  const [panelPosition, setPanelPosition] = useState<{ x: number; y: number }>({ x: 150, y: 150 })
-  const [panelSize, setPanelSize] = useState<{ width: number; height: number }>({ width: 900, height: 800 })
-  const [panelMax, setPanelMax] = useState<boolean>(false)
-  const [panelDocked, setPanelDocked] = useState<boolean>(false)
-  const [panelDockPos, setPanelDockPos] = useState<'left' | 'right' | 'top' | 'bottom'>('right')
+  // Panel state with persistence
+  const [panelPosition, setPanelPosition] = useState<{ x: number; y: number }>(() => {
+    try {
+      const saved = localStorage.getItem('transactionDetailsPanel:position');
+      return saved ? JSON.parse(saved) : { x: 150, y: 150 };
+    } catch { return { x: 150, y: 150 }; }
+  })
+  const [panelSize, setPanelSize] = useState<{ width: number; height: number }>(() => {
+    try {
+      const saved = localStorage.getItem('transactionDetailsPanel:size');
+      return saved ? JSON.parse(saved) : { width: 900, height: 800 };
+    } catch { return { width: 900, height: 800 }; }
+  })
+  const [panelMax, setPanelMax] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('transactionDetailsPanel:maximized');
+      return saved === 'true';
+    } catch { return false; }
+  })
+  const [panelDocked, setPanelDocked] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('transactionDetailsPanel:docked');
+      return saved === 'true';
+    } catch { return false; }
+  })
+  const [panelDockPos, setPanelDockPos] = useState<'left' | 'right' | 'top' | 'bottom'>(() => {
+    try {
+      const saved = localStorage.getItem('transactionDetailsPanel:dockPosition');
+      return (saved as 'left' | 'right' | 'top' | 'bottom') || 'right';
+    } catch { return 'right'; }
+  })
   
   // Action modals
   const [reviewModalOpen, setReviewModalOpen] = useState(false)
@@ -196,22 +221,68 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
     }
   }
   
+  // Save current modal layout and size as preferred
+  const handleSaveModalLayout = () => {
+    try {
+      const modalPreference = {
+        position: panelPosition,
+        size: panelSize,
+        maximized: panelMax,
+        docked: panelDocked,
+        dockPosition: panelDockPos,
+        savedTimestamp: Date.now(),
+        userPreferred: true
+      };
+      localStorage.setItem('transactionDetailsPanel:preferred', JSON.stringify(modalPreference));
+      console.log('✅ تم حفظ تخطيط المودال الحالي كمفضل');
+      
+      // Visual feedback - could be replaced with toast notification
+      const tempBadge = document.createElement('div');
+      tempBadge.textContent = '✅ تم حفظ التخطيط';
+      tempBadge.style.cssText = `
+        position: fixed; top: 20px; right: 20px; z-index: 10000;
+        background: #10b981; color: white; padding: 8px 16px;
+        border-radius: 6px; font-size: 14px; font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        pointer-events: none; transition: opacity 0.3s ease;
+      `;
+      document.body.appendChild(tempBadge);
+      setTimeout(() => {
+        tempBadge.style.opacity = '0';
+        setTimeout(() => document.body.removeChild(tempBadge), 300);
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to save modal layout:', error);
+    }
+  }
+  
+  // Reset modal to default layout and size
+  const handleResetModalLayout = () => {
+    setPanelPosition({ x: 150, y: 150 });
+    setPanelSize({ width: 900, height: 800 });
+    setPanelMax(false);
+    setPanelDocked(false);
+    setPanelDockPos('right');
+    
+    // Clear saved preferences
+    try {
+      localStorage.removeItem('transactionDetailsPanel:preferred');
+      localStorage.removeItem('transactionDetailsPanel:position');
+      localStorage.removeItem('transactionDetailsPanel:size');
+      localStorage.removeItem('transactionDetailsPanel:maximized');
+      localStorage.removeItem('transactionDetailsPanel:docked');
+      localStorage.removeItem('transactionDetailsPanel:dockPosition');
+      console.log('🔄 تم إعادة تعيين تخطيط المودال للافتراضي');
+    } catch {}
+  }
+  
   // Helper function to check if a section should be visible
   const isSectionVisible = (sectionId: string): boolean => {
     return detailsConfig.visibleSections.has(sectionId)
   }
   
   // Legacy compatibility helpers (map new config to old column config properties)
-  const columnConfig = useMemo(() => ({
-    showSystemInfo: isSectionVisible('system_info') || isSectionVisible('posting_info'),
-    showAuditTrail: isSectionVisible('audit_trail'),
-    showApprovalHistory: isSectionVisible('approval_history'),
-    showSubmitNotes: isSectionVisible('submit_notes'),
-    compactMode: false, // Not used in new config
-    fieldLayout: 'grid' as const, // Default
-    showFieldLabels: true,
-    groupFields: true
-  }), [detailsConfig])
+  // (Removed unused columnConfig placeholder)
   
   // Persist details configuration
   useEffect(() => {
@@ -224,6 +295,41 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
       localStorage.setItem('transactionDetailsLayoutConfig', JSON.stringify(configToSave));
     } catch {}
   }, [detailsConfig])
+  
+  // Persist panel position
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionDetailsPanel:position', JSON.stringify(panelPosition));
+    } catch {}
+  }, [panelPosition])
+  
+  // Persist panel size
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionDetailsPanel:size', JSON.stringify(panelSize));
+    } catch {}
+  }, [panelSize])
+  
+  // Persist panel maximized state
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionDetailsPanel:maximized', String(panelMax));
+    } catch {}
+  }, [panelMax])
+  
+  // Persist panel docked state
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionDetailsPanel:docked', String(panelDocked));
+    } catch {}
+  }, [panelDocked])
+  
+  // Persist panel dock position
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionDetailsPanel:dockPosition', panelDockPos);
+    } catch {}
+  }, [panelDockPos])
 
   // Get account label helper
   const getAccountLabel = (accountId?: string | null) => {
@@ -307,7 +413,7 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
     reference_number: transaction.reference_number || '',
     notes: transaction.notes || '',
     classification_id: transaction.classification_id || '',
-    expenses_category_id: (transaction as any).expenses_category_id || '',
+    sub_tree_id: (transaction as any).sub_tree_id || '',
     work_item_id: (transaction as any).work_item_id || '',
     analysis_work_item_id: (transaction as any).analysis_work_item_id || '',
     cost_center_id: transaction.cost_center_id || '',
@@ -331,7 +437,7 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
         amount: parseFloat(data.amount),
         notes: data.notes || null,
         classification_id: data.classification_id || null,
-        expenses_category_id: data.expenses_category_id || null,
+        sub_tree_id: data.sub_tree_id || null,
         work_item_id: data.work_item_id || null,
         analysis_work_item_id: data.analysis_work_item_id || null,
         cost_center_id: data.cost_center_id || null,
@@ -428,7 +534,7 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
   }
 
   // Determine which actions are available
-  const availableActions = useMemo(() => {
+  const availableActions: Array<{ key: string; label: string; className: string; onClick: () => void }> = useMemo(() => {
     const actions = []
     const isPosted = transaction.is_posted
     const approvalStatus = (transaction as any).approval_status || 'draft'
@@ -589,6 +695,40 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
                     </div>
                   </button>
                   
+                  {/* Save Modal Layout Button */}
+                  <button
+                    className="ultimate-btn ultimate-btn-success"
+                    onClick={handleSaveModalLayout}
+                    disabled={isLoading}
+                    title="حفظ حجم وموضع المودال الحالي كمفضل"
+                    style={{
+                      fontSize: '12px',
+                      padding: '6px 10px',
+                      border: '1px solid var(--border-light)'
+                    }}
+                  >
+                    <div className="btn-content">
+                      <span className="btn-text">💾 حفظ التخطيط</span>
+                    </div>
+                  </button>
+                  
+                  {/* Reset Modal Layout Button */}
+                  <button
+                    className="ultimate-btn ultimate-btn-warning"
+                    onClick={handleResetModalLayout}
+                    disabled={isLoading}
+                    title="إعادة تعيين حجم وموضع المودال للافتراضي"
+                    style={{
+                      fontSize: '12px',
+                      padding: '6px 10px',
+                      border: '1px solid var(--border-light)'
+                    }}
+                  >
+                    <div className="btn-content">
+                      <span className="btn-text">🔄 إعادة تعيين</span>
+                    </div>
+                  </button>
+                  
                   {availableActions.map(action => (
                     <button
                       key={action.key}
@@ -657,7 +797,7 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
                       title: 'التصنيف والفئة',
                       fields: [
                         { id: 'classification', label: 'التصنيف', value: (transaction as any).transaction_classification?.name || '—' },
-                        { id: 'category', label: 'فئة المصروف', value: categoryLabel || '—' },
+                        { id: 'category', label: 'الشجرة الفرعية', value: categoryLabel || '—' },
                       ]
                     },
                     work_items: {
@@ -763,13 +903,13 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
 
                   // Filter and order ALL sections based on configuration
                   return detailsConfig.sectionOrder
-                    .filter(sectionId => 
+                    .filter((sectionId: string) => 
                       isSectionVisible(sectionId) && 
-                      allSectionsData[sectionId] && 
-                      allSectionsData[sectionId].fields.length > 0
+                      (allSectionsData as any)[sectionId] && 
+                      ((allSectionsData as any)[sectionId].fields as any[]).length > 0
                     )
-                    .map(sectionId => {
-                      const section = allSectionsData[sectionId];
+                    .map((sectionId: string) => {
+                      const section = (allSectionsData as any)[sectionId] as { title: string; fields: Array<{ id: string; label: string; value: React.ReactNode; className?: string }>; };
                       const isFullWidth = detailsConfig.fullWidthSections.has(sectionId);
                       
                       return (
@@ -789,7 +929,7 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
                                 : 'repeat(auto-fit, minmax(200px, 1fr))'
                             }}
                           >
-                            {section.fields.map(field => (
+                            {section.fields.map((field: { id: string; label: string; value: React.ReactNode; className?: string }) => (
                               <div key={field.id} className={`info-item ${field.label === '' ? 'info-item--full' : ''}`}>
                                 {field.label && <label className="info-label">{field.label}</label>}
                                 <div className={`info-value ${field.className || ''}`}>

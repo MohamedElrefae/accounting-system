@@ -8,8 +8,7 @@ import './StandardFinancialStatements.css'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import { getCompanyConfig } from '../../services/company-config'
-import { fetchPrefixRules, classifyByRules, type PrefixRule } from '../../services/account-prefix-map'
-import { getAccountBalances, type AccountBalanceFilter } from '../../services/account-balances'
+import { fetchPrefixRules, type PrefixRule } from '../../services/account-prefix-map'
 import Visibility from '@mui/icons-material/Visibility'
 import VisibilityOff from '@mui/icons-material/VisibilityOff'
 import Bolt from '@mui/icons-material/Bolt'
@@ -60,9 +59,9 @@ export default function TrialBalanceOriginal() {
   const [projectId, setProjectId] = useState<string>('')
   const [companyName, setCompanyName] = useState<string>('')
   const [orgId, setOrgId] = useState<string>('')
-  const [orgOptions, setOrgOptions] = useState<LookupOption[]>([])
+  const [_orgOptions, _setOrgOptions] = useState<LookupOption[]>([])
   const [activeGroupsOnly, setActiveGroupsOnly] = useState<boolean>(false)
-  const [prefixRules, setPrefixRules] = useState<PrefixRule[]>([])
+  const [_prefixRules, _setPrefixRules] = useState<PrefixRule[]>([])
   const [_breakPerGroup, _setBreakPerGroup] = useState<boolean>(false)
   const [postedOnly, setPostedOnly] = useState<boolean>(false)
   // Numbers-only setting (hide currency symbol)
@@ -136,7 +135,7 @@ export default function TrialBalanceOriginal() {
     // Load organizations and set default
     try { 
       const orgs = await fetchOrganizations(); 
-      setOrgOptions(orgs || [])
+      _setOrgOptions(orgs || [])
       // Set default org from localStorage or first available
       const storedOrgId = getActiveOrgId()
       if (storedOrgId) {
@@ -147,7 +146,7 @@ export default function TrialBalanceOriginal() {
     } catch {}
     
     try { const cfg = await getCompanyConfig(); setCompanyName(cfg.company_name || ''); } catch {}
-    try { const rules = await fetchPrefixRules(); setPrefixRules(rules) } catch { /* fallback in classifier */ }
+    try { const rules = await fetchPrefixRules(); _setPrefixRules(rules) } catch { /* fallback in classifier */ }
   }
 
   async function load() {
@@ -296,7 +295,6 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
           totalDebits: totals.debit,
           totalCredits: totals.credit,
           netTotal: totals.diff,
-          balanceStatus: Math.abs(totals.diff) < 0.01 ? 'متوازن' : 'غير متوازن'
         }
       }
 

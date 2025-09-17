@@ -4,11 +4,6 @@ import type {
   SubTreeNode,
   CreateSubTreePayload,
   UpdateSubTreePayload,
-  // Legacy aliases
-  ExpensesCategoryRow,
-  ExpensesCategoryTreeNode,
-  CreateExpensesCategoryPayload,
-  UpdateExpensesCategoryPayload,
 } from '../types/sub-tree'
 
 export interface AccountLite {

@@ -210,7 +210,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   const [layoutControlsOpen, setLayoutControlsOpen] = useState(false);
   
   // Async options management - track loading states and resolved options per field
-  const [fieldOptions, setFieldOptions] = useState<Record<string, SearchableSelectOption[]>>({});
+  const [fieldOptions, setFieldOptions] = useState<Record<string, any>>({});
   const [fieldOptionsLoading, setFieldOptionsLoading] = useState<Set<string>>(new Set());
   const [fieldOptionsErrors, setFieldOptionsErrors] = useState<Record<string, string>>({});
 
@@ -318,8 +318,8 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       const currentKey = `${field.id}:${dependencyValues}`;
       
       // Check if we already have options for this field+dependency combo
-      const existingKey = fieldOptions[field.id + '_key'];
-      if (existingKey === currentKey && fieldOptions[field.id]) {
+      const existingKey = fieldOptions[field.id + '_key'] as string | undefined;
+      if (existingKey === currentKey && Array.isArray(fieldOptions[field.id])) {
         return; // Already loaded for these dependencies
       }
       
@@ -333,7 +333,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
         
         setFieldOptions(prev => ({
           ...prev,
-          [field.id]: options,
+          [field.id]: options as SearchableSelectOption[],
           [field.id + '_key']: currentKey
         }));
       } catch (error) {
@@ -707,7 +707,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
           className={[inputClasses, styles.inputSelect, (field.disabled || isLoading) ? styles.inputDisabled : ''].filter(Boolean).join(' ')}
         >
           <option value="">{field.placeholder || `اختر ${field.label}`}</option>
-          {resolvedOptions.map(option => (
+          {resolvedOptions.map((option: SearchableSelectOption) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>

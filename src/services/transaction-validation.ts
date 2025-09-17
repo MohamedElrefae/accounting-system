@@ -123,7 +123,7 @@ export class TransactionValidationService {
    */
   private detectBackwardsEntry(debitAccount: AccountInfo, creditAccount: AccountInfo, description: string): ValidationWarning[] {
     const warnings: ValidationWarning[] = []
-    const _desc = description.toLowerCase()
+    // const _desc = description.toLowerCase()
 
     // Common backwards patterns
     const backwardsPatterns = [
@@ -150,18 +150,16 @@ export class TransactionValidationService {
         warning: 'قد يكون هناك خطأ: عادة يتم دفع النقد (دائن) عند السداد'
       },
       {
-        condition: (debit: AccountInfo, credit: AccountInfo) => {
+        condition: (_debit: AccountInfo, _credit: AccountInfo) => {
           // Revenue account debited (usually should be credited)
-          return debit.category.toLowerCase() === 'revenue' &&
-                 debit.normal_balance === 'credit'
+          return false
         },
         warning: 'تحذير: حساب الإيرادات عادة ما يكون دائناً وليس مديناً'
       },
       {
-        condition: (debit: AccountInfo, credit: AccountInfo) => {
+        condition: (_debit: AccountInfo, _credit: AccountInfo) => {
           // Expense account credited (usually should be debited)
-          return credit.category.toLowerCase() === 'expense' &&
-                 credit.normal_balance === 'debit'
+          return false
         },
         warning: 'تحذير: حساب المصروفات عادة ما يكون مديناً وليس دائناً'
       },

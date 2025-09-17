@@ -218,7 +218,7 @@ export async function generateGenericFinancialPDF(
   const pdfColumns: PDFTableColumn[] = columnKeys
     .map(key => {
       const config = COMMON_COLUMNS[key];
-      if (!config) return null;
+      if (!config) return undefined as unknown as PDFTableColumn; // filter below
       
       // Check if column should be shown in current mode
       const shouldShow = mode === 'range' ? config.showInRange : config.showInAsof;
@@ -232,7 +232,7 @@ export async function generateGenericFinancialPDF(
         align: config.align
       };
     })
-    .filter((col): col is PDFTableColumn => col !== null);
+    .filter((col): col is PDFTableColumn => !!col);
 
   // Build rows
   const pdfRows = reportData.data.map(item => {
