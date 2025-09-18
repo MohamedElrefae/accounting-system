@@ -36,7 +36,7 @@ export async function fetchBalanceSheetReport(filters: BSFilters): Promise<{
 }> {
   try {
     // Use GL Summary function directly for guaranteed consistency
-    const { data: glSummaryData, error: glError } = await supabase.rpc('get_gl_account_summary', {
+    const { data: glSummaryData, error: glError } = await supabase.rpc('get_gl_account_summary_filtered', {
       p_date_from: null, // Balance Sheet is as-of a date, so no start date
       p_date_to: filters.asOfDate,
       p_org_id: filters.orgId || null,
@@ -45,13 +45,9 @@ export async function fetchBalanceSheetReport(filters: BSFilters): Promise<{
       p_limit: null,
       p_offset: null,
       p_classification_id: null,
-      p_cost_center_id: null,
-      p_work_item_id: null,
-        p_sub_tree_id: null,
-      p_debit_account_id: null,
-      p_credit_account_id: null,
-      p_amount_min: null,
-      p_amount_max: null
+      p_analysis_work_item_id: null,
+      p_expenses_category_id: null, // Backward-compat param (DB will coalesce)
+      p_sub_tree_id: null
     })
     
     if (glError) throw glError

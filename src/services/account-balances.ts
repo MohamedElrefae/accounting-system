@@ -168,17 +168,44 @@ export async function getAccountBalance(accountId: string, filters: AccountBalan
 
 /**
  * Get totals by category (for dashboard cards)
+ * Now uses the unified GL Summary service for consistency with financial reports
  */
 export async function getCategoryTotals(filters: AccountBalanceFilter = {}): Promise<Record<string, number>> {
-  const balances = await getAccountBalances(filters);
-  const totals: Record<string, number> = {};
+  // Import the unified GL Summary service
+  const { getDashboardCategoryTotals } = await import('./gl-summary');
+  
+  try {
+    const totals = await getDashboardCategoryTotals({
+      dateFrom: filters.dateFrom ?? null,
+      dateTo: filters.dateTo ?? null,
+      postedOnly: !!filters.postedOnly,
+      orgId: filters.orgId ?? null,
+      projectId: filters.projectId ?? null
+    });
 
-  for (const balance of balances) {
-    if (!totals[balance.category]) {
-      totals[balance.category] = 0;
+    // Return in the expected format for backward compatibility
+    return {
+      asset: totals.assets,
+      liability: totals.liabilities,
+      equity: totals.equity,
+      revenue: totals.revenue,
+      expense: totals.expenses,
+      net_income: totals.netIncome
+    };
+  } catch (error) {
+    console.error('Failed to get category totals from GL Summary, falling back to legacy method:', error);
+    
+    // Fallback to the original method if GL Summary fails
+    const balances = await getAccountBalances(filters);
+    const totals: Record<string, number> = {};
+
+    for (const balance of balances) {
+      if (!totals[balance.category]) {
+        totals[balance.category] = 0;
+      }
+      totals[balance.category] += Math.abs(balance.balance);
     }
-    totals[balance.category] += Math.abs(balance.balance);
-  }
 
-  return totals;
+    return totals;
+  }
 }

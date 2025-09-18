@@ -313,7 +313,7 @@ const GeneralLedger: React.FC = () => {
           if (filters.postedOnly) chips.push('فلتر: قيود معتمدة فقط')
           if (hideZeroAccounts) chips.push('فلتر: إخفاء الحسابات ذات القيم 0')
           if (activityOnly) chips.push('فلتر: حركة فقط')
-          if (onlyPostable) chips.push('فلتر: قابل للترحيل فقط')
+          if (onlyPostable) chips.push('فلتر: حسابات ورقية فقط')
           if (onlyNonPostable) chips.push('فلتر: تجميعي فقط')
           if (analysisWorkItemId) {
             const ai = analysisItemOptions.find(a => a.id === analysisWorkItemId)
@@ -330,8 +330,7 @@ const GeneralLedger: React.FC = () => {
           const base = (() => {
             if (!acc) return 'تقرير دفتر الأستاذ العام'
             const hasChildren = !!(acc.code && accountOptions.some(o => o.id !== acc.id && o.code && o.code.startsWith(acc.code || '')))
-            const badge = hasChildren ? 'تجميعي' : 'قابل للترحيل'
-            return `تقرير دفتر الأستاذ — ${acc.code ? acc.code + ' - ' : ''}${acc.name_ar || acc.name} (${badge})`
+            return `تقرير دفتر الأستاذ — ${acc.code ? acc.code + ' - ' : ''}${acc.name_ar || acc.name}`
           })()
           const chips: string[] = []
           if (filters.postedOnly) chips.push('فلتر: قيود معتمدة فقط')
@@ -966,7 +965,7 @@ const GeneralLedger: React.FC = () => {
               cellContent = row.account_code || '—'
               break
             case 'account_name':
-              cellContent = `${row.account_name_ar || row.account_name_en || ''}${(!summaryRows.some(s => s.account_id !== row.account_id && s.account_code && row.account_code && s.account_code.startsWith(row.account_code)) ? ' (قابل للترحيل)' : ' (تجميعي)')}`
+              cellContent = row.account_name_ar || row.account_name_en || ''
               break
             case 'opening_debit':
               cellContent = (Number(row.opening_debit || 0) !== 0) ? formatPrintCurrency(Number(row.opening_debit || 0), numbersOnly ? 'none' : 'EGP') : '—'
@@ -1763,7 +1762,7 @@ const GeneralLedger: React.FC = () => {
       closing_debit: Number(r.closing_debit || 0),
       closing_credit: Number(r.closing_credit || 0),
       transaction_count: r.transaction_count,
-      account_type: (!summaryRows.some(s => s.account_id !== r.account_id && s.account_code && r.account_code && s.account_code.startsWith(r.account_code))) ? 'قابل للترحيل' : 'تجميعي',
+      account_type: (!summaryRows.some(s => s.account_id !== r.account_id && s.account_code && r.account_code && s.account_code.startsWith(r.account_code))) ? 'ورقي' : 'تجميعي',
     }) )
 
     const rows = rowsBase
@@ -2050,7 +2049,7 @@ const GeneralLedger: React.FC = () => {
                       if (filters.postedOnly) chips.push('فلتر: قيود معتمدة فقط')
                       if (hideZeroAccounts) chips.push('فلتر: إخفاء الحسابات ذات القيم 0')
                       if (activityOnly) chips.push('فلتر: حركة فقط')
-                      if (onlyPostable) chips.push('فلتر: قابل للترحيل فقط')
+                      if (onlyPostable) chips.push('فلتر: حسابات ورقية فقط')
                       if (onlyNonPostable) chips.push('فلتر: تجميعي فقط')
                       if (analysisWorkItemId) {
                         const ai = analysisItemOptions.find(a => a.id === analysisWorkItemId)
@@ -2076,8 +2075,7 @@ const GeneralLedger: React.FC = () => {
                       const base = (() => {
                         if (!acc) return 'تقرير دفتر الأستاذ العام'
                         const hasChildren = !!(acc.code && accountOptions.some(o => o.id !== acc.id && o.code && o.code.startsWith(acc.code || '')))
-                        const badge = hasChildren ? 'تجميعي' : 'قابل للترحيل'
-                        return `تقرير دفتر الأستاذ — ${acc.code ? acc.code + ' - ' : ''}${acc.name_ar || acc.name} (${badge})`
+                        return `تقرير دفتر الأستاذ — ${acc.code ? acc.code + ' - ' : ''}${acc.name_ar || acc.name}`
                       })()
                       const chips: string[] = []
                       if (filters.postedOnly) chips.push('فلتر: قيود معتمدة فقط')
@@ -2775,9 +2773,8 @@ const GeneralLedger: React.FC = () => {
                     const isExpanded = expandedAccountId === row.account_id
                     const colSpan = 1 + overviewColumnOptions.filter(c => visibleOverviewColumns.includes(c.key)).length
                     return (
-                      <>
+                      <React.Fragment key={row.account_id}>
                         <tr
-                          key={row.account_id}
                           className={isExpanded ? styles.rowExpanded : ''}
                           onClick={() => toggleExpand(row.account_id)}
                           title="انقر للعرض التفصيلي"
@@ -2811,15 +2808,6 @@ const GeneralLedger: React.FC = () => {
                           {visibleOverviewColumns.includes('account_name') && (
                             <td>
                               {row.account_name_ar || row.account_name_en || ''}
-                              {(() => {
-                                const hasChildren = summaryRows.some(s => s.account_id !== row.account_id && s.account_code && row.account_code && s.account_code.startsWith(row.account_code))
-                                const isPostable = !hasChildren
-                                return (
-                                  <span className={isPostable ? styles.badgePostable : styles.badgeNonPostable} title={isPostable ? 'حساب قابل للترحيل (ورقي)' : 'حساب تجميعي (غير قابل للترحيل)'}>
-                                    {isPostable ? 'قابل للترحيل' : 'تجميعي'}
-                                  </span>
-                                )
-                              })()}
                             </td>
                           )}
                           {visibleOverviewColumns.includes('opening_debit') && (<td>{Number(row.opening_debit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>)}
@@ -2938,7 +2926,7 @@ const GeneralLedger: React.FC = () => {
                             </td>
                           </tr>
                         )}
-                      </>
+                      </React.Fragment>
                     )
                   })}
                 </tbody>
@@ -2959,9 +2947,6 @@ const GeneralLedger: React.FC = () => {
               <>
                 <div className={styles.detailsHeaderTitle}>
                   {acc.code ? `${acc.code} - ` : ''}{acc.name_ar || acc.name}
-                  <span className={isPostable ? styles.badgePostable : styles.badgeNonPostable} title={isPostable ? 'حساب قابل للترحيل (لا يحتوي حسابات فرعية)' : 'حساب تجميعي (يحتوي حسابات فرعية)'} style={{marginInlineStart: 10}}>
-                    {isPostable ? 'قابل للترحيل' : 'تجميعي'}
-                  </span>
                 </div>
                 {(acc.category || acc.normal_balance) && (
                   <div className={styles.detailsHeaderMeta}>
