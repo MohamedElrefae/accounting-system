@@ -67,3 +67,5 @@ export default tseslint.config([
   },
 ])
 ```
+
+[permanent preview seed] 2025-09-18T19:37:03.8494776+03:00
