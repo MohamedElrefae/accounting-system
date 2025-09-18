@@ -1,0 +1,12 @@
+-- list_approval_inbox_backup.sql
+-- Purpose: paste here the exact function definition you exported from your production/staging DB before applying changes.
+-- Use the BACKUP query we provided to extract the text, then commit it in this file for traceability.
+
+-- Example header (replace with real output):
+-- BACKUP START: public.list_approval_inbox
+-- CREATE OR REPLACE FUNCTION public.list_approval_inbox(p_user_id uuid)
+-- RETURNS TABLE (...)
+-- LANGUAGE sql STABLE AS $$
+--   SELECT ...
+-- $$;
+-- BACKUP END: public.list_approval_inbox
