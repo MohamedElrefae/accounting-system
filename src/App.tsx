@@ -322,6 +322,10 @@ const App: React.FC = () => {
               </React.Suspense>
             } />
             {/* Legacy routes removed - consolidated into /settings/user-management */}
+            {/* Temporary redirects for legacy bookmarks - remove in next major release */}
+            <Route path="/settings/users" element={<Navigate to="/settings/user-management" replace />} />
+            <Route path="/settings/roles" element={<Navigate to="/settings/user-management" replace />} />
+            <Route path="/settings/permissions" element={<Navigate to="/settings/user-management" replace />} />
             <Route path="/settings/organization-management" element={
               <React.Suspense fallback={<div>Loading...</div>}>
                 <OrgManagementTabs />
