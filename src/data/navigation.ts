@@ -284,7 +284,8 @@ export const navigationItems: NavigationItem[] = [
         titleEn: "User Management",
         titleAr: "إدارة المستخدمين",
         icon: "Security",
-        path: "/settings/user-management"
+        path: "/settings/user-management",
+        requiredPermission: "users.view"
       },
       {
         id: "org-management",

@@ -317,9 +317,11 @@ const App: React.FC = () => {
             } />
             {/* Unified User Management System */}
             <Route path="/settings/user-management" element={
-              <React.Suspense fallback={<div>Loading...</div>}>
-                <UserManagementSystem />
-              </React.Suspense>
+              <RequirePermission perm="users.view">
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <UserManagementSystem />
+                </React.Suspense>
+              </RequirePermission>
             } />
             {/* Legacy routes removed - consolidated into /settings/user-management */}
             {/* Temporary redirects for legacy bookmarks - remove in next major release */}
