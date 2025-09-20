@@ -26,6 +26,8 @@ interface DraggableResizablePanelProps {
   onMaximize: () => void;
   onDock: (position: 'left' | 'right' | 'top' | 'bottom') => void;
   onResetPosition: () => void;
+  /** Optional label to show next to the size badge, e.g. current preset name */
+  presetName?: string;
 }
 
 const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
@@ -45,39 +47,74 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
   onResize,
   onMaximize,
   onDock,
-  onResetPosition
+  onResetPosition,
+  presetName
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0, origX: 0, origY: 0 });
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [showControls, setShowControls] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Handle dragging
-  const handleMouseDown = (e: React.MouseEvent) => {
+// Handle dragging
+const handleMouseDown = (e: React.MouseEvent) => {
     if (isMaximized || isDocked) return;
+    e.preventDefault();
     
     setIsDragging(true);
     setDragStart({
       x: e.clientX - position.x,
-      y: e.clientY - position.y
+      y: e.clientY - position.y,
+      origX: position.x,
+      origY: position.y
     });
   };
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
+const handleMouseMove = useCallback((e: MouseEvent) => {
     if (isDragging && !isMaximized && !isDocked) {
+      // Compute unclamped new position
+      let nextX = e.clientX - dragStart.x;
+      let nextY = e.clientY - dragStart.y;
+
+      // Shift-drag axis locking: lock to dominant axis while Shift is held
+      if (e.shiftKey) {
+        const dx = nextX - dragStart.origX;
+        const dy = nextY - dragStart.origY;
+        if (Math.abs(dx) > Math.abs(dy)) {
+          // lock vertical
+          nextY = dragStart.origY;
+        } else {
+          // lock horizontal
+          nextX = dragStart.origX;
+        }
+      }
+
       const newPosition = {
-        x: Math.max(0, Math.min(window.innerWidth - size.width, e.clientX - dragStart.x)),
-        y: Math.max(0, Math.min(window.innerHeight - size.height, e.clientY - dragStart.y))
+        x: Math.max(0, Math.min(window.innerWidth - size.width, nextX)),
+        y: Math.max(0, Math.min(window.innerHeight - size.height, nextY))
       };
       onMove(newPosition);
     } else if (isResizing && !isMaximized && !isDocked) {
-      const newWidth = Math.max(400, resizeStart.width + (e.clientX - resizeStart.x));
-      const newHeight = Math.max(300, resizeStart.height + (e.clientY - resizeStart.y));
+      let newWidth = Math.max(400, resizeStart.width + (e.clientX - resizeStart.x));
+      let newHeight = Math.max(300, resizeStart.height + (e.clientY - resizeStart.y));
+
+      // Shift-resize axis locking: lock the smaller delta axis while Shift is held
+      if (e.shiftKey) {
+        const dx = Math.abs(e.clientX - resizeStart.x);
+        const dy = Math.abs(e.clientY - resizeStart.y);
+        if (dx > dy) {
+          // lock height
+          newHeight = resizeStart.height;
+        } else {
+          // lock width
+          newWidth = resizeStart.width;
+        }
+      }
+
       onResize({ width: newWidth, height: newHeight });
     }
-  }, [isDragging, isMaximized, isDocked, size.width, size.height, dragStart.x, dragStart.y, onMove, isResizing, resizeStart.width, resizeStart.height, resizeStart.x, resizeStart.y, onResize]);
+  }, [isDragging, isMaximized, isDocked, size.width, size.height, dragStart.x, dragStart.y, dragStart.origX, dragStart.origY, onMove, isResizing, resizeStart.width, resizeStart.height, resizeStart.x, resizeStart.y, onResize]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
@@ -85,9 +122,10 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
   }, []);
 
   // Handle resizing
-  const handleResizeStart = (e: React.MouseEvent) => {
+const handleResizeStart = (e: React.MouseEvent) => {
     if (isMaximized || isDocked) return;
     
+    e.preventDefault();
     e.stopPropagation();
     setIsResizing(true);
     setResizeStart({
@@ -276,7 +314,8 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
         {/* Size Indicator */}
         {showControls && !isMaximized && !isDocked && (
           <div className={styles.sizeIndicator}>
-            {size.width} × {size.height}
+            <span>{size.width} × {size.height}</span>
+{presetName ? <span className={styles.presetName}>— {presetName}</span> : null}
           </div>
         )}
 

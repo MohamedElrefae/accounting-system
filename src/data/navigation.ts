@@ -80,6 +80,15 @@ export const navigationItems: NavigationItem[] = [
         titleAr: "مراكز التكلفة",
         icon: "target",
         path: "/main-data/cost-centers"
+      },
+      {
+        id: "transaction-line-items",
+        label: "Transaction Line Items",
+        titleEn: "Transaction Line Items Catalog",
+        titleAr: "بنود التكلفة التفصيلية",
+        icon: "list-tree",
+        path: "/main-data/transaction-line-items",
+        requiredPermission: "transaction_line_items.read"
       }
     ]
   },
@@ -116,6 +125,15 @@ export const navigationItems: NavigationItem[] = [
         icon: "list",
         path: "/transactions/all",
         requiredPermission: "transactions.read.all"
+      },
+      {
+        id: "assign-cost-analysis",
+        label: "Assign Cost Analysis",
+        titleEn: "Assign Cost Analysis",
+        titleAr: "تسجيل التكاليف",
+        icon: "calculator",
+        path: "/transactions/assign-cost-analysis",
+        requiredPermission: "transactions.cost_analysis"
       }
     ]
   },

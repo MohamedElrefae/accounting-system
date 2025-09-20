@@ -19,6 +19,7 @@ interface ButtonState { loading: boolean; success: boolean; error: boolean }
 
 interface WorkItemsTreeProps {
   data: WorkItemsTreeNode[]
+  highlightQuery?: string
   onEdit?: (node: WorkItemsTreeNode) => void
   onAdd?: (parent: WorkItemsTreeNode) => void
   onToggleStatus?: (node: WorkItemsTreeNode) => void
@@ -41,6 +42,7 @@ interface WorkItemsTreeProps {
 
 const WorkItemsTree: React.FC<WorkItemsTreeProps> = ({
   data,
+  highlightQuery,
   onEdit,
   onAdd,
   onToggleStatus,
@@ -60,6 +62,28 @@ const WorkItemsTree: React.FC<WorkItemsTreeProps> = ({
   onToggleSelect,
 }) => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  const highlight = (text: string, q?: string): React.ReactNode => {
+    if (!q) return text
+    const query = q.trim()
+    if (!query) return text
+    try {
+      const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const re = new RegExp(escaped, 'gi')
+      const parts = text.split(re)
+      const matches = text.match(re)
+      const out: React.ReactNode[] = []
+      for (let i = 0; i < parts.length; i++) {
+        out.push(parts[i])
+        if (matches && matches[i]) {
+          out.push(<mark key={`m-${i}`} className="wit-highlight">{matches[i]}</mark>)
+        }
+      }
+      return out
+    } catch {
+      return text
+    }
+  }
   const [buttonStates, setButtonStates] = useState<Record<string, ButtonState>>({})
 
   // External commands: expand/collapse all
@@ -124,20 +148,37 @@ const WorkItemsTree: React.FC<WorkItemsTreeProps> = ({
             {mayHaveChildren && <ChevronRight className="exp-icon" size={16} />}
           </div>
           <div className={`wit-status ${n.is_active ? 'active' : 'inactive'}`} />
-          <div className="wit-code">
+          <div className={`wit-code`}>
             {showSegmentedCode ? (
               n.code.split('.').map((seg, idx, arr) => (
                 <React.Fragment key={idx}>
-                  <span className="seg">{seg}</span>
+                  <span className="seg">{highlight(seg, (highlightQuery || ''))}</span>
                   {idx < arr.length - 1 && <span className="dot">.</span>}
                 </React.Fragment>
               ))
             ) : (
-              n.code
+              <>{highlight(n.code, highlightQuery)}</>
             )}
           </div>
           <div className={`wit-name ${onSelect ? 'clickable' : ''}`} onClick={() => onSelect && onSelect(n)}>
-            {n.name_ar || n.name}
+            {highlight(n.name_ar || n.name || '', highlightQuery)}
+            {(n as any).is_selectable ? (
+              <span className="wit-badge selectable badge-gap">قابل للاختيار</span>
+            ) : null}
+            {(n as any).base_unit_of_measure ? (
+              <span className="wit-badge uom badge-gap-sm">UoM: {(n as any).base_unit_of_measure}</span>
+            ) : null}
+            {(() => {
+              const specs = (n as any).specifications
+              if (!specs) return null
+              try {
+                const obj = typeof specs === 'string' ? JSON.parse(specs) : specs
+                const keys = Object.keys(obj || {})
+                if (keys.length === 0) return null
+                const preview = keys.slice(0, 3).map(k => `${k}: ${String(obj[k])}`).join(' • ')
+                return <span className="wit-badge spec badge-gap-sm" title={preview}>المواصفات</span>
+              } catch { return null }
+            })()}
           </div>
           <div className="wit-scope">{n.project_code ? (<span className="wit-badge override">مشروع: {n.project_code}</span>) : (<span className="wit-badge catalog">مؤسسة</span>)}</div>
           <div className="wit-level"><span className={`level-badge ${ui.badgeLevel}`}>{n.level}</span></div>

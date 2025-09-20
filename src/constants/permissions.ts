@@ -199,6 +199,34 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         description: 'Manage all transactions (edit/delete)',
         descriptionAr: 'إدارة جميع المعاملات (تعديل/حذف)',
         category: 'transactions'
+      },
+      {
+        name: 'transaction_line_items.view',
+        nameAr: 'عرض بنود المعاملات',
+        description: 'View transaction line items',
+        descriptionAr: 'عرض بنود تفاصيل المعاملات',
+        category: 'transactions'
+      },
+      {
+        name: 'transaction_line_items.create',
+        nameAr: 'إنشاء بنود المعاملات',
+        description: 'Create transaction line items',
+        descriptionAr: 'إنشاء بنود تفاصيل المعاملات',
+        category: 'transactions'
+      },
+      {
+        name: 'transaction_line_items.update',
+        nameAr: 'تعديل بنود المعاملات',
+        description: 'Update transaction line items',
+        descriptionAr: 'تعديل بنود تفاصيل المعاملات',
+        category: 'transactions'
+      },
+      {
+        name: 'transaction_line_items.delete',
+        nameAr: 'حذف بنود المعاملات',
+        description: 'Delete transaction line items',
+        descriptionAr: 'حذف بنود تفاصيل المعاملات',
+        category: 'transactions'
       }
     ]
   },
@@ -476,6 +504,10 @@ export const PERMISSIONS = {
   TRANSACTIONS_UPDATE: 'transactions.update',
   TRANSACTIONS_DELETE: 'transactions.delete',
   TRANSACTIONS_APPROVE: 'transactions.approve',
+  TRANSACTION_LINE_ITEMS_VIEW: 'transaction_line_items.view',
+  TRANSACTION_LINE_ITEMS_CREATE: 'transaction_line_items.create',
+  TRANSACTION_LINE_ITEMS_UPDATE: 'transaction_line_items.update',
+  TRANSACTION_LINE_ITEMS_DELETE: 'transaction_line_items.delete',
   
   // Reports
   REPORTS_VIEW: 'reports.view',

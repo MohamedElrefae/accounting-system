@@ -10,6 +10,7 @@ import type { TransactionClassification } from '../../services/transaction-class
 import type { ExpensesCategoryRow } from '../../types/sub-tree'
 import type { WorkItemRow } from '../../types/work-items'
 import './UnifiedTransactionDetailsPanel.css'
+import { TransactionLineItemsSection } from '../line-items/TransactionLineItemsSection'
 
 export interface UnifiedTransactionDetailsPanelProps {
   transaction: TransactionRecord
@@ -956,6 +957,15 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
                 onCancel={handleFormCancel}
                 isLoading={isLoading}
               />
+
+              {/* Transaction Line Items Editor Section */}
+              <div style={{ marginTop: 'var(--spacing-xl)' }}>
+                <TransactionLineItemsSection
+                  transactionId={transaction.id}
+                  orgId={transaction.org_id || ''}
+                  disabled={isLoading}
+                />
+              </div>
             </div>
           )}
         </div>

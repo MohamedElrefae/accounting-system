@@ -32,6 +32,7 @@ import SearchableSelect, { type SearchableSelectOption } from '../../components/
 import { supabase } from '../../utils/supabase'
 import { transactionValidationAPI } from '../../services/transaction-validation-api'
 import { getCompanyConfig } from '../../services/company-config'
+import TransactionAnalysisModal from '../../components/Transactions/TransactionAnalysisModal'
 
 interface FilterState {
   dateFrom: string
@@ -67,6 +68,11 @@ const TransactionsPage: React.FC = () => {
   const [audit, setAudit] = useState<TransactionAudit[]>([])
   const [approvalHistory, setApprovalHistory] = useState<ApprovalHistoryRow[]>([])
   
+  // Cost Analysis Modal state
+  const [analysisModalOpen, setAnalysisModalOpen] = useState(false)
+  const [analysisTransactionId, setAnalysisTransactionId] = useState<string | null>(null)
+  const [analysisTransaction, setAnalysisTransaction] = useState<TransactionRecord | null>(null)
+  
   // Unified form panel state with persistence
   const [panelPosition, setPanelPosition] = useState<{ x: number; y: number }>(() => {
     try {
@@ -100,6 +106,19 @@ const TransactionsPage: React.FC = () => {
   })
   
   const formRef = React.useRef<UnifiedCRUDFormHandle>(null)
+  
+  // Function to open cost analysis modal
+  const openCostAnalysisModal = (transaction: TransactionRecord) => {
+    setAnalysisTransaction(transaction)
+    setAnalysisTransactionId(transaction.id)
+    setAnalysisModalOpen(true)
+  }
+  
+  const closeCostAnalysisModal = () => {
+    setAnalysisModalOpen(false)
+    setAnalysisTransactionId(null)
+    setAnalysisTransaction(null)
+  }
 
   const [filters, setFilters] = useState<FilterState>({
     dateFrom: '',
@@ -1495,6 +1514,12 @@ approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted
                     } catch {}
                     setDetailsOpen(true)
                   }}><div className="btn-content"><span className="btn-text">تفاصيل</span></div></button>
+                  {/* Cost Analysis Button */}
+                  <button className="ultimate-btn ultimate-btn-success" 
+                    onClick={() => openCostAnalysisModal(row.original)}
+                    title="تحليل التكلفة - إدارة بنود التكلفة التفصيلية">
+                    <div className="btn-content"><span className="btn-text">تحليل التكلفة</span></div>
+                  </button>
                   {/* Review actions in pending mode if permitted */}
                   {mode === 'pending' && !row.original.is_posted && (
                     <>
@@ -2066,6 +2091,18 @@ approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted
         </div>
       )}
 
+      {/* Transaction Analysis Modal */}
+      <TransactionAnalysisModal
+        open={analysisModalOpen}
+        transactionId={analysisTransactionId}
+        onClose={closeCostAnalysisModal}
+        entryNumber={analysisTransaction?.entry_number}
+        description={analysisTransaction?.description}
+        effectiveTolerance={1.0}
+        transactionAmount={analysisTransaction?.amount}
+        orgId={analysisTransaction?.org_id || ''}
+      />
+      
       {/* Column Configuration Modal */}
       <ColumnConfiguration
         columns={columns}

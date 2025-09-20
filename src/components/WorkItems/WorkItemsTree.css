@@ -1,3 +1,17 @@
+.wit-highlight {
+  background: var(--accent-primary, #ffe08a);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+.wit-badge.selectable { background: var(--success-ghost, #165); }
+.wit-badge.uom { background: var(--info-ghost, #124); }
+.wit-badge.spec { background: var(--accent-ghost, #224); }
+
+.badge-gap { margin-inline-start: 8px; }
+.badge-gap-sm { margin-inline-start: 6px; }
+
 /* Work Items dedicated tree (keeps original TreeView untouched) */
 @import '../Common/UltimateButtons.css';
 .wit-container {

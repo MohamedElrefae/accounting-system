@@ -9,10 +9,13 @@ const AccountsTreeLazy = React.lazy(() => import('./pages/MainData/AccountsTree'
 const ExpensesCategoriesPage = React.lazy(() => import('./pages/MainData/ExpensesCategories'));
 const WorkItemsPage = React.lazy(() => import('./pages/MainData/WorkItems'));
 const CostCentersPage = React.lazy(() => import('./pages/MainData/CostCenters'));
+const TransactionLineItemsCatalogPage = React.lazy(() => import('./pages/MainData/TransactionLineItems'));
 const AnalysisWorkItemsPage = React.lazy(() => import('./pages/MainData/AnalysisWorkItems'));
+const AssignCostAnalysisPage = React.lazy(() => import('./pages/Transactions/AssignCostAnalysis'));
 const TestRTL = React.lazy(() => import('./pages/TestRTL'));
 const ExportTestPage = React.lazy(() => import('./pages/ExportTestPage'));
 const TransactionsPage = React.lazy(() => import('./pages/Transactions/Transactions'));
+const TxLineItemsPage = React.lazy(() => import('./pages/Transactions/TransactionLineItems'));
 const GeneralLedgerPage = React.lazy(() => import('./pages/Reports/GeneralLedger'))
 const ProfitLossPage = React.lazy(() => import('./pages/Reports/ProfitLoss'))
 const BalanceSheetPage = React.lazy(() => import('./pages/Reports/BalanceSheet'))
@@ -144,6 +147,13 @@ const App: React.FC = () => {
               <CostCentersPage />
             </React.Suspense>
           } />
+          <Route path="/main-data/transaction-line-items" element={
+            <RequirePermission perm="transaction_line_items.read">
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <TransactionLineItemsCatalogPage />
+              </React.Suspense>
+            </RequirePermission>
+          } />
           <Route path="/main-data/organizations" element={
             <React.Suspense fallback={<div>Loading...</div>}>
               <OrgManagementTabs />
@@ -176,6 +186,25 @@ const App: React.FC = () => {
           <Route path="/transactions/all" element={
             <React.Suspense fallback={<div>Loading...</div>}>
               <TransactionsPage />
+            </React.Suspense>
+          } />
+          <Route path="/transactions/assign-cost-analysis" element={
+            <RequirePermission perm="transactions.cost_analysis">
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <AssignCostAnalysisPage />
+              </React.Suspense>
+            </RequirePermission>
+          } />
+
+          {/* Standalone Transaction Line Items page */}
+          <Route path="/Transactions/TransactionLineItems" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <TxLineItemsPage />
+            </React.Suspense>
+          } />
+          <Route path="/transactions/line-items" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <TxLineItemsPage />
             </React.Suspense>
           } />
 

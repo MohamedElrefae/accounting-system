@@ -72,6 +72,7 @@ import MoreIcon from '@mui/icons-material/MoreVert';
 import PermissionIcon from '@mui/icons-material/Assignment';
 import { supabase } from '../../utils/supabase';
 import { PERMISSION_CATEGORIES } from '../../constants/permissions';
+import EnhancedQuickPermissionAssignment from '../../components/EnhancedQuickPermissionAssignment';
 
 interface Role {
   id: number;
@@ -93,6 +94,7 @@ type SortDirection = 'asc' | 'desc';
 export default function EnterpriseRoleManagement() {
   const theme = useTheme();
   const [roles, setRoles] = useState<Role[]>([]);
+  const [permissions, setPermissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
@@ -137,6 +139,18 @@ export default function EnterpriseRoleManagement() {
       if (!rolesData || rolesData.length === 0) {
         setRoles([]);
         return;
+      }
+
+      // Load all permissions for the enhanced component
+      const { data: allPermissionsData, error: allPermissionsError } = await supabase
+        .from('permissions')
+        .select('*')
+        .order('resource, action');
+
+      if (allPermissionsError) {
+        console.warn('Warning loading permissions:', allPermissionsError);
+      } else {
+        setPermissions(allPermissionsData || []);
       }
 
       // Then load role permissions separately
@@ -991,6 +1005,7 @@ export default function EnterpriseRoleManagement() {
           >
             <Tab label="معلومات الدور" />
             <Tab label="الصلاحيات" disabled={!selectedRole} />
+            <Tab label="تعيين سريع" icon={<AdminIcon />} />
             <Tab label="المستخدمين" disabled={!selectedRole} />
           </Tabs>
 
@@ -1044,6 +1059,44 @@ export default function EnterpriseRoleManagement() {
                 <Typography variant="subtitle1" fontWeight="medium" mb={2}>
                   الصلاحيات ({formData.permissions.length})
                 </Typography>
+                
+                {/* Enhanced Quick Permission Assignment Component */}
+                <Box sx={{ mb: 4 }}>
+                  <Divider sx={{ my: 3 }}>
+                    <Chip label="تعيين سريع متقدم" color="primary" icon={<AdminIcon />} />
+                  </Divider>
+                  
+                  <EnhancedQuickPermissionAssignment
+                    selectedRoleId={selectedRole?.id}
+                    allRoles={roles}
+                    allPermissions={permissions}
+                    onAssignmentComplete={(result) => {
+                      console.log('Assignment result:', result);
+                      if (result.success) {
+                        loadRoles(); // Refresh roles data
+                        // Update form data with current role permissions
+                        if (selectedRole) {
+                          const updatedRole = roles.find(r => r.id === selectedRole.id);
+                          if (updatedRole) {
+                            setFormData(prev => ({
+                              ...prev,
+                              permissions: updatedRole.permissions || []
+                            }));
+                          }
+                        }
+                      }
+                    }}
+                    onRefreshNeeded={() => {
+                      loadRoles(); // Refresh when needed
+                    }}
+                  />
+                  
+                  <Divider sx={{ my: 3 }}>
+                    <Chip label="تعيين تقليدي" variant="outlined" />
+                  </Divider>
+                </Box>
+                
+                {/* Original Permission Assignment */}
                 <Stack spacing={2}>
                   {PERMISSION_CATEGORIES.map(category => (
                     <Accordion key={category.key}>
@@ -1089,6 +1142,35 @@ export default function EnterpriseRoleManagement() {
 
             {activeTab === 2 && (
               <Box>
+                <Typography variant="h5" fontWeight="bold" mb={1} sx={{ color: 'primary.main' }}>
+                  🚀 تعيين سريع متقدم
+                </Typography>
+                <Typography variant="body2" color="text.secondary" mb={3}>
+                  استخدم هذه الأداة المتقدمة لتعيين صلاحيات متعددة لأدوار متعددة في نفس الوقت
+                </Typography>
+                
+                <EnhancedQuickPermissionAssignment
+                  selectedRoleId={selectedRole?.id}
+                  allRoles={roles}
+                  allPermissions={permissions}
+                  onAssignmentComplete={(result) => {
+                    console.log('Assignment result:', result);
+                    if (result.success) {
+                      loadRoles(); // Refresh roles data
+                      alert(`✅ تم تعيين ${result.permissions_assigned} صلاحية بنجاح!`);
+                    } else {
+                      alert(`❌ فشل في تعيين الصلاحيات: ${result.message}`);
+                    }
+                  }}
+                  onRefreshNeeded={() => {
+                    loadRoles(); // Refresh when needed
+                  }}
+                />
+              </Box>
+            )}
+
+            {activeTab === 3 && (
+              <Box>
                 <Typography variant="subtitle1" fontWeight="medium" mb={2}>
                   المستخدمين المعينين لهذا الدور
                 </Typography>
@@ -1121,6 +1203,15 @@ export default function EnterpriseRoleManagement() {
                 startIcon={<SaveIcon />}
               >
                 {savingPerms ? 'جاري حفظ الصلاحيات...' : 'حفظ الصلاحيات'}
+              </Button>
+            )}
+            {activeTab === 2 && (
+              <Button
+                variant="outlined"
+                startIcon={<AdminIcon />}
+                onClick={() => alert('✨ استخدم الأدوات المتقدمة أعلاه لتعيين الصلاحيات')}
+              >
+                دليل الاستخدام
               </Button>
             )}
           </Stack>

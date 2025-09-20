@@ -11,6 +11,8 @@ export interface ColumnConfig {
   resizable?: boolean
   sortable?: boolean
   type?: 'text' | 'number' | 'date' | 'currency' | 'boolean' | 'badge' | 'actions'
+  frozen?: boolean
+  pinPriority?: number
 }
 
 // Local interfaces for this hook
@@ -191,7 +193,10 @@ function mergeWithDefaults(stored: ColumnConfig[], defaults: ColumnConfig[]): Co
         maxWidth: defaultCol.maxWidth,
         type: defaultCol.type,
         resizable: defaultCol.resizable,
-        sortable: defaultCol.sortable
+        sortable: defaultCol.sortable,
+        // Preserve user-configured frozen and pinPriority settings
+        frozen: storedCol.frozen,
+        pinPriority: storedCol.pinPriority
       }
     }
     return defaultCol

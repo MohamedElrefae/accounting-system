@@ -26,8 +26,8 @@ export default defineConfig(({ mode }) => ({
   },
   server: {
     host: true, // allow LAN access and avoids "use --host to expose" message
-    port: 3000,
-    strictPort: true, // fail fast if 3000 is taken instead of switching ports silently
+    port: 3001,
+    strictPort: true, // fail fast if 3001 is taken instead of switching ports silently
     open: true,
     watch: {
       // OneDrive/Network folders on Windows often need polling to detect changes reliably
