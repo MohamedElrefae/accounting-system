@@ -15,20 +15,16 @@
 
 ### 2. Frontend Components
 
-#### User Management Page (`/settings/users`)
-- Full user listing with search and filtering
-- Role assignment dropdown for each user
-- Active/inactive status toggle
-- Permission matrix dialog for detailed permission management
+#### Unified User Management System (`/settings/user-management`)
+- Enterprise-grade tabbed interface with four main sections:
+  - **Users Tab**: Full user listing with search, filtering, role assignment, and status toggles
+  - **Roles Tab**: Create, edit, delete roles with permission assignment
+  - **Permissions Tab**: View and manage all system permissions with categorization
+  - **Access Requests Tab**: Handle user access requests and approvals
+- Consolidated enterprise components for better integration
 - Two-step data fetching to avoid PostgREST issues
-- Error handling and display
-
-#### Role Management Page (`/settings/roles`)
-- Create, edit, delete roles
-- Assign permissions to roles
-- Arabic/English bilingual support
-- Permission categories with expand/collapse
-- Search functionality
+- Error handling and display across all tabs
+- Arabic/English bilingual support throughout
 
 #### Permission Matrix Component
 - Complex UI for managing user permissions
@@ -182,8 +178,7 @@ npm run dev
 
 ### Access Key Pages
 - Main App: http://localhost:3003
-- User Management: http://localhost:3003/settings/users
-- Role Management: http://localhost:3003/settings/roles
+- Unified User Management: http://localhost:3003/settings/user-management
 - Diagnostics: http://localhost:3003/settings/diagnostics
 
 ### Check Supabase Data
@@ -213,9 +208,11 @@ WHERE ur.is_active = true;
 - Row Level Security (RLS) for data protection
 
 ## 🔗 Related Files
-- `/src/pages/admin/UserManagement.tsx` - Main user management page
-- `/src/pages/admin/RoleManagement.tsx` - Role management page
-- `/src/components/admin/PermissionMatrix.tsx` - Permission editor
+- `/src/pages/admin/UserManagementSystem.tsx` - Unified user management system
+- `/src/pages/admin/EnterpriseUserManagement.tsx` - Enterprise user management component
+- `/src/pages/admin/EnterpriseRoleManagement.tsx` - Enterprise role management component
+- `/src/pages/admin/EnterprisePermissionsManagement.tsx` - Enterprise permissions management component
+- `/src/components/admin/AccessRequestManagement.tsx` - Access request management component
 - `/src/components/admin/DatabaseDiagnostics.tsx` - Diagnostic tool
 - `/src/constants/permissions.ts` - Permission definitions
 - `/src/utils/supabase.ts` - Supabase client configuration

@@ -5,10 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:test": "vite --mode testing",
     "build": "vite build",
+    "build:test": "vite build --mode testing",
     "build:analyze": "tsc -b && vite build --mode analyze",
     "lint": "eslint .",
     "preview": "npm run build && vite preview . --host --port 4173 --strictPort",
+    "preview:test": "npm run build:test && vite preview . --host --port 4174 --strictPort",
     "check:migration": "tsx scripts/checkLineItemsMigration.ts"
   },
   "dependencies": {

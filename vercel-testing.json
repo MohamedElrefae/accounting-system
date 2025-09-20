@@ -1,0 +1,26 @@
+{
+  "name": "accounting-system-testing",
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "buildCommand": "npm run build:test"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "env": {
+    "VITE_SUPABASE_URL": "https://eraufhmagwekqsfskimv.supabase.co",
+    "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyYXVmaG1hZ3dla3FzZnNraW12Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNjI0NjQsImV4cCI6MjA3MzkzODQ2NH0.ewZ-gyV5gV6ZABuf-KwwYyGxTseJMi3h_6bsN_Ul75Y",
+    "VITE_ENVIRONMENT": "testing",
+    "VITE_APP_TITLE": "Accounting System (TEST)",
+    "VITE_SHOW_TEST_BANNER": "true"
+  }
+}

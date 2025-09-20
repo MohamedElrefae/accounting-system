@@ -29,9 +29,6 @@ import { RegisterForm } from './components/auth/RegisterForm';
 import { ForgotPassword } from './components/auth/ForgotPassword';
 import { ResetPassword } from './components/auth/ResetPassword';
 import AuthDebug from './pages/AuthDebug';
-const UserManagement = React.lazy(() => import('./pages/admin/UserManagement'));
-const RoleManagement = React.lazy(() => import('./pages/admin/RoleManagement'));
-const PermissionsManagement = React.lazy(() => import('./pages/admin/PermissionsManagement'));
 const UserManagementSystem = React.lazy(() => import('./pages/admin/UserManagementSystem'));
 const Diagnostics = React.lazy(() => import('./pages/admin/Diagnostics'));
 const Profile = React.lazy(() => import('./pages/admin/Profile'));
@@ -324,24 +321,7 @@ const App: React.FC = () => {
                 <UserManagementSystem />
               </React.Suspense>
             } />
-            {/* Individual routes for direct access */}
-            <Route path="/settings/users" element={
-              <React.Suspense fallback={<div>Loading...</div>}>
-                <UserManagement />
-              </React.Suspense>
-            } />
-            <Route path="/settings/roles" element={
-              <React.Suspense fallback={<div>Loading...</div>}>
-                <RoleManagement />
-              </React.Suspense>
-            } />
-            <Route path="/settings/permissions" element={
-              <RequirePermission perm="permissions.view">
-                <React.Suspense fallback={<div>Loading...</div>}>
-                  <PermissionsManagement />
-                </React.Suspense>
-              </RequirePermission>
-            } />
+            {/* Legacy routes removed - consolidated into /settings/user-management */}
             <Route path="/settings/organization-management" element={
               <React.Suspense fallback={<div>Loading...</div>}>
                 <OrgManagementTabs />
