@@ -66,6 +66,23 @@ export const navigationItems: NavigationItem[] = [
         path: "/main-data/work-items"
       },
       {
+        id: "document-categories",
+        label: "Document Categories",
+        titleEn: "Document Categories",
+        titleAr: "تصنيفات المستندات",
+        icon: "Category",
+        path: "/main-data/document-categories"
+      },
+      {
+        id: "document-templates",
+        label: "Document Templates",
+        titleEn: "Document Templates",
+        titleAr: "قوالب المستندات",
+        icon: "Description",
+        path: "/main-data/document-templates",
+        requiredPermission: "templates.view"
+      },
+      {
         id: "analysis-work-items",
         label: "Analysis Work Items",
         titleEn: "Analysis Work Items",
@@ -91,6 +108,15 @@ export const navigationItems: NavigationItem[] = [
         requiredPermission: "transaction_line_items.read"
       }
     ]
+  },
+  {
+    id: "documents",
+    label: "Document Management",
+    titleEn: "Document Management",
+    titleAr: "إدارة المستندات",
+    icon: "Description",
+    path: "/documents",
+    requiredPermission: "documents.view"
   },
   {
     id: "transactions",
@@ -145,6 +171,14 @@ export const navigationItems: NavigationItem[] = [
     icon: "Assignment",
     children: [
       {
+        id: "approvals-documents",
+        label: "Document Approvals",
+        titleEn: "Document Approvals",
+        titleAr: "موافقات المستندات",
+        icon: "Assignment",
+        path: "/approvals/documents"
+      },
+      {
         id: "approvals-inbox",
         label: "Inbox",
         titleEn: "Inbox",
@@ -170,6 +204,103 @@ export const navigationItems: NavigationItem[] = [
         icon: "Assignment",
         path: "/approvals/test",
         requiredPermission: "transactions.manage"
+      }
+    ]
+  },
+  {
+    id: "fiscal",
+    label: "Fiscal",
+    titleEn: "Fiscal Management",
+    titleAr: "الإدارة المالية السنوية",
+    icon: "AccountBalance",
+    children: [
+      {
+        id: "fiscal-dashboard",
+        label: "Fiscal Dashboard",
+        titleEn: "Fiscal Dashboard",
+        titleAr: "لوحة السنة المالية",
+        icon: "BarChart",
+        path: "/fiscal/dashboard"
+      },
+      {
+        id: "opening-balance-import",
+        label: "Opening Balance Import",
+        titleEn: "Opening Balance Import",
+        titleAr: "استيراد الأرصدة الافتتاحية",
+        icon: "Summarize",
+        path: "/fiscal/opening-balance-import"
+      },
+      {
+        id: "fiscal-periods",
+        label: "Period Manager",
+        titleEn: "Period Manager",
+        titleAr: "إدارة الفترات",
+        icon: "List",
+        path: "/fiscal/periods"
+      },
+      {
+        id: "construction-dashboard",
+        label: "Construction",
+        titleEn: "Construction Dashboard",
+        titleAr: "لوحة الإنشاءات",
+        icon: "TrendingUp",
+        path: "/fiscal/construction"
+      },
+      {
+        id: "approval-workflow",
+        label: "Approval Workflow",
+        titleEn: "Approval Workflow",
+        titleAr: "مسار الموافقات",
+        icon: "Assignment",
+        path: "/fiscal/approval-workflow"
+      },
+      {
+        id: "validation-rules",
+        label: "Validation Rules",
+        titleEn: "Validation Rules",
+        titleAr: "قواعد التحقق",
+        icon: "Tune",
+        path: "/fiscal/validation-rules"
+      },
+      {
+        id: "reconciliation",
+        label: "Reconciliation",
+        titleEn: "Reconciliation",
+        titleAr: "التسوية",
+        icon: "Balance",
+        path: "/fiscal/reconciliation"
+      },
+      {
+        id: "audit-trail",
+        label: "Audit Trail",
+        titleEn: "Audit Trail",
+        titleAr: "سجل التدقيق",
+        icon: "Security",
+        path: "/fiscal/audit-trail"
+      },
+      {
+        id: "approvals-center",
+        label: "Approvals Center",
+        titleEn: "Approvals Center",
+        titleAr: "مركز الموافقات",
+        icon: "Assignment",
+        path: "/fiscal/approvals"
+      },
+      {
+        id: "opening-balance-import",
+        label: "Opening Balance Import",
+        titleEn: "Opening Balance Import",
+        titleAr: "استيراد الأرصدة الافتتاحية",
+        icon: "UploadFile",
+        path: "/fiscal/opening-balance-import"
+      },
+      {
+        id: "fiscal-year-dashboard",
+        label: "Fiscal Year Dashboard",
+        titleEn: "Fiscal Year Dashboard",
+        titleAr: "لوحة السنة المالية",
+        icon: "Dashboard",
+        path: "/fiscal/dashboard"
       }
     ]
   },

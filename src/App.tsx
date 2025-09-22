@@ -6,6 +6,11 @@ import useAppStore from './store/useAppStore';
 import DashboardLayout from './components/layout/DashboardLayout';
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const AccountsTreeLazy = React.lazy(() => import('./pages/MainData/AccountsTree'));
+const DocumentCategoriesPage = React.lazy(() => import('./pages/MainData/DocumentCategories'));
+const TemplateLibraryPage = React.lazy(() => import('./pages/MainData/DocumentTemplates/TemplateLibrary'));
+const TemplateEditorPage = React.lazy(() => import('./pages/MainData/DocumentTemplates/TemplateEditor'));
+const TemplateViewerPage = React.lazy(() => import('./pages/MainData/DocumentTemplates/TemplateViewer'));
+const DocumentApprovalsPage = React.lazy(() => import('./pages/Approvals/DocumentApprovals'));
 const ExpensesCategoriesPage = React.lazy(() => import('./pages/MainData/ExpensesCategories'));
 const WorkItemsPage = React.lazy(() => import('./pages/MainData/WorkItems'));
 const CostCentersPage = React.lazy(() => import('./pages/MainData/CostCenters'));
@@ -14,6 +19,8 @@ const AnalysisWorkItemsPage = React.lazy(() => import('./pages/MainData/Analysis
 const AssignCostAnalysisPage = React.lazy(() => import('./pages/Transactions/AssignCostAnalysis'));
 const TestRTL = React.lazy(() => import('./pages/TestRTL'));
 const ExportTestPage = React.lazy(() => import('./pages/ExportTestPage'));
+const DocumentControlsBarTest = React.lazy(() => import('./features/documents/components/DocumentControlsBarTest'));
+const DocumentControlsBarRTLTest = React.lazy(() => import('./features/documents/components/DocumentControlsBarRTLTest'));
 const TransactionsPage = React.lazy(() => import('./pages/Transactions/Transactions'));
 const TxLineItemsPage = React.lazy(() => import('./pages/Transactions/TransactionLineItems'));
 const GeneralLedgerPage = React.lazy(() => import('./pages/Reports/GeneralLedger'))
@@ -24,6 +31,17 @@ const AnalysisItemUsagePage = React.lazy(() => import('./pages/Reports/AnalysisI
 const TrialBalanceAllLevelsPage = React.lazy(() => import('./pages/Reports/TrialBalanceAllLevels'))
 const AccountExplorerReportPage = React.lazy(() => import('./pages/Reports/AccountExplorer'))
 const CustomReportsPage = React.lazy(() => import('./pages/CustomReports'))
+const DocumentsPage = React.lazy(() => import('./pages/Documents/Documents'))
+const OpeningBalanceImportPage = React.lazy(() => import('./pages/Fiscal/OpeningBalanceImport'))
+const FiscalYearDashboardPage = React.lazy(() => import('./pages/Fiscal/FiscalYearDashboard'))
+const FiscalPeriodManagerPage = React.lazy(() => import('./pages/Fiscal/FiscalPeriodManager'))
+const ConstructionDashboardPage = React.lazy(() => import('./pages/Fiscal/ConstructionDashboard'))
+const OpeningBalanceApprovalWorkflowPage = React.lazy(() => import('./pages/Fiscal/OpeningBalanceApprovalWorkflow'))
+const ValidationRuleManagerPage = React.lazy(() => import('./pages/Fiscal/ValidationRuleManager'))
+const BalanceReconciliationDashboardPage = React.lazy(() => import('./pages/Fiscal/BalanceReconciliationDashboard'))
+const OpeningBalanceAuditTrailPage = React.lazy(() => import('./pages/Fiscal/OpeningBalanceAuditTrail'))
+const ApprovalNotificationCenterPage = React.lazy(() => import('./pages/Fiscal/ApprovalNotificationCenter'))
+const PerformanceDashboardPage = React.lazy(() => import('./pages/PerformanceDashboard'))
 import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
 import { ForgotPassword } from './components/auth/ForgotPassword';
@@ -33,6 +51,7 @@ const UserManagementSystem = React.lazy(() => import('./pages/admin/UserManageme
 const Diagnostics = React.lazy(() => import('./pages/admin/Diagnostics'));
 const Profile = React.lazy(() => import('./pages/admin/Profile'));
 const ProjectManagement = React.lazy(() => import('./components/Projects/ProjectManagement'));
+const ProjectAttachmentsPage = React.lazy(() => import('./pages/Projects/ProjectAttachments'));
 const OrgManagementTabs = React.lazy(() => import('./components/Organizations/OrganizationManagementTabs'));
 const FontSettings = React.lazy(() => import('./components/Settings/FontSettings'));
 const ExportDatabasePage = React.lazy(() => import('./pages/admin/ExportDatabase'));
@@ -119,6 +138,16 @@ const App: React.FC = () => {
               <TestRTL />
             </React.Suspense>
           } />
+          <Route path="/test/document-controls" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <DocumentControlsBarTest />
+            </React.Suspense>
+          } />
+          <Route path="/test/document-controls-rtl" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <DocumentControlsBarRTLTest />
+            </React.Suspense>
+          } />
           
           {/* Main Data */}
           <Route path="/main-data/accounts-tree" element={<React.Suspense fallback={<>Loading...</>}><AccountsTreeLazy /></React.Suspense>} />
@@ -133,6 +162,32 @@ const App: React.FC = () => {
             <React.Suspense fallback={<div>Loading...</div>}>
               <WorkItemsPage />
             </React.Suspense>
+          } />
+          <Route path="/main-data/document-categories" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <DocumentCategoriesPage />
+            </React.Suspense>
+          } />
+          <Route path="/main-data/document-templates" element={
+            <RequirePermission perm="templates.view">
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <TemplateLibraryPage />
+              </React.Suspense>
+            </RequirePermission>
+          } />
+          <Route path="/main-data/document-templates/:id" element={
+            <RequirePermission perm="templates.manage">
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <TemplateEditorPage />
+              </React.Suspense>
+            </RequirePermission>
+          } />
+          <Route path="/main-data/document-templates/:id/view" element={
+            <RequirePermission perm="templates.view">
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <TemplateViewerPage />
+              </React.Suspense>
+            </RequirePermission>
           } />
           <Route path="/main-data/analysis-work-items" element={
             <React.Suspense fallback={<div>Loading...</div>}>
@@ -160,6 +215,13 @@ const App: React.FC = () => {
             <React.Suspense fallback={<div>Loading...</div>}>
               <ProjectManagement />
             </React.Suspense>
+          } />
+          <Route path="/projects/:id/attachments" element={
+            <RequirePermission perm="documents.view">
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <ProjectAttachmentsPage />
+              </React.Suspense>
+            </RequirePermission>
           } />
           <Route path="/main-data/transaction-classification" element={
             <React.Suspense fallback={<div>Loading...</div>}>
@@ -298,8 +360,60 @@ const App: React.FC = () => {
                 </React.Suspense>
             } />
             
-            {/* Inventory */}
-            <Route path="/inventory/items" element={<PlaceholderPage title="Items Management" />} />
+          {/* Fiscal Management */}
+          <Route path="/fiscal/opening-balance-import" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <OpeningBalanceImportPage />
+            </React.Suspense>
+          } />
+          <Route path="/fiscal/dashboard" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <FiscalYearDashboardPage />
+            </React.Suspense>
+          } />
+          <Route path="/fiscal/periods" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <FiscalPeriodManagerPage />
+            </React.Suspense>
+          } />
+          <Route path="/fiscal/construction" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <ConstructionDashboardPage />
+            </React.Suspense>
+          } />
+          <Route path="/fiscal/approval-workflow" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <OpeningBalanceApprovalWorkflowPage />
+            </React.Suspense>
+          } />
+          <Route path="/fiscal/validation-rules" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <ValidationRuleManagerPage />
+            </React.Suspense>
+          } />
+          <Route path="/fiscal/reconciliation" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <BalanceReconciliationDashboardPage />
+            </React.Suspense>
+          } />
+          <Route path="/fiscal/audit-trail" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <OpeningBalanceAuditTrailPage />
+            </React.Suspense>
+          } />
+          <Route path="/fiscal/approvals" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <ApprovalNotificationCenterPage />
+            </React.Suspense>
+          } />
+          <Route path="/performance" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <PerformanceDashboardPage />
+            </React.Suspense>
+          } />
+
+          {/* Inventory */}
+          <Route path="/inventory/items" element={<PlaceholderPage title="Items Management" />} />
             <Route path="/inventory/movements" element={<PlaceholderPage title="Stock Movements" />} />
             <Route path="/inventory/reports" element={<PlaceholderPage title="Stock Reports" />} />
             
@@ -354,7 +468,21 @@ const App: React.FC = () => {
             <Route path="/settings/preferences" element={<PlaceholderPage title="Preferences" />} />
             <Route path="/settings/backup" element={<PlaceholderPage title="Backup & Restore" />} />
             
+            {/* Documents */}
+            <Route path="/documents" element={
+              <RequirePermission perm="documents.view">
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <DocumentsPage />
+                </React.Suspense>
+              </RequirePermission>
+            } />
+
             {/* Approvals */}
+            <Route path="/approvals/documents" element={
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <DocumentApprovalsPage />
+              </React.Suspense>
+            } />
             <Route path="/approvals/inbox" element={
               <RequirePermission perm="transactions.review">
                 <React.Suspense fallback={<div>Loading...</div>}>

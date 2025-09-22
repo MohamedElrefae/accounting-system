@@ -1,3 +1,4 @@
+@import '../Common/UltimateButtons.css';
 .wit-highlight {
   background: var(--accent-primary, #ffe08a);
   color: inherit;
@@ -12,8 +13,8 @@
 .badge-gap { margin-inline-start: 8px; }
 .badge-gap-sm { margin-inline-start: 6px; }
 
+/* moved to top */
 /* Work Items dedicated tree (keeps original TreeView untouched) */
-@import '../Common/UltimateButtons.css';
 .wit-container {
   background-color: var(--content-bg);
   border: 1px solid var(--border-light);
