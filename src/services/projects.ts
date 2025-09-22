@@ -86,6 +86,17 @@ export async function getActiveProjects(): Promise<Project[]> {
   return (data as Project[]) || []
 }
 
+export async function getActiveProjectsByOrg(orgId: string): Promise<Project[]> {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('status', 'active')
+    .eq('org_id', orgId)
+    .order('code', { ascending: true });
+  if (error) throw error;
+  return (data as Project[]) || [];
+}
+
 // Get project by ID
 export async function getProject(id: string): Promise<Project | null> {
   const { data, error } = await supabase

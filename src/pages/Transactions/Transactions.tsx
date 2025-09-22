@@ -4,6 +4,7 @@ import { getAccounts, getTransactions, createTransaction, deleteTransaction, upd
 import { listWorkItemsAll } from '../../services/work-items'
 import type { WorkItemRow } from '../../types/work-items'
 import { getOrganizations } from '../../services/organization'
+import { getActiveProjectId } from '../../utils/org'
 import { getAllTransactionClassifications, type TransactionClassification } from '../../services/transaction-classification'
 import { getExpensesCategoriesList } from '../../services/sub-tree'
 import { listAnalysisWorkItems } from '../../services/analysis-work-items'
@@ -33,6 +34,7 @@ import { supabase } from '../../utils/supabase'
 import { transactionValidationAPI } from '../../services/transaction-validation-api'
 import { getCompanyConfig } from '../../services/company-config'
 import TransactionAnalysisModal from '../../components/Transactions/TransactionAnalysisModal'
+import AttachDocumentsPanel from '../../components/documents/AttachDocumentsPanel'
 
 interface FilterState {
   dateFrom: string
@@ -72,6 +74,42 @@ const TransactionsPage: React.FC = () => {
   const [analysisModalOpen, setAnalysisModalOpen] = useState(false)
   const [analysisTransactionId, setAnalysisTransactionId] = useState<string | null>(null)
   const [analysisTransaction, setAnalysisTransaction] = useState<TransactionRecord | null>(null)
+
+  // Documents panel state
+  const [documentsOpen, setDocumentsOpen] = useState(false)
+  const [documentsFor, setDocumentsFor] = useState<TransactionRecord | null>(null)
+
+  // Documents panel layout state with persistence
+  const [docsPanelPosition, setDocsPanelPosition] = useState<{ x: number; y: number }>(() => {
+    try {
+      const saved = localStorage.getItem('documentsPanel:position');
+      return saved ? JSON.parse(saved) : { x: 120, y: 120 };
+    } catch { return { x: 120, y: 120 }; }
+  })
+  const [docsPanelSize, setDocsPanelSize] = useState<{ width: number; height: number }>(() => {
+    try {
+      const saved = localStorage.getItem('documentsPanel:size');
+      return saved ? JSON.parse(saved) : { width: 900, height: 700 };
+    } catch { return { width: 900, height: 700 }; }
+  })
+  const [docsPanelMax, setDocsPanelMax] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('documentsPanel:maximized');
+      return saved === 'true';
+    } catch { return false; }
+  })
+  const [docsPanelDocked, setDocsPanelDocked] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('documentsPanel:docked');
+      return saved === 'true';
+    } catch { return false; }
+  })
+  const [docsPanelDockPos, setDocsPanelDockPos] = useState<'left' | 'right' | 'top' | 'bottom'>(() => {
+    try {
+      const saved = localStorage.getItem('documentsPanel:dockPosition');
+      return (saved as 'left' | 'right' | 'top' | 'bottom') || 'right';
+    } catch { return 'right'; }
+  })
   
   // Unified form panel state with persistence
   const [panelPosition, setPanelPosition] = useState<{ x: number; y: number }>(() => {
@@ -129,7 +167,10 @@ const TransactionsPage: React.FC = () => {
   const [debitFilterId, setDebitFilterId] = useState<string>('')
   const [creditFilterId, setCreditFilterId] = useState<string>('')
   const [orgFilterId, setOrgFilterId] = useState<string>('')
-  const [projectFilterId, setProjectFilterId] = useState<string>('')
+  const [projectFilterId, setProjectFilterId] = useState<string>(() => {
+    try { return (localStorage.getItem('project_id') || '') as string } catch { return '' }
+  })
+  const [useGlobalProjectTx, setUseGlobalProjectTx] = useState<boolean>(() => { try { return localStorage.getItem('transactions:useGlobalProject') === '1' } catch { return true } })
   const [classificationFilterId, setClassificationFilterId] = useState<string>('')
   const [expensesCategoryFilterId, setExpensesCategoryFilterId] = useState<string>('')
   const [workItemFilterId, setWorkItemFilterId] = useState<string>('')
@@ -152,6 +193,19 @@ const TransactionsPage: React.FC = () => {
     } catch { return false }
   })
   
+  // Sync project filter with global when enabled
+  useEffect(() => {
+    if (!useGlobalProjectTx) return
+    try {
+      const pid = getActiveProjectId() || ''
+      setProjectFilterId(pid)
+    } catch {}
+  }, [useGlobalProjectTx, orgFilterId])
+
+  useEffect(() => {
+    try { localStorage.setItem('transactions:useGlobalProject', useGlobalProjectTx ? '1' : '0') } catch {}
+  }, [useGlobalProjectTx])
+
   // Persist wrapMode to server when available
   useEffect(() => {
     if (!currentUserId) return
@@ -287,6 +341,23 @@ const TransactionsPage: React.FC = () => {
       localStorage.setItem('transactionFormPanel:dockPosition', panelDockPos);
     } catch {}
   }, [panelDockPos])
+
+  // Persist documents panel layout
+  useEffect(() => {
+    try { localStorage.setItem('documentsPanel:position', JSON.stringify(docsPanelPosition)); } catch {}
+  }, [docsPanelPosition])
+  useEffect(() => {
+    try { localStorage.setItem('documentsPanel:size', JSON.stringify(docsPanelSize)); } catch {}
+  }, [docsPanelSize])
+  useEffect(() => {
+    try { localStorage.setItem('documentsPanel:maximized', String(docsPanelMax)); } catch {}
+  }, [docsPanelMax])
+  useEffect(() => {
+    try { localStorage.setItem('documentsPanel:docked', String(docsPanelDocked)); } catch {}
+  }, [docsPanelDocked])
+  useEffect(() => {
+    try { localStorage.setItem('documentsPanel:dockPosition', docsPanelDockPos); } catch {}
+  }, [docsPanelDockPos])
 
   const location = useLocation()
   // Apply workItemId from URL query (drill-through)
@@ -444,6 +515,8 @@ const TransactionsPage: React.FC = () => {
     { key: 'created_by_name', label: 'أنشئت بواسطة', visible: false, width: 140, minWidth: 120, maxWidth: 200, type: 'text', resizable: true },
     { key: 'posted_by_name', label: 'مرحلة بواسطة', visible: false, width: 140, minWidth: 120, maxWidth: 200, type: 'text', resizable: true },
     { key: 'approval_status', label: 'حالة الاعتماد', visible: true, width: 140, minWidth: 120, maxWidth: 200, type: 'badge', resizable: false },
+    { key: 'documents_count', label: 'عدد المرفقات', visible: true, width: 100, minWidth: 80, maxWidth: 140, type: 'number', resizable: true },
+    { key: 'documents', label: 'المستندات', visible: true, width: 130, minWidth: 110, maxWidth: 180, type: 'actions', resizable: true },
     { key: 'actions', label: 'الإجراءات', visible: true, width: 220, minWidth: 180, maxWidth: 400, type: 'actions', resizable: true }
   ], [])
 
@@ -1498,6 +1571,31 @@ approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted
                 </span>
               )
             }
+            if (column.key === 'documents_count') {
+              const count = (row.original as any).documents_count || 0;
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{count}</span>
+                  {count > 0 && <span title={`عدد المرفقات: ${count}`}>📎</span>}
+                </div>
+              )
+            }
+            if (column.key === 'documents') {
+              return (
+                <WithPermission perm="documents.read">
+                  <button
+                    className="ultimate-btn ultimate-btn-edit"
+                    title="إدارة مستندات المعاملة"
+                    onClick={() => {
+                      setDocumentsFor(row.original)
+                      setDocumentsOpen(true)
+                    }}
+                  >
+                    <div className="btn-content"><span className="btn-text">مستندات</span></div>
+                  </button>
+                </WithPermission>
+              )
+            }
             if (column.key === 'actions') {
               return (
                 <div className="tree-node-actions">
@@ -2111,6 +2209,84 @@ approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted
         onClose={() => setColumnConfigOpen(false)}
         onReset={resetToDefaults}
       />
+
+      {/* Documents Panel */}
+      {documentsOpen && documentsFor && (
+        <DraggableResizablePanel
+          title={`مستندات المعاملة - ${documentsFor.entry_number}`}
+          isOpen={documentsOpen}
+          onClose={() => setDocumentsOpen(false)}
+          position={docsPanelPosition}
+          size={docsPanelSize}
+          onMove={setDocsPanelPosition}
+          onResize={setDocsPanelSize}
+          isMaximized={docsPanelMax}
+          onMaximize={() => setDocsPanelMax(!docsPanelMax)}
+          isDocked={docsPanelDocked}
+          dockPosition={docsPanelDockPos}
+          onDock={(pos) => {
+            setDocsPanelDocked(true)
+            setDocsPanelDockPos(pos)
+          }}
+          onResetPosition={() => {
+            setDocsPanelPosition({ x: 120, y: 120 })
+            setDocsPanelSize({ width: 900, height: 700 })
+            setDocsPanelMax(false)
+            setDocsPanelDocked(false)
+          }}
+        >
+          <div className="panel-actions">
+            <button
+              className="ultimate-btn ultimate-btn-success"
+              title="حفظ تخطيط لوحة المستندات"
+              onClick={() => {
+                try {
+                  const pref = {
+                    position: docsPanelPosition,
+                    size: docsPanelSize,
+                    maximized: docsPanelMax,
+                    docked: docsPanelDocked,
+                    dockPosition: docsPanelDockPos,
+                    savedTimestamp: Date.now(),
+                    userPreferred: true
+                  }
+                  localStorage.setItem('documentsPanel:preferred', JSON.stringify(pref))
+                } catch {}
+              }}
+              style={{ fontSize: '12px', padding: '6px 10px' }}
+            >
+              <div className="btn-content"><span className="btn-text">💾 حفظ التخطيط</span></div>
+            </button>
+            <button
+              className="ultimate-btn ultimate-btn-warning"
+              title="إعادة تعيين تخطيط لوحة المستندات"
+              onClick={() => {
+                setDocsPanelPosition({ x: 120, y: 120 })
+                setDocsPanelSize({ width: 900, height: 700 })
+                setDocsPanelMax(false)
+                setDocsPanelDocked(false)
+                setDocsPanelDockPos('right')
+                try {
+                  localStorage.removeItem('documentsPanel:preferred')
+                  localStorage.removeItem('documentsPanel:position')
+                  localStorage.removeItem('documentsPanel:size')
+                  localStorage.removeItem('documentsPanel:maximized')
+                  localStorage.removeItem('documentsPanel:docked')
+                  localStorage.removeItem('documentsPanel:dockPosition')
+                } catch {}
+              }}
+              style={{ fontSize: '12px', padding: '6px 10px' }}
+            >
+              <div className="btn-content"><span className="btn-text">🔄 إعادة تعيين</span></div>
+            </button>
+          </div>
+          <AttachDocumentsPanel
+            orgId={documentsFor.org_id || ''}
+            transactionId={documentsFor.id}
+            projectId={documentsFor.project_id || undefined}
+          />
+        </DraggableResizablePanel>
+      )}
     </div>
   )
 }

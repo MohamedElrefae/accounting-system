@@ -9,7 +9,7 @@ import html2canvas from 'html2canvas'
 import { getCompanyConfig } from '../../services/company-config'
 import { fetchTransactionsDateRange } from '../../services/reports/common';
 import { fetchProfitLossReport, type PLFilters, type PLRow, type PLSummary } from '../../services/reports/profit-loss'
-import { getActiveOrgId } from '../../utils/org'
+import { getActiveOrgId, getActiveProjectId } from '../../utils/org'
 import { fetchOrganizations, type LookupOption } from '../../services/lookups'
 import Visibility from '@mui/icons-material/Visibility'
 import VisibilityOff from '@mui/icons-material/VisibilityOff'
@@ -55,7 +55,7 @@ export default function ProfitLoss() {
   const [includeZeros, setIncludeZeros] = useState<boolean>(false)
   const [uiLang, setUiLang] = useState<'ar' | 'en'>('ar')
   const [projects, setProjects] = useState<{ id: string; code: string; name: string }[]>([])
-  const [projectId, setProjectId] = useState<string>('')
+  const [projectId, setProjectId] = useState<string>(() => { try { return getActiveProjectId() || '' } catch { return '' } })
   const [companyName, setCompanyName] = useState<string>('')
   const [orgId, setOrgId] = useState<string>('')
   const [_orgOptions, _setOrgOptions] = useState<LookupOption[]>([])
@@ -76,6 +76,15 @@ export default function ProfitLoss() {
   useEffect(() => {
     try { localStorage.setItem('pl_numbersOnly', String(numbersOnly)) } catch {}
   }, [numbersOnly])
+
+  useEffect(() => {
+    try { const v = localStorage.getItem('pl:useGlobalProject'); if (v !== null) setPostedOnly(postedOnly) } catch {}
+  }, [])
+  useEffect(() => {
+    // Auto-sync with global project if enabled
+    const useGlobal = (()=>{ try { return localStorage.getItem('pl:useGlobalProject') === '1' } catch { return true } })()
+    if (useGlobal) { try { setProjectId(getActiveProjectId() || '') } catch {} }
+  }, [orgId])
 
   // Group rows by account type for better presentation
   const grouped = useMemo((): GroupedPLData[] => {

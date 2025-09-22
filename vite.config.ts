@@ -18,7 +18,8 @@ export default defineConfig(({ mode }) => ({
       enforce: 'pre',
       transform(code, id) {
         if (id.includes('@supabase/postgrest-js/dist/esm/wrapper.mjs')) {
-          return code.replace("import index from '../cjs/index.js'", "import * as index from '../cjs/index.js'")
+          const patched = code.replace("import index from '../cjs/index.js'", "import * as index from '../cjs/index.js'")
+          return { code: patched, map: null }
         }
         return null
       }

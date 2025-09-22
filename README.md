@@ -1,3 +1,28 @@
+# Accounting System – Fiscal Management Enhancements (Summary)
+
+This repository contains the enterprise fiscal year management implementation using React + Supabase.
+
+Highlights:
+- Fiscal schema and functions (Phase 1)
+- Opening balance import + validation UI (Phase 2)
+- Period management with checklists, closing, and reconciliation (Phase 3)
+- Construction dashboards and services (Phase 4)
+- Test scaffolding (Phase 5)
+
+Run locally:
+- Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.
+- `npm run dev`
+
+Notes:
+- SQL migrations mirrored under `supabase/migrations`.
+- Construction dashboards read from minimal schema tables added in Phase 4.
+
+Testing:
+- Placeholder tests are in `src/services/__tests__` and `src/components/__tests__`.
+- Add a test runner like Vitest or Jest with jsdom to execute component tests.
+- Suggested dev dependencies: vitest, @vitest/ui, @testing-library/react, @testing-library/jest-dom, jsdom.
+- Example scripts: "test": "vitest", "test:ui": "vitest --ui".
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

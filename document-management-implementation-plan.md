@@ -68,6 +68,8 @@ Ensure Arabic language support and proper foreign key relationships to existing 
 
 ### 1.3 Supabase Storage Configuration
 
+See also: docs/README-documents-storage-rls.md for the enforced upload flow and RLS expectations (must insert document + document_versions first, then upload to the exact storage_path).
+
 **Warp AI Prompt for Storage**:
 ```bash
 Configure Supabase Storage buckets for enterprise document management:

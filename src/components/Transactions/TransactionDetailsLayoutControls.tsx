@@ -31,6 +31,9 @@ export const DEFAULT_DETAIL_SECTIONS: DetailSection[] = [
   { id: 'submit_notes', label: 'ملاحظات الإرسال', type: 'audit' },
   { id: 'audit_trail', label: 'سجل الإجراءات', type: 'audit' },
   { id: 'approval_history', label: 'سجل الموافقات', type: 'audit' },
+  
+  // Documents section
+  { id: 'documents', label: 'المستندات المرفقة', type: 'info' },
 ];
 
 export interface TransactionDetailsConfig {

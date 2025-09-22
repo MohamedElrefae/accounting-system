@@ -13,6 +13,7 @@ import { getCompanyConfig } from '../../services/company-config'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import { supabase } from '../../utils/supabase'
+import { getActiveProjectId } from '../../utils/org'
 import './StandardFinancialStatements.css'
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
@@ -62,7 +63,7 @@ const GeneralLedger: React.FC = () => {
 
   const [accountId, setAccountId] = useState<string>('')
   const [orgId, setOrgId] = useState<string>('')
-  const [projectId, setProjectId] = useState<string>('')
+  const [projectId, setProjectId] = useState<string>(() => { try { return getActiveProjectId() || '' } catch { return '' } })
   const [classificationId, setClassificationId] = useState<string>('')
   const [analysisWorkItemId, setAnalysisWorkItemId] = useState<string>('')
   const [expensesCategoryId, setExpensesCategoryId] = useState<string>('')
@@ -117,11 +118,18 @@ const GeneralLedger: React.FC = () => {
   const [accountOptions, setAccountOptions] = useState<LookupOption[]>([])
   const [classificationOptions, setClassificationOptions] = useState<LookupOption[]>([])
   
+  useEffect(() => {
+    if (!useGlobalProjectGL) return
+    try { setProjectId(getActiveProjectId() || '') } catch {}
+  }, [useGlobalProjectGL, orgId])
+  useEffect(() => { try { localStorage.setItem('gl:useGlobalProject', useGlobalProjectGL ? '1' : '0') } catch {} }, [useGlobalProjectGL])
+
   // Advanced features
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [densityMode, setDensityMode] = useState<DensityMode>('normal')
   // Numbers-only (hide currency symbol) setting for exports
   const [numbersOnly, setNumbersOnly] = useState<boolean>(true)
+  const [useGlobalProjectGL, setUseGlobalProjectGL] = useState<boolean>(() => { try { return localStorage.getItem('gl:useGlobalProject') === '1' } catch { return true } })
   const debouncedSearch = useDebounced(searchTerm, 300)
   const searchInputRef = useRef<HTMLInputElement>(null)
   // Jump to account code (overview)

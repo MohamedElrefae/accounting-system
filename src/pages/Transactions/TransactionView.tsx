@@ -1,6 +1,8 @@
 import React from 'react'
 import type { TransactionRecord, TransactionAudit } from '../../services/transactions'
 import type { ApprovalHistoryRow } from '../../services/approvals'
+import AttachDocumentsPanel from '../../components/documents/AttachDocumentsPanel'
+import { WithPermission } from '../../components/Common/withPermission'
 
 interface Props {
   transaction: TransactionRecord
@@ -77,6 +79,18 @@ const TransactionView: React.FC<Props> = ({ transaction, audit, userNames, onClo
               <div><strong>التاريخ:</strong> {new Date(row.created_at).toLocaleString('ar-EG')}</div>
             </div>
           ))}
+        </div>
+
+        {/* Documents attachment panel */}
+        <div className="audit-title" style={{ marginTop: 12 }}>المستندات</div>
+        <div style={{ background: 'var(--mui-palette-background-paper)', border: '1px solid var(--mui-palette-divider)', borderRadius: 8, padding: 12, marginBottom: 16 }}>
+          <WithPermission permission="documents.view">
+            <AttachDocumentsPanel 
+              orgId={(transaction as any).org_id || (transaction as any).organization_id}
+              transactionId={transaction.id}
+              projectId={(transaction as any).project_id || undefined}
+            />
+          </WithPermission>
         </div>
 
         {approvalHistory && approvalHistory.length > 0 && (

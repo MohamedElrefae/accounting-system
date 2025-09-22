@@ -8,6 +8,7 @@ import { exportToExcel, exportToCSV } from '../../utils/UniversalExportManager'
 import type { UniversalTableData, UniversalTableColumn } from '../../utils/UniversalExportManager'
 import { getCompanyConfig } from '../../services/company-config'
 import { fetchProjects, fetchOrganizations, type LookupOption } from '../../services/lookups'
+import { getActiveProjectId } from '../../utils/org'
 
 /**
  * Trial Balance All Levels Report
@@ -51,7 +52,7 @@ export default function TrialBalanceAllLevels() {
   const [dateFrom, setDateFrom] = useState<string>(startOfYearISO())
   const [dateTo, setDateTo] = useState<string>(todayISO())
   const [postedOnly, setPostedOnly] = useState<boolean>(false)
-  const [projectId, setProjectId] = useState<string>('')
+  const [projectId, setProjectId] = useState<string>(() => { try { return getActiveProjectId() || '' } catch { return '' } })
   const [projectOptions, setProjectOptions] = useState<LookupOption[]>([])
   const [orgOptions, setOrgOptions] = useState<LookupOption[]>([])
   const [orgId, setOrgId] = useState<string>('')
@@ -93,6 +94,11 @@ export default function TrialBalanceAllLevels() {
   }
 
   const orgIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const useGlobal = (()=>{ try { return localStorage.getItem('tb:useGlobalProject') === '1' } catch { return true } })()
+    if (useGlobal) { try { setProjectId(getActiveProjectId() || '') } catch {} }
+  }, [orgId])
 
   // Persist numbersOnly like other pages
   useEffect(() => { try { const v = localStorage.getItem('tb_all_numbersOnly'); if (v !== null) setNumbersOnly(v === 'true') } catch { /* noop */ } }, [])

@@ -11,6 +11,8 @@ import type { ExpensesCategoryRow } from '../../types/sub-tree'
 import type { WorkItemRow } from '../../types/work-items'
 import './UnifiedTransactionDetailsPanel.css'
 import { TransactionLineItemsSection } from '../line-items/TransactionLineItemsSection'
+import AttachDocumentsPanel from '../documents/AttachDocumentsPanel'
+import { WithPermission } from '../Common/withPermission'
 
 export interface UnifiedTransactionDetailsPanelProps {
   transaction: TransactionRecord
@@ -899,16 +901,35 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
                           ) 
                         },
                       ] : []
+                    },
+                    documents: {
+                      title: 'المستندات المرفقة',
+                      fields: [
+                        {
+                          id: 'documents_panel',
+                          label: '',
+                          value: (
+                            <AttachDocumentsPanel 
+                              orgId={transaction.org_id || ''}
+                              transactionId={transaction.id}
+                              projectId={transaction.project_id || undefined}
+                            />
+                          )
+                        }
+                      ]
                     }
                   };
 
                   // Filter and order ALL sections based on configuration
                   return detailsConfig.sectionOrder
-                    .filter((sectionId: string) => 
-                      isSectionVisible(sectionId) && 
-                      (allSectionsData as any)[sectionId] && 
-                      ((allSectionsData as any)[sectionId].fields as any[]).length > 0
-                    )
+                    .filter((sectionId: string) => {
+                      // Always show documents section
+                      if (sectionId === 'documents') return true;
+                      
+                      return isSectionVisible(sectionId) && 
+                        (allSectionsData as any)[sectionId] && 
+                        ((allSectionsData as any)[sectionId].fields as any[]).length > 0;
+                    })
                     .map((sectionId: string) => {
                       const section = (allSectionsData as any)[sectionId] as { title: string; fields: Array<{ id: string; label: string; value: React.ReactNode; className?: string }>; };
                       const isFullWidth = detailsConfig.fullWidthSections.has(sectionId);

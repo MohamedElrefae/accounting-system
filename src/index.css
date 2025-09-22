@@ -92,9 +92,24 @@ button:focus-visible {
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-full: 9999px;
   --transition-fast: 0.2s ease;
   --font-size-sm: 0.9rem;
+  
+  /* Control bar specific variables */
+  --controlbar-bg: var(--surface);
+  --controlbar-border: var(--border);
+  
+  /* Shadow values */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  
+  /* Layout spacing */
+  --section-gap: 20px;
+  --toolbar-gap: 8px;
+  --control-gap: 12px;
+  --control-height: 40px;
 }
 
 html[data-theme='dark'] {
@@ -141,6 +156,29 @@ html[data-theme='dark'] {
   --info-strong: #4A90FF;
   --chip-bg: rgba(255, 255, 255, 0.1);
   --row-alt-bg: rgba(255, 255, 255, 0.03);
+  
+  /* Radius values */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+  --transition-fast: 0.2s ease;
+  --font-size-sm: 0.9rem;
+  
+  /* Control bar specific variables */
+  --controlbar-bg: var(--surface);
+  --controlbar-border: var(--border);
+  
+  /* Shadow values */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  
+  /* Layout spacing */
+  --section-gap: 20px;
+  --toolbar-gap: 8px;
+  --control-gap: 12px;
+  --control-height: 40px;
 }
 
 html[data-theme='light'] {
@@ -185,6 +223,29 @@ html[data-theme='light'] {
   --info-strong: #1A5FE6;
   --chip-bg: #e5e7eb;
   --row-alt-bg: #f7fafc;
+  
+  /* Radius values */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+  --transition-fast: 0.2s ease;
+  --font-size-sm: 0.9rem;
+  
+  /* Control bar specific variables */
+  --controlbar-bg: var(--surface);
+  --controlbar-border: var(--border);
+  
+  /* Shadow values - lighter for light theme */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  
+  /* Layout spacing */
+  --section-gap: 20px;
+  --toolbar-gap: 8px;
+  --control-gap: 12px;
+  --control-height: 40px;
 }
 
 /* Print styles to ensure table headers repeat on every page and clean pagination */

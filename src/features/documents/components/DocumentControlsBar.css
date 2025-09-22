@@ -1,0 +1,200 @@
+/* DocumentControlsBar styles using theme tokens like AccountsTree */
+
+/* Ultimate Enhanced Button Styles */
+.ultimate-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  min-width: 85px;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  user-select: none;
+  backdrop-filter: blur(10px);
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.1),
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.ultimate-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.ultimate-btn:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 4px 8px rgba(0, 0, 0, 0.15),
+    0 2px 4px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.ultimate-btn:not(:disabled):active {
+  transform: translateY(0);
+  transition-duration: 0.1s;
+}
+
+.btn-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  position: relative;
+  z-index: 2;
+}
+
+.btn-icon {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.btn-icon.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.btn-text {
+  white-space: nowrap;
+  line-height: 1;
+  font-size: 0.8rem;
+  margin-left: 0.2rem;
+}
+
+/* Add Button - Success */
+.ultimate-btn-add {
+  background: linear-gradient(135deg, var(--success) 0%, var(--success-strong) 100%);
+  color: var(--on-accent);
+}
+
+.ultimate-btn-add::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--success-strong) 0%, var(--success) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.ultimate-btn-add:not(:disabled):hover::before {
+  opacity: 1;
+}
+
+/* Edit Button - Brand Accent */
+.ultimate-btn-edit {
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-primary-hover) 100%);
+  color: var(--on-accent);
+}
+
+.ultimate-btn-edit::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--accent-primary-hover) 0%, var(--accent-primary) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.ultimate-btn-edit:not(:disabled):hover::before {
+  opacity: 1;
+}
+
+/* Warning Button - Orange */
+.ultimate-btn-warning {
+  background: linear-gradient(135deg, var(--warning) 0%, var(--warning-strong) 100%);
+  color: var(--on-accent);
+}
+
+.ultimate-btn-warning::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--warning-strong) 0%, var(--warning) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.ultimate-btn-warning:not(:disabled):hover::before {
+  opacity: 1;
+}
+
+/* Button States */
+.ultimate-btn.loading {
+  pointer-events: none;
+}
+
+.ultimate-btn.loading::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: loading-pulse 1.5s linear infinite;
+}
+
+@keyframes loading-pulse {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.ultimate-btn.success {
+  background: linear-gradient(135deg, var(--success) 0%, var(--success-strong) 100%) !important;
+  color: var(--on-accent);
+}
+
+.ultimate-btn.success .btn-icon {
+  animation: checkmark 0.6s ease-in-out;
+}
+
+@keyframes checkmark {
+  0% { transform: scale(0) rotate(45deg); }
+  50% { transform: scale(1.2) rotate(45deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+.ultimate-btn.error {
+  background: linear-gradient(135deg, var(--error) 0%, var(--error-strong) 100%) !important;
+  color: var(--on-accent);
+}
+
+.ultimate-btn.error .btn-icon {
+  animation: shake 0.6s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+/* Spinning animation for mobile menu loading icons */
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .ultimate-btn {
+    min-height: 32px;
+    padding: 0.4rem 0.8rem;
+  }
+  
+  .btn-text {
+    font-size: 0.8rem;
+  }
+}

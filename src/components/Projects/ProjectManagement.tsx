@@ -1,4 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useHasPermission } from '../../hooks/useHasPermission';
+import { getProjectDocumentCounts } from '../../services/documents';
+import { Tooltip } from '@mui/material';
+import useAppStore from '../../store/useAppStore';
 import { FolderOpen, Plus, Edit, Trash2, Building, Calendar, DollarSign } from 'lucide-react';
 import { getActiveProjects, createProject, updateProject, deleteProject, type Project } from '../../services/projects';
 import { getOrganizations, type Organization } from '../../services/organization';
@@ -35,6 +40,11 @@ const ProjectManagement: React.FC = () => {
   });
 
   const { showToast } = useToast();
+  const navigate = useNavigate();
+  const hasPerm = useHasPermission();
+  const canViewDocs = hasPerm('documents.view');
+  const [docCounts, setDocCounts] = useState<Record<string, number>>({});
+  const { language } = useAppStore();
 
   useEffect(() => {
     loadData();
@@ -49,6 +59,13 @@ const ProjectManagement: React.FC = () => {
       ]);
       setProjects(projectsData);
       setOrganizations(orgsData);
+      try {
+        const ids = projectsData.map(p => p.id);
+        const counts = await getProjectDocumentCounts(ids);
+        setDocCounts(counts);
+      } catch {
+        // best-effort; ignore count failures
+      }
     } catch (error) {
       console.error('Error loading data:', error);
       showToast('فشل تحميل البيانات', { severity: 'error' });
@@ -204,7 +221,7 @@ const ProjectManagement: React.FC = () => {
                   <div className={styles.cardHeader}>
                     <div className={styles.projectInfo}>
                       <h3>{project.code}</h3>
-                      <h4>{project.name}</h4>
+                      <h4>{project.name} {canViewDocs && (docCounts[project.id] ? `• ${docCounts[project.id]} ${language === 'ar' ? 'مستند' : 'docs'}` : '')}</h4>
                     </div>
                     <div className={`${styles.statusBadge} ${getStatusColor(project.status) === 'status-active' ? styles.statusActive : getStatusColor(project.status) === 'status-completed' ? styles.statusCompleted : styles.statusInactive}`}>
                       {getStatusText(project.status)}
@@ -254,6 +271,19 @@ const ProjectManagement: React.FC = () => {
                       <Edit size={16} />
                       تعديل
                     </button>
+{canViewDocs ? (
+                      <button className={`${styles.actionButton}`} onClick={() => navigate(`/projects/${project.id}/attachments`)}>
+                        📎 المرفقات
+                      </button>
+                    ) : (
+                      <Tooltip title={language === 'ar' ? 'تحتاج لصلاحية documents.view' : 'Requires documents.view permission'}>
+                        <span>
+                          <button className={`${styles.actionButton}`} disabled>
+                            📎 المرفقات
+                          </button>
+                        </span>
+                      </Tooltip>
+                    )}
                     <button className={`${styles.actionButton} ${styles.deleteButton}`} onClick={() => handleDelete(project)}>
                       <Trash2 size={16} />
                       حذف

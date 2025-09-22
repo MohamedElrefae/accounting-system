@@ -425,6 +425,56 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ]
   },
   {
+    key: 'documents',
+    name: 'Document Management',
+    nameAr: 'إدارة المستندات',
+    icon: 'Description',
+    permissions: [
+      {
+        name: 'documents.view',
+        nameAr: 'عرض المستندات',
+        description: 'View documents',
+        descriptionAr: 'عرض المستندات',
+        category: 'documents'
+      },
+      {
+        name: 'documents.create',
+        nameAr: 'إنشاء المستندات',
+        description: 'Create documents',
+        descriptionAr: 'إنشاء مستندات',
+        category: 'documents'
+      },
+      {
+        name: 'documents.update',
+        nameAr: 'تحديث المستندات',
+        description: 'Update documents',
+        descriptionAr: 'تحديث مستندات',
+        category: 'documents'
+      },
+      {
+        name: 'documents.delete',
+        nameAr: 'حذف المستندات',
+        description: 'Delete documents',
+        descriptionAr: 'حذف مستندات',
+        category: 'documents'
+      },
+      {
+        name: 'documents.manage',
+        nameAr: 'إدارة المستندات والصلاحيات',
+        description: 'Manage documents and permissions',
+        descriptionAr: 'إدارة المستندات والصلاحيات',
+        category: 'documents'
+      },
+      {
+        name: 'documents.approve',
+        nameAr: 'اعتماد المستندات',
+        description: 'Approve submitted documents',
+        descriptionAr: 'اعتماد المستندات المقدمة',
+        category: 'documents'
+      }
+    ]
+  },
+  {
     key: 'settings',
     name: 'System Settings',
     nameAr: 'إعدادات النظام',
@@ -533,6 +583,14 @@ export const PERMISSIONS = {
   SETTINGS_UPDATE: 'settings.update',
   SETTINGS_BACKUP: 'settings.backup',
   SETTINGS_AUDIT: 'settings.audit',
+
+  // Documents
+  DOCUMENTS_VIEW: 'documents.view',
+  DOCUMENTS_CREATE: 'documents.create',
+  DOCUMENTS_UPDATE: 'documents.update',
+  DOCUMENTS_DELETE: 'documents.delete',
+  DOCUMENTS_MANAGE: 'documents.manage',
+  DOCUMENTS_APPROVE: 'documents.approve',
 } as const;
 
 export type PermissionName = typeof PERMISSIONS[keyof typeof PERMISSIONS];

@@ -4,12 +4,15 @@ import Toolbar from '@mui/material/Toolbar';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import Badge from '@mui/material/Badge';
+import Chip from '@mui/material/Chip';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
 import Tooltip from '@mui/material/Tooltip';
 import Divider from '@mui/material/Divider';
+import Popover from '@mui/material/Popover';
+import Stack from '@mui/material/Stack';
 import MenuIcon from '@mui/icons-material/Menu';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import AccountCircle from '@mui/icons-material/AccountCircle';
@@ -18,7 +21,11 @@ import Brightness7 from '@mui/icons-material/Brightness7';
 import LanguageIcon from '@mui/icons-material/Language';
 import SettingsIcon from '@mui/icons-material/Settings';
 import LogoutIcon from '@mui/icons-material/ExitToApp';
+import Switch from '@mui/material/Switch';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import PaletteIcon from '@mui/icons-material/Palette';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import useAppStore from '../../store/useAppStore';
 import { useCustomTheme } from '../../contexts/ThemeContext';
 
@@ -26,6 +33,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useUserProfile } from '../../contexts/UserProfileContext';
 // import { ThemeSettings } from "./ThemeSettings"; // Temporarily disabled
 import { mergedTranslations as translations } from '../../data/mockData';
+import OrgSelector from '../organizations/OrgSelector';
+import ProjectSelector from '../organizations/ProjectSelector';
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -43,10 +52,52 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
 
   const [profileMenuAnchor, setProfileMenuAnchor] = useState<null | HTMLElement>(null);
   const [notificationMenuAnchor, setNotificationMenuAnchor] = useState<null | HTMLElement>(null);
+  const [scopeAnchor, setScopeAnchor] = useState<null | HTMLElement>(null);
   // const [themeSettingsOpen, setThemeSettingsOpen] = useState(false); // Temporarily disabled
   const isRtl = language === 'ar';
 
   const t = translations[language];
+
+  const [activeProjectId, setActiveProjectId] = React.useState<string | null>(() => {
+    try { return localStorage.getItem('project_id'); } catch { return null }
+  });
+  React.useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'project_id') {
+        setActiveProjectId(e.newValue);
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  // Global toggle: link pages to the Project selector
+  const [linkToProject, setLinkToProject] = React.useState<boolean>(() => {
+    try { return localStorage.getItem('global:useProjectScope') !== '0' } catch { return true }
+  });
+  // Persist compact popover preference (open/closed last state)
+  const [scopeOpen, setScopeOpen] = React.useState<boolean>(() => {
+    try { return localStorage.getItem('topbar_scope_open') === '1'; } catch { return false }
+  });
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('global:useProjectScope', linkToProject ? '1' : '0');
+      const keys = [
+        'documents:useGlobalProject',
+        'transactions:useGlobalProject',
+        'gl:useGlobalProject',
+        'pl:useGlobalProject',
+        'bs:useGlobalProject',
+        'ae:useGlobalProject',
+        'tb:useGlobalProject',
+      ];
+      for (const k of keys) localStorage.setItem(k, linkToProject ? '1' : '0');
+    } catch {}
+  }, [linkToProject]);
+
+  React.useEffect(() => {
+    try { localStorage.setItem('topbar_scope_open', scopeOpen ? '1' : '0'); } catch {}
+  }, [scopeOpen]);
 
   // Force component update when language changes
   React.useEffect(() => {
@@ -193,6 +244,22 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
           gap: 0.5,
           zIndex: 10
         }}>
+          {/* Compact Scope Chip -> opens filters popover */}
+          <Chip
+            size="small"
+            color="default"
+            onClick={(e) => { setScopeAnchor(e.currentTarget); setScopeOpen(true); }}
+            onDelete={() => { setScopeOpen((v)=>!v); if (scopeOpen) setScopeAnchor(null); }}
+            deleteIcon={scopeOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            label={language === 'ar' ? (activeProjectId ? 'نطاق: مشروع' : 'نطاق: كل المشاريع') : (activeProjectId ? 'Scope: Project' : 'Scope: All projects')}
+            sx={{
+              border: '1px solid',
+              borderColor: 'divider',
+              bgcolor: 'background.paper',
+              '&:hover': { bgcolor: 'action.hover' },
+              mr: 1,
+            }}
+          />
           {/* Theme Settings - Modern Glass Effect */}
           <Tooltip title="Theme Settings" placement="bottom">
             <IconButton 
@@ -374,6 +441,36 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
         </Box>
       </Toolbar>
     </AppBar>
+
+    {/* Scope Popover - professional compact/expanded filters */}
+    <Popover
+      open={scopeOpen}
+      anchorEl={scopeAnchor}
+      onClose={() => { setScopeOpen(false); setScopeAnchor(null); }}
+      anchorOrigin={{ vertical: 'bottom', horizontal: isRtl ? 'left' : 'right' }}
+      transformOrigin={{ vertical: 'top', horizontal: isRtl ? 'left' : 'right' }}
+      PaperProps={{ sx: { p: 2, minWidth: 520, maxWidth: 640 } }}
+    >
+      <Stack direction="column" spacing={2} sx={{ direction: isRtl ? 'rtl' : 'ltr' }}>
+        <Stack direction={isRtl ? 'row-reverse' : 'row'} spacing={2} alignItems="center">
+          <Box sx={{ minWidth: 220, flex: '1 1 220px' }}>
+            <OrgSelector size="small" label={language === 'ar' ? 'المؤسسة' : 'Organization'} />
+          </Box>
+          <Box sx={{ minWidth: 220, flex: '1 1 220px' }}>
+            <ProjectSelector size="small" label={language === 'ar' ? 'المشروع' : 'Project'} allowAll />
+          </Box>
+        </Stack>
+        <Box>
+          <FormControlLabel
+            control={<Switch size="small" checked={linkToProject} onChange={(e)=>setLinkToProject(e.target.checked)} />}
+            label={language === 'ar' ? 'ربط الصفحات بالمشروع' : 'Link pages to Project'}
+          />
+          {!activeProjectId && (
+            <Chip size="small" variant="outlined" color="info" label={language === 'ar' ? 'كل المشاريع' : 'All projects'} sx={{ ml: isRtl ? 0 : 1, mr: isRtl ? 1 : 0 }} />
+          )}
+        </Box>
+      </Stack>
+    </Popover>
 
     {/* Profile Menu */}
     <Menu

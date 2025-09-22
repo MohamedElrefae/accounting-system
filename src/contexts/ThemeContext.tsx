@@ -141,6 +141,32 @@ export const CustomThemeProvider: React.FC<ThemeProviderProps> = ({ children }) 
     set('--chip-bg', p?.action?.selected || (mode === 'dark' ? 'rgba(255,255,255,0.10)' : '#e5e7eb'));
     set('--row-alt-bg', p?.action?.selected || (mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#f7fafc'));
     set('--info-bg', mode === 'dark' ? 'rgba(32, 118, 255, 0.08)' : 'rgba(32, 118, 255, 0.08)');
+
+    // Layout and Control System tokens
+    // Shape/radius
+    set('--radius-sm', '8px');
+    set('--radius-md', '12px');
+    set('--radius-lg', '16px');
+    set('--radius-xl', '20px');
+
+    // Shadows
+    set('--shadow-sm', '0 1px 3px rgba(0,0,0,0.08)');
+    set('--shadow-md', '0 4px 12px rgba(0,0,0,0.12)');
+    set('--shadow-lg', '0 10px 24px rgba(0,0,0,0.16)');
+
+    // Controls sizing
+    set('--control-height', '40px');
+    set('--control-gap', '12px');
+    set('--section-gap', '16px');
+    set('--toolbar-gap', '24px');
+
+    // Containers
+    set('--container-max', '1600px');
+    set('--content-padding', '16px');
+
+    // ControlBar colors
+    set('--controlbar-bg', p?.background?.paper);
+    set('--controlbar-border', p?.divider);
   }, [theme, themeMode]);
 
   const contextValue: ThemeContextType = {

@@ -7,6 +7,7 @@ import { tableColWidths, type ExplorerMode } from '../../components/Reports/Acco
 import ReportTreeView from '../../components/TreeView/ReportTreeView'
 import { fetchProjects, fetchOrganizations, type LookupOption, fetchAccountsMinimal } from '../../services/lookups'
 import { getCompanyConfig } from '../../services/company-config'
+import { getActiveProjectId } from '../../utils/org'
 import SearchableSelect, { type SearchableSelectOption } from '../../components/Common/SearchableSelect'
 import { getAllTransactionClassifications, type TransactionClassification } from '../../services/transaction-classification'
 import { getExpensesCategoriesList } from '../../services/sub-tree'
@@ -98,7 +99,7 @@ const AccountExplorerReport: React.FC = () => {
   const [orgOptions, setOrgOptions] = useState<LookupOption[]>([])
   const [projectOptions, setProjectOptions] = useState<LookupOption[]>([])
   const [orgId, setOrgId] = useState<string>('')
-  const [projectId, setProjectId] = useState<string>('')
+  const [projectId, setProjectId] = useState<string>(() => { try { return getActiveProjectId() || '' } catch { return '' } })
   const orgIdRef = useRef<string | null>(null)
 
   // Data
@@ -142,6 +143,11 @@ const AccountExplorerReport: React.FC = () => {
   const [amountMin, setAmountMin] = useState<string>('')
   const [amountMax, setAmountMax] = useState<string>('')
   const [searchTerm, setSearchTerm] = useState<string>('')
+
+  useEffect(() => {
+    const useGlobal = (()=>{ try { return localStorage.getItem('ae:useGlobalProject') === '1' } catch { return true } })()
+    if (useGlobal) { try { setProjectId(getActiveProjectId() || '') } catch {} }
+  }, [orgId])
 
   // Load orgs, projects, default org, company currency
   useEffect(() => {
