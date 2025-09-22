@@ -32,6 +32,8 @@ export default function OpeningBalanceImportPage() {
   const [status, setStatus] = useState<{ status?: string; totalRows?: number; successRows?: number; failedRows?: number; importId?: string, errorReport?: any[] }>()
   const [channel, setChannel] = useState<ReturnType<typeof supabase.channel> | null>(null)
   const [report, setReport] = useState<ValidationReport | null>(null)
+  const [previewRows, setPreviewRows] = useState<any[]>([])
+  const [clientIssues, setClientIssues] = useState<{errors:any[]; warnings:any[]}|null>(null)
 
   const disabled = useMemo(() => busy || !orgId || !fiscalYearId || !file, [busy, orgId, fiscalYearId, file])
 
@@ -171,14 +173,45 @@ export default function OpeningBalanceImportPage() {
                     <input
                       type="file"
                       accept=".xlsx,.xls"
-                      onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                      onChange={async (e) => {
+                        const f = e.target.files?.[0] ?? null
+                        setFile(f)
+                        setPreviewRows([])
+                        setClientIssues(null)
+                        if (f) {
+                          // Client-side preview using xlsx
+                          try {
+                            const buf = await f.arrayBuffer()
+                            const XLSX = await import('xlsx')
+                            const wb = XLSX.read(buf, { type: 'array' })
+                            const sh = wb.Sheets[wb.SheetNames[0]]
+                            const rows = XLSX.utils.sheet_to_json(sh, { defval: null }) as any[]
+                            setPreviewRows(rows.slice(0, 100))
+                          } catch {}
+                        }
+                      }}
                     />
                     {file && (
                       <Typography variant="caption" color="text.secondary">{file.name}</Typography>
                     )}
                   </Stack>
                 </Paper>
-                <Button variant="contained" disabled={!!disabled} onClick={onImport}>Import</Button>
+                <Stack direction="row" spacing={1}>
+                  <Button variant="outlined" onClick={() => {
+                    try {
+                      const { validateOpeningBalanceRows } = require('@/utils/csv')
+                      const normalized = previewRows.map((r:any) => ({
+                        account_code: String(r.account_code || r.code || r.Account || ''),
+                        amount: Number(r.amount ?? r.Amount ?? r.debit ?? 0),
+                        cost_center_code: r.cost_center_code ?? r.cc ?? undefined,
+                        project_code: r.project_code ?? r.project ?? undefined,
+                      }))
+                      const result = validateOpeningBalanceRows(normalized)
+                      setClientIssues({ errors: result.errors, warnings: result.warnings })
+                    } catch {}
+                  }}>Validate</Button>
+                  <Button variant="contained" disabled={!!disabled} onClick={onImport}>Import</Button>
+                </Stack>
               </Stack>
             </Grid>
             <Grid item xs={12} md={8}>
@@ -194,7 +227,38 @@ export default function OpeningBalanceImportPage() {
                   successRows={status?.successRows}
                   failedRows={status?.failedRows}
                 />
+                {clientIssues && (
+                  <Paper variant="outlined" sx={{ p: 2 }}>
+                    <Typography variant="subtitle2">Client validation</Typography>
+                    <Typography variant="caption" color="text.secondary">Errors: {clientIssues.errors.length} • Warnings: {clientIssues.warnings.length}</Typography>
+                  </Paper>
+                )}
                 <ValidationResults report={report} />
+                {previewRows.length > 0 && (
+                  <Paper variant="outlined" sx={{ p: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Preview (first 100 rows)</Typography>
+                    <Box sx={{ maxHeight: 280, overflow: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr>
+                            {Object.keys(previewRows[0]).map((k) => (
+                              <th key={k} style={{ textAlign: 'left', padding: 4, borderBottom: '1px solid #eee' }}>{k}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {previewRows.map((row, i) => (
+                            <tr key={i}>
+                              {Object.values(row).map((v, j) => (
+                                <td key={j} style={{ padding: 4, borderBottom: '1px solid #f5f5f5' }}>{String(v ?? '')}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </Box>
+                  </Paper>
+                )}
                 {status?.errorReport && status.errorReport.length > 0 && (
                   <Button
                     variant="outlined"

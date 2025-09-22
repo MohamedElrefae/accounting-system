@@ -49,6 +49,7 @@ This document captures the plan, progress, and remaining work for the recent enh
 - Fiscal Year Dashboard
   - Quick Links to all fiscal pages above
   - Status snapshot tiles (open/locked/closed/imports/warnings/errors)
+  - Loading and error states for data fetching
 
 - Period Manager Enhancements
   - Details drawer with:
@@ -59,6 +60,7 @@ This document captures the plan, progress, and remaining work for the recent enh
 
 - Opening Balance Import Page
   - UI scaffolding for upload/validate/import flow (stub actions retained)
+  - Client-side Excel preview (first 100 rows) and local validation (missing account_code, invalid amount, zero warnings)
 
 - Additional Fiscal Scaffolds
   - Validation Rule Manager
@@ -156,7 +158,7 @@ This document captures the plan, progress, and remaining work for the recent enh
   - npm run build → succeeds
   - npm run preview → pages render from dist and navigate properly
 - Tests (incremental)
-  - Run unit tests for CSV utils and core services
+  - Run unit tests for CSV utils and core services (added: opening-balance.validation test, fiscal dashboard summarizer test)
 
 ## 8) Next Steps
 

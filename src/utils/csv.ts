@@ -18,3 +18,35 @@ export function reconciliationToCsv(rec: { glTotal: number; openingTotal: number
   ]
   return [header.join(','), ...rows.map(r => r.join(','))].join('\n')
 }
+
+export type OpeningBalanceRow = {
+  account_code: string
+  amount: number
+  cost_center_code?: string
+  project_code?: string
+}
+
+export type OpeningBalanceClientValidation = {
+  ok: boolean
+  errors: { code: string; message: string; rowIndex: number }[]
+  warnings: { code: string; message: string; rowIndex: number }[]
+  totals: { count: number; sum: number }
+}
+
+export function validateOpeningBalanceRows(rows: OpeningBalanceRow[]): OpeningBalanceClientValidation {
+  const errors: OpeningBalanceClientValidation['errors'] = []
+  const warnings: OpeningBalanceClientValidation['warnings'] = []
+  let sum = 0
+  rows.forEach((r, i) => {
+    if (!r.account_code) errors.push({ code: 'E_ACC_CODE', message: 'Missing account_code', rowIndex: i })
+    if (typeof r.amount !== 'number' || Number.isNaN(r.amount)) errors.push({ code: 'E_AMOUNT', message: 'Invalid amount', rowIndex: i })
+    if (typeof r.amount === 'number') sum += r.amount || 0
+    if (r.amount === 0) warnings.push({ code: 'W_ZERO', message: 'Zero amount', rowIndex: i })
+  })
+  return {
+    ok: errors.length === 0,
+    errors,
+    warnings,
+    totals: { count: rows.length, sum }
+  }
+}
