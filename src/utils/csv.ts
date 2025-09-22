@@ -33,6 +33,29 @@ export type OpeningBalanceClientValidation = {
   totals: { count: number; sum: number }
 }
 
+export type OpeningBalanceMapping = {
+  account_code?: string
+  amount?: string
+  cost_center_code?: string
+  project_code?: string
+}
+
+export function normalizeOpeningBalanceRows(raw: any[], mapping: OpeningBalanceMapping): OpeningBalanceRow[] {
+  const map = (name?: string) => (name || '').trim()
+  return raw.map((r) => {
+    const accKey = map(mapping.account_code)
+    const amtKey = map(mapping.amount)
+    const ccKey = map(mapping.cost_center_code)
+    const prjKey = map(mapping.project_code)
+    return {
+      account_code: String(accKey ? r[accKey] ?? '' : ''),
+      amount: Number(amtKey ? r[amtKey] ?? 0 : 0),
+      cost_center_code: ccKey ? (r[ccKey] as any) ?? undefined : undefined,
+      project_code: prjKey ? (r[prjKey] as any) ?? undefined : undefined,
+    }
+  })
+}
+
 export function validateOpeningBalanceRows(rows: OpeningBalanceRow[]): OpeningBalanceClientValidation {
   const errors: OpeningBalanceClientValidation['errors'] = []
   const warnings: OpeningBalanceClientValidation['warnings'] = []

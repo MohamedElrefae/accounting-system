@@ -61,6 +61,7 @@ This document captures the plan, progress, and remaining work for the recent enh
 - Opening Balance Import Page
   - UI scaffolding for upload/validate/import flow (stub actions retained)
   - Client-side Excel preview (first 100 rows) and local validation (missing account_code, invalid amount, zero warnings)
+  - Column mapping UI to select headers for account_code, amount, cost_center_code, project_code; normalization helper + tests
 
 - Additional Fiscal Scaffolds
   - Validation Rule Manager

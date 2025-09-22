@@ -10,6 +10,10 @@ import {
   TextField,
   Typography,
   Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import DownloadIcon from '@mui/icons-material/Download'
@@ -34,6 +38,7 @@ export default function OpeningBalanceImportPage() {
   const [report, setReport] = useState<ValidationReport | null>(null)
   const [previewRows, setPreviewRows] = useState<any[]>([])
   const [clientIssues, setClientIssues] = useState<{errors:any[]; warnings:any[]}|null>(null)
+  const [mapping, setMapping] = useState<{ account_code?: string; amount?: string; cost_center_code?: string; project_code?: string }>({})
 
   const disabled = useMemo(() => busy || !orgId || !fiscalYearId || !file, [busy, orgId, fiscalYearId, file])
 
@@ -186,6 +191,13 @@ export default function OpeningBalanceImportPage() {
                             const wb = XLSX.read(buf, { type: 'array' })
                             const sh = wb.Sheets[wb.SheetNames[0]]
                             const rows = XLSX.utils.sheet_to_json(sh, { defval: null }) as any[]
+                            const head = rows[0] ? Object.keys(rows[0]) : []
+                            setMapping((m) => ({
+                              account_code: m.account_code || head.find(h => /acc|code/i.test(h)) || head[0],
+                              amount: m.amount || head.find(h => /amount|debit|balance/i.test(h)) || head[1],
+                              cost_center_code: m.cost_center_code || head.find(h => /cost.*center|cc/i.test(h)) || undefined,
+                              project_code: m.project_code || head.find(h => /project/i.test(h)) || undefined,
+                            }))
                             setPreviewRows(rows.slice(0, 100))
                           } catch {}
                         }
@@ -196,16 +208,36 @@ export default function OpeningBalanceImportPage() {
                     )}
                   </Stack>
                 </Paper>
+                {/* Column Mapping */}
+                {previewRows.length > 0 && (
+                  <Paper variant="outlined" sx={{ p: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Column Mapping</Typography>
+                    <Grid container spacing={2}>
+                      {['account_code','amount','cost_center_code','project_code'].map((key) => (
+                        <Grid item xs={12} sm={6} key={key}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>{key}</InputLabel>
+                            <Select
+                              label={key}
+                              value={(mapping as any)[key] || ''}
+                              onChange={(e) => setMapping(prev => ({ ...prev, [key]: e.target.value }))}
+                            >
+                              {(previewRows[0] ? Object.keys(previewRows[0]) : []).map((h) => (
+                                <MenuItem key={h} value={h}>{h}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Paper>
+                )}
+
                 <Stack direction="row" spacing={1}>
                   <Button variant="outlined" onClick={() => {
                     try {
-                      const { validateOpeningBalanceRows } = require('@/utils/csv')
-                      const normalized = previewRows.map((r:any) => ({
-                        account_code: String(r.account_code || r.code || r.Account || ''),
-                        amount: Number(r.amount ?? r.Amount ?? r.debit ?? 0),
-                        cost_center_code: r.cost_center_code ?? r.cc ?? undefined,
-                        project_code: r.project_code ?? r.project ?? undefined,
-                      }))
+                      const { normalizeOpeningBalanceRows, validateOpeningBalanceRows } = require('@/utils/csv')
+                      const normalized = normalizeOpeningBalanceRows(previewRows, mapping)
                       const result = validateOpeningBalanceRows(normalized)
                       setClientIssues({ errors: result.errors, warnings: result.warnings })
                     } catch {}
