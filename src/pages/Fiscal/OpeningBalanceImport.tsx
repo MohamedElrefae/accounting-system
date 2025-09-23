@@ -272,6 +272,17 @@ export default function OpeningBalanceImportPage() {
                       setClientIssues({ errors: result.errors, warnings: result.warnings })
                     } catch {}
                   }}>Validate</Button>
+                  <Button variant="outlined" disabled={!mapping.account_code || !mapping.amount || previewRows.length===0} onClick={() => {
+                    try {
+                      const { normalizeOpeningBalanceRows } = require('@/utils/csv')
+                      const { simulateOpeningBalanceImport } = require('@/services/OpeningBalanceDryRun')
+                      const normalized = normalizeOpeningBalanceRows(previewRows, mapping)
+                      const sim = simulateOpeningBalanceImport(normalized)
+                      setStatus({ status: 'dry-run', totalRows: sim.summary.total, successRows: sim.summary.success, failedRows: sim.summary.errors })
+                      // Reuse clientIssues panel to present warnings/errors count quickly
+                      setClientIssues({ errors: new Array(sim.summary.errors).fill({}), warnings: new Array(sim.summary.warnings).fill({}) })
+                    } catch {}
+                  }}>Dry Run</Button>
                   <Button variant="contained" disabled={!!disabled} onClick={onImport}>Import</Button>
                   {previewRows.length>0 && mapping.account_code && mapping.amount && (
                     <Typography variant="caption" color="success.main">Mapping Complete</Typography>
