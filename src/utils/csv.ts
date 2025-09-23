@@ -147,6 +147,32 @@ export type OpeningBalanceMapping = {
   project_code?: string
 }
 
+export function guessOpeningBalanceMapping(headers: string[]): OpeningBalanceMapping {
+  const inHeaders = (patterns: RegExp[]) => headers.find(h => patterns.some(p => p.test(h)))
+  const acc = inHeaders([
+    /acc|account|code/i,
+    /الحساب|رمز/i,
+  ])
+  const amt = inHeaders([
+    /amount|debit|balance|value/i,
+    /المبلغ|رصيد|مدين/i,
+  ])
+  const cc = inHeaders([
+    /cost.*center|cc/i,
+    /مركز.*تكلفة/i,
+  ])
+  const prj = inHeaders([
+    /project/i,
+    /مشروع/i,
+  ])
+  return {
+    account_code: acc || headers[0],
+    amount: amt || headers[1],
+    cost_center_code: cc || undefined,
+    project_code: prj || undefined,
+  }
+}
+
 export function normalizeOpeningBalanceRows(raw: any[], mapping: OpeningBalanceMapping): OpeningBalanceRow[] {
   const map = (name?: string) => (name || '').trim()
   return raw.map((r) => {

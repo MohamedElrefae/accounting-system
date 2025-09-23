@@ -192,11 +192,13 @@ export default function OpeningBalanceImportPage() {
                               const { parseCsv } = await import('@/utils/csv')
                               const rows = parseCsv(text)
                               const head = rows[0] ? Object.keys(rows[0]) : []
+                              const { guessOpeningBalanceMapping } = await import('@/utils/csv')
+                              const guessed = guessOpeningBalanceMapping(head)
                               setMapping((m) => ({
-                                account_code: m.account_code || head.find(h => /acc|code/i.test(h)) || head[0],
-                                amount: m.amount || head.find(h => /amount|debit|balance/i.test(h)) || head[1],
-                                cost_center_code: m.cost_center_code || head.find(h => /cost.*center|cc/i.test(h)) || undefined,
-                                project_code: m.project_code || head.find(h => /project/i.test(h)) || undefined,
+                                account_code: m.account_code || guessed.account_code,
+                                amount: m.amount || guessed.amount,
+                                cost_center_code: m.cost_center_code || guessed.cost_center_code,
+                                project_code: m.project_code || guessed.project_code,
                               }))
                               setPreviewRows(rows.slice(0, 100))
                             } else {
@@ -206,11 +208,13 @@ export default function OpeningBalanceImportPage() {
                             const sh = wb.Sheets[wb.SheetNames[0]]
                             const rows = XLSX.utils.sheet_to_json(sh, { defval: null }) as any[]
                             const head = rows[0] ? Object.keys(rows[0]) : []
+                            const { guessOpeningBalanceMapping } = await import('@/utils/csv')
+                            const guessed = guessOpeningBalanceMapping(head)
                             setMapping((m) => ({
-                              account_code: m.account_code || head.find(h => /acc|code/i.test(h)) || head[0],
-                              amount: m.amount || head.find(h => /amount|debit|balance/i.test(h)) || head[1],
-                              cost_center_code: m.cost_center_code || head.find(h => /cost.*center|cc/i.test(h)) || undefined,
-                              project_code: m.project_code || head.find(h => /project/i.test(h)) || undefined,
+                              account_code: m.account_code || guessed.account_code,
+                              amount: m.amount || guessed.amount,
+                              cost_center_code: m.cost_center_code || guessed.cost_center_code,
+                              project_code: m.project_code || guessed.project_code,
                             }))
                             setPreviewRows(rows.slice(0, 100))
                           } catch {}
