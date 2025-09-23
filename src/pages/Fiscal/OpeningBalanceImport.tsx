@@ -225,7 +225,12 @@ export default function OpeningBalanceImportPage() {
                 {/* Column Mapping */}
                 {previewRows.length > 0 && (
                   <Paper variant="outlined" sx={{ p: 2 }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Column Mapping</Typography>
+                    <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }}>
+                      <Typography variant="subtitle2" sx={{ mb: 1 }}>Column Mapping</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Preview rows: {previewRows.length} • Mapped: {['account_code','amount','cost_center_code','project_code'].filter(k => (mapping as any)[k]).length}/4
+                      </Typography>
+                    </Stack>
                     <Grid container spacing={2}>
                       {['account_code','amount','cost_center_code','project_code'].map((key) => (
                         <Grid item xs={12} sm={6} key={key}>
