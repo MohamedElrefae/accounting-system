@@ -14,6 +14,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  FormHelperText,
 } from '@mui/material'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import DownloadIcon from '@mui/icons-material/Download'
@@ -235,13 +236,16 @@ export default function OpeningBalanceImportPage() {
                         Preview rows: {previewRows.length} • Mapped: {require('@/utils/csv').countMapped(mapping)}/4
                       </Typography>
                     </Stack>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                      Required: account_code, amount • Optional: cost_center_code, project_code
+                    </Typography>
                     <Grid container spacing={2}>
                       {['account_code','amount','cost_center_code','project_code'].map((key) => (
                         <Grid item xs={12} sm={6} key={key}>
-                          <FormControl fullWidth size="small">
-                            <InputLabel>{key}</InputLabel>
+                          <FormControl fullWidth size="small" error={previewRows.length>0 && (key==='account_code' || key==='amount') && !(mapping as any)[key]}>
+                            <InputLabel>{key}{(key==='account_code' || key==='amount') ? ' (required)' : ''}</InputLabel>
                             <Select
-                              label={key}
+                              label={`${key}${(key==='account_code' || key==='amount') ? ' (required)' : ''}`}
                               value={(mapping as any)[key] || ''}
                               onChange={(e) => setMapping(prev => ({ ...prev, [key]: e.target.value }))}
                             >
@@ -249,6 +253,9 @@ export default function OpeningBalanceImportPage() {
                                 <MenuItem key={h} value={h}>{h}</MenuItem>
                               ))}
                             </Select>
+                            {(key==='account_code' || key==='amount') && !(mapping as any)[key] && previewRows.length>0 && (
+                              <FormHelperText>This field is required for validation</FormHelperText>
+                            )}
                           </FormControl>
                         </Grid>
                       ))}
