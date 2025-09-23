@@ -60,7 +60,7 @@ This document captures the plan, progress, and remaining work for the recent enh
 
 - Opening Balance Import Page
   - UI scaffolding for upload/validate/import flow (stub actions retained)
-  - Client-side Excel preview (first 100 rows) and local validation (missing account_code, invalid amount, zero warnings)
+  - Client-side Excel/CSV preview (first 100 rows) and local validation (missing account_code, invalid amount, zero warnings)
   - Column mapping UI to select headers for account_code, amount, cost_center_code, project_code; normalization helper + tests
 
 - Additional Fiscal Scaffolds
@@ -79,6 +79,7 @@ This document captures the plan, progress, and remaining work for the recent enh
   - Dev server: allow port fallback and HMR auto-port on Windows/OneDrive setups
   - Production build: fixed CJS/ESM interop by patching Supabase postgrest wrapper import via a small Vite transform
   - Moved CSS @import to top of WorkItemsTree.css to satisfy PostCSS
+  - CI: Added GitHub Actions workflow (.github/workflows/ci.yml) to lint, type-check, build, and run migration check
 
 - Performance Utilities
   - Lightweight ApplicationPerformanceMonitor service and Performance Dashboard (basic event list)

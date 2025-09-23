@@ -177,7 +177,7 @@ export default function OpeningBalanceImportPage() {
                     <Typography variant="body2" color="text.secondary">Drag & drop Excel here or choose file</Typography>
                     <input
                       type="file"
-                      accept=".xlsx,.xls"
+                      accept=\".xlsx,.xls,.csv\"
                       onChange={async (e) => {
                         const f = e.target.files?.[0] ?? null
                         setFile(f)
@@ -186,7 +186,21 @@ export default function OpeningBalanceImportPage() {
                         if (f) {
                           // Client-side preview using xlsx
                           try {
-                            const buf = await f.arrayBuffer()
+                            const isCsv = /\.csv$/i.test(f.name)
+                            if (isCsv) {
+                              const text = await f.text()
+                              const { parseCsv } = await import('@/utils/csv')
+                              const rows = parseCsv(text)
+                              const head = rows[0] ? Object.keys(rows[0]) : []
+                              setMapping((m) => ({
+                                account_code: m.account_code || head.find(h => /acc|code/i.test(h)) || head[0],
+                                amount: m.amount || head.find(h => /amount|debit|balance/i.test(h)) || head[1],
+                                cost_center_code: m.cost_center_code || head.find(h => /cost.*center|cc/i.test(h)) || undefined,
+                                project_code: m.project_code || head.find(h => /project/i.test(h)) || undefined,
+                              }))
+                              setPreviewRows(rows.slice(0, 100))
+                            } else {
+                              const buf = await f.arrayBuffer()
                             const XLSX = await import('xlsx')
                             const wb = XLSX.read(buf, { type: 'array' })
                             const sh = wb.Sheets[wb.SheetNames[0]]
