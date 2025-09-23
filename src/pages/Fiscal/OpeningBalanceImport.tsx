@@ -247,7 +247,7 @@ export default function OpeningBalanceImportPage() {
                   </Paper>
                 )}
 
-                <Stack direction="row" spacing={1}>
+                <Stack direction="row" spacing={1} alignItems="center">
                   <Button variant="outlined" disabled={!mapping.account_code || !mapping.amount || previewRows.length===0} onClick={() => {
                     try {
                       const { normalizeOpeningBalanceRows, validateOpeningBalanceRows } = require('@/utils/csv')
@@ -257,6 +257,11 @@ export default function OpeningBalanceImportPage() {
                     } catch {}
                   }}>Validate</Button>
                   <Button variant="contained" disabled={!!disabled} onClick={onImport}>Import</Button>
+                  {(!mapping.account_code || !mapping.amount) && previewRows.length>0 && (
+                    <Typography variant="caption" color="text.secondary">
+                      Select at least account_code and amount columns to enable validation.
+                    </Typography>
+                  )}
                 </Stack>
               </Stack>
             </Grid>
