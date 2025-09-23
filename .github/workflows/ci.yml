@@ -31,5 +31,8 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Unit tests
+        run: npm test --silent
+
       - name: Validate migrations (no execution)
         run: npm run check:migration --if-present

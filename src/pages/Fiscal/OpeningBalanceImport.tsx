@@ -248,7 +248,7 @@ export default function OpeningBalanceImportPage() {
                 )}
 
                 <Stack direction="row" spacing={1}>
-                  <Button variant="outlined" onClick={() => {
+                  <Button variant="outlined" disabled={!mapping.account_code || !mapping.amount || previewRows.length===0} onClick={() => {
                     try {
                       const { normalizeOpeningBalanceRows, validateOpeningBalanceRows } = require('@/utils/csv')
                       const normalized = normalizeOpeningBalanceRows(previewRows, mapping)
