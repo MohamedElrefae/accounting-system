@@ -232,7 +232,7 @@ export default function OpeningBalanceImportPage() {
                     <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }}>
                       <Typography variant="subtitle2" sx={{ mb: 1 }}>Column Mapping</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Preview rows: {previewRows.length} • Mapped: {['account_code','amount','cost_center_code','project_code'].filter(k => (mapping as any)[k]).length}/4
+                        Preview rows: {previewRows.length} • Mapped: {require('@/utils/csv').countMapped(mapping)}/4
                       </Typography>
                     </Stack>
                     <Grid container spacing={2}>
@@ -266,6 +266,9 @@ export default function OpeningBalanceImportPage() {
                     } catch {}
                   }}>Validate</Button>
                   <Button variant="contained" disabled={!!disabled} onClick={onImport}>Import</Button>
+                  {previewRows.length>0 && mapping.account_code && mapping.amount && (
+                    <Typography variant="caption" color="success.main">Mapping Complete</Typography>
+                  )}
                   {(!mapping.account_code || !mapping.amount) && previewRows.length>0 && (
                     <Typography variant="caption" color="text.secondary">
                       Select at least account_code and amount columns to enable validation.
