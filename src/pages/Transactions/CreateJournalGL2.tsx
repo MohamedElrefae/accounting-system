@@ -14,6 +14,11 @@ const CreateJournalGL2Page: React.FC = () => {
   const [costCenterCode, setCostCenterCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // Extra dimensions by code
+  const [classificationCode, setClassificationCode] = useState('');
+  const [expensesCategoryCode, setExpensesCategoryCode] = useState('');
+  const [workItemCode, setWorkItemCode] = useState('');
+  const [analysisWorkItemCode, setAnalysisWorkItemCode] = useState('');
 
   const onCreate = async () => {
     setBusy(true); setMsg(null);
@@ -33,6 +38,10 @@ const CreateJournalGL2Page: React.FC = () => {
               // Prefer codes (resolved by DB function); fallback to UUIDs if provided
               project_id: (projectCode || projectId) || undefined,
               cost_center_id: (costCenterCode || costCenterId) || undefined,
+              classification_id: classificationCode || undefined,
+              expenses_category_id: expensesCategoryCode || undefined,
+              work_item_id: workItemCode || undefined,
+              analysis_work_item_id: analysisWorkItemCode || undefined,
             },
           },
           {
@@ -61,6 +70,10 @@ const CreateJournalGL2Page: React.FC = () => {
         <input type="number" placeholder="Amount" value={amount} onChange={e=>setAmount(parseFloat(e.target.value))} />
         <input placeholder="Project CODE (preferred)" value={projectCode} onChange={e=>setProjectCode(e.target.value)} />
         <input placeholder="Cost Center CODE (preferred)" value={costCenterCode} onChange={e=>setCostCenterCode(e.target.value)} />
+        <input placeholder="Classification CODE (optional)" value={classificationCode} onChange={e=>setClassificationCode(e.target.value)} />
+        <input placeholder="Expenses Category CODE (optional)" value={expensesCategoryCode} onChange={e=>setExpensesCategoryCode(e.target.value)} />
+        <input placeholder="Work Item CODE (optional)" value={workItemCode} onChange={e=>setWorkItemCode(e.target.value)} />
+        <input placeholder="Analysis Work Item CODE (optional)" value={analysisWorkItemCode} onChange={e=>setAnalysisWorkItemCode(e.target.value)} />
         <input placeholder="Project UUID (optional)" value={projectId} onChange={e=>setProjectId(e.target.value)} />
         <input placeholder="Cost Center UUID (optional)" value={costCenterId} onChange={e=>setCostCenterId(e.target.value)} />
         <button onClick={onCreate} disabled={busy}>إنشاء مسودة</button>
