@@ -75,7 +75,7 @@
   background: var(--border);
 }
 
-.resizable-th:last-child {
+.resizable-th:last-of-type {
   border-right: none;
 }
 
@@ -134,7 +134,7 @@
   position: relative;
 }
 
-.resizable-td:last-child {
+.resizable-td:last-of-type {
   border-right: none;
 }
 

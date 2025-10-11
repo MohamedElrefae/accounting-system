@@ -302,12 +302,7 @@ export default function DocumentDetailsDrawer({ open, onClose, document }: Docum
     if (!v) return <Typography variant="body2" color="text.secondary">Select a version</Typography>;
     const mime = (v.mime_type || '').toLowerCase();
     if (text != null) {
-      // Simple text view with line highlighting if only one side available
-      return (
-        <Box sx={{ fontFamily: 'monospace', fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 420, overflow: 'auto' }}>
-          {text}
-        </Box>
-      );
+      return renderHighlightedText(text, mime);
     }
     if (mime.startsWith('image/')) {
       return (
@@ -326,8 +321,81 @@ export default function DocumentDetailsDrawer({ open, onClose, document }: Docum
     return <Typography variant="body2" color="text.secondary">Preview not available. Try Download.</Typography>;
   };
 
+  // Syntax highlighting for simple types (JSON, CSV, plain)
+  function renderHighlightedText(text: string, mime?: string | null) {
+    const isJSON = (mime || '').includes('json');
+    const isCSV = (mime || '').includes('csv');
+
+    const color = {
+      key: '#c792ea',
+      string: '#91b859',
+      number: '#f78c6c',
+      boolean: '#ff5370',
+      nullish: '#ff5370',
+      comma: '#89ddff',
+      colon: '#89ddff',
+      default: 'inherit',
+    } as const;
+
+    const highlightJSONLine = (line: string, idx: number) => {
+      const parts: React.ReactNode[] = [];
+      let i = 0;
+      const push = (text: string, style?: React.CSSProperties) => parts.push(<span key={`${idx}-${parts.length}`} style={style}>{text}</span>);
+      while (i < line.length) {
+        const rest = line.slice(i);
+        // String
+        const mStr = rest.match(/^"(?:[^"\\]|\\.)*"/);
+        if (mStr) {
+          const val = mStr[0];
+          // Key if followed by colon in remaining
+          const isKey = line.slice(i + val.length).trimStart().startsWith(':');
+          push(val, { color: isKey ? color.key : color.string });
+          i += val.length;
+          continue;
+        }
+        // Number
+        const mNum = rest.match(/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/);
+        if (mNum) { push(mNum[0], { color: color.number }); i += mNum[0].length; continue; }
+        // Boolean/null
+        const mBool = rest.match(/^(true|false|null)/);
+        if (mBool) { push(mBool[0], { color: color.boolean }); i += mBool[0].length; continue; }
+        // Punctuation
+        const ch = rest[0];
+        if (ch === ':' || ch === ',') { push(ch, { color: color.colon }); i++; continue; }
+        // Default
+        push(ch, { color: color.default }); i++;
+      }
+      return <div key={idx}>{parts}</div>;
+    };
+
+    const renderLine = (line: string, idx: number) => {
+      if (isJSON) return highlightJSONLine(line, idx);
+      // For CSV we can lightly color commas
+      if (isCSV) {
+        const segs = line.split(',');
+        return (
+          <div key={idx}>
+            {segs.map((s, i2) => (
+              <React.Fragment key={`${idx}-${i2}`}>
+                <span>{s}</span>
+                {i2 < segs.length - 1 && <span style={{ color: color.comma }}>,</span>}
+              </React.Fragment>
+            ))}
+          </div>
+        );
+      }
+      return <div key={idx}>{line}</div>;
+    };
+
+    return (
+      <Box sx={{ fontFamily: 'monospace', fontSize: 12, whiteSpace: 'pre', wordBreak: 'normal', maxHeight: 420, overflow: 'auto', p: 1 }}>
+        {text.split(/\r?\n/).map((ln, i) => renderLine(ln, i))}
+      </Box>
+    );
+  }
+
   // Minimal unified diff renderer (line-based LCS)
-  function renderUnifiedDiff(aText: string, bText: string) {
+  function renderUnifiedDiff(aText: string, bText: string, mimeHint?: string | null) {
     const a = aText.split(/\r?\n/);
     const b = bText.split(/\r?\n/);
 
@@ -365,7 +433,7 @@ export default function DocumentDetailsDrawer({ open, onClose, document }: Docum
             <Typography component="span" sx={{ color: row.type === 'add' ? 'success.main' : row.type === 'del' ? 'error.main' : 'text.secondary', mr: 1 }}>
               {row.type === 'add' ? '+' : row.type === 'del' ? '-' : ' '}
             </Typography>
-            {row.text}
+            <span>{renderHighlightedText(row.text, mimeHint)}</span>
           </Box>
         ))}
       </Box>
@@ -580,7 +648,7 @@ export default function DocumentDetailsDrawer({ open, onClose, document }: Docum
                 {compareAText != null && compareBText != null && (
                   <Box sx={{ mt: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
                     <Typography variant="subtitle2" sx={{ px: 1, py: 0.5 }}>Highlighted differences</Typography>
-                    {renderUnifiedDiff(compareAText, compareBText)}
+                    {renderUnifiedDiff(compareAText, compareBText, (compareA?.mime_type || compareB?.mime_type || '').toLowerCase())}
                   </Box>
                 )}
               </>

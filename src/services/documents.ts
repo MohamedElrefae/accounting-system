@@ -13,6 +13,7 @@ export interface Document {
   current_version_id?: string | null;
   category_id?: string | null;
   project_id?: string | null;
+  folder_id?: string | null;
   storage_path?: string | null;
   created_by: string;
   created_at: string;
@@ -42,8 +43,9 @@ export interface DocumentPermissionInput {
 
 const DOCUMENTS_BUCKET = 'documents';
 
-function buildStoragePath(orgId: string, documentId: string, version: number, fileName: string) {
-  return `documents/${orgId}/${documentId}/${version}/${fileName}`;
+function buildStoragePath(orgId: string, folderId: string, documentId: string, version: number, fileName: string) {
+  // Folder-aware path; stable because it uses folderId (not folder name)
+  return `documents/${orgId}/folders/${folderId}/${documentId}/${version}/${fileName}`;
 }
 
 export async function getSignedUrl(storagePath: string, expiresIn = 900) {
@@ -59,17 +61,28 @@ export async function uploadDocument(params: {
   description?: string;
   categoryId?: string;
   projectId?: string;
+  folderId?: string; // optional; if not provided, defaults to Unfiled
   notes?: string;
 }) {
-  const { orgId, title, file, description, categoryId, projectId, notes } = params;
+  const { orgId, title, file, description, categoryId, projectId, folderId, notes } = params;
 
   console.log('[uploadDocument] payload', { orgId, title, hasFile: Boolean(file), description, categoryId, projectId });
+  // resolve folder id: use provided or fallback to Unfiled
+  let resolvedFolderId = folderId ?? null;
+  if (!resolvedFolderId) {
+    try {
+      const { getUnfiledFolderId } = await import('./document-folders');
+      resolvedFolderId = await getUnfiledFolderId(orgId);
+    } catch {}
+  }
+
   const insertPayload = {
     org_id: orgId,
     title,
     description: description ?? null,
     category_id: categoryId ?? null,
     project_id: projectId ?? null,
+    folder_id: resolvedFolderId ?? null,
     status: 'draft'
   } as const;
   const { data: docIns, error: docErr } = await supabase
@@ -101,7 +114,7 @@ export async function uploadDocument(params: {
   const name = (file as any).name ?? `upload-${Date.now()}`;
   const type = (file as any).type ?? 'application/octet-stream';
   const size = (file as any).size ?? 0;
-  const storagePath = buildStoragePath(orgId, document.id, versionNumber, name);
+  const storagePath = buildStoragePath(orgId, (document as any).folder_id || (resolvedFolderId || 'unassigned'), document.id, versionNumber, name);
 
   const { data: verIns, error: verErr } = await supabase
     .from('document_versions')
@@ -138,6 +151,15 @@ export async function uploadDocument(params: {
 }
 
 export async function createDocumentVersion(documentId: string, orgId: string, file: File | Blob, notes?: string) {
+  // ensure we know the folder_id from the document
+  const { data: docRow, error: docErr } = await supabase
+    .from('documents')
+    .select('id, org_id, folder_id')
+    .eq('id', documentId)
+    .single();
+  if (docErr) throw docErr;
+  const docMeta = docRow as Pick<Document, 'id' | 'org_id' | 'folder_id'>;
+
   const { data: versions, error: vErr } = await supabase
     .from('document_versions')
     .select('version_number')
@@ -149,7 +171,7 @@ export async function createDocumentVersion(documentId: string, orgId: string, f
   const name = (file as any).name ?? `upload-${Date.now()}`;
   const type = (file as any).type ?? 'application/octet-stream';
   const size = (file as any).size ?? 0;
-  const storagePath = buildStoragePath(orgId, documentId, nextVersion, name);
+  const storagePath = buildStoragePath(orgId, (docMeta.folder_id as any) || 'unassigned', documentId, nextVersion, name);
 
   const { data: verIns, error: verErr } = await supabase
     .from('document_versions')
@@ -185,18 +207,20 @@ export async function getDocuments(params: {
   status?: DocumentStatus[];
   categoryId?: string;
   projectId?: string;
+  folderId?: string;
   search?: string;
   limit?: number;
   offset?: number;
   orderBy?: { column: string; ascending: boolean };
   fts?: boolean; // use full-text search on search_vector
 }) {
-  const { orgId, status, categoryId, projectId, search, limit = 20, offset = 0, orderBy, fts } = params;
+  const { orgId, status, categoryId, projectId, folderId, search, limit = 20, offset = 0, orderBy, fts } = params;
   let query = supabase.from('documents').select('*', { count: 'exact' }).eq('org_id', orgId);
 
   if (status?.length) query = query.in('status', status as any);
   if (categoryId) query = query.eq('category_id', categoryId);
   if (projectId) query = query.eq('project_id', projectId);
+  if (folderId) query = query.eq('folder_id', folderId);
   if (search) {
     if (fts) {
       // Use PostgREST text search on tsvector column
@@ -336,10 +360,21 @@ export async function getProjectDocumentCounts(projectIds: string[]): Promise<Re
   return map;
 }
 
-export async function updateDocument(id: string, updates: Partial<Pick<Document, 'title' | 'title_ar' | 'description' | 'category_id' | 'project_id'>>) {
+export async function updateDocument(id: string, updates: Partial<Pick<Document, 'title' | 'title_ar' | 'description' | 'category_id' | 'project_id' | 'folder_id'>>) {
   const { data, error } = await supabase.from('documents').update(updates).eq('id', id).select('*').single();
   if (error) throw error;
   return data as Document;
+}
+
+export async function moveDocument(documentId: string, newFolderId: string) {
+  const { data, error } = await supabase
+    .from('documents')
+    .update({ folder_id: newFolderId })
+    .eq('id', documentId)
+    .select('id, folder_id')
+    .single();
+  if (error) throw error;
+  return data as Pick<Document, 'id' | 'folder_id'>;
 }
 
 export async function deleteDocument(id: string) {

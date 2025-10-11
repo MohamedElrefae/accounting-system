@@ -1,0 +1,3 @@
+account_code,account_name_en,account_name_ar,level,parent_code,parent_path,opening_balance_debit,opening_balance_credit,project_code,cost_center_code,currency_code,project_scope_id,cost_center_scope_id
+1110,Cash,الخزينة,3,1100,1000 / 1100,1000,,PRJ-001,CC-HQ,USD,SAMPLE_PROJECT,SAMPLE_COST_CENTER
+2110,Trade Payables - Materials,ذمم تجارية - موردي المواد,3,2100,2000 / 2100,,1000,PRJ-001,CC-HQ,USD,SAMPLE_PROJECT,SAMPLE_COST_CENTER

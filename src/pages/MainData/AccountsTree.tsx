@@ -9,6 +9,7 @@ import { useToast } from '../../contexts/ToastContext';
 import UnifiedCRUDForm, { type UnifiedCRUDFormHandle } from '../../components/Common/UnifiedCRUDForm';
 import { createAccountFormConfig } from '../../components/Accounts/AccountFormConfig';
 import DraggableResizablePanel from '../../components/Common/DraggableResizablePanel';
+import { tokens } from '../../theme/tokens';
 import { getOrganizations } from '../../services/organization';
 import { useHasPermission } from '../../hooks/useHasPermission';
 import { debugAccountRollups, testRollupModes, testViewDirectly, manualRollupsCalculation } from '../../utils/debug-rollups';
@@ -1081,10 +1082,10 @@ const AccountsTreePage: React.FC = () => {
         <DraggableResizablePanel
           title={dialogMode === 'edit' ? 'تعديل الحساب' : 'إضافة حساب جديد'}
           subtitle={draft?.code ? `الكود: ${draft.code}` : undefined}
-          headerGradient={'linear-gradient(90deg, #5b21b6, #8b5cf6, #06b6d4)'}
+          headerGradient={`linear-gradient(90deg, ${tokens.palette.primary.dark}, ${tokens.palette.primary.main}, ${tokens.palette.info.main})`}
           headerActions={(
             <>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'white', fontSize: 12, marginInlineEnd: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: tokens.palette.primary.contrastText, fontSize: 12, marginInlineEnd: 8 }}>
                 <input type="checkbox" checked={rememberPanel} onChange={(e) => setRememberPanel(e.target.checked)} />
                 تذكر التخطيط
               </label>

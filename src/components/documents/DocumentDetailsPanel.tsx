@@ -23,6 +23,10 @@ export default function DocumentDetailsPanel({ orgId, documentId, isOpen, onClos
   const canManage = hasPerm('documents.manage')
   const canCreate = hasPerm('documents.create') || canManage
 
+  // For editing category/folder
+  const [allCategories, setAllCategories] = useState<Array<{ id: string; name: string }>>([])
+  const [allFolders, setAllFolders] = useState<Array<{ id: string; name: string }>>([])
+
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [status, setStatus] = useState<'draft' | 'submitted' | 'approved' | 'rejected' | 'archived'>('draft')
@@ -39,6 +43,69 @@ export default function DocumentDetailsPanel({ orgId, documentId, isOpen, onClos
     await Promise.all([refetchDoc(), refetchVersions()])
     onChanged && onChanged()
   }
+
+  const [folderPath, setFolderPath] = useState<string>('')
+  const [categoryName, setCategoryName] = useState<string>('')
+
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!doc) { setFolderPath(''); setCategoryName(''); setAllCategories([]); setAllFolders([]); return }
+        const { supabase } = await import('../../utils/supabase')
+        // Load lists for editing selectors
+        try {
+          const { data: cats } = await supabase.from('document_categories').select('id,name').eq('org_id', (doc as any).org_id).order('position');
+          setAllCategories((cats || []) as any)
+        } catch { setAllCategories([]) }
+        try {
+          const { data: fs } = await supabase.from('document_folders').select('id,name,parent_id,position').eq('org_id', (doc as any).org_id);
+          // simple alphabetical
+          setAllFolders(((fs || []) as any).sort((a: any,b: any) => a.name.localeCompare(b.name)))
+        } catch { setAllFolders([]) }
+        // Folder path
+        if ((doc as any).folder_id) {
+          const { data } = await supabase
+            .from('document_folders')
+            .select('id, name, parent_id')
+            .eq('id', (doc as any).folder_id)
+            .single()
+          if (data) {
+            // Build simple path upwards
+            let cur: any = data
+            const names: string[] = []
+            const guard = new Set<string>()
+            // load all folders in org (limited depth walk via repeated fetch)
+            for (let i = 0; i < 12 && cur && !guard.has(cur.id); i++) {
+              guard.add(cur.id)
+              names.unshift(cur.name)
+              if (!cur.parent_id) break
+              const { data: p } = await supabase
+                .from('document_folders')
+                .select('id,name,parent_id')
+                .eq('id', cur.parent_id)
+                .single()
+              cur = p
+            }
+            setFolderPath(names.join('/'))
+          } else setFolderPath('')
+        } else {
+          setFolderPath('')
+        }
+        // Category name
+        if ((doc as any).category_id) {
+          const { data: c } = await supabase
+            .from('document_categories')
+            .select('name')
+            .eq('id', (doc as any).category_id)
+            .single()
+          setCategoryName((c as any)?.name || '')
+        } else setCategoryName('')
+      } catch {
+        setFolderPath('')
+        setCategoryName('')
+      }
+    })()
+  }, [doc])
 
   const handleSave = async () => {
     if (!canManage) return
@@ -162,6 +229,31 @@ export default function DocumentDetailsPanel({ orgId, documentId, isOpen, onClos
         <TextField label="الوصف" size="small" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} disabled={!canManage} />
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
+          <TextField label="Folder" size="small" value={folderPath} disabled={!canManage} fullWidth select onChange={async (e) => {
+            try {
+              await svc.updateDocument(documentId, { folder_id: e.target.value as any })
+              showToast('Folder updated', { severity: 'success' })
+              await refresh()
+            } catch (er: any) { showToast(er?.message || 'Failed to update folder', { severity: 'error' }) }
+          }} SelectProps={{ native: true }}>
+            <option value=""></option>
+            {allFolders.map(f => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+          </TextField>
+
+          <TextField label="Category" size="small" value={categoryName} disabled={!canManage} fullWidth select onChange={async (e) => {
+            try {
+              await svc.updateDocument(documentId, { category_id: e.target.value || null as any })
+              showToast('Category updated', { severity: 'success' })
+              await refresh()
+            } catch (er: any) { showToast(er?.message || 'Failed to update category', { severity: 'error' }) }
+          }} SelectProps={{ native: true }}>
+            <option value=""></option>
+            {allCategories.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </TextField>
           <TextField select size="small" label="الحالة" value={status} onChange={async (e) => {
             const s = e.target.value as any
             setStatus(s)
@@ -196,10 +288,15 @@ export default function DocumentDetailsPanel({ orgId, documentId, isOpen, onClos
                 <Button size="small" onClick={async () => {
                   try { const url = await svc.downloadDocumentByVersion(v.id); window.open(url, '_blank', 'noopener'); } catch (e: any) { showToast(e?.message || 'فشل التنزيل', { severity: 'error' }) }
                 }}>Download</Button>
+                <Button size="small" disabled={!canManage} onClick={async () => {
+                  try { await svc.promoteDocumentVersion(v.id); showToast('Set as current version', { severity: 'success' }); await refresh(); }
+                  catch (e: any) { showToast(e?.message || 'Failed to promote version', { severity: 'error' }) }
+                }}>Promote</Button>
               </Stack>
-            }>
-              <ListItemText primary={`v${v.version_number} - ${v.file_name}`} secondary={`${(v.file_size/1024).toFixed(1)} KB • ${new Date(v.uploaded_at).toLocaleString()}`} />
-            </ListItem>
+            }
+          >
+            <ListItemText primary={`v${v.version_number} - ${v.file_name}`} secondary={`${(v.file_size/1024).toFixed(1)} KB • ${new Date(v.uploaded_at).toLocaleString()}`} />
+          </ListItem>
           ))}
           {versions.length === 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>لا توجد نسخ بعد.</Typography>

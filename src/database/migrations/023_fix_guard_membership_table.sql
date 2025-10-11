@@ -1,5 +1,5 @@
 -- 023_fix_guard_membership_table.sql
--- Update guard checks to use public.org_memberships (org_id, user_id, role) instead of org_members.
+-- Update guard checks to use public.org_memberships (org_id, user_id). Note: org_memberships is roleless.
 -- Falls back gracefully if the relation does not exist.
 
 begin;

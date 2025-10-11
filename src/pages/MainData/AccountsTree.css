@@ -72,8 +72,8 @@
 .accounts-table th { font-weight: 600; position: sticky; top: 0; z-index: 10; }
 
 /* Sticky first column (RTL/LTR aware using logical properties) */
-.accounts-table th:first-child,
-.accounts-table td:first-child {
+.accounts-table th:first-of-type,
+.accounts-table td:first-of-type {
   position: sticky;
   inset-inline-start: 0;
   z-index: 2; /* stay above other cells */
@@ -82,7 +82,7 @@
 }
 
 /* Keep header cell above sticky body cell */
-.accounts-table thead th:first-child {
+.accounts-table thead th:first-of-type {
   z-index: 3;
 }
 
@@ -214,7 +214,7 @@ html[data-theme='light'] .table-code-cell {
 }
 
 .config-modal-close:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: color-mix(in srgb, var(--on-accent) 20%, transparent);
 }
 
 .config-modal-body {
@@ -225,7 +225,7 @@ html[data-theme='light'] .table-code-cell {
   margin-bottom: 2rem;
 }
 
-.config-section:last-child {
+.config-section:last-of-type {
   margin-bottom: 0;
 }
 

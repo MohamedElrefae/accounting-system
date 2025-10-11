@@ -419,6 +419,16 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
   return data as TransactionRecord
 }
 
+export async function getTransactionById(id: string): Promise<TransactionRecord | null> {
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('id', id)
+    .single()
+  if (error) return null
+  return data as TransactionRecord
+}
+
 export async function deleteTransaction(id: string): Promise<void> {
   const { error } = await supabase
     .from('transactions')

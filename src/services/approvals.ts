@@ -3,7 +3,7 @@ import { getCurrentUserId } from './transactions'
 
 export interface ApprovalInboxRow {
   request_id: string
-  transaction_id: string
+  transaction_id: string | null
   entry_number: string
   entry_date: string
   amount: number
@@ -17,14 +17,41 @@ export interface ApprovalInboxRow {
   approver_user_id?: string | null
   submitted_by?: string | null
   submitted_at: string
+  status?: 'pending' | 'approved' | 'rejected' | 'cancelled'
+  target_table?: string
+  target_id?: string
 }
 
 export async function getApprovalInbox(): Promise<ApprovalInboxRow[]> {
   const uid = await getCurrentUserId()
   if (!uid) return []
-  const { data, error } = await supabase.rpc('list_approval_inbox', { p_user_id: uid })
+  const { data, error } = await supabase.rpc('list_approval_inbox_v2', { p_user_id: uid })
   if (error) throw error
   return (data as any[]) as ApprovalInboxRow[]
+}
+
+export interface ApprovalRequestRow {
+  id: string
+  target_table: string
+  target_id: string
+  org_id: string | null
+  workflow_id: string | null
+  status: string
+  submitted_by: string | null
+  submitted_at: string
+}
+
+export async function getApprovalByTarget(targetTable: string, targetId: string): Promise<ApprovalRequestRow | null> {
+  const { data, error } = await supabase
+    .from('approval_requests')
+    .select('id, target_table, target_id, org_id, workflow_id, status, submitted_by, submitted_at')
+    .eq('target_table', targetTable)
+    .eq('target_id', targetId)
+    .order('submitted_at', { ascending: false })
+    .limit(1)
+    .single()
+  if (error) return null
+  return data as any
 }
 
 export async function canApprove(requestId: string): Promise<boolean> {
@@ -33,6 +60,11 @@ export async function canApprove(requestId: string): Promise<boolean> {
   const { data, error } = await supabase.rpc('can_user_approve_request', { p_user_id: uid, p_request_id: requestId } as any)
   if (error) return false
   return Boolean(data)
+}
+
+export async function reviewRequest(requestId: string, action: 'approve' | 'reject' | 'revise', reason?: string) {
+  const { error } = await supabase.rpc('review_request', { p_request_id: requestId, p_action: action, p_reason: reason ?? null } as any)
+  if (error) throw error
 }
 
 export interface ApprovalHistoryRow {

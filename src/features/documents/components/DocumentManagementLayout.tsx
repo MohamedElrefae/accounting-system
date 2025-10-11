@@ -1,5 +1,5 @@
 import React from 'react';
-import { Typography, CircularProgress } from '@mui/material';
+import { Typography, CircularProgress, IconButton, Menu, MenuItem } from '@mui/material';
 import { 
   PageRoot, 
   PageContainer, 
@@ -41,6 +41,16 @@ export interface DocumentManagementLayoutProps extends DocumentControlsBarProps 
   onDocumentClick?: (document: Document) => void;
   onDocumentSelect?: (documentIds: string[]) => void;
   selectedDocumentIds?: string[];
+
+  // Lookup maps for display (optional)
+  categoryNames?: Record<string, string>;
+  folderPaths?: Record<string, string>;
+  
+  // Actions
+  onMoveToSelectedFolder?: (documentId: string) => void;
+  onDownloadDocument?: (documentId: string) => void;
+  onOpenDocumentPermissions?: (documentId: string) => void;
+  onLinkToCurrentProject?: (documentId: string) => void;
   
   // Pagination
   currentPage?: number;
@@ -80,6 +90,12 @@ const DocumentManagementLayout: React.FC<DocumentManagementLayoutProps> = ({
   onDocumentClick,
   onDocumentSelect,
   selectedDocumentIds = [],
+  categoryNames,
+  folderPaths,
+  onMoveToSelectedFolder,
+  onDownloadDocument,
+  onOpenDocumentPermissions,
+  onLinkToCurrentProject,
   currentPage = 1,
   pageSize = 20,
   onPageChange,
@@ -127,6 +143,12 @@ const DocumentManagementLayout: React.FC<DocumentManagementLayoutProps> = ({
     }
   };
   
+  const [menuAnchor, setMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const [menuDocId, setMenuDocId] = React.useState<string | null>(null);
+
+  const openMenu = (e: React.MouseEvent<HTMLElement>, id: string) => { setMenuAnchor(e.currentTarget); setMenuDocId(id); };
+  const closeMenu = () => { setMenuAnchor(null); setMenuDocId(null); };
+
   const renderDocuments = () => {
     // Error state
     if (error) {
@@ -199,6 +221,29 @@ const DocumentManagementLayout: React.FC<DocumentManagementLayoutProps> = ({
               aria-label={`Document: ${document.title}`}
             >
               <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  {/* Selection checkbox */}
+                  {onDocumentSelect && (
+                    <input
+                      type="checkbox"
+                      checked={selectedDocumentIds.includes(document.id)}
+                      onChange={(e) => {
+                        const next = new Set(selectedDocumentIds);
+                        if (e.target.checked) next.add(document.id); else next.delete(document.id);
+                        onDocumentSelect(Array.from(next));
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      title="Select"
+                    />
+                  )}
+                  <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                    {(onDownloadDocument || onMoveToSelectedFolder) && (
+                      <IconButton size="small" onClick={(e) => { e.stopPropagation(); openMenu(e, document.id); }} aria-label="More actions">
+                        ⋮
+                      </IconButton>
+                    )}
+                  </div>
+                </div>
                 <Typography 
                   variant="h6" 
                   gutterBottom 
@@ -238,6 +283,7 @@ const DocumentManagementLayout: React.FC<DocumentManagementLayoutProps> = ({
                   alignItems: 'center', 
                   gap: '8px',
                   marginBottom: '8px',
+                  flexWrap: 'wrap'
                 }}>
                   <Typography 
                     variant="caption" 
@@ -262,11 +308,33 @@ const DocumentManagementLayout: React.FC<DocumentManagementLayoutProps> = ({
                       {formatFileSize(document.file_size)}
                     </Typography>
                   )}
+
+                  {document.category_id && (
+                    <Typography variant="caption" sx={{ px: 1, py: 0.25, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                      Category
+                    </Typography>
+                  )}
+
+                  {document.project_id && (
+                    <Typography variant="caption" sx={{ px: 1, py: 0.25, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                      Project
+                    </Typography>
+                  )}
                 </div>
                 
-                <Typography variant="caption" color="textSecondary">
-                  Updated: {formatDate(document.updated_at)}
-                </Typography>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="caption" color="textSecondary">
+                    Updated: {formatDate(document.updated_at)}
+                  </Typography>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {document.category_id && categoryNames?.[document.category_id] && (
+                      <Typography variant="caption" color="textSecondary">{categoryNames[document.category_id]}</Typography>
+                    )}
+                    {folderPaths && (
+                      <Typography variant="caption" color="textSecondary">{folderPaths[document.folder_id as any] || ''}</Typography>
+                    )}
+                  </div>
+                </div>
               </div>
             </DocumentCard>
           ))}
@@ -274,7 +342,34 @@ const DocumentManagementLayout: React.FC<DocumentManagementLayoutProps> = ({
       );
     }
     
-    // List view (simplified - would typically use DataGrid or similar)
+    // List view (virtualized when large)
+    if (documents.length > 100) {
+      const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => {
+        const document = documents[index];
+        return (
+          <div style={{ ...style, display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: index < documents.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer' }} onClick={() => onDocumentClick?.(document)}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Typography variant="body2" sx={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{document.title}</Typography>
+              {document.description && (
+                <Typography variant="caption" color="textSecondary" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{document.description}</Typography>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '16px' }}>
+              <Typography variant="caption" sx={{ px: 1, py: 0.25, borderRadius: 'var(--radius-sm)', background: 'var(--chip-bg)', border: '1px solid var(--border)', textTransform: 'capitalize', minWidth: '60px', textAlign: 'center' }}>{document.status}</Typography>
+              <Typography variant="caption" color="textSecondary" sx={{ minWidth: '100px' }}>{formatDate(document.updated_at)}</Typography>
+            </div>
+          </div>
+        );
+      };
+      return (
+        <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+          <List height={520} itemCount={documents.length} itemSize={64} width={'100%'}>
+            {Row as any}
+          </List>
+        </div>
+      );
+    }
+
     return (
       <div style={{ 
         border: '1px solid var(--border)', 
@@ -405,6 +500,22 @@ const DocumentManagementLayout: React.FC<DocumentManagementLayoutProps> = ({
             </div>
           )}
         </MainContent>
+
+        {/* Card actions menu */}
+        <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={closeMenu} keepMounted>
+          {onDownloadDocument && (
+            <MenuItem onClick={() => { if (menuDocId) onDownloadDocument(menuDocId); closeMenu(); }}>Download</MenuItem>
+          )}
+          {onMoveToSelectedFolder && (
+            <MenuItem onClick={() => { if (menuDocId) onMoveToSelectedFolder(menuDocId); closeMenu(); }}>Move to selected folder</MenuItem>
+          )}
+          {onOpenDocumentPermissions && (
+            <MenuItem onClick={() => { if (menuDocId) onOpenDocumentPermissions(menuDocId); closeMenu(); }}>Permissions…</MenuItem>
+          )}
+          {onLinkToCurrentProject && (
+            <MenuItem onClick={() => { if (menuDocId) onLinkToCurrentProject(menuDocId); closeMenu(); }}>Link to current project</MenuItem>
+          )}
+        </Menu>
       </PageContainer>
     </PageRoot>
   );
