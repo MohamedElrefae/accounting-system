@@ -442,8 +442,8 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
     if (gl2OrFilters.length) {
       q = (q as any).or(gl2OrFilters.join(','));
     }
-    if (f?.dateFrom) q = q.gte('posting_date', f.dateFrom);
-    if (f?.dateTo) q = q.lte('posting_date', f.dateTo);
+    if (f?.dateFrom) q = q.gte('effective_date', f.dateFrom);
+    if (f?.dateTo) q = q.lte('effective_date', f.dateTo);
     if (f?.amountFrom != null) q = q.gte('amount', f.amountFrom);
     if (f?.amountTo != null) q = q.lte('amount', f.amountTo);
     if (debitCode) q = q.eq('debit_account_code', debitCode);
