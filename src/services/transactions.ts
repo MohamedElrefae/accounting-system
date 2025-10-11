@@ -2,12 +2,10 @@
 // to either legacy or gl2 data paths based on feature flags. They are additive
 // and should not break existing imports.
 
-// Attempt to import the shared Supabase client used across services
-// Adjust the path if your project organizes the client differently.
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import { supabase } from './supabaseClient';
 import { featureFlags } from '../config/featureFlags';
+import { supabase } from '../utils/supabase'
+import { formatDateForSupabase } from '../utils/dateHelpers'
+import { getTransactionNumberConfig } from './company-config'
 
 export type UnifiedListParams = { limit?: number };
 
@@ -127,9 +125,6 @@ export async function postJournalUnified(journalId: string, postingDate?: string
   return supabase.rpc('api_post_journal', payload);
 }
 
-import { supabase } from '../utils/supabase'
-import { formatDateForSupabase } from '../utils/dateHelpers'
-import { getTransactionNumberConfig } from './company-config'
 
 export interface Account {
   id: string

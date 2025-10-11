@@ -23,6 +23,7 @@ const ExportTestPage = React.lazy(() => import('./pages/ExportTestPage'));
 const DocumentControlsBarTest = React.lazy(() => import('./features/documents/components/DocumentControlsBarTest'));
 const DocumentControlsBarRTLTest = React.lazy(() => import('./features/documents/components/DocumentControlsBarRTLTest'));
 const TransactionsPage = React.lazy(() => import('./pages/Transactions/Transactions'));
+const Gl2JournalsPage = React.lazy(() => import('./pages/Transactions/Gl2Journals'));
 const TxLineItemsPage = React.lazy(() => import('./pages/Transactions/TransactionLineItems'))
 const TransactionDetailsPage = React.lazy(() => import('./pages/Transactions/TransactionDetails'))
 const GeneralLedgerPage = React.lazy(() => import('./pages/Reports/GeneralLedger'))
@@ -251,7 +252,16 @@ const App: React.FC = () => {
               </React.Suspense>
             </RequirePermission>
           } />
-          <Route path="/transactions/all" element={
+<Route path="/transactions/all" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <TransactionsPage />
+            </React.Suspense>
+          } />
+          <Route path="/transactions/gl2" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <Gl2JournalsPage />
+            </React.Suspense>
+          } />
             <React.Suspense fallback={<div>Loading...</div>}>
               <TransactionsPage />
             </React.Suspense>
