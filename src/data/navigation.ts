@@ -163,6 +163,15 @@ const baseNavigation: NavigationItem[] = [
         path: "/transactions/gl2",
         requiredPermission: "transactions.read.all"
       },
+{
+        id: "gl2-journals-full",
+        label: "GL2 Journals (Full)",
+        titleEn: "GL2 Journals (Full)",
+        titleAr: "قيود GL2 (كاملة)",
+        icon: "receipt",
+        path: "/transactions/gl2-advanced",
+        requiredPermission: "transactions.read.all"
+      },
       {
         id: "assign-cost-analysis",
         label: "Assign Cost Analysis",
