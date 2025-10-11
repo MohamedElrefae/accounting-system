@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { listJournalsUnified } from '@/services/transactions';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
+import { supabase } from '@/services/supabaseClient';
 
 const Gl2JournalsPage: React.FC = () => {
   const { READ_MODE } = useFeatureFlags();
@@ -12,13 +12,42 @@ const Gl2JournalsPage: React.FC = () => {
     (async () => {
       setLoading(true);
       setError(null);
-      const { data, error } = await listJournalsUnified({ limit: 100 });
-      setLoading(false);
-      if (error) {
+      // Force GL2 fetch regardless of READ_MODE so this page always works
+      // Try single-line posted first; if empty, fall back to collapsed
+      const r1 = await supabase
+        .from('legacy_compat.v_journals_single_line_posted')
+        .select('journal_id, number, doc_date, posting_date, debit_account_code, credit_account_code, amount, status')
+        .order('posting_date', { ascending: false })
+        .limit(100);
+
+      if (r1.error) {
+        // If permission error, surface it
+        setError(r1.error.message || 'فشل تحميل قيود اليومية');
         setRows([]);
-        setError(error.message || 'فشل تحميل قيود اليومية');
+        setLoading(false);
+        return;
+      }
+
+      const rows1 = r1.data ?? [];
+      if (rows1.length > 0) {
+        setRows(rows1);
+        setLoading(false);
+        return;
+      }
+
+      // Fallback to collapsed view
+      const r2 = await supabase
+        .from('legacy_compat.v_journals_collapsed')
+        .select('journal_id, number, doc_date, posting_date, total_debits, total_credits, debit_account_code, credit_account_code, status')
+        .order('posting_date', { ascending: false })
+        .limit(100);
+
+      setLoading(false);
+      if (r2.error) {
+        setRows([]);
+        setError(r2.error.message || 'فشل تحميل قيود اليومية');
       } else {
-        setRows(data ?? []);
+        setRows(r2.data ?? []);
       }
     })();
   }, [READ_MODE]);

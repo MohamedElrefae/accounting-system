@@ -262,10 +262,6 @@ const App: React.FC = () => {
               <Gl2JournalsPage />
             </React.Suspense>
           } />
-            <React.Suspense fallback={<div>Loading...</div>}>
-              <TransactionsPage />
-            </React.Suspense>
-          } />
           <Route path="/transactions/:id" element={
             <React.Suspense fallback={<div>Loading...</div>}>
               <TransactionDetailsPage />
