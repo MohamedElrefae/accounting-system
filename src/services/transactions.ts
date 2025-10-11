@@ -387,19 +387,87 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
   if (getReadMode() !== 'legacy') {
     const fromIdx = from;
     const toIdx = to;
-    const { data, error, count } = await supabase
+
+    // Map filters to GL2 view columns
+    const f = options?.filters;
+    const gl2Filters: string[] = [];
+    const gl2OrFilters: string[] = [];
+
+    // Search on number
+    if (f?.search && f.search.trim()) {
+      const s = f.search.trim();
+      gl2OrFilters.push(`number.ilike.%${s}%`);
+    }
+    // Date range -> posting_date (fallback doc_date)
+    // PostgREST cannot OR across columns easily; we use posting_date for consistency
+    // The view populates posting_date for posted; for drafts we used doc_date at display only.
+    // It is acceptable to filter on posting_date only for now.
+
+    // Amount filters
+    // The view exposes amount for two-line journals
+
+    // Account filters: translate account_id (UUID) to code
+    let debitCode: string | null = null;
+    let creditCode: string | null = null;
+    if (f?.debitAccountId || f?.creditAccountId) {
+      const ids: string[] = [];
+      if (f?.debitAccountId) ids.push(f.debitAccountId);
+      if (f?.creditAccountId) ids.push(f.creditAccountId);
+      if (ids.length) {
+        const { data: accs } = await supabase
+          .from('accounts')
+          .select('id, code')
+          .in('id', ids);
+        if (accs && accs.length) {
+          for (const a of accs as any[]) {
+            if (f?.debitAccountId === a.id) debitCode = a.code;
+            if (f?.creditAccountId === a.id) creditCode = a.code;
+          }
+        }
+      }
+    }
+
+    // Build the query
+    let q = supabase
       .from('v_gl2_journals_single_line_all')
       .select('journal_id, number, doc_date, posting_date, debit_account_code, credit_account_code, amount, status', { count: 'exact' })
       .order('posting_date', { ascending: false })
       .range(fromIdx, toIdx);
+
+    // Apply filters
+    if (gl2OrFilters.length) {
+      q = (q as any).or(gl2OrFilters.join(','));
+    }
+    if (f?.dateFrom) q = q.gte('posting_date', f.dateFrom);
+    if (f?.dateTo) q = q.lte('posting_date', f.dateTo);
+    if (f?.amountFrom != null) q = q.gte('amount', f.amountFrom);
+    if (f?.amountTo != null) q = q.lte('amount', f.amountTo);
+    if (debitCode) q = q.eq('debit_account_code', debitCode);
+    if (creditCode) q = q.eq('credit_account_code', creditCode);
+
+    const { data, error, count } = await q;
     if (error) throw error;
+
+    // Build code->name map for nicer labels
+    const codes = Array.from(new Set((data || []).flatMap((r: any) => [r.debit_account_code, r.credit_account_code]).filter(Boolean)));
+    let codeToName: Record<string, string> = {};
+    if (codes.length) {
+      const { data: a2 } = await supabase
+        .from('gl2.accounts')
+        .select('code, name')
+        .in('code', codes);
+      if (a2) {
+        codeToName = Object.fromEntries((a2 as any[]).map(r => [r.code, r.name]));
+      }
+    }
+
     const rows = (data || []).map((r: any) => ({
       id: r.journal_id,
       entry_number: r.number,
       entry_date: r.doc_date || r.posting_date,
       description: '',
       reference_number: null,
-      debit_account_id: r.debit_account_code, // display will show code if id not found
+      debit_account_id: r.debit_account_code,
       credit_account_id: r.credit_account_code,
       amount: Number(r.amount ?? 0),
       notes: null,
@@ -422,6 +490,9 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
       review_reason: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      // Display helpers used by UI (code - name)
+      _debit_display: r.debit_account_code ? `${r.debit_account_code} - ${codeToName[r.debit_account_code] ?? ''}`.trim() : '',
+      _credit_display: r.credit_account_code ? `${r.credit_account_code} - ${codeToName[r.credit_account_code] ?? ''}`.trim() : '',
     })) as any[];
     return { rows: rows as any, total: count ?? rows.length };
   }
