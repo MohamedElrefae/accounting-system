@@ -17,5 +17,22 @@ export const featureFlags: FeatureFlags = {
   WRITE_MODE: ((import.meta as any)?.env?.VITE_WRITE_MODE as WriteMode) ?? 'legacy',
 };
 
-export const isGl2Read = () => featureFlags.READ_MODE !== 'legacy';
-export const isGl2Write = () => featureFlags.WRITE_MODE === 'gl2';
+// Runtime overrides to enable page-level switching without env changes
+export const getReadMode = (): ReadMode => {
+  try {
+    const o = (window as any).__READ_MODE_OVERRIDE as ReadMode | undefined;
+    if (o) return o;
+  } catch {}
+  return featureFlags.READ_MODE;
+};
+
+export const getWriteMode = (): WriteMode => {
+  try {
+    const o = (window as any).__WRITE_MODE_OVERRIDE as WriteMode | undefined;
+    if (o) return o;
+  } catch {}
+  return featureFlags.WRITE_MODE;
+};
+
+export const isGl2Read = () => getReadMode() !== 'legacy';
+export const isGl2Write = () => getWriteMode() === 'gl2';
