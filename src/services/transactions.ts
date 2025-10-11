@@ -429,9 +429,9 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
 
     // Build the query
     let q = supabase
-      .from('v_gl2_journals_single_line_all')
-      .select('journal_id, number, doc_date, posting_date, debit_account_code, credit_account_code, amount, status', { count: 'exact' })
-      .order('posting_date', { ascending: false })
+      .from('v_gl2_journals_enriched')
+      .select('journal_id, org_id, number, doc_date, posting_date, status, debit_account_code, debit_account_name, credit_account_code, credit_account_name, amount, total_debits, total_credits', { count: 'exact' })
+      .order('posting_date', { ascending: false, nullsFirst: false })
       .range(fromIdx, toIdx);
 
     // Apply filters
@@ -444,23 +444,17 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
     if (f?.amountTo != null) q = q.lte('amount', f.amountTo);
     if (debitCode) q = q.eq('debit_account_code', debitCode);
     if (creditCode) q = q.eq('credit_account_code', creditCode);
+    if (f?.orgId) q = q.eq('org_id', f.orgId);
+    if (f?.approvalStatus) {
+      if (f.approvalStatus === 'posted') q = q.eq('status', 'posted');
+      else if (f.approvalStatus === 'draft') q = q.eq('status', 'draft');
+    }
 
     const { data, error, count } = await q;
     if (error) throw error;
 
     // Build code->name map for nicer labels
-    const codes = Array.from(new Set((data || []).flatMap((r: any) => [r.debit_account_code, r.credit_account_code]).filter(Boolean)));
-    let codeToName: Record<string, string> = {};
-    if (codes.length) {
-      const { data: a2 } = await supabase
-        .from('gl2.accounts')
-        .select('code, name')
-        .in('code', codes);
-      if (a2) {
-        codeToName = Object.fromEntries((a2 as any[]).map(r => [r.code, r.name]));
-      }
-    }
-
+    // Mapping not required; view already exposes names
     const rows = (data || []).map((r: any) => ({
       id: r.journal_id,
       entry_number: r.number,
@@ -480,7 +474,7 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
       posted_by: null,
       created_by: null,
       project_id: null,
-      org_id: null,
+      org_id: r.org_id ?? null,
       approval_status: String(r.status).toLowerCase() === 'posted' ? 'approved' : 'draft',
       submitted_at: null,
       submitted_by: null,
@@ -491,8 +485,8 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       // Display helpers used by UI (code - name)
-      _debit_display: r.debit_account_code ? `${r.debit_account_code} - ${codeToName[r.debit_account_code] ?? ''}`.trim() : '',
-      _credit_display: r.credit_account_code ? `${r.credit_account_code} - ${codeToName[r.credit_account_code] ?? ''}`.trim() : '',
+      _debit_display: r.debit_account_code ? `${r.debit_account_code} - ${r.debit_account_name ?? ''}`.trim() : '',
+      _credit_display: r.credit_account_code ? `${r.credit_account_code} - ${r.credit_account_name ?? ''}`.trim() : '',
     })) as any[];
     return { rows: rows as any, total: count ?? rows.length };
   }
