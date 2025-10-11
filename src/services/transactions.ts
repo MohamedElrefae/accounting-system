@@ -2,7 +2,7 @@
 // to either legacy or gl2 data paths based on feature flags. They are additive
 // and should not break existing imports.
 
-import { featureFlags } from '../config/featureFlags';
+import { featureFlags, getReadMode } from '../config/featureFlags';
 import { supabase } from '../utils/supabase'
 import { formatDateForSupabase } from '../utils/dateHelpers'
 import { getTransactionNumberConfig } from './company-config'
@@ -382,6 +382,49 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
   const pageSize = options?.pageSize ?? 20
   const from = (page - 1) * pageSize
   const to = from + pageSize - 1
+
+// If GL2 read override is active, route to public GL2 views and map into legacy shape
+  if (getReadMode() !== 'legacy') {
+    const fromIdx = from;
+    const toIdx = to;
+    const { data, error, count } = await supabase
+      .from('v_gl2_journals_single_line_all')
+      .select('journal_id, number, doc_date, posting_date, debit_account_code, credit_account_code, amount, status', { count: 'exact' })
+      .order('posting_date', { ascending: false })
+      .range(fromIdx, toIdx);
+    if (error) throw error;
+    const rows = (data || []).map((r: any) => ({
+      id: r.journal_id,
+      entry_number: r.number,
+      entry_date: r.doc_date || r.posting_date,
+      description: '',
+      reference_number: null,
+      debit_account_id: r.debit_account_code, // display will show code if id not found
+      credit_account_id: r.credit_account_code,
+      amount: Number(r.amount ?? 0),
+      notes: null,
+      classification_id: null,
+      sub_tree_id: null,
+      work_item_id: null,
+      cost_center_id: null,
+      is_posted: String(r.status).toLowerCase() === 'posted',
+      posted_at: null,
+      posted_by: null,
+      created_by: null,
+      project_id: null,
+      org_id: null,
+      approval_status: String(r.status).toLowerCase() === 'posted' ? 'approved' : 'draft',
+      submitted_at: null,
+      submitted_by: null,
+      reviewed_at: null,
+      reviewed_by: null,
+      review_action: null,
+      review_reason: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })) as any[];
+    return { rows: rows as any, total: count ?? rows.length };
+  }
 
   // Dynamic query with organization, project, classification, and cost center joins
   let query = supabase
