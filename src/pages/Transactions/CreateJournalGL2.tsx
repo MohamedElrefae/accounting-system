@@ -10,6 +10,8 @@ const CreateJournalGL2Page: React.FC = () => {
   const [creditCode, setCreditCode] = useState('1110');
   const [projectId, setProjectId] = useState('');
   const [costCenterId, setCostCenterId] = useState('');
+  const [projectCode, setProjectCode] = useState('');
+  const [costCenterCode, setCostCenterCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -28,8 +30,9 @@ const CreateJournalGL2Page: React.FC = () => {
             debit_base: amount,
             credit_base: 0,
             dimensions: {
-              project_id: projectId || undefined,
-              cost_center_id: costCenterId || undefined,
+              // Prefer codes (resolved by DB function); fallback to UUIDs if provided
+              project_id: (projectCode || projectId) || undefined,
+              cost_center_id: (costCenterCode || costCenterId) || undefined,
             },
           },
           {
@@ -56,6 +59,8 @@ const CreateJournalGL2Page: React.FC = () => {
         <input placeholder="Debit account code" value={debitCode} onChange={e=>setDebitCode(e.target.value)} />
         <input placeholder="Credit account code" value={creditCode} onChange={e=>setCreditCode(e.target.value)} />
         <input type="number" placeholder="Amount" value={amount} onChange={e=>setAmount(parseFloat(e.target.value))} />
+        <input placeholder="Project CODE (preferred)" value={projectCode} onChange={e=>setProjectCode(e.target.value)} />
+        <input placeholder="Cost Center CODE (preferred)" value={costCenterCode} onChange={e=>setCostCenterCode(e.target.value)} />
         <input placeholder="Project UUID (optional)" value={projectId} onChange={e=>setProjectId(e.target.value)} />
         <input placeholder="Cost Center UUID (optional)" value={costCenterId} onChange={e=>setCostCenterId(e.target.value)} />
         <button onClick={onCreate} disabled={busy}>إنشاء مسودة</button>
