@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
-import { supabase } from '@/services/supabaseClient';
+import { supabase } from '@/utils/supabase';
 
 const Gl2JournalsPage: React.FC = () => {
   const { READ_MODE } = useFeatureFlags();
@@ -15,7 +15,7 @@ const Gl2JournalsPage: React.FC = () => {
       // Force GL2 fetch regardless of READ_MODE so this page always works
       // Try single-line posted first; if empty, fall back to collapsed
       const r1 = await supabase
-        .from('legacy_compat.v_journals_single_line_posted')
+.from('v_gl2_journals_single_line_posted')
         .select('journal_id, number, doc_date, posting_date, debit_account_code, credit_account_code, amount, status')
         .order('posting_date', { ascending: false })
         .limit(100);
@@ -37,7 +37,7 @@ const Gl2JournalsPage: React.FC = () => {
 
       // Fallback to collapsed view
       const r2 = await supabase
-        .from('legacy_compat.v_journals_collapsed')
+.from('v_gl2_journals_collapsed')
         .select('journal_id, number, doc_date, posting_date, total_debits, total_credits, debit_account_code, credit_account_code, status')
         .order('posting_date', { ascending: false })
         .limit(100);
