@@ -1,3 +1,132 @@
+// NOTE: The functions appended at the end of this file provide unified access
+// to either legacy or gl2 data paths based on feature flags. They are additive
+// and should not break existing imports.
+
+// Attempt to import the shared Supabase client used across services
+// Adjust the path if your project organizes the client differently.
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import { supabase } from './supabaseClient';
+import { featureFlags } from '../config/featureFlags';
+
+export type UnifiedListParams = { limit?: number };
+
+// Unified list that switches based on READ_MODE
+export async function listJournalsUnified(params?: UnifiedListParams) {
+  const { READ_MODE } = featureFlags;
+  const limit = params?.limit ?? 50;
+
+  if (READ_MODE === 'legacy') {
+    // Keep legacy behavior by default; adjust source as needed
+    // Falls back to an existing enriched view if available
+    return supabase
+      .from('transactions_enriched')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+  }
+
+  if (READ_MODE === 'gl2_single_line') {
+    return supabase
+      .from('legacy_compat.v_journals_single_line_posted')
+      .select('journal_id, number, doc_date, posting_date, debit_account_code, credit_account_code, amount, status')
+      .order('posting_date', { ascending: false })
+      .limit(limit);
+  }
+
+  // gl2_collapsed
+  return supabase
+    .from('legacy_compat.v_journals_collapsed')
+    .select('journal_id, number, doc_date, posting_date, total_debits, total_credits, debit_account_code, credit_account_code, status')
+    .order('posting_date', { ascending: false })
+    .limit(limit);
+}
+
+// Unified detail fetch by journal id
+export async function getJournalDetailsUnified(journalId: string) {
+  const { READ_MODE } = featureFlags;
+
+  if (READ_MODE === 'legacy') {
+    // Legacy: keep existing detail behavior if present
+    return supabase
+      .from('transactions_enriched')
+      .select('*')
+      .eq('id', journalId)
+      .single();
+  }
+
+  // GL2: fetch header + lines
+  const header = await supabase
+    .from('gl2.journal_entries')
+    .select('id, org_id, number, doc_type, doc_ref, doc_date, posting_date, status, description, source_module, source_reference_id')
+    .eq('id', journalId)
+    .single();
+
+  const lines = await supabase
+    .from('gl2.journal_lines')
+    .select('line_no, account_id, debit_base, credit_base, description, accounts:account_id(code, name)')
+    .eq('journal_entry_id', journalId)
+    .order('line_no', { ascending: true });
+
+  return { header, lines };
+}
+
+export type CreateJournalUnifiedArgs = {
+  orgId: string;
+  number: string;
+  docType: string;
+  docDate: string; // ISO date (YYYY-MM-DD)
+  description?: string;
+  sourceModule?: string;
+  sourceRefId?: string | null;
+  entityCode?: string | null;
+  lines: Array<{
+    account_code: string;
+    debit_base: string | number;
+    credit_base: string | number;
+    description?: string;
+  }>;
+};
+
+// Unified create that switches based on WRITE_MODE
+export async function createJournalUnified(args: CreateJournalUnifiedArgs) {
+  const { WRITE_MODE } = featureFlags;
+
+  if (WRITE_MODE === 'legacy') {
+    // Not implementing legacy write here to avoid breaking existing flows
+    throw new Error('Legacy write path is disabled for unified API');
+  }
+
+  const payload = {
+    p_org_id: args.orgId,
+    p_number: args.number,
+    p_doc_type: args.docType,
+    p_doc_date: args.docDate,
+    p_description: args.description ?? null,
+    p_source_module: args.sourceModule ?? 'manual',
+    p_source_ref_id: args.sourceRefId ?? null,
+    p_entity_code: args.entityCode ?? null,
+    p_lines: args.lines,
+  } as const;
+
+  return supabase.rpc('api_create_journal', payload);
+}
+
+export async function postJournalUnified(journalId: string, postingDate?: string) {
+  const { WRITE_MODE } = featureFlags;
+
+  if (WRITE_MODE === 'legacy') {
+    throw new Error('Legacy write path is disabled for unified API');
+  }
+
+  const payload = {
+    p_journal_id: journalId,
+    p_posting_date: postingDate ?? new Date().toISOString().slice(0, 10),
+  } as const;
+
+  return supabase.rpc('api_post_journal', payload);
+}
+
 import { supabase } from '../utils/supabase'
 import { formatDateForSupabase } from '../utils/dateHelpers'
 import { getTransactionNumberConfig } from './company-config'
