@@ -15,7 +15,7 @@ const Gl2JournalsPage: React.FC = () => {
       // Force GL2 fetch regardless of READ_MODE so this page always works
       // Try single-line posted first; if empty, fall back to collapsed
       const r1 = await supabase
-.from('v_gl2_journals_single_line_posted')
+.from('v_gl2_journals_single_line_all')
         .select('journal_id, number, doc_date, posting_date, debit_account_code, credit_account_code, amount, status')
         .order('posting_date', { ascending: false })
         .limit(100);
@@ -54,7 +54,8 @@ const Gl2JournalsPage: React.FC = () => {
 
   return (
     <div style={{ padding: 16 }}>
-      <h2>قيود اليومية (GL2)</h2>
+<h2>قيود اليومية (GL2)</h2>
+      <div style={{ fontSize: 12, color: '#9aa' }}>تعرض الصفحة القيود ذات سطرين (مدين/دائن) من GL2. إذا لم تتوفر، يتم عرض ملخص القيود متعددة الأسطر.</div>
       <div style={{ marginBottom: 8 }}>وضع القراءة: <strong>{READ_MODE}</strong></div>
       {loading && <div>جاري التحميل…</div>}
       {error && <div style={{ color: 'red' }}>{error}</div>}
