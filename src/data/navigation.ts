@@ -173,6 +173,15 @@ const baseNavigation: NavigationItem[] = [
         requiredPermission: "transactions.read.all"
       },
       {
+        id: "gl2-create",
+        label: "Create GL2 Journal",
+        titleEn: "Create GL2 Journal",
+        titleAr: "إنشاء قيد GL2",
+        icon: "add",
+        path: "/transactions/gl2-create",
+        requiredPermission: "transactions.read.all"
+      },
+      {
         id: "assign-cost-analysis",
         label: "Assign Cost Analysis",
         titleEn: "Assign Cost Analysis",

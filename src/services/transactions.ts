@@ -83,6 +83,9 @@ export type CreateJournalUnifiedArgs = {
     debit_base: string | number;
     credit_base: string | number;
     description?: string;
+    // Optional line-level dimensions to be stored in gl2.journal_line_dimensions
+    // Keys should match the dimension_key values expected by the DB function
+    dimensions?: Partial<Record<'project_id' | 'cost_center_id' | 'work_item_id' | 'analysis_work_item_id' | 'classification_id' | 'expenses_category_id', string>>;
   }>;
 };
 
@@ -104,6 +107,7 @@ export async function createJournalUnified(args: CreateJournalUnifiedArgs) {
     p_source_module: args.sourceModule ?? 'manual',
     p_source_ref_id: args.sourceRefId ?? null,
     p_entity_code: args.entityCode ?? null,
+    // Pass through dimensions per-line as provided; the DB function must handle them
     p_lines: args.lines,
   } as const;
 
@@ -449,6 +453,13 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
       if (f.approvalStatus === 'posted') q = q.eq('status', 'posted');
       else if (f.approvalStatus === 'draft') q = q.eq('status', 'draft');
     }
+    // Line-level dimension filters (view exposes these from first debit line)
+    if (f?.classificationId) q = q.eq('classification_id', f.classificationId);
+    if (f?.expensesCategoryId) q = q.eq('expenses_category_id', f.expensesCategoryId);
+    if (f?.workItemId) q = q.eq('work_item_id', f.workItemId);
+    if (f?.analysisWorkItemId) q = q.eq('analysis_work_item_id', f.analysisWorkItemId);
+    if (f?.costCenterId) q = q.eq('cost_center_id', f.costCenterId);
+    if (f?.projectId) q = q.eq('project_id', f.projectId);
 
     const { data, error, count } = await q;
     if (error) throw error;

@@ -25,6 +25,7 @@ const DocumentControlsBarRTLTest = React.lazy(() => import('./features/documents
 const TransactionsPage = React.lazy(() => import('./pages/Transactions/Transactions'));
 const Gl2JournalsPage = React.lazy(() => import('./pages/Transactions/Gl2Journals'));
 const TransactionsGL2Page = React.lazy(() => import('./pages/Transactions/TransactionsGL2'));
+const CreateJournalGL2Page = React.lazy(() => import('./pages/Transactions/CreateJournalGL2'));
 const TxLineItemsPage = React.lazy(() => import('./pages/Transactions/TransactionLineItems'))
 const TransactionDetailsPage = React.lazy(() => import('./pages/Transactions/TransactionDetails'))
 const GeneralLedgerPage = React.lazy(() => import('./pages/Reports/GeneralLedger'))
@@ -266,6 +267,11 @@ const App: React.FC = () => {
           <Route path="/transactions/gl2-advanced" element={
             <React.Suspense fallback={<div>Loading...</div>}>
               <TransactionsGL2Page />
+            </React.Suspense>
+          } />
+          <Route path="/transactions/gl2-create" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <CreateJournalGL2Page />
             </React.Suspense>
           } />
           <Route path="/transactions/:id" element={
