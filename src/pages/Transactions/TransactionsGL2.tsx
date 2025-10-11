@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import ResizableTable from '@/components/Common/ResizableTable';
-import { useFeatureFlags } from '@/hooks/useFeatureFlags';
-import { supabase } from '@/utils/supabase';
+import ResizableTable from '../../components/Common/ResizableTable';
+import { useFeatureFlags } from '../../hooks/useFeatureFlags';
+import { supabase } from '../../utils/supabase';
 
 // A GL2 clone of the legacy transactions list page (simplified):
 // - Reuses the same table component and a similar column layout

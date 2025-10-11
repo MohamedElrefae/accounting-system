@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useFeatureFlags } from '@/hooks/useFeatureFlags';
-import { supabase } from '@/utils/supabase';
+import { useFeatureFlags } from '../../hooks/useFeatureFlags';
+import { supabase } from '../../utils/supabase';
 
 const Gl2JournalsPage: React.FC = () => {
   const { READ_MODE } = useFeatureFlags();
