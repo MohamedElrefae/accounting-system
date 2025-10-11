@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 import { supabase } from '../../utils/supabase';
+import Gl2DetailsDrawer from './Gl2DetailsDrawer';
 
 const Gl2JournalsPage: React.FC = () => {
   const { READ_MODE } = useFeatureFlags();
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -60,6 +63,9 @@ const Gl2JournalsPage: React.FC = () => {
       {loading && <div>جاري التحميل…</div>}
       {error && <div style={{ color: 'red' }}>{error}</div>}
 
+      {/* Table banner */}
+      <div style={{ background:'#0b6', color:'#fff', padding:6, borderRadius:6, marginBottom:8 }}>GL2 mode (pilot)</div>
+
       {READ_MODE === 'gl2_collapsed' ? (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
@@ -75,7 +81,7 @@ const Gl2JournalsPage: React.FC = () => {
           </thead>
           <tbody>
             {rows.map((r: any) => (
-              <tr key={r.journal_id}>
+              <tr key={r.journal_id} style={{ cursor:'pointer' }} onClick={()=>{ setSelected(r.journal_id); setDrawerOpen(true); }}>
                 <td>{r.number}</td>
                 <td>{r.posting_date}</td>
                 <td>{r.total_debits}</td>
@@ -104,7 +110,7 @@ const Gl2JournalsPage: React.FC = () => {
           </thead>
           <tbody>
             {rows.map((r: any) => (
-              <tr key={r.journal_id}>
+              <tr key={r.journal_id} style={{ cursor:'pointer' }} onClick={()=>{ setSelected(r.journal_id); setDrawerOpen(true); }}>
                 <td>{r.number}</td>
                 <td>{r.posting_date}</td>
                 <td>{r.debit_account_code}</td>
@@ -119,6 +125,7 @@ const Gl2JournalsPage: React.FC = () => {
           </tbody>
         </table>
       )}
+      <Gl2DetailsDrawer open={drawerOpen} journalId={selected} onClose={()=>setDrawerOpen(false)} onChanged={()=>{ setDrawerOpen(false); /* trigger refresh */ }} />
     </div>
   );
 };

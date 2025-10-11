@@ -126,7 +126,46 @@ export async function postJournalUnified(journalId: string, postingDate?: string
     p_posting_date: postingDate ?? new Date().toISOString().slice(0, 10),
   } as const;
 
-  return supabase.rpc('api_post_journal', payload);
+return supabase.rpc('api_post_journal', payload);
+}
+
+// Fetch GL2 header + lines + dimensions
+export async function getGL2JournalDetails(journalId: string) {
+  const header = await supabase
+    .from('gl2.journal_entries')
+    .select('id, org_id, number, doc_type, doc_ref, doc_date, posting_date, status, description, source_module, source_reference_id')
+    .eq('id', journalId)
+    .single();
+
+  const lines = await supabase
+    .from('gl2.journal_lines')
+    .select('id, line_no, account_id, debit_base, credit_base, description, accounts:account_id(code, name)')
+    .eq('journal_entry_id', journalId)
+    .order('line_no', { ascending: true });
+
+  const dims = await supabase
+    .from('gl2.journal_line_dimensions')
+    .select('journal_line_id, dimension_key, dimension_value')
+    .in('journal_line_id', (lines.data || []).map((l:any)=>l.id));
+
+  const dimsByLine: Record<string, {key: string, value: string}[]> = {};
+  (dims.data || []).forEach((d:any) => {
+    const k = String(d.journal_line_id);
+    if (!dimsByLine[k]) dimsByLine[k] = [];
+    dimsByLine[k].push({ key: d.dimension_key, value: d.dimension_value });
+  });
+
+  return { header, lines, dimensions: dimsByLine };
+}
+
+// Void journal (requires DB function api_void_journal)
+export async function voidJournalGL2(journalId: string) {
+  return supabase.rpc('api_void_journal', { p_journal_id: journalId });
+}
+
+// Reverse journal (requires DB function api_reverse_journal)
+export async function reverseJournalGL2(journalId: string, reverseDate?: string) {
+  return supabase.rpc('api_reverse_journal', { p_journal_id: journalId, p_reverse_date: reverseDate ?? new Date().toISOString().slice(0,10) });
 }
 
 
