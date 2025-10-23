@@ -16,6 +16,27 @@ Run locally:
 Notes:
 - SQL migrations mirrored under `supabase/migrations`.
 - Construction dashboards read from minimal schema tables added in Phase 4.
+- IMPORTANT: Organization memberships are roleless (binary). See `docs/ROLELESS_ORG_MEMBERSHIPS.md`.
+- Opening Balance Import service API note: subscribeToImport now requires a single params object. See docs/OPENING_BALANCE_IMPORT_PLAN.md (API consistency update).
+- Inventory Implementation Plan: see `docs/inventory-implementation-plan.md`.
+- Inventory Smoke Playbook: see `docs/inventory-smoke-playbook.md`.
+
+Example: subscribeToImport usage (params-only)
+
+```ts path=null start=null
+import { OpeningBalanceImportService } from '@/services/OpeningBalanceImportService'
+
+const sub = OpeningBalanceImportService.subscribeToImport({
+  importId: 'your-import-id',
+  onTick: (status) => {
+    // status: { importId, status: 'pending'|'processing'|'completed'|'failed'|'partially_completed', ... }
+    console.log('Import status updated:', status)
+  },
+})
+
+// Later, when you want to stop listening
+sub.unsubscribe()
+```
 
 Testing:
 - Placeholder tests are in `src/services/__tests__` and `src/components/__tests__`.

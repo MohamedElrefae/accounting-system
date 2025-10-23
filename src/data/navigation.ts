@@ -1,6 +1,8 @@
 import type { NavigationItem } from "../types";
 
-export const navigationItems: NavigationItem[] = [
+const FEATURE_INVENTORY = Boolean(import.meta.env.VITE_FEATURE_INVENTORY);
+
+const baseNavigation: NavigationItem[] = [
   {
     id: "dashboard",
     label: "Dashboard",
@@ -152,6 +154,7 @@ export const navigationItems: NavigationItem[] = [
         path: "/transactions/all",
         requiredPermission: "transactions.read.all"
       },
+// GL2 menu items removed in unified model
       {
         id: "assign-cost-analysis",
         label: "Assign Cost Analysis",
@@ -287,20 +290,53 @@ export const navigationItems: NavigationItem[] = [
         path: "/fiscal/approvals"
       },
       {
-        id: "opening-balance-import",
-        label: "Opening Balance Import",
-        titleEn: "Opening Balance Import",
-        titleAr: "استيراد الأرصدة الافتتاحية",
-        icon: "UploadFile",
-        path: "/fiscal/opening-balance-import"
-      },
-      {
         id: "fiscal-year-dashboard",
         label: "Fiscal Year Dashboard",
         titleEn: "Fiscal Year Dashboard",
         titleAr: "لوحة السنة المالية",
         icon: "Dashboard",
         path: "/fiscal/dashboard"
+      },
+      {
+        id: "enhanced-fiscal",
+        label: "Enhanced Fiscal (Arabic/RTL)",
+        titleEn: "Enhanced Fiscal Management",
+        titleAr: "الإدارة المالية المحسّنة",
+        icon: "AccountBalance",
+        children: [
+          {
+            id: "enhanced-fiscal-hub",
+            label: "Enhanced Hub",
+            titleEn: "Enhanced Hub",
+            titleAr: "المركز المحسّن",
+            icon: "Dashboard",
+            path: "/fiscal/enhanced"
+          },
+          {
+            id: "enhanced-fiscal-dashboard",
+            label: "Enhanced Dashboard",
+            titleEn: "Enhanced Fiscal Dashboard",
+            titleAr: "لوحة التحكم المحسّنة",
+            icon: "BarChart",
+            path: "/fiscal/enhanced/dashboard"
+          },
+          {
+            id: "enhanced-opening-balance",
+            label: "Enhanced Opening Balance",
+            titleEn: "Enhanced Opening Balance Import",
+            titleAr: "استيراد الأرصدة المحسّن",
+            icon: "Summarize",
+            path: "/fiscal/enhanced/opening-balance-import"
+          },
+          {
+            id: "enhanced-period-manager",
+            label: "Enhanced Period Manager",
+            titleEn: "Enhanced Period Manager",
+            titleAr: "إدارة الفترات المحسّنة",
+            icon: "List",
+            path: "/fiscal/enhanced/periods"
+          }
+        ]
       }
     ]
   },
@@ -471,3 +507,186 @@ export const navigationItems: NavigationItem[] = [
     ]
   }
 ];
+
+// Conditionally add Inventory section when feature flag is on
+const inventorySection: NavigationItem | null = FEATURE_INVENTORY ? {
+  id: 'inventory',
+  label: 'Inventory',
+  titleEn: 'Inventory',
+  titleAr: 'إدارة المخزون',
+  icon: 'inventory',
+  children: [
+      {
+        id: 'inventory-dashboard',
+        label: 'Dashboard',
+        titleEn: 'Inventory Dashboard',
+        titleAr: 'لوحة المخزون',
+        icon: 'dashboard',
+        path: '/inventory'
+      },
+      {
+        id: 'inventory-kpis',
+        label: 'KPIs',
+        titleEn: 'Inventory KPIs',
+        titleAr: 'مؤشرات المخزون',
+        icon: 'bar-chart',
+        path: '/inventory/kpis'
+      },
+    {
+      id: 'inventory-materials',
+      label: 'Materials',
+      titleEn: 'Materials',
+      titleAr: 'المواد',
+      icon: 'list',
+      path: '/inventory/materials',
+      requiredPermission: 'inventory.view'
+    },
+    {
+      id: 'inventory-locations',
+      label: 'Locations',
+      titleEn: 'Locations',
+      titleAr: 'المواقع',
+      icon: 'location',
+      path: '/inventory/locations',
+      requiredPermission: 'inventory.manage'
+    },
+    {
+      id: 'inventory-on-hand',
+      label: 'On Hand',
+      titleEn: 'On Hand',
+      titleAr: 'الرصيد المتاح',
+      icon: 'boxes',
+      path: '/inventory/on-hand',
+      requiredPermission: 'inventory.view'
+    },
+      {
+        id: 'inventory-movements',
+        label: 'Movements',
+        titleEn: 'Movements',
+        titleAr: 'حركة المخزون',
+        icon: 'activity',
+        path: '/inventory/movements',
+        requiredPermission: 'inventory.view'
+      },
+      {
+        id: 'inventory-valuation',
+        label: 'Valuation',
+        titleEn: 'Valuation',
+        titleAr: 'تقييم المخزون',
+        icon: 'trending-up',
+        path: '/inventory/valuation',
+        requiredPermission: 'inventory.view'
+      },
+      {
+        id: 'inventory-ageing',
+        label: 'Ageing',
+        titleEn: 'Stock Ageing',
+        titleAr: 'تقادم المخزون',
+        icon: 'clock',
+        path: '/inventory/ageing',
+        requiredPermission: 'inventory.view'
+      },
+      {
+        id: 'inventory-movement-summary',
+        label: 'Movement Summary',
+        titleEn: 'Movement Summary',
+        titleAr: 'ملخص الحركة',
+        icon: 'activity',
+        path: '/inventory/movement-summary',
+        requiredPermission: 'inventory.view'
+      },
+      {
+        id: 'inventory-movement-detail',
+        label: 'Movement Detail',
+        titleEn: 'Movement Detail',
+        titleAr: 'تفاصيل الحركة',
+        icon: 'list',
+        path: '/inventory/movement-detail',
+        requiredPermission: 'inventory.view'
+      },
+      {
+        id: 'inventory-project-movement-summary',
+        label: 'Project Movement Summary',
+        titleEn: 'Project Movement Summary',
+        titleAr: 'ملخص الحركة حسب المشروع',
+        icon: 'bar-chart',
+        path: '/inventory/project-movement-summary',
+        requiredPermission: 'inventory.view'
+      },
+      {
+        id: 'inventory-valuation-by-project',
+        label: 'Valuation by Project',
+        titleEn: 'Valuation by Project',
+        titleAr: 'قيمة المخزون حسب المشروع',
+        icon: 'trending-up',
+        path: '/inventory/valuation-by-project',
+        requiredPermission: 'inventory.view'
+      },
+    {
+      id: 'inventory-receive',
+      label: 'Receive',
+      titleEn: 'Receive Materials',
+      titleAr: 'توريد مواد',
+      icon: 'download',
+      path: '/inventory/receive',
+      requiredPermission: 'inventory.manage'
+    },
+    {
+      id: 'inventory-issue',
+      label: 'Issue',
+      titleEn: 'Issue to Project',
+      titleAr: 'صرف للمشروع',
+      icon: 'upload',
+      path: '/inventory/issue',
+      requiredPermission: 'inventory.manage'
+    },
+    {
+      id: 'inventory-transfer',
+      label: 'Transfer',
+      titleEn: 'Transfer',
+      titleAr: 'نقل',
+      icon: 'shuffle',
+      path: '/inventory/transfer',
+      requiredPermission: 'inventory.transfer'
+    },
+    {
+      id: 'inventory-adjust',
+      label: 'Adjust',
+      titleEn: 'Adjust',
+      titleAr: 'تسوية',
+      icon: 'tune',
+      path: '/inventory/adjust',
+      requiredPermission: 'inventory.adjust'
+    },
+    {
+      id: 'inventory-returns',
+      label: 'Returns',
+      titleEn: 'Returns',
+      titleAr: 'مرتجعات',
+      icon: 'rotate-ccw',
+      path: '/inventory/returns',
+      requiredPermission: 'inventory.manage'
+    },
+      {
+        id: 'inventory-settings',
+        label: 'Settings',
+        titleEn: 'Inventory Settings',
+        titleAr: 'إعدادات المخزون',
+        icon: 'settings',
+        path: '/inventory/settings',
+        requiredPermission: 'inventory.manage'
+      },
+      {
+        id: 'inventory-reconciliation',
+        label: 'Reconciliation',
+        titleEn: 'Reconciliation',
+        titleAr: 'التسوية',
+        icon: 'Balance',
+        path: '/inventory/reconciliation',
+        requiredPermission: 'inventory.adjust'
+      }
+  ]
+} : null;
+export const navigationItems: NavigationItem[] = inventorySection
+  ? [...baseNavigation, inventorySection]
+  : baseNavigation;

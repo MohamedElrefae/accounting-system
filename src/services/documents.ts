@@ -13,6 +13,7 @@ export interface Document {
   current_version_id?: string | null;
   category_id?: string | null;
   project_id?: string | null;
+  folder_id?: string | null;
   storage_path?: string | null;
   created_by: string;
   created_at: string;
@@ -42,8 +43,34 @@ export interface DocumentPermissionInput {
 
 const DOCUMENTS_BUCKET = 'documents';
 
-function buildStoragePath(orgId: string, documentId: string, version: number, fileName: string) {
-  return `documents/${orgId}/${documentId}/${version}/${fileName}`;
+/**
+ * Sanitize filename for Supabase storage (removes non-ASCII and special characters)
+ * Keeps only alphanumeric, hyphens, underscores, and file extension
+ */
+function sanitizeFileName(fileName: string): string {
+  // Extract extension
+  const ext = fileName.lastIndexOf('.') > 0 ? fileName.slice(fileName.lastIndexOf('.')) : '';
+  // Remove extension from name
+  const nameWithoutExt = fileName.slice(0, fileName.lastIndexOf('.') > 0 ? fileName.lastIndexOf('.') : fileName.length);
+  
+  // Keep only alphanumeric, hyphens, underscores, and dots in extension
+  const sanitized = nameWithoutExt
+    .replace(/[^a-zA-Z0-9_-]/g, '_') // Replace non-alphanumeric (except - and _) with underscore
+    .replace(/_+/g, '_') // Collapse multiple underscores
+    .replace(/^_+|_+$/g, '') // Remove leading/trailing underscores
+    .slice(0, 200); // Limit length
+  
+  // Sanitize extension too
+  const sanitizedExt = ext.replace(/[^a-zA-Z0-9.]/g, '').slice(0, 10);
+  
+  return `${sanitized}${sanitizedExt}` || `file_${Date.now()}${ext}`;
+}
+
+function buildStoragePath(orgId: string, folderId: string, documentId: string, version: number, fileName: string) {
+  // Folder-aware path; stable because it uses folderId (not folder name)
+  // Sanitize filename to ensure Supabase storage compatibility
+  const sanitizedFileName = sanitizeFileName(fileName);
+  return `documents/${orgId}/folders/${folderId}/${documentId}/${version}/${sanitizedFileName}`;
 }
 
 export async function getSignedUrl(storagePath: string, expiresIn = 900) {
@@ -59,17 +86,28 @@ export async function uploadDocument(params: {
   description?: string;
   categoryId?: string;
   projectId?: string;
+  folderId?: string; // optional; if not provided, defaults to Unfiled
   notes?: string;
 }) {
-  const { orgId, title, file, description, categoryId, projectId, notes } = params;
+  const { orgId, title, file, description, categoryId, projectId, folderId, notes } = params;
 
   console.log('[uploadDocument] payload', { orgId, title, hasFile: Boolean(file), description, categoryId, projectId });
+  // resolve folder id: use provided or fallback to Unfiled
+  let resolvedFolderId = folderId ?? null;
+  if (!resolvedFolderId) {
+    try {
+      const { getUnfiledFolderId } = await import('./document-folders');
+      resolvedFolderId = await getUnfiledFolderId(orgId);
+    } catch {}
+  }
+
   const insertPayload = {
     org_id: orgId,
     title,
     description: description ?? null,
     category_id: categoryId ?? null,
     project_id: projectId ?? null,
+    folder_id: resolvedFolderId ?? null,
     status: 'draft'
   } as const;
   const { data: docIns, error: docErr } = await supabase
@@ -101,7 +139,7 @@ export async function uploadDocument(params: {
   const name = (file as any).name ?? `upload-${Date.now()}`;
   const type = (file as any).type ?? 'application/octet-stream';
   const size = (file as any).size ?? 0;
-  const storagePath = buildStoragePath(orgId, document.id, versionNumber, name);
+  const storagePath = buildStoragePath(orgId, (document as any).folder_id || (resolvedFolderId || 'unassigned'), document.id, versionNumber, name);
 
   const { data: verIns, error: verErr } = await supabase
     .from('document_versions')
@@ -138,6 +176,15 @@ export async function uploadDocument(params: {
 }
 
 export async function createDocumentVersion(documentId: string, orgId: string, file: File | Blob, notes?: string) {
+  // ensure we know the folder_id from the document
+  const { data: docRow, error: docErr } = await supabase
+    .from('documents')
+    .select('id, org_id, folder_id')
+    .eq('id', documentId)
+    .single();
+  if (docErr) throw docErr;
+  const docMeta = docRow as Pick<Document, 'id' | 'org_id' | 'folder_id'>;
+
   const { data: versions, error: vErr } = await supabase
     .from('document_versions')
     .select('version_number')
@@ -149,7 +196,7 @@ export async function createDocumentVersion(documentId: string, orgId: string, f
   const name = (file as any).name ?? `upload-${Date.now()}`;
   const type = (file as any).type ?? 'application/octet-stream';
   const size = (file as any).size ?? 0;
-  const storagePath = buildStoragePath(orgId, documentId, nextVersion, name);
+  const storagePath = buildStoragePath(orgId, (docMeta.folder_id as any) || 'unassigned', documentId, nextVersion, name);
 
   const { data: verIns, error: verErr } = await supabase
     .from('document_versions')
@@ -185,18 +232,20 @@ export async function getDocuments(params: {
   status?: DocumentStatus[];
   categoryId?: string;
   projectId?: string;
+  folderId?: string;
   search?: string;
   limit?: number;
   offset?: number;
   orderBy?: { column: string; ascending: boolean };
   fts?: boolean; // use full-text search on search_vector
 }) {
-  const { orgId, status, categoryId, projectId, search, limit = 20, offset = 0, orderBy, fts } = params;
+  const { orgId, status, categoryId, projectId, folderId, search, limit = 20, offset = 0, orderBy, fts } = params;
   let query = supabase.from('documents').select('*', { count: 'exact' }).eq('org_id', orgId);
 
   if (status?.length) query = query.in('status', status as any);
   if (categoryId) query = query.eq('category_id', categoryId);
   if (projectId) query = query.eq('project_id', projectId);
+  if (folderId) query = query.eq('folder_id', folderId);
   if (search) {
     if (fts) {
       // Use PostgREST text search on tsvector column
@@ -336,10 +385,21 @@ export async function getProjectDocumentCounts(projectIds: string[]): Promise<Re
   return map;
 }
 
-export async function updateDocument(id: string, updates: Partial<Pick<Document, 'title' | 'title_ar' | 'description' | 'category_id' | 'project_id'>>) {
+export async function updateDocument(id: string, updates: Partial<Pick<Document, 'title' | 'title_ar' | 'description' | 'category_id' | 'project_id' | 'folder_id'>>) {
   const { data, error } = await supabase.from('documents').update(updates).eq('id', id).select('*').single();
   if (error) throw error;
   return data as Document;
+}
+
+export async function moveDocument(documentId: string, newFolderId: string) {
+  const { data, error } = await supabase
+    .from('documents')
+    .update({ folder_id: newFolderId })
+    .eq('id', documentId)
+    .select('id, folder_id')
+    .single();
+  if (error) throw error;
+  return data as Pick<Document, 'id' | 'folder_id'>;
 }
 
 export async function deleteDocument(id: string) {
@@ -372,4 +432,170 @@ export async function rejectDocument(documentId: string) {
   const { data, error } = await supabase.from('documents').update({ status: 'rejected' }).eq('id', documentId).select('*').single();
   if (error) throw error;
   return data as Document;
+}
+
+// ==================== DOCUMENT ASSOCIATIONS (Unified Linking Model) ====================
+// Link documents to ANY entity (transaction, transaction_line, invoice, etc) via document_associations table
+// This avoids FK bloat and supports extensibility to new entity types
+
+export type EntityType = 'transaction' | 'transaction_line' | 'transaction_line_items' | 'invoice' | 'purchase_order' | 'payment';
+
+export interface DocumentAssociation {
+  id: string;
+  document_id: string;
+  entity_type: EntityType;
+  entity_id: string;
+  sort_order: number;
+  created_at: string;
+}
+
+/**
+ * Link a document to an entity (transaction, line, invoice, etc)
+ */
+export async function linkDocumentToEntity(
+  documentId: string,
+  entityType: EntityType,
+  entityId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('document_associations')
+    .insert({ document_id: documentId, entity_type: entityType, entity_id: entityId });
+  
+  // Silently ignore duplicate key errors (already linked)
+  if (error && !error.message.includes('duplicate')) throw error;
+}
+
+/**
+ * Get documents linked to a transaction line
+ */
+export async function getTransactionLineDocuments(transactionLineId: string): Promise<Document[]> {
+  const { data, error } = await supabase
+    .from('document_associations')
+    .select('document_id, documents!document_id(*)')
+    .eq('entity_type', 'transaction_line')
+    .eq('entity_id', transactionLineId)
+    .order('sort_order', { ascending: true });
+  
+  if (error) throw error;
+  return data?.map((row: any) => row.documents).filter(Boolean) || [];
+}
+
+/**
+ * Get documents linked to a transaction (from both transaction and its lines)
+ */
+export async function getTransactionDocuments(transactionId: string): Promise<Document[]> {
+  const { data, error } = await supabase
+    .from('document_associations')
+    .select('document_id, documents!document_id(*)')
+    .in('entity_type', ['transaction', 'transaction_line'])
+    .in('entity_id', [
+      transactionId, // direct transaction links
+      supabase.rpc('get_transaction_line_ids', { tx_id: transactionId }) // line links (will be handled by separate call)
+    ])
+    .order('sort_order', { ascending: true });
+  
+  if (error) throw error;
+  return data?.map((row: any) => row.documents).filter(Boolean) || [];
+}
+
+/**
+ * Get document count for a transaction line
+ */
+export async function getTransactionLineDocumentCount(transactionLineId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('document_associations')
+    .select('*', { count: 'exact' })
+    .eq('entity_type', 'transaction_line')
+    .eq('entity_id', transactionLineId);
+  
+  if (error) throw error;
+  return count || 0;
+}
+
+/**
+ * Get document count for an entity (transaction, line, etc)
+ */
+export async function getEntityDocumentCount(
+  entityType: EntityType,
+  entityId: string
+): Promise<number> {
+  const { count, error } = await supabase
+    .from('document_associations')
+    .select('*', { count: 'exact' })
+    .eq('entity_type', entityType)
+    .eq('entity_id', entityId);
+  
+  if (error) throw error;
+  return count || 0;
+}
+
+/**
+ * Unlink a document from an entity
+ */
+export async function unlinkDocumentFromEntity(
+  documentId: string,
+  entityType: EntityType,
+  entityId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('document_associations')
+    .delete()
+    .eq('document_id', documentId)
+    .eq('entity_type', entityType)
+    .eq('entity_id', entityId);
+  
+  if (error) throw error;
+}
+
+/**
+ * Convenience alias: Link document to transaction line
+ */
+export const linkDocumentToTransactionLine = (documentId: string, lineId: string) =>
+  linkDocumentToEntity(documentId, 'transaction_line', lineId);
+
+/**
+ * Convenience alias: Unlink document from transaction line
+ */
+export const unlinkDocumentFromTransactionLine = (documentId: string, lineId: string) =>
+  unlinkDocumentFromEntity(documentId, 'transaction_line', lineId);
+
+/**
+ * Convenience alias: Link document to transaction line items
+ */
+export const linkDocumentToTransactionLineItems = (documentId: string, lineItemId: string) =>
+  linkDocumentToEntity(documentId, 'transaction_line_items', lineItemId);
+
+/**
+ * Convenience alias: Unlink document from transaction line items
+ */
+export const unlinkDocumentFromTransactionLineItems = (documentId: string, lineItemId: string) =>
+  unlinkDocumentFromEntity(documentId, 'transaction_line_items', lineItemId);
+
+/**
+ * Get documents linked to transaction line items
+ */
+export async function getTransactionLineItemsDocuments(lineItemId: string): Promise<Document[]> {
+  const { data, error } = await supabase
+    .from('document_associations')
+    .select('document_id, documents!document_id(*)')
+    .eq('entity_type', 'transaction_line_items')
+    .eq('entity_id', lineItemId)
+    .order('sort_order', { ascending: true });
+  
+  if (error) throw error;
+  return data?.map((row: any) => row.documents).filter(Boolean) || [];
+}
+
+/**
+ * Get document count for transaction line items
+ */
+export async function getTransactionLineItemsDocumentCount(lineItemId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('document_associations')
+    .select('*', { count: 'exact' })
+    .eq('entity_type', 'transaction_line_items')
+    .eq('entity_id', lineItemId);
+  
+  if (error) throw error;
+  return count || 0;
 }

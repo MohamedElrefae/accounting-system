@@ -3,8 +3,7 @@ import styles from './TransactionLineItems.module.css'
 import { useHasPermission } from '../../hooks/useHasPermission'
 import { useToast } from '../../contexts/ToastContext'
 import { getOrganizations, type Organization } from '../../services/organization'
-import { transactionLineItemsCatalogService } from '../../services/transaction-line-items-enhanced'
-import type { DbTxLineItem } from '../../services/transaction-line-items'
+import { lineItemsCatalogService, type CatalogItem } from '../../services/line-items-catalog'
 import ExportButtons from '../../components/Common/ExportButtons'
 import TreeView from '../../components/TreeView/TreeView'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
@@ -42,7 +41,15 @@ async function getInitialOrgId(): Promise<string> {
   }
 }
 
-type TransactionLineItemRow = DbTxLineItem & {
+type TransactionLineItemRow = {
+  id: string
+  item_code: string | null
+  item_name: string | null
+  item_name_ar: string | null
+  parent_id?: string | null
+  unit_price: number
+  unit_of_measure: string | null
+  is_active: boolean
   level: number
   child_count: number
   has_usage: boolean
@@ -126,26 +133,32 @@ const TransactionLineItemsPage: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canView])
 
-  const reload = async (chosen: string) => {
+const reload = async (chosen: string) => {
     if (!chosen) return
     setLoading(true)
     try {
-      const [catalogItems, catalogStats] = await Promise.all([
-        transactionLineItemsCatalogService.getCatalogItems(chosen, true),
-        transactionLineItemsCatalogService.getCatalogStats(chosen)
-      ])
-      
-      // Transform to include additional data
-      const itemsWithMeta: TransactionLineItemRow[] = catalogItems.map(item => ({
-        ...item,
-        level: calculateLevelFromCode(item.item_code || ''),
-        child_count: 0, // Will be calculated
-        has_usage: false, // Will be calculated
-        usage_count: 0 // Will be calculated
+      const catalogItems: CatalogItem[] = await lineItemsCatalogService.list(chosen, true)
+
+      const itemsWithMeta: TransactionLineItemRow[] = catalogItems.map(i => ({
+        id: i.id,
+        item_code: i.code || null,
+        item_name: i.name || null,
+        item_name_ar: i.name_ar || null,
+        parent_id: i.parent_id || null,
+        unit_price: i.standard_cost ?? 0,
+        unit_of_measure: i.base_unit_of_measure ?? null,
+        is_active: i.is_active,
+        level: i.level || calculateLevelFromCode(i.code || ''),
+        child_count: 0,
+        has_usage: false,
+        usage_count: 0,
       }))
-      
+
+      // Basic stats computed client-side
+      const rootItems = itemsWithMeta.filter(r => !r.parent_id).length
+      const maxDepth = Math.max(0, ...itemsWithMeta.map(r => r.level || 1))
       setList(itemsWithMeta)
-      setStats(catalogStats)
+      setStats({ totalItems: itemsWithMeta.length, rootItems, maxDepth, usageCount: 0 })
       console.log('✅ Loaded', itemsWithMeta.length, 'catalog items')
     } catch (e: unknown) {
       showToast((e as Error).message || 'Failed to reload', { severity: 'error' })
@@ -202,7 +215,7 @@ const TransactionLineItemsPage: React.FC = () => {
       item_name: r.item_name || '',
       item_name_ar: r.item_name_ar || '',
       level: r.level,
-      quantity: r.quantity,
+quantity: 1,
       unit_price: r.unit_price,
       unit_of_measure: r.unit_of_measure || '',
       is_active: r.is_active !== false,
@@ -215,7 +228,7 @@ const TransactionLineItemsPage: React.FC = () => {
   const getNextCode = async (parentId?: string | null) => {
     if (!orgId) return '1000'
     try {
-      return await transactionLineItemsCatalogService.getNextCatalogItemCode(orgId, parentId ?? undefined)
+return await lineItemsCatalogService.getNextCode(orgId, parentId ?? undefined)
     } catch (e: unknown) {
       const error = e as Error
       showToast(
@@ -246,17 +259,17 @@ const TransactionLineItemsPage: React.FC = () => {
 
   const openEdit = (row: TransactionLineItemRow) => {
     setEditingId(row.id)
-    setForm({
+setForm({
       item_code: row.item_code || '',
       item_name: row.item_name || '',
       item_name_ar: row.item_name_ar || '',
-      description: row.description || '',
+      description: '',
       parent_id: row.parent_id || '',
-      quantity: row.quantity,
+      quantity: 1,
       unit_price: row.unit_price,
       unit_of_measure: row.unit_of_measure || 'piece',
       is_active: row.is_active !== false,
-      position: row.line_number
+      position: 0
     })
     setOpen(true)
   }
@@ -265,29 +278,24 @@ const TransactionLineItemsPage: React.FC = () => {
     if (!orgId) { showToast('Select organization', { severity: 'warning' }); return }
     try {
       if (editingId) {
-        await transactionLineItemsCatalogService.updateCatalogItem(editingId, orgId, {
-          item_code: form.item_code,
-          item_name: form.item_name,
-          item_name_ar: form.item_name_ar || undefined,
-          description: form.description || undefined,
-          quantity: form.quantity,
-          unit_price: form.unit_price,
-          unit_of_measure: form.unit_of_measure,
+await lineItemsCatalogService.update(editingId, orgId, {
+          code: form.item_code,
+          name: form.item_name,
+          name_ar: form.item_name_ar || undefined,
+          base_unit_of_measure: form.unit_of_measure,
+          standard_cost: form.unit_price,
           is_active: form.is_active,
-          position: form.position,
         })
         showToast('تم التحديث بنجاح', { severity: 'success' })
       } else {
-        await transactionLineItemsCatalogService.createCatalogItem(orgId, {
-          item_code: form.item_code,
-          item_name: form.item_name,
-          item_name_ar: form.item_name_ar || undefined,
-          description: form.description || undefined,
+await lineItemsCatalogService.create(orgId, {
+          code: form.item_code,
+          name: form.item_name,
+          name_ar: form.item_name_ar || undefined,
           parent_id: form.parent_id || undefined,
-          quantity: form.quantity,
-          unit_price: form.unit_price,
-          unit_of_measure: form.unit_of_measure,
-          position: form.position,
+          base_unit_of_measure: form.unit_of_measure,
+          standard_cost: form.unit_price,
+          is_active: true,
         })
         showToast('تم الإنشاء بنجاح', { severity: 'success' })
       }
@@ -320,7 +328,7 @@ const TransactionLineItemsPage: React.FC = () => {
 
   const handleToggleActive = async (row: TransactionLineItemRow) => {
     try {
-      await transactionLineItemsCatalogService.updateCatalogItem(row.id, orgId, { 
+await lineItemsCatalogService.update(row.id, orgId, { 
         is_active: !row.is_active 
       })
       showToast(row.is_active ? 'تم التعطيل' : 'تم التفعيل', { severity: 'success' })
@@ -334,7 +342,7 @@ const TransactionLineItemsPage: React.FC = () => {
     if (!orgId) return
     if (!confirm(`حذف بند التكلفة ${row.item_code}؟`)) return
     try {
-      await transactionLineItemsCatalogService.deleteCatalogItem(row.id, orgId)
+await lineItemsCatalogService.remove(row.id, orgId)
       showToast('تم الحذف بنجاح', { severity: 'success' })
       await reload(orgId)
     } catch (e: unknown) {
@@ -448,7 +456,7 @@ const TransactionLineItemsPage: React.FC = () => {
                         header: 'Quantity', 
                         render: (n) => {
                           const item = list.find(i => i.id === n.id)
-                          return <span>{item?.quantity || 0}</span>
+return <span>{1}</span>
                         }
                       },
                       { 
@@ -533,7 +541,7 @@ const TransactionLineItemsPage: React.FC = () => {
                             <TableCell>{r.item_name}</TableCell>
                             <TableCell>{r.item_name_ar || ''}</TableCell>
                             <TableCell>{r.level}</TableCell>
-                            <TableCell>{r.quantity}</TableCell>
+<TableCell>{1}</TableCell>
                             <TableCell>{r.unit_price}</TableCell>
                             <TableCell>{r.unit_of_measure}</TableCell>
                             <TableCell><Checkbox checked={r.is_active !== false} disabled /></TableCell>

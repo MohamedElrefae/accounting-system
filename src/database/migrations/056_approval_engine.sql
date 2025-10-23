@@ -111,9 +111,10 @@ begin
       where ur.user_id = p_user_id and ur.role_id = v_role_id and ur.is_active = true
     );
   elsif v_type = 'org_manager' then
+    -- Roleless membership: any member of the org can approve when approver_type = 'org_manager'
     v_allowed := exists (
       select 1 from public.org_memberships m
-      where m.user_id = p_user_id and m.org_id = v_org_id and m.role = 'manager'
+      where m.user_id = p_user_id and m.org_id = v_org_id
     );
   end if;
   return coalesce(v_allowed, false);
@@ -165,7 +166,7 @@ returns table (
             select 1 from public.user_roles ur where ur.user_id = p_user_id and ur.role_id = s.approver_role_id and ur.is_active = true
           ))
       or (s.approver_type = 'org_manager' and exists (
-            select 1 from public.org_memberships m where m.user_id = p_user_id and m.org_id = r.org_id and m.role = 'manager'
+            select 1 from public.org_memberships m where m.user_id = p_user_id and m.org_id = r.org_id
           ))
     )
   order by r.submitted_at desc

@@ -301,8 +301,8 @@
 }
 
 /* Fix column widths for better readability */
-.table th:first-child,
-.table td:first-child {
+.table th:first-of-type,
+.table td:first-of-type {
   min-width: 32px;
   width: 32px;
 }
@@ -791,7 +791,7 @@
   border-bottom: 1px solid var(--border-color);
 }
 
-.shortcut:last-child {
+.shortcut:last-of-type {
   border-bottom: none;
 }
 

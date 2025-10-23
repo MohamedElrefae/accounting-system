@@ -12,6 +12,7 @@ import type { WorkItemRow } from '../../types/work-items'
 import './UnifiedTransactionDetailsPanel.css'
 import { TransactionLineItemsSection } from '../line-items/TransactionLineItemsSection'
 import AttachDocumentsPanel from '../documents/AttachDocumentsPanel'
+import { getTransactionLines } from '../../services/transaction-lines'
 import { WithPermission } from '../Common/withPermission'
 
 export interface UnifiedTransactionDetailsPanelProps {
@@ -88,6 +89,8 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
   const [viewMode, setViewMode] = useState<ViewMode>('view')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [txLines, setTxLines] = useState<any[]>([])
+  const [linesState, setLinesState] = useState<{ totalDebits: number; totalCredits: number; isBalanced: boolean; linesCount: number }>({ totalDebits: 0, totalCredits: 0, isBalanced: false, linesCount: 0 })
   
   // Panel state with persistence
   const [panelPosition, setPanelPosition] = useState<{ x: number; y: number }>(() => {
@@ -154,6 +157,36 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
   })
   
   const formRef = useRef<UnifiedCRUDFormHandle>(null)
+
+  // Build header form config with external lines validity gating Save
+  const headerFormConfig = useMemo(() => {
+    try {
+      return createTransactionFormConfig(
+        true,
+        accounts,
+        projects,
+        organizations,
+        classifications,
+        transaction,
+        categories,
+        workItems,
+        costCenters,
+        { linesBalanced: linesState.isBalanced, linesCount: linesState.linesCount }
+      )
+    } catch {
+      return createTransactionFormConfig(
+        true,
+        accounts,
+        projects,
+        organizations,
+        classifications,
+        transaction,
+        categories,
+        workItems,
+        costCenters
+      )
+    }
+  }, [accounts, projects, organizations, classifications, transaction, categories, workItems, costCenters, linesState.isBalanced, linesState.linesCount])
   
   // Configuration change handlers
   const handleSectionOrderChange = (newOrder: string[]) => {
@@ -389,6 +422,18 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
     }
     return map[st] || map['draft']
   }, [transaction])
+
+  // Load transaction lines for view mode (read-only section)
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = await getTransactionLines(transaction.id)
+        setTxLines(rows || [])
+      } catch {
+        // ignore in view; editors can still load
+      }
+    })()
+  }, [transaction.id])
 
   // Form configuration
   const transactionFormConfig = useMemo(() => {
@@ -771,15 +816,20 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
                     amount_info: {
                       title: 'المبلغ والمرجع',
                       fields: [
-                        { id: 'amount', label: 'المبلغ', value: `${transaction.amount.toLocaleString('ar-EG')} ج.م`, className: 'amount-value' },
+                        { id: 'amount', label: 'المبلغ', value: (
+                          (() => {
+                            const amt = (transaction as any).total_debits ?? (transaction as any).line_items_total ?? null;
+                            return (amt != null) ? `${Number(amt).toLocaleString('ar-EG')} ج.م` : '—'
+                          })()
+                        ), className: 'amount-value' },
                         { id: 'reference_number', label: 'المرجع', value: transaction.reference_number || '—' },
                       ]
                     },
                     accounts_info: {
                       title: 'الحسابات',
                       fields: [
-                        { id: 'debit_account', label: 'الحساب المدين', value: getAccountLabel(transaction.debit_account_id) },
-                        { id: 'credit_account', label: 'الحساب الدائن', value: getAccountLabel(transaction.credit_account_id) },
+                        ...((transaction as any).debit_account_id ? [{ id: 'debit_account', label: 'الحساب المدين', value: getAccountLabel((transaction as any).debit_account_id) }] : []),
+                        ...((transaction as any).credit_account_id ? [{ id: 'credit_account', label: 'الحساب الدائن', value: getAccountLabel((transaction as any).credit_account_id) }] : []),
                       ]
                     },
                     approval_status: {
@@ -828,8 +878,43 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
                       title: 'معلومات النظام',
                       fields: [
                         { id: 'created_by', label: 'أنشئت بواسطة', value: transaction.created_by ? (userNames[transaction.created_by] || transaction.created_by) : '—' },
-                        { id: 'created_at', label: 'تاريخ الإنشاء', value: new Date(transaction.created_at).toLocaleString('ar-EG') },
+                        { id: 'created_at', label: 'تاريخ الإنشاء', value: transaction.created_at ? new Date(transaction.created_at).toLocaleString('ar-EG') : '—' },
                       ]
+                    },
+                    lines_view: {
+                      title: 'القيود التفصيلية',
+                      fields: txLines.length > 0 ? [
+                        {
+                          id: 'tx_lines_table',
+                          label: '',
+                          value: (
+                            <div style={{ overflowX: 'auto' }}>
+                              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                  <tr>
+                                    <th style={{ textAlign: 'center' }}>#</th>
+                                    <th>الحساب</th>
+                                    <th style={{ textAlign: 'right' }}>مدين</th>
+                                    <th style={{ textAlign: 'right' }}>دائن</th>
+                                    <th>البيان</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {txLines.map((l:any, idx:number) => (
+                                    <tr key={`${l.id || idx}`}>
+                                      <td style={{ textAlign: 'center' }}>{l.line_no}</td>
+<td>{getAccountLabel(l.account_id)}</td>
+                                      <td style={{ textAlign: 'right' }}>{Number(l.debit_amount || 0).toLocaleString('ar-EG')}</td>
+                                      <td style={{ textAlign: 'right' }}>{Number(l.credit_amount || 0).toLocaleString('ar-EG')}</td>
+                                      <td>{l.description || ''}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )
+                        }
+                      ] : []
                     },
                     posting_info: {
                       title: 'معلومات الترحيل',
@@ -856,7 +941,7 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
                                 <div key={row.id} className="audit-item">
                                   <div className="audit-header">
                                     <span className="audit-action">{row.action}</span>
-                                    <span className="audit-date">{new Date(row.created_at).toLocaleString('ar-EG')}</span>
+                                    <span className="audit-date">{row.created_at ? new Date(row.created_at).toLocaleString('ar-EG') : '—'}</span>
                                   </div>
                                   <div className="audit-user">
                                     {row.actor_id ? (userNames[row.actor_id] || row.actor_id.substring(0, 8)) : '—'}
@@ -885,7 +970,7 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
                                        r.action === 'request_changes' ? 'إرجاع للتعديل' : 
                                        r.action === 'reject' ? 'رفض' : 'ملاحظة'}
                                     </span>
-                                    <span className="approval-date">{new Date(r.created_at).toLocaleString('ar-EG')}</span>
+                                    <span className="approval-date">{r.created_at ? new Date(r.created_at).toLocaleString('ar-EG') : '—'}</span>
                                   </div>
                                   <div className="approval-user">
                                     {userNames[r.actor_user_id] || r.actor_user_id.substring(0, 8)}
@@ -969,9 +1054,19 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
           ) : (
             // Edit mode
             <div className="details-edit-mode">
+<div style={{ marginBottom: '16px' }}>
+                <MultiLineEditor
+                  transactionId={transaction.id}
+                  accounts={accounts}
+                  orgId={transaction.org_id || ''}
+                  disabled={isLoading}
+                  onSaved={() => {/* optional hook after save */}}
+                  onLinesStateChange={(s) => setLinesState(s)}
+                />
+              </div>
               <UnifiedCRUDForm
                 ref={formRef}
-                config={transactionFormConfig}
+                config={headerFormConfig}
                 initialData={initialFormData}
                 resetOnInitialDataChange={false}
                 onSubmit={handleFormSubmit}
@@ -980,13 +1075,23 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
               />
 
               {/* Transaction Line Items Editor Section */}
-              <div style={{ marginTop: 'var(--spacing-xl)' }}>
-                <TransactionLineItemsSection
-                  transactionId={transaction.id}
-                  orgId={transaction.org_id || ''}
-                  disabled={isLoading}
-                />
-              </div>
+              {txLines.length > 0 && (
+                <div style={{ marginTop: 'var(--spacing-xl)' }}>
+                  <TransactionLineItemsSection
+                    transactionLineId={txLines[0]?.id || ''}
+                    orgId={transaction.org_id || ''}
+                    disabled={isLoading || !txLines[0]?.id}
+                    workItems={workItems}
+                    analysisItems={analysisItemsMap}
+                    costCenters={costCenters}
+                    transactionLineDefaults={{
+                      work_item_id: txLines[0]?.work_item_id,
+                      analysis_work_item_id: txLines[0]?.analysis_work_item_id,
+                      sub_tree_id: txLines[0]?.sub_tree_id,
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>

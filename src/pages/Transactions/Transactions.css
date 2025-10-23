@@ -258,3 +258,90 @@
   color: #fff;
 }
 
+/* Dual-table layout styles */
+.transactions-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px;
+}
+
+.transactions-section {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface, #0f0f0f);
+  overflow: auto;
+}
+
+.headers-section {
+  flex: 1 1 50%;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.lines-section {
+  flex: 0 1 45%;
+  min-height: 300px;
+  max-height: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+.transactions-section-divider {
+  text-align: center;
+  padding: 8px;
+  color: var(--text-secondary, #a3a3a3);
+  font-weight: bold;
+  font-size: 0.9rem;
+  border-top: 2px dashed rgba(255, 255, 255, 0.2);
+  border-bottom: 2px dashed rgba(255, 255, 255, 0.2);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.section-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--text-primary, #eaeaea);
+}
+
+.section-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.section-controls button {
+  font-size: 0.85rem;
+  padding: 6px 12px;
+}
+
+.section-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Adjust transactions-tablebar for dual-table context */
+.transactions-tablebar {
+  flex-shrink: 0;
+}
+
+/* Ensure ResizableTable fills available space */
+.transactions-resizable-table {
+  flex: 1;
+  overflow: auto;
+}
+
+.transaction-lines-resizable-table {
+  flex: 1;
+  overflow: auto;
+}
+

@@ -1,0 +1,5 @@
+.print-hide { display: inline-flex; }
+@media print {
+  .print-hide { display: none !important; }
+  .print-container { padding: 0 !important; box-shadow: none !important; }
+}

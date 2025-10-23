@@ -9,6 +9,7 @@ import { useToast } from '../../contexts/ToastContext';
 import UnifiedCRUDForm, { type UnifiedCRUDFormHandle } from '../../components/Common/UnifiedCRUDForm';
 import { createAccountFormConfig } from '../../components/Accounts/AccountFormConfig';
 import DraggableResizablePanel from '../../components/Common/DraggableResizablePanel';
+import { tokens } from '../../theme/tokens';
 import { getOrganizations } from '../../services/organization';
 import { useHasPermission } from '../../hooks/useHasPermission';
 import { debugAccountRollups, testRollupModes, testViewDirectly, manualRollupsCalculation } from '../../utils/debug-rollups';
@@ -235,44 +236,40 @@ const AccountsTreePage: React.FC = () => {
   const { showToast } = useToast();
 
   // Cache for delete-eligibility info to reduce RPC traffic
-  const [deleteFlags, setDeleteFlags] = useState<Record<string, { has_transactions: boolean; is_standard: boolean }>>({});
+  const [deleteFlags, setDeleteFlags] = useState<Record<string, { has_transactions: boolean; is_standard: boolean; linked_to_sub_tree: boolean }>>({});
 
   async function fetchCanDeleteFlags(accountIds: string[]) {
     if (!orgId || accountIds.length === 0) return;
-    // Filter out ids we already have
-    const pending = accountIds.filter(id => !deleteFlags[id]);
-    if (pending.length === 0) return;
+    // Derive locally using existing data to avoid RPC dependency
+    const updates: Record<string, { has_transactions: boolean; is_standard: boolean; linked_to_sub_tree: boolean }> = {};
+    for (const id of accountIds) {
+      const item = accounts.find(a => a.id === id) as (AccountItem & { is_standard?: boolean; linked_to_sub_tree?: boolean }) | undefined;
+      const hasTx = !!(rollups[id]?.has_transactions);
+      const isStd = !!item?.['is_standard'];
+      updates[id] = { has_transactions: hasTx, is_standard: isStd, linked_to_sub_tree: !!item?.['linked_to_sub_tree'] };
+    }
 
-    const updates: Record<string, { has_transactions: boolean; is_standard: boolean }> = {};
-
-    // Process in small parallel batches to reduce latency but avoid hammering the backend
-    const BATCH_SIZE = 6;
-    for (let i = 0; i < pending.length; i += BATCH_SIZE) {
-      const slice = pending.slice(i, i + BATCH_SIZE);
-      const results = await Promise.all(slice.map(async (id) => {
-        try {
-          const { data, error } = await supabase.rpc('can_delete_account', {
-            p_org_id: orgId,
-            p_account_id: id,
-          });
-          if (!error && Array.isArray(data) && data.length > 0) {
-            const row = data[0] as { has_transactions?: boolean; is_standard?: boolean };
-            return [id, { has_transactions: !!row.has_transactions, is_standard: !!row.is_standard }] as const;
+    // Enrich with server check: is this account linked in sub_tree (linked_account_id)?
+    try {
+      const { data: links, error: linkErr } = await supabase
+        .from('sub_tree')
+        .select('linked_account_id')
+        .eq('org_id', orgId)
+        .in('linked_account_id', accountIds)
+        .limit(1000);
+      if (!linkErr && Array.isArray(links)) {
+        const linkedSet = new Set<string>((links as any[]).map(r => String(r.linked_account_id)).filter(Boolean));
+        for (const id of accountIds) {
+          if (linkedSet.has(id)) {
+            updates[id] = { ...(updates[id] || { has_transactions: false, is_standard: false, linked_to_sub_tree: false }), linked_to_sub_tree: true };
           }
-        } catch {}
-        return [id, null] as const;
-      }));
-
-      for (const [id, val] of results) {
-        if (val) updates[id] = val;
+        }
       }
-    }
+    } catch {}
 
-    if (Object.keys(updates).length) {
-      setDeleteFlags(prev => ({ ...prev, ...updates }));
-      // Also merge onto accounts so UI logic sees them immediately
-      setAccounts(prev => prev.map(a => updates[a.id] ? { ...a, ...updates[a.id] } : a));
-    }
+    setDeleteFlags(prev => ({ ...prev, ...updates }));
+    // Also merge onto accounts so UI logic sees them immediately
+    setAccounts(prev => prev.map(a => updates[a.id] ? { ...a, ...updates[a.id] } : a));
   }
 
   useEffect(() => {
@@ -627,48 +624,23 @@ const AccountsTreePage: React.FC = () => {
     let rollupData: any[] = [];
     let dataSource = 'unknown';
     
-    // Try RPC function first (if available)
+    // Use view-based query to avoid RPC dependency
     try {
-      const includeUnposted = balanceMode === 'all';
-      const { data: rpcData, error: rpcError } = await supabase.rpc('get_accounts_activity_rollups', {
-        p_org_id: orgId,
-        p_include_unposted: includeUnposted
-      });
-      
-      if (!rpcError && rpcData) {
-        rollupData = rpcData;
-        dataSource = 'RPC';
-        console.log('✅ Successfully fetched from RPC:', rollupData.length, 'records');
-      } else {
-        console.warn('⚠️ RPC failed or returned no data, trying view fallback. Error:', rpcError);
-        throw new Error('RPC not available or failed');
-      }
-    } catch (rpcErr) {
-      // Fallback to view-based query
-      console.log('📋 Falling back to view-based query...');
-      
-      try {
-        const viewQuery = supabase
-          .from('v_accounts_activity_rollups')
-          .select('id, org_id, has_transactions, net_amount, total_debit_amount, total_credit_amount, child_count')
-          .eq('org_id', orgId);
-        
-        // Note: The view doesn't support project filtering directly since it aggregates all accounts
-        // Project filtering would need to be done at the account level, not transaction level
-        const { data: viewData, error: viewError } = await viewQuery;
-        
-        if (viewError) {
-          console.error('❌ Error fetching from view:', viewError);
-          return;
-        }
-        
-        rollupData = viewData || [];
-        dataSource = 'VIEW';
-        console.log('✅ Successfully fetched from view:', rollupData.length, 'records');
-      } catch (viewErr) {
-        console.error('❌ Both RPC and view failed:', viewErr);
+      const viewQuery = supabase
+        .from('v_accounts_activity_rollups')
+        .select('id, org_id, has_transactions, net_amount, total_debit_amount, total_credit_amount, child_count')
+        .eq('org_id', orgId);
+      const { data: viewData, error: viewError } = await viewQuery;
+      if (viewError) {
+        console.error('❌ Error fetching from view:', viewError);
         return;
       }
+      rollupData = viewData || [];
+      dataSource = 'VIEW';
+      console.log('✅ Fetched rollups from view:', rollupData.length);
+    } catch (err) {
+      console.error('❌ Failed to fetch rollups:', err);
+      return;
     }
     
     console.log('📊 Raw rollup data from', dataSource, ':', rollupData.slice(0, 3));
@@ -980,10 +952,11 @@ const AccountsTreePage: React.FC = () => {
               if (!item) return true;
               // Disable if parent (has children) – immediate and cheap
               if (item.has_children || item.has_active_children) return true;
-              // Optional: disable if we already know it has transactions or is standard (cached on item via extensions)
-              const extendedItem = item as AccountItem & { has_transactions?: boolean; is_standard?: boolean };
+              // Optional: disable if we already know it has transactions or is standard or linked in sub_tree
+              const extendedItem = item as AccountItem & { has_transactions?: boolean; is_standard?: boolean; linked_to_sub_tree?: boolean };
               if (extendedItem?.has_transactions === true) return true;
               if (extendedItem?.is_standard === true) return true;
+              if (extendedItem?.linked_to_sub_tree === true) return true;
               return false;
             }}
             getDeleteDisabledReason={(node) => {
@@ -991,8 +964,9 @@ const AccountsTreePage: React.FC = () => {
               const item = accounts.find(a => a.id === id);
               if (!item) return 'غير متاح';
               if (item.has_children || item.has_active_children) return 'لا يمكن حذف حساب له فروع';
-              const extendedItem = item as AccountItem & { has_transactions?: boolean; is_standard?: boolean };
+              const extendedItem = item as AccountItem & { has_transactions?: boolean; is_standard?: boolean; linked_to_sub_tree?: boolean };
               if (extendedItem?.is_standard) return 'حساب قياسي (افتراضي) لا يمكن حذفه';
+              if (extendedItem?.linked_to_sub_tree) return 'مرتبط بفئة في الشجرة الفرعية — فك الارتباط أولاً';
               if (extendedItem?.has_transactions) return 'لا يمكن حذف حساب لديه حركات';
               return 'حذف';
             }}
@@ -1081,10 +1055,10 @@ const AccountsTreePage: React.FC = () => {
         <DraggableResizablePanel
           title={dialogMode === 'edit' ? 'تعديل الحساب' : 'إضافة حساب جديد'}
           subtitle={draft?.code ? `الكود: ${draft.code}` : undefined}
-          headerGradient={'linear-gradient(90deg, #5b21b6, #8b5cf6, #06b6d4)'}
+          headerGradient={`linear-gradient(90deg, ${tokens.palette.primary.dark}, ${tokens.palette.primary.main}, ${tokens.palette.info.main})`}
           headerActions={(
             <>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'white', fontSize: 12, marginInlineEnd: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: tokens.palette.primary.contrastText, fontSize: 12, marginInlineEnd: 8 }}>
                 <input type="checkbox" checked={rememberPanel} onChange={(e) => setRememberPanel(e.target.checked)} />
                 تذكر التخطيط
               </label>

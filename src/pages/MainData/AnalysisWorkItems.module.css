@@ -56,6 +56,8 @@
   min-height: 0;
 }
 
+/* Enforce app font within the table area regardless of global imports order */
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -89,6 +91,39 @@
   top: 0;
   z-index: 1;
 }
+
+/* Data table visual styles scoped to this page */
+.dataTable :global(thead th) {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover));
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+/* Force app font for this page even if an inline theme sets a different font */
+
+.dataTable :global(tbody tr:nth-of-type(odd)) { background: var(--row-alt-bg); }
+.dataTable :global(tbody tr:nth-of-type(even)) { background: var(--surface); }
+.dataTable :global(tbody tr:hover) { background: var(--hover-bg); }
+
+.dataTable {
+  font-size: var(--font-size-sm, 0.95rem);
+}
+
+.dataTable :global(th),
+.dataTable :global(td) {
+  padding: 10px 12px;
+  color: var(--text);
+  font-family: var(--user-font-family, var(--font-family, inherit)) !important;
+}
+
+/* Keep normal code font for consistency with other pages */
+.dataTable :global(td.table-code-cell) {
+  letter-spacing: 0;
+}
+
+/* Wider actions column and code column width */
+.actionsCell { min-width: 260px; }
+.codeCol { min-width: 140px; font-weight: 600; }
 
 .footerActions {
   display: flex;

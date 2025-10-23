@@ -8,24 +8,26 @@ const cache = {
 
 export async function listAnalysisWorkItems(params: {
   orgId: string,
+  // projectId intentionally ignored for listing; AWIs are org-level
   projectId?: string | null,
   search?: string,
   onlyWithTx?: boolean,
   includeInactive?: boolean,
 }): Promise<AnalysisWorkItemFull[]> {
-  const key = JSON.stringify(params)
+  // Normalize cache key to exclude projectId from affecting list results
+  const { orgId, search = null, onlyWithTx = false, includeInactive = true } = params
+  if (!orgId) return []
+  const key = JSON.stringify({ orgId, search, onlyWithTx, includeInactive })
   if (cache.byOrg.has(key)) return cache.byOrg.get(key)!
 
-  const { orgId, projectId = null, search = null, onlyWithTx = false, includeInactive = true } = params
-  
-  // First try the main RPC function
+  // First try the main RPC function without project filter so we never hide org items
   let data, error
   
   try {
     const result = await supabase.rpc('list_analysis_work_items', {
       p_org_id: orgId,
       p_only_with_tx: onlyWithTx,
-      p_project_id: projectId,
+      p_project_id: null, // do not scope listing by project
       p_search: search,
       p_include_inactive: includeInactive,
     })

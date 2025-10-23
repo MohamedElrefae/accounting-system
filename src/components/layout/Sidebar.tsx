@@ -44,6 +44,8 @@ import Security from '@mui/icons-material/Security';
 import Database from '@mui/icons-material/Storage';
 import Tag from '@mui/icons-material/LocalOffer';
 import FormatSize from '@mui/icons-material/FormatSize';
+import AutoAwesome from '@mui/icons-material/AutoAwesome';
+import Upload from '@mui/icons-material/Upload';
 import useAppStore from '../../store/useAppStore';
 import { navigationItems } from '../../data/navigation';
 import type { NavigationItem } from '../../types';
@@ -120,6 +122,10 @@ const getIcon = (iconName: string) => {
       return <Tag />;
     case 'type':
       return <FormatSize />;
+    case 'AutoAwesome':
+      return <AutoAwesome />;
+    case 'Upload':
+      return <Upload />;
     default:
       return <DashboardIcon />;
   }

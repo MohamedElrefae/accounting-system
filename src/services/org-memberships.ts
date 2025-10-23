@@ -1,18 +1,14 @@
 import { supabase } from "../utils/supabase";
 
-export type OrgMemberRole = 'viewer' | 'manager' | 'admin';
-
 export interface OrgMemberRecord {
   org_id: string;
   user_id: string;
-  role: OrgMemberRole;
   created_at?: string;
 }
 
 export interface OrgMemberWithUser {
   org_id: string;
   user_id: string;
-  role: OrgMemberRole;
   created_at?: string;
   user: {
     id: string;
@@ -42,7 +38,7 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberWithUser[]
   const { data, error } = await supabase
     .from("org_memberships")
     .select(
-      `org_id, user_id, role, created_at,
+      `org_id, user_id, created_at,
        user:user_profiles ( id, email, first_name, last_name, full_name_ar, department, job_title, is_active, avatar_url )`
     )
     .eq("org_id", orgId)
@@ -52,14 +48,13 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberWithUser[]
   return (data || []) as unknown as OrgMemberWithUser[];
 }
 
-export async function addOrgMember(orgId: string, userId: string, role: OrgMemberRole): Promise<void> {
+export async function addOrgMember(orgId: string, userId: string): Promise<void> {
   if (USE_MOCK) {
     const exists = mockStore.memberships.find(m => m.org_id === orgId && m.user_id === userId);
     if (!exists) {
       mockStore.memberships.push({
         org_id: orgId,
         user_id: userId,
-        role,
         created_at: new Date().toISOString(),
         user: { id: userId, email: `${userId}@example.com`, first_name: 'User', last_name: userId.slice(0, 6), is_active: true, full_name_ar: 'مستخدم تجريبي' }
       });
@@ -68,23 +63,10 @@ export async function addOrgMember(orgId: string, userId: string, role: OrgMembe
   }
   const { error } = await supabase
     .from("org_memberships")
-    .insert({ org_id: orgId, user_id: userId, role });
+    .insert({ org_id: orgId, user_id: userId });
   if (error) throw error;
 }
 
-export async function updateOrgMemberRole(orgId: string, userId: string, role: OrgMemberRole): Promise<void> {
-  if (USE_MOCK) {
-    const item = mockStore.memberships.find(m => m.org_id === orgId && m.user_id === userId);
-    if (item) item.role = role;
-    return;
-  }
-  const { error } = await supabase
-    .from("org_memberships")
-    .update({ role })
-    .eq("org_id", orgId)
-    .eq("user_id", userId);
-  if (error) throw error;
-}
 
 export async function removeOrgMember(orgId: string, userId: string): Promise<void> {
   if (USE_MOCK) {

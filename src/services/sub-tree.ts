@@ -11,8 +11,10 @@ export interface AccountLite {
   org_id: string
   code: string
   name: string
+  name_ar?: string | null
   level: number
   is_postable?: boolean
+  allow_transactions?: boolean
 }
 
 // Simple in-memory cache keyed by org_id
@@ -54,16 +56,10 @@ export async function getExpensesCategoriesTree(orgId: string, force = false): P
   if (!force && cache.tree.has(orgId)) return cache.tree.get(orgId)!
 
   console.log('🌳 Loading sub tree for org:', orgId)
-  const { data, error } = await supabase.rpc('get_sub_tree_tree', { p_org_id: orgId })
-  if (error) {
-    console.error('❌ Sub tree RPC error:', error)
-    throw error
-  }
-  const rows = (data as any[] | null)?.map(r => ({ ...r, path: String(r.path) })) as SubTreeRow[] || []
-  console.log('🌳 Loaded sub tree rows:', rows.length)
-  const tree = buildTree(rows)
+  // Use view/table directly to avoid RPC schema mismatches
+  const list = await getExpensesCategoriesList(orgId, /*force*/ true)
+  const tree = buildTree(list)
   cache.tree.set(orgId, tree)
-  cache.list.set(orgId, rows)
   return tree
 }
 
@@ -119,10 +115,15 @@ export async function fetchNextExpensesCategoryCode(orgId: string, parentId: str
 }
 
 export async function createExpensesCategory(payload: CreateSubTreePayload): Promise<string> {
+  // Enforce DB constraint for description length (1..300)
+  const desc = String(payload.description ?? '').trim().slice(0, 300)
+  if (desc.length < 1) {
+    throw new Error('الوصف مطلوب (1..300)')
+  }
   const { data, error } = await supabase.rpc('create_sub_tree', {
     p_org_id: payload.org_id,
-    p_code: payload.code,
-    p_description: payload.description,
+    p_code: String(payload.code ?? '').trim(),
+    p_description: desc,
     p_add_to_cost: payload.add_to_cost ?? false,
     p_parent_id: payload.parent_id ?? null,
     p_linked_account_id: payload.linked_account_id ?? null,
@@ -135,10 +136,15 @@ export async function createExpensesCategory(payload: CreateSubTreePayload): Pro
 }
 
 export async function updateExpensesCategory(payload: UpdateSubTreePayload & { org_id?: string }): Promise<boolean> {
+  // Respect description constraint if provided
+  const desc = payload.description === undefined ? undefined : String(payload.description ?? '').trim().slice(0, 300)
+  if (desc !== undefined && desc.length < 1) {
+    throw new Error('الوصف مطلوب (1..300)')
+  }
   const { data, error } = await supabase.rpc('update_sub_tree', {
     p_id: payload.id,
-    p_code: payload.code ?? null,
-    p_description: payload.description ?? null,
+    p_code: payload.code ? String(payload.code).trim() : null,
+    p_description: desc ?? null,
     p_add_to_cost: payload.add_to_cost ?? null,
     p_is_active: payload.is_active ?? null,
     p_linked_account_id: payload.linked_account_id ?? null,
@@ -166,7 +172,7 @@ export async function listAccountsForOrg(orgId: string): Promise<AccountLite[]> 
   if (cache.accounts.has(orgId)) return cache.accounts.get(orgId)!
   const { data, error } = await supabase
     .from('accounts')
-    .select('id, org_id, code, name, level, is_postable')
+    .select('id, org_id, code, name, name_ar, level, is_postable, allow_transactions')
     .eq('org_id', orgId)
     .order('code', { ascending: true })
   if (error) throw error

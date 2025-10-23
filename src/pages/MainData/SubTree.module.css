@@ -1,0 +1,148 @@
+/* Sub Tree Page styles (migrated from ExpensesCategories.module.css) */
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--background);
+  color: var(--text);
+}
+
+.header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--topbar_bg);
+  flex-shrink: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--heading);
+  font-weight: 600;
+}
+
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 24px;
+  gap: 16px;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.cardBody {
+  padding: 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.filtersRow {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.tableContainer {
+  flex: 1;
+  overflow: auto;
+  min-height: 400px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: 16px;
+}
+
+.sectionTitle {
+  font-weight: 600;
+  color: var(--heading);
+}
+
+.footerActions {
+  display: flex;
+  gap: 8px;
+}
+
+.tableWrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.tableScrollArea {
+  flex: 1;
+  overflow: auto;
+}
+
+ .tablePagination {
+  flex-shrink: 0;
+}
+
+/* Action buttons visibility like tree view */
+.actionButtons {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.tableRow:hover .actionButtons {
+  opacity: 1;
+}
+
+/* List view styling to match tree view theme/font */
+.dataTable {
+  font-family: var(--font-family, inherit);
+  font-size: var(--font-size, 0.95rem);
+  color: var(--text);
+  background: var(--surface);
+}
+
+/* Ensure MUI table parts inherit theme when using CSS modules */
+.dataTable :global(.MuiTableCell-root) {
+  color: var(--text);
+  border-color: var(--border);
+  font-family: var(--font-family, inherit);
+  font-size: var(--font-size, 0.95rem);
+}
+.dataTable :global(.MuiTableHead-root) {
+  background: var(--topbar_bg);
+}
+.dataTable :global(.MuiTableRow-root) {
+  transition: background-color .2s ease;
+}
+.dataTable :global(tbody .MuiTableRow-root:hover) {
+  background-color: var(--hover_bg, rgba(0,0,0,0.03));
+}
+
+.tableHeader {
+  background: var(--topbar_bg);
+}
+.tableRow {
+  transition: background-color .2s ease;
+}
+.tableRow:hover {
+  background-color: var(--hover_bg, rgba(0,0,0,0.03));
+}
+.tableCell {
+  color: var(--text);
+  border-color: var(--border);
+}

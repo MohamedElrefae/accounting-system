@@ -1,6 +1,94 @@
+// NOTE: The functions appended at the end of this file provide unified access
+// to either legacy or gl2 data paths based on feature flags. They are additive
+// and should not break existing imports.
+
+// GL2 feature flags removed; unified model only
 import { supabase } from '../utils/supabase'
 import { formatDateForSupabase } from '../utils/dateHelpers'
 import { getTransactionNumberConfig } from './company-config'
+import { getReadMode } from '../config/featureFlags'
+
+export type UnifiedListParams = { limit?: number };
+
+// GL2 journal listing/reading removed — use unified data sources (transactions + transaction_lines).
+export async function listJournalsUnified(params?: UnifiedListParams) {
+  const limit = params?.limit ?? 50;
+  return supabase
+    .from('transactions_enriched')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+}
+
+export async function getJournalDetailsUnified(journalId: string) {
+  // Fallback to enriched transactions view by id
+  return supabase
+    .from('transactions_enriched')
+    .select('*')
+    .eq('id', journalId)
+    .single();
+}
+
+export type CreateJournalUnifiedArgs = {
+  orgId: string;
+  number: string;
+  docType: string;
+  docDate: string; // ISO date (YYYY-MM-DD)
+  description?: string;
+  sourceModule?: string;
+  sourceRefId?: string | null;
+  entityCode?: string | null;
+  lines: Array<{
+    account_code: string;
+    debit_base: string | number;
+    credit_base: string | number;
+    description?: string;
+    // Optional line-level dimensions to be stored in gl2.journal_line_dimensions
+    // Keys should match the dimension_key values expected by the DB function
+    dimensions?: Partial<Record<'project_id' | 'cost_center_id' | 'work_item_id' | 'analysis_work_item_id' | 'classification_id' | 'expenses_category_id', string>>;
+  }>;
+};
+
+// GL2 journal create/post removed — use transactions + transaction_lines flows instead.
+export async function createJournalUnified(_args: CreateJournalUnifiedArgs) {
+  throw new Error('Removed: GL2 journal creation disabled. Use transactions + transaction_lines.');
+}
+
+export async function postJournalUnified(_journalId: string, _postingDate?: string) {
+  throw new Error('Removed: GL2 journal posting disabled. Use post_transaction with transaction lines.');
+}
+
+// Removed: GL2 helpers — use unified transactions and transaction_lines.
+export async function getGL2JournalDetails(_journalId: string) {
+  throw new Error('Removed: GL2 journal details disabled. Use unified transactions + lines.');
+}
+
+export async function voidJournalGL2(_journalId: string) {
+  throw new Error('Removed: GL2 void disabled.');
+}
+
+export async function reverseJournalGL2(_journalId: string, _reverseDate?: string) {
+  throw new Error('Removed: GL2 reverse disabled.');
+}
+
+// Helper: fetch a transaction header with its lines (for edit forms)
+import { getTransactionLines } from './transaction-lines'
+
+export async function getTransactionWithLines(transactionId: string) {
+  if (!transactionId) throw new Error('transactionId is required')
+
+  const { data: header, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('id', transactionId)
+    .single()
+
+  if (error) throw error
+
+  const lines = await getTransactionLines(transactionId)
+  return { header, lines }
+}
+
 
 export interface Account {
   id: string
@@ -259,16 +347,125 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
   const from = (page - 1) * pageSize
   const to = from + pageSize - 1
 
-  // Dynamic query with organization, project, classification, and cost center joins
+// Use main transactions table (not GL2 view)
+  if (false) { // Disabled: Always use main transactions table
+    const fromIdx = from;
+    const toIdx = to;
+
+    // Map filters to GL2 view columns
+    const f = options?.filters;
+    const gl2Filters: string[] = [];
+    const gl2OrFilters: string[] = [];
+
+    // Search on number
+    if (f?.search && f.search.trim()) {
+      const s = f.search.trim();
+      gl2OrFilters.push(`number.ilike.%${s}%`);
+    }
+    // Date range -> posting_date (fallback doc_date)
+    // PostgREST cannot OR across columns easily; we use posting_date for consistency
+    // The view populates posting_date for posted; for drafts we used doc_date at display only.
+    // It is acceptable to filter on posting_date only for now.
+
+    // Amount filters
+    // The view exposes amount for two-line journals
+
+    // Account filters: translate account_id (UUID) to code
+    let debitCode: string | null = null;
+    let creditCode: string | null = null;
+    if (f?.debitAccountId || f?.creditAccountId) {
+      const ids: string[] = [];
+      if (f?.debitAccountId) ids.push(f.debitAccountId);
+      if (f?.creditAccountId) ids.push(f.creditAccountId);
+      if (ids.length) {
+        const { data: accs } = await supabase
+          .from('accounts')
+          .select('id, code')
+          .in('id', ids);
+        if (accs && accs.length) {
+          for (const a of accs as any[]) {
+            if (f?.debitAccountId === a.id) debitCode = a.code;
+            if (f?.creditAccountId === a.id) creditCode = a.code;
+          }
+        }
+      }
+    }
+
+    // Build the query
+    let q = supabase
+      .from('v_gl2_journals_enriched')
+      .select('journal_id, org_id, number, doc_date, posting_date, status, debit_account_code, debit_account_name, credit_account_code, credit_account_name, amount, total_debits, total_credits', { count: 'exact' })
+      .order('posting_date', { ascending: false, nullsFirst: false })
+      .range(fromIdx, toIdx);
+
+    // Apply filters
+    if (gl2OrFilters.length) {
+      q = (q as any).or(gl2OrFilters.join(','));
+    }
+    if (f?.dateFrom) q = q.gte('effective_date', f.dateFrom);
+    if (f?.dateTo) q = q.lte('effective_date', f.dateTo);
+    if (f?.amountFrom != null) q = q.gte('amount', f.amountFrom);
+    if (f?.amountTo != null) q = q.lte('amount', f.amountTo);
+    if (debitCode) q = q.eq('debit_account_code', debitCode);
+    if (creditCode) q = q.eq('credit_account_code', creditCode);
+    if (f?.orgId) q = q.eq('org_id', f.orgId);
+    if (f?.approvalStatus) {
+      if (f.approvalStatus === 'posted') q = q.eq('status', 'posted');
+      else if (f.approvalStatus === 'draft') q = q.eq('status', 'draft');
+    }
+    // Line-level dimension filters (view exposes these from first debit line)
+    if (f?.classificationId) q = q.eq('classification_id', f.classificationId);
+    if (f?.expensesCategoryId) q = q.eq('expenses_category_id', f.expensesCategoryId);
+    if (f?.workItemId) q = q.eq('work_item_id', f.workItemId);
+    if (f?.analysisWorkItemId) q = q.eq('analysis_work_item_id', f.analysisWorkItemId);
+    if (f?.costCenterId) q = q.eq('cost_center_id', f.costCenterId);
+    if (f?.projectId) q = q.eq('project_id', f.projectId);
+
+    const { data, error, count } = await q;
+    if (error) throw error;
+
+    // Build code->name map for nicer labels
+    // Mapping not required; view already exposes names
+    const rows = (data || []).map((r: any) => ({
+      id: r.journal_id,
+      entry_number: r.number,
+      entry_date: r.doc_date || r.posting_date,
+      description: '',
+      reference_number: null,
+      debit_account_id: r.debit_account_code,
+      credit_account_id: r.credit_account_code,
+      amount: Number(r.amount ?? 0),
+      notes: null,
+      classification_id: null,
+      sub_tree_id: null,
+      work_item_id: null,
+      cost_center_id: null,
+      is_posted: String(r.status).toLowerCase() === 'posted',
+      posted_at: null,
+      posted_by: null,
+      created_by: null,
+      project_id: null,
+      org_id: r.org_id ?? null,
+      approval_status: String(r.status).toLowerCase() === 'posted' ? 'approved' : 'draft',
+      submitted_at: null,
+      submitted_by: null,
+      reviewed_at: null,
+      reviewed_by: null,
+      review_action: null,
+      review_reason: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      // Display helpers used by UI (code - name)
+      _debit_display: r.debit_account_code ? `${r.debit_account_code} - ${r.debit_account_name ?? ''}`.trim() : '',
+      _credit_display: r.credit_account_code ? `${r.credit_account_code} - ${r.credit_account_name ?? ''}`.trim() : '',
+    })) as any[];
+    return { rows: rows as any, total: count ?? rows.length };
+  }
+
+  // Dynamic query - no joins (relationships don't exist in schema)
   let query = supabase
     .from('transactions')
-    .select(`
-      *,
-      organizations!left(name),
-      projects!left(name),
-      transaction_classification!left(code, name),
-      cost_centers!left(code, name)
-    `, { count: 'exact' })
+    .select('*', { count: 'exact' })
     .order('entry_date', { ascending: false })
 
   if (scope === 'my') {
@@ -318,16 +515,8 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
   const { data, error, count } = await query.range(from, to)
   if (error) throw error
   
-  // Transform the data to include organization, project, and cost center information
-  const transformedData = (data || []).map((row: any) => ({
-    ...row,
-    organization_name: row.organizations?.name || null,
-    project_name: row.projects?.name || null,
-    cost_center_code: row.cost_centers?.code || null,
-    cost_center_name: row.cost_centers?.name || null
-  }))
-  
-  return { rows: transformedData as (TransactionRecord & { organization_name?: string; project_name?: string; cost_center_code?: string; cost_center_name?: string })[], total: count ?? 0 }
+  // Return data as-is (no joins available)
+  return { rows: (data || []) as TransactionRecord[], total: count ?? 0 }
 }
 
 export interface CreateTransactionInput {
@@ -416,6 +605,16 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
     }
     throw error
   }
+  return data as TransactionRecord
+}
+
+export async function getTransactionById(id: string): Promise<TransactionRecord | null> {
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('id', id)
+    .single()
+  if (error) return null
   return data as TransactionRecord
 }
 

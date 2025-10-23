@@ -1,0 +1,276 @@
+import React, { useMemo } from 'react'
+import ResizableTable from '../../components/Common/ResizableTable'
+import type { ColumnConfig } from '../../components/Common/ColumnConfiguration'
+import type { TransactionRecord } from '../../services/transactions'
+import { WithPermission } from '../../components/Common/withPermission'
+
+interface TransactionsHeaderTableProps {
+  transactions: TransactionRecord[]
+  accounts: Array<{ id: string; code: string; name: string }>
+  organizations: Array<{ id: string; code: string; name: string }>
+  projects: Array<{ id: string; code: string; name: string }>
+  categories: Array<{ id: string; code: string; description: string }>
+  workItems: Array<{ id: string; code: string; name: string }>
+  analysisItemsMap: Record<string, { code: string; name: string }>
+  classifications: Array<{ id: string; code: string; name: string }>
+  userNames: Record<string, string>
+  columns: ColumnConfig[]
+  wrapMode: boolean
+  loading: boolean
+  onColumnResize: (key: string, width: number) => void
+  onSelectTransaction: (tx: TransactionRecord) => void
+  selectedTransactionId?: string
+  // All the action handlers
+  onEdit: (tx: TransactionRecord) => void
+  onDelete: (id: string) => void
+  onOpenDetails: (tx: TransactionRecord) => Promise<void>
+  onOpenDocuments: (tx: TransactionRecord) => void
+  onOpenCostAnalysis: (tx: TransactionRecord) => void
+  onSubmit: (id: string) => void
+  onApprove: (id: string) => void
+  onRevise: (id: string) => void
+  onReject: (id: string) => void
+  onResubmit: (id: string) => void
+  onPost: (id: string) => void
+  onCancelSubmission: (id: string) => void
+  mode: 'my' | 'pending' | 'all'
+  currentUserId?: string
+  hasPerm: (perm: string) => boolean
+}
+
+const TransactionsHeaderTable: React.FC<TransactionsHeaderTableProps> = ({
+  transactions,
+  accounts,
+  organizations,
+  projects,
+  categories,
+  workItems,
+  analysisItemsMap,
+  classifications,
+  userNames,
+  columns,
+  wrapMode,
+  loading,
+  onColumnResize,
+  onSelectTransaction,
+  selectedTransactionId,
+  onEdit,
+  onDelete,
+  onOpenDetails,
+  onOpenDocuments,
+  onOpenCostAnalysis,
+  onSubmit,
+  onApprove,
+  onRevise,
+  onReject,
+  onResubmit,
+  onPost,
+  onCancelSubmission,
+  mode,
+  currentUserId,
+  hasPerm
+}) => {
+  console.log('🐛 TransactionsHeaderTable received:', transactions?.length || 0, 'transactions');
+  
+  // Prepare table data
+  const tableData = useMemo(() => {
+    const accLabel = (id?: string | null) => {
+      if (!id) return ''
+      const a = accounts.find(x => x.id === id)
+      return a ? `${a.code} - ${a.name}` : id
+    }
+
+    const catMap: Record<string, string> = {}
+    for (const c of categories) { catMap[c.id] = `${c.code} - ${c.description}` }
+
+    return transactions.map((t: any) => ({
+      entry_number: t.entry_number,
+      entry_date: t.entry_date,
+      description: t.description,
+      debit_account_label: accLabel(t.debit_account_id),
+      credit_account_label: accLabel(t.credit_account_id),
+      amount: t.amount,
+      sub_tree_label: t.sub_tree_id ? (catMap[t.sub_tree_id] || '—') : '—',
+      work_item_label: (() => { const wi = workItems.find(w => w.id === (t.work_item_id || '')); return wi ? `${wi.code} - ${wi.name}` : '—' })(),
+      analysis_work_item_label: (() => {
+        const id = (t as any).analysis_work_item_id || ''
+        if (!id) return '—'
+        const a = analysisItemsMap[id]
+        return a ? `${a.code} - ${a.name}` : id
+      })(),
+      classification_name: t.transaction_classification?.name || '—',
+      organization_name: organizations.find(o => o.id === (t.org_id || ''))?.name || '—',
+      project_name: projects.find(p => p.id === (t.project_id || ''))?.name || '—',
+      cost_center_label: t.cost_center_code && t.cost_center_name ? `${t.cost_center_code} - ${t.cost_center_name}` : '—',
+      reference_number: t.reference_number || '—',
+      notes: t.notes || '—',
+      created_by_name: t.created_by ? (userNames[t.created_by] || t.created_by.substring(0, 8)) : '—',
+      posted_by_name: t.posted_by ? (userNames[t.posted_by] || t.posted_by.substring(0, 8)) : '—',
+      approval_status: t.is_posted ? 'posted' : ((t as any).approval_status || 'draft'),
+      documents_count: (t as any).documents_count || 0,
+      actions: null,
+      original: t
+    }))
+  }, [transactions, accounts, userNames, categories, workItems, analysisItemsMap, organizations, projects])
+
+  return (
+    <ResizableTable
+      columns={columns}
+      data={tableData}
+      onColumnResize={onColumnResize}
+      className={`transactions-resizable-table ${wrapMode ? 'wrap' : 'nowrap'}`}
+      isLoading={loading}
+      emptyMessage="لا توجد معاملات"
+      highlightRowId={selectedTransactionId}
+      getRowId={(row) => (row as any).original?.id ?? (row as any).id}
+      renderCell={(_value, column, row, _rowIndex) => {
+        // Handle approval status badge
+        if (column.key === 'approval_status') {
+          const st = row.original.is_posted ? 'posted' : String((row.original as any).approval_status || 'draft')
+          const map: Record<string, { label: string; cls: string; tip: string }> = {
+            draft: { label: 'مسودة', cls: 'ultimate-btn-neutral', tip: 'لم يتم إرسالها للمراجعة بعد' },
+            submitted: { label: 'مُرسلة', cls: 'ultimate-btn-edit', tip: 'بإنتظار المراجعة' },
+            revision_requested: { label: 'طلب تعديل', cls: 'ultimate-btn-warning', tip: 'أُعيدت للتعديل — أعد الإرسال بعد التصحيح' },
+            approved: { label: 'معتمدة', cls: 'ultimate-btn-success', tip: 'تم الاعتماد' },
+            rejected: { label: 'مرفوضة', cls: 'ultimate-btn-delete', tip: 'تم الرفض' },
+            cancelled: { label: 'ملغاة', cls: 'ultimate-btn-neutral', tip: 'ألغى المُرسل الإرسال' },
+            posted: { label: 'مرحلة', cls: 'ultimate-btn-posted', tip: 'تم الترحيل (مُثبت في الدفاتر)' },
+          }
+          const conf = map[st] || map['draft']
+          return (
+            <span className={`ultimate-btn ${conf.cls}`} style={{ cursor: 'default', padding: '4px 8px', minHeight: 28 }} title={conf.tip}>
+              <span className="btn-text">{conf.label}</span>
+            </span>
+          )
+        }
+
+        // Handle documents count
+        if (column.key === 'documents_count') {
+          const count = (row.original as any).documents_count || 0
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+              <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{count}</span>
+              {count > 0 && <span title={`عدد المرفقات: ${count}`}>📎</span>}
+            </div>
+          )
+        }
+
+        // Handle documents button
+        if (column.key === 'documents') {
+          return (
+            <WithPermission perm="documents.read">
+              <button
+                className="ultimate-btn ultimate-btn-edit"
+                title="إدارة مستندات المعاملة"
+                onClick={() => onOpenDocuments(row.original)}
+              >
+                <div className="btn-content"><span className="btn-text">مستندات</span></div>
+              </button>
+            </WithPermission>
+          )
+        }
+
+        // Handle actions column
+        if (column.key === 'actions') {
+          return (
+            <div className="tree-node-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+              <button 
+                className="ultimate-btn ultimate-btn-edit" 
+                onClick={async () => {
+                  onSelectTransaction(row.original)
+                  await onOpenDetails(row.original)
+                }}
+                title="عرض التفاصيل والسجل"
+              >
+                <div className="btn-content"><span className="btn-text">تفاصيل</span></div>
+              </button>
+
+              {/* Edit button */}
+              {mode === 'my' && !row.original.is_posted && hasPerm('transactions.update') && row.original.created_by === currentUserId && (
+                <button 
+                  className="ultimate-btn ultimate-btn-edit" 
+                  onClick={() => {
+                    onSelectTransaction(row.original)
+                    onEdit(row.original)
+                  }}
+                >
+                  <div className="btn-content"><span className="btn-text">تعديل</span></div>
+                </button>
+              )}
+              {mode === 'all' && !row.original.is_posted && hasPerm('transactions.manage') && (
+                <button 
+                  className="ultimate-btn ultimate-btn-edit" 
+                  onClick={() => {
+                    onSelectTransaction(row.original)
+                    onEdit(row.original)
+                  }}
+                >
+                  <div className="btn-content"><span className="btn-text">تعديل</span></div>
+                </button>
+              )}
+
+              {/* Delete button */}
+              {mode === 'my' && !row.original.is_posted && hasPerm('transactions.delete') && row.original.created_by === currentUserId && (
+                <button 
+                  className="ultimate-btn ultimate-btn-delete" 
+                  onClick={() => onDelete(row.original.id)}
+                  title="حذف المعاملة (لا يمكن التراجع)"
+                >
+                  <div className="btn-content"><span className="btn-text">حذف</span></div>
+                </button>
+              )}
+
+              {/* Submit for review */}
+              {!row.original.is_posted && (((mode === 'my' && row.original.created_by === currentUserId) || (mode === 'all' && hasPerm('transactions.manage')))) && 
+                !['submitted', 'approved', 'rejected'].includes(((row.original as any).approval_status || 'draft')) && (
+                <button 
+                  className="ultimate-btn ultimate-btn-success" 
+                  onClick={() => onSubmit(row.original.id)}
+                >
+                  <div className="btn-content"><span className="btn-text">إرسال</span></div>
+                </button>
+              )}
+
+              {/* Review buttons (pending mode) */}
+              {mode === 'pending' && !row.original.is_posted && (
+                <>
+                  {(row.original as any).approval_status !== 'approved' && (
+                    <WithPermission perm="transactions.review">
+                      <button 
+                        className="ultimate-btn ultimate-btn-success" 
+                        onClick={() => onApprove(row.original.id)}
+                      >
+                        <div className="btn-content"><span className="btn-text">اعتماد</span></div>
+                      </button>
+                    </WithPermission>
+                  )}
+                  <WithPermission perm="transactions.review">
+                    <button 
+                      className="ultimate-btn ultimate-btn-edit" 
+                      onClick={() => onRevise(row.original.id)}
+                    >
+                      <div className="btn-content"><span className="btn-text">تعديل</span></div>
+                    </button>
+                  </WithPermission>
+                  <WithPermission perm="transactions.review">
+                    <button 
+                      className="ultimate-btn ultimate-btn-delete" 
+                      onClick={() => onReject(row.original.id)}
+                    >
+                      <div className="btn-content"><span className="btn-text">رفض</span></div>
+                    </button>
+                  </WithPermission>
+                </>
+              )}
+            </div>
+          )
+        }
+
+        return _value
+      }}
+      onRowClick={(row) => onSelectTransaction(row.original)}
+    />
+  )
+}
+
+export default TransactionsHeaderTable

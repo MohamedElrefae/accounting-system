@@ -128,7 +128,7 @@ export async function getProjectByCode(code: string): Promise<Project | null> {
 }
 
 // Create a new project
-export async function createProject(input: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Promise<Project> {
+export async function createProject(input: Omit<Project, 'id' | 'created_at' | 'updated_at'> & Record<string, any>): Promise<Project> {
   const uid = await getCurrentUserId()
   
   // Validate required fields
@@ -139,11 +139,21 @@ export async function createProject(input: Omit<Project, 'id' | 'created_at' | '
   // Check if project code already exists
   const existingProject = await getProjectByCode(input.code)
   if (existingProject) {
-    throw new Error(`كود المشروع "${input.code}" موجود مسبقاً`)
+    throw new Error(`كود المشروع \"${input.code}\" موجود مسبقاً`)
   }
 
-  const payload = {
-    ...input,
+  // Build sanitized payload (avoid sending generated or aliased columns)
+  const normalizeDate = (v: any) => (v && String(v).trim() !== '' ? v : null)
+  const normalize = (v: any) => (v === '' ? null : v)
+  const payload: Record<string, any> = {
+    code: input.code,
+    name: input.name,
+    description: normalize(input.description ?? null),
+    status: input.status ?? 'active',
+    start_date: normalizeDate((input as any).start_date),
+    end_date: normalizeDate((input as any).end_date),
+    org_id: normalize((input as any).org_id ?? (input as any).organization_id ?? null),
+    budget_amount: normalize((input as any).budget_amount ?? (input as any).budget ?? null),
     created_by: uid ?? null,
   }
 
@@ -158,18 +168,35 @@ export async function createProject(input: Omit<Project, 'id' | 'created_at' | '
 }
 
 // Update a project
-export async function updateProject(id: string, updates: Partial<Omit<Project, 'id' | 'created_at' | 'updated_at'>>): Promise<Project> {
+export async function updateProject(id: string, updates: Partial<Omit<Project, 'id' | 'created_at' | 'updated_at'>> & Record<string, any>): Promise<Project> {
   // If updating code, check for duplicates
   if (updates.code) {
     const existingProject = await getProjectByCode(updates.code)
     if (existingProject && existingProject.id !== id) {
-      throw new Error(`كود المشروع "${updates.code}" موجود مسبقاً`)
+      throw new Error(`كود المشروع \"${updates.code}\" موجود مسبقاً`)
     }
+  }
+
+  // Sanitize updates and map aliases
+  const normalizeDate = (v: any) => (v && String(v).trim() !== '' ? v : null)
+  const normalize = (v: any) => (v === '' ? null : v)
+  const payload: Record<string, any> = {}
+  if (updates.code !== undefined) payload.code = updates.code
+  if (updates.name !== undefined) payload.name = updates.name
+  if (updates.description !== undefined) payload.description = normalize(updates.description)
+  if (updates.status !== undefined) payload.status = updates.status
+  if ((updates as any).start_date !== undefined) payload.start_date = normalizeDate((updates as any).start_date)
+  if ((updates as any).end_date !== undefined) payload.end_date = normalizeDate((updates as any).end_date)
+  if ((updates as any).org_id !== undefined || (updates as any).organization_id !== undefined) {
+    payload.org_id = normalize((updates as any).org_id ?? (updates as any).organization_id)
+  }
+  if ((updates as any).budget_amount !== undefined || (updates as any).budget !== undefined) {
+    payload.budget_amount = normalize((updates as any).budget_amount ?? (updates as any).budget)
   }
 
   const { data, error } = await supabase
     .from('projects')
-    .update(updates)
+    .update(payload)
     .eq('id', id)
     .select('*')
     .single()
@@ -181,16 +208,17 @@ export async function updateProject(id: string, updates: Partial<Omit<Project, '
 // Delete a project
 export async function deleteProject(id: string): Promise<void> {
   // First check if project has any transactions
-  const { data: transactions, error: txError } = await supabase
-    .from('transactions')
+  // Check references in transaction_lines (project moved to lines)
+  const { data: lines, error: tlError } = await supabase
+    .from('transaction_lines')
     .select('id')
     .eq('project_id', id)
     .limit(1)
 
-  if (txError) throw txError
+  if (tlError) throw tlError
   
-  if (transactions && transactions.length > 0) {
-    throw new Error('لا يمكن حذف المشروع لأنه يحتوي على معاملات مالية')
+  if (lines && lines.length > 0) {
+    throw new Error('لا يمكن حذف المشروع لأنه مرتبط بحركات في قيود اليومية')
   }
 
   const { error } = await supabase

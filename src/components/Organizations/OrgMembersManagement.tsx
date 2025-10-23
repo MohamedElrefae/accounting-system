@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Building2, UserPlus2, Users2, Trash2, Shield, RefreshCw } from 'lucide-react';
+import { Building2, UserPlus2, Users2, Trash2, RefreshCw } from 'lucide-react';
 import styles from './OrgMembersManagement.module.css';
 import { useToast } from '../../contexts/ToastContext';
 import { getOrganizations, type Organization } from '../../services/organization';
@@ -7,19 +7,10 @@ import type { User } from '../../types/common';
 import { 
   listOrgMembers, 
   addOrgMember, 
-  updateOrgMemberRole, 
   removeOrgMember, 
   searchUsersNotInOrg, 
-  type OrgMemberRole, 
   type OrgMemberWithUser 
 } from '../../services/org-memberships';
-import { getDefaultRoleForNewMember } from '../../data/mock-org-permissions';
-
-const ROLE_OPTIONS: { value: OrgMemberRole; label: string }[] = [
-  { value: 'viewer', label: 'مشاهد' },
-  { value: 'manager', label: 'مدير' },
-  { value: 'admin', label: 'مسؤول' },
-];
 
 const OrgMembersManagement: React.FC = () => {
   const { showToast } = useToast();
@@ -34,7 +25,6 @@ const OrgMembersManagement: React.FC = () => {
   const [userQuery, setUserQuery] = useState('');
   const [userOptions, setUserOptions] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
-  const [selectedRole, setSelectedRole] = useState<OrgMemberRole>(getDefaultRoleForNewMember());
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -77,7 +67,6 @@ const OrgMembersManagement: React.FC = () => {
   const handleOpenAdd = async () => {
     setUserQuery('');
     setSelectedUserId('');
-    setSelectedRole(getDefaultRoleForNewMember());
     setAddDialogOpen(true);
     await fetchUserOptions('');
   };
@@ -96,7 +85,7 @@ const OrgMembersManagement: React.FC = () => {
     if (!selectedOrgId || !selectedUserId) return;
     setSaving(true);
     try {
-      await addOrgMember(selectedOrgId, selectedUserId, selectedRole);
+      await addOrgMember(selectedOrgId, selectedUserId);
       setAddDialogOpen(false);
       await loadMembers(selectedOrgId);
       showToast('تم إضافة العضو بنجاح', { severity: 'success' });
@@ -104,17 +93,6 @@ const OrgMembersManagement: React.FC = () => {
       showToast('فشل إضافة العضو', { severity: 'error' });
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleRoleChange = async (userId: string, role: OrgMemberRole) => {
-    if (!selectedOrgId) return;
-    try {
-      await updateOrgMemberRole(selectedOrgId, userId, role);
-      setMembers(prev => prev.map(m => m.user_id === userId ? { ...m, role } : m));
-      showToast('تم تحديث دور العضو', { severity: 'success' });
-    } catch {
-      showToast('فشل تحديث الدور', { severity: 'error' });
     }
   };
 
@@ -151,7 +129,7 @@ const OrgMembersManagement: React.FC = () => {
             </div>
             <div className={styles.headerText}>
               <h1>أعضاء المؤسسة</h1>
-              <p>إدارة الأعضاء وتعيين أدوارهم داخل المؤسسة المختارة</p>
+              <p>إدارة أعضاء المؤسسة المختارة</p>
             </div>
           </div>
 
@@ -201,7 +179,6 @@ const OrgMembersManagement: React.FC = () => {
                     <th>المستخدم</th>
                     <th>البريد</th>
                     <th>القسم</th>
-                    <th>الدور</th>
                     <th>الإجراءات</th>
                   </tr>
                 </thead>
@@ -219,20 +196,6 @@ const OrgMembersManagement: React.FC = () => {
                       </td>
                       <td className={styles.muted}>{m.user.email}</td>
                       <td className={styles.muted}>{m.user.department || '—'}</td>
-                      <td>
-                        <div className={styles.roleCell}>
-                          <Shield size={16} />
-                          <select 
-                            className={styles.selectSmall}
-                            value={m.role}
-                            onChange={(e) => handleRoleChange(m.user_id, e.target.value as OrgMemberRole)}
-                          >
-                            {ROLE_OPTIONS.map(r => (
-                              <option key={r.value} value={r.value}>{r.label}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </td>
                       <td>
                         <button className={`${styles.actionButton} ${styles.deleteButton}`} onClick={() => handleRemove(m.user_id)}>
                           <Trash2 size={16} />
@@ -277,18 +240,6 @@ const OrgMembersManagement: React.FC = () => {
                     <option value="" disabled>اختر مستخدم</option>
                     {userOptions.map((u) => (
                       <option key={u.id} value={u.id}>{u.email}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className={styles.formField}>
-                  <label>الدور</label>
-                  <select 
-                    className={styles.select}
-                    value={selectedRole}
-                    onChange={(e) => setSelectedRole(e.target.value as OrgMemberRole)}
-                  >
-                    {ROLE_OPTIONS.map(r => (
-                      <option key={r.value} value={r.value}>{r.label}</option>
                     ))}
                   </select>
                 </div>

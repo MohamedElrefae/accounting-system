@@ -183,28 +183,28 @@ export class TransactionLineItemsEnhancedService {
   /**
    * Get line items as tree structure with caching
    */
-  async getLineItemsTree(transactionId: string, force = false): Promise<LineItemTreeNode[]> {
-    if (!force && cache.tree.has(transactionId)) {
-      return cache.tree.get(transactionId)!
+  async getLineItemsTree(transactionLineId: string, force = false): Promise<LineItemTreeNode[]> {
+    if (!force && cache.tree.has(transactionLineId)) {
+      return cache.tree.get(transactionLineId)!
     }
 
-    console.log('🌳 Loading line items tree for transaction:', transactionId)
+    console.log('🌳 Loading line items tree for transaction line:', transactionLineId)
     try {
       // Load flat data from basic service
-      const items = await transactionLineItemsService.listByTransaction(transactionId)
+      const items = await transactionLineItemsService.listByTransactionLine(transactionLineId)
       
       // Build tree structure
       const tree = buildLineItemTree(items)
       
       // Cache results
-      cache.tree.set(transactionId, tree)
-      cache.list.set(transactionId, items)
-      cache.metadata.set(transactionId, { 
+      cache.tree.set(transactionLineId, tree)
+      cache.list.set(transactionLineId, items)
+      cache.metadata.set(transactionLineId, { 
         lastUpdated: Date.now(),
-        orgId: items[0]?.transaction_id || '' // Store for reference
+        orgId: items[0]?.org_id || '' // Store for reference
       })
       
-      console.log('🌳 Built tree with', tree.length, 'roots for transaction', transactionId)
+      console.log('🌳 Built tree with', tree.length, 'roots for transaction line', transactionLineId)
       return tree
     } catch (error) {
       console.error('❌ Error building line items tree:', error)
@@ -215,14 +215,14 @@ export class TransactionLineItemsEnhancedService {
   /**
    * Get line items as flat list with caching
    */
-  async getLineItemsList(transactionId: string, force = false): Promise<DbTxLineItem[]> {
-    if (!force && cache.list.has(transactionId)) {
-      return cache.list.get(transactionId)!
+  async getLineItemsList(transactionLineId: string, force = false): Promise<DbTxLineItem[]> {
+    if (!force && cache.list.has(transactionLineId)) {
+      return cache.list.get(transactionLineId)!
     }
 
     // Load and cache via tree method (which also caches the list)
-    await this.getLineItemsTree(transactionId, force)
-    return cache.list.get(transactionId) || []
+    await this.getLineItemsTree(transactionLineId, force)
+    return cache.list.get(transactionLineId) || []
   }
 
   /**
@@ -268,13 +268,13 @@ export class TransactionLineItemsEnhancedService {
    * This would ideally call the database function fn_get_next_line_item_code
    */
   async getCodeSuggestion(
-    transactionId: string, 
+    transactionLineId: string, 
     parentItemCode?: string
   ): Promise<CodeSuggestionResult> {
     try {
       // For now, we'll implement the logic here
-      // In production, you'd call: fn_get_next_line_item_code(transactionId, parentItemCode)
-      const items = await transactionLineItemsService.listByTransaction(transactionId);
+      // In production, you'd call: fn_get_next_line_item_code(transactionLineId, parentItemCode)
+      const items = await transactionLineItemsService.listByTransactionLine(transactionLineId);
       
       if (!parentItemCode) {
         // Root level suggestion
@@ -336,12 +336,12 @@ export class TransactionLineItemsEnhancedService {
    * Create line item with tree-aware cache invalidation
    */
   async createLineItem(
-    transactionId: string,
+    transactionLineId: string,
     itemData: EditableTxLineItem
   ): Promise<EditableTxLineItem> {
     try {
       // Get current items
-      const items = await this.getLineItemsList(transactionId)
+      const items = await this.getLineItemsList(transactionLineId)
       
       // Add new item
       const updatedItems = [...items.map(item => ({
@@ -350,21 +350,18 @@ export class TransactionLineItemsEnhancedService {
         quantity: item.quantity,
         percentage: item.percentage,
         unit_price: item.unit_price,
-        discount_amount: item.discount_amount,
-        tax_amount: item.tax_amount,
         item_code: item.item_code,
         item_name: item.item_name,
         analysis_work_item_id: item.analysis_work_item_id,
         sub_tree_id: item.sub_tree_id,
-        line_item_id: item.line_item_id,
         unit_of_measure: item.unit_of_measure
       })), itemData]
       
       // Update via basic service
-      await transactionLineItemsService.upsertMany(transactionId, updatedItems)
+      await transactionLineItemsService.upsertMany(transactionLineId, updatedItems)
       
       // Invalidate cache
-      this.clearCache(transactionId)
+      this.clearCache(transactionLineId)
       
       return itemData
     } catch (error) {
@@ -377,12 +374,12 @@ export class TransactionLineItemsEnhancedService {
    * Update line item with tree-aware cache invalidation
    */
   async updateLineItem(
-    transactionId: string,
+    transactionLineId: string,
     itemId: string,
     updates: Partial<EditableTxLineItem>
   ): Promise<EditableTxLineItem> {
     try {
-      const items = await this.getLineItemsList(transactionId)
+      const items = await this.getLineItemsList(transactionLineId)
       const itemIndex = items.findIndex(item => item.id === itemId)
       
       if (itemIndex === -1) {
@@ -399,13 +396,10 @@ export class TransactionLineItemsEnhancedService {
               quantity: updatedItem.quantity,
               percentage: updatedItem.percentage,
               unit_price: updatedItem.unit_price,
-              discount_amount: updatedItem.discount_amount,
-              tax_amount: updatedItem.tax_amount,
               item_code: updatedItem.item_code,
               item_name: updatedItem.item_name,
               analysis_work_item_id: updatedItem.analysis_work_item_id,
               sub_tree_id: updatedItem.sub_tree_id,
-              line_item_id: updatedItem.line_item_id,
               unit_of_measure: updatedItem.unit_of_measure
             }
           : {
@@ -414,22 +408,19 @@ export class TransactionLineItemsEnhancedService {
               quantity: item.quantity,
               percentage: item.percentage,
               unit_price: item.unit_price,
-              discount_amount: item.discount_amount,
-              tax_amount: item.tax_amount,
               item_code: item.item_code,
               item_name: item.item_name,
               analysis_work_item_id: item.analysis_work_item_id,
               sub_tree_id: item.sub_tree_id,
-              line_item_id: item.line_item_id,
               unit_of_measure: item.unit_of_measure
             }
       )
       
       // Update via basic service
-      await transactionLineItemsService.upsertMany(transactionId, updatedItems)
+      await transactionLineItemsService.upsertMany(transactionLineId, updatedItems)
       
       // Invalidate cache
-      this.clearCache(transactionId)
+      this.clearCache(transactionLineId)
       
       return updatedItem as EditableTxLineItem
     } catch (error) {
@@ -442,11 +433,11 @@ export class TransactionLineItemsEnhancedService {
    * Delete line item with tree-aware cache invalidation
    */
   async deleteLineItem(
-    transactionId: string,
+    transactionLineId: string,
     itemId: string
   ): Promise<boolean> {
     try {
-      const items = await this.getLineItemsList(transactionId)
+      const items = await this.getLineItemsList(transactionLineId)
       const updatedItems = items
         .filter(item => item.id !== itemId)
         .map(item => ({
@@ -455,20 +446,17 @@ export class TransactionLineItemsEnhancedService {
           quantity: item.quantity,
           percentage: item.percentage,
           unit_price: item.unit_price,
-          discount_amount: item.discount_amount,
-          tax_amount: item.tax_amount,
           item_code: item.item_code,
           item_name: item.item_name,
           analysis_work_item_id: item.analysis_work_item_id,
           sub_tree_id: item.sub_tree_id,
-          line_item_id: item.line_item_id,
           unit_of_measure: item.unit_of_measure
         }))
       
-      await transactionLineItemsService.upsertMany(transactionId, updatedItems)
+      await transactionLineItemsService.upsertMany(transactionLineId, updatedItems)
       
       // Invalidate cache
-      this.clearCache(transactionId)
+      this.clearCache(transactionLineId)
       
       return true
     } catch (error) {
@@ -481,16 +469,16 @@ export class TransactionLineItemsEnhancedService {
    * Create a child line item with auto-suggested properties
    */
   async createChildLineItem(
-    transactionId: string,
+    transactionLineId: string,
     childData: ChildLineItemRequest
   ): Promise<EditableTxLineItem> {
     try {
-      const items = await this.getLineItemsList(transactionId);
+      const items = await this.getLineItemsList(transactionLineId);
       
       // Get code suggestion if not provided
       let itemCode = childData.suggested_code;
       if (!itemCode) {
-        const suggestion = await this.getCodeSuggestion(transactionId, childData.parent_item_code);
+        const suggestion = await this.getCodeSuggestion(transactionLineId, childData.parent_item_code);
         itemCode = suggestion.suggested_code;
       }
 
@@ -521,17 +509,14 @@ export class TransactionLineItemsEnhancedService {
         quantity: childData.quantity ?? 1,
         percentage: childData.percentage ?? 100,
         unit_price: childData.unit_price ?? 0,
-        discount_amount: childData.discount_amount ?? 0,
-        tax_amount: childData.tax_amount ?? 0,
         unit_of_measure: childData.unit_of_measure ?? 'piece',
         // Inherit from parent if available
         analysis_work_item_id: parentItem?.analysis_work_item_id,
-        sub_tree_id: parentItem?.sub_tree_id,
-        line_item_id: parentItem?.line_item_id
+        sub_tree_id: parentItem?.sub_tree_id
       };
 
       // Save the new item using the enhanced create method
-      await this.createLineItem(transactionId, newItem);
+      await this.createLineItem(transactionLineId, newItem);
       
       return newItem;
     } catch (error) {
@@ -543,9 +528,9 @@ export class TransactionLineItemsEnhancedService {
   /**
    * Get line items as a tree structure
    */
-  async getTreeStructure(transactionId: string): Promise<LineItemTreeNode[]> {
+  async getTreeStructure(transactionLineId: string): Promise<LineItemTreeNode[]> {
     try {
-      const items = await transactionLineItemsService.listByTransaction(transactionId);
+      const items = await transactionLineItemsService.listByTransactionLine(transactionLineId);
       
       // Transform to tree nodes
       const treeNodes: LineItemTreeNode[] = items.map(item => ({
@@ -633,9 +618,9 @@ export class TransactionLineItemsEnhancedService {
   /**
    * Delete line item and all its children
    */
-  async deleteLineItemWithChildren(transactionId: string, itemCode: string): Promise<void> {
+  async deleteLineItemWithChildren(transactionLineId: string, itemCode: string): Promise<void> {
     try {
-      const items = await transactionLineItemsService.listByTransaction(transactionId);
+      const items = await transactionLineItemsService.listByTransactionLine(transactionLineId);
       
       // Find item and all its descendants
       const toDelete = new Set<string>();
@@ -671,7 +656,7 @@ export class TransactionLineItemsEnhancedService {
           unit_of_measure: item.unit_of_measure
         }));
 
-      await transactionLineItemsService.upsertMany(transactionId, remainingItems);
+      await transactionLineItemsService.upsertMany(transactionLineId, remainingItems);
     } catch (error) {
       console.error('Error deleting line item with children:', error);
       throw new Error('Failed to delete line item with children');
@@ -746,9 +731,9 @@ export class TransactionLineItemsEnhancedService {
   /**
    * Get flat nodes at specific depth level
    */
-  async getLineItemsByLevel(transactionId: string, level: number): Promise<LineItemTreeNode[]> {
+  async getLineItemsByLevel(transactionLineId: string, level: number): Promise<LineItemTreeNode[]> {
     try {
-      const tree = await this.getLineItemsTree(transactionId)
+      const tree = await this.getLineItemsTree(transactionLineId)
       const result: LineItemTreeNode[] = []
       
       const collectAtLevel = (nodes: LineItemTreeNode[], currentLevel: number) => {
@@ -773,9 +758,9 @@ export class TransactionLineItemsEnhancedService {
   /**
    * Find line item by code in tree structure
    */
-  async findLineItemByCode(transactionId: string, itemCode: string): Promise<LineItemTreeNode | null> {
+  async findLineItemByCode(transactionLineId: string, itemCode: string): Promise<LineItemTreeNode | null> {
     try {
-      const tree = await this.getLineItemsTree(transactionId)
+      const tree = await this.getLineItemsTree(transactionLineId)
       
       const findInTree = (nodes: LineItemTreeNode[]): LineItemTreeNode | null => {
         for (const node of nodes) {
@@ -800,9 +785,9 @@ export class TransactionLineItemsEnhancedService {
   /**
    * Get all descendants of a line item
    */
-  async getLineItemDescendants(transactionId: string, itemCode: string): Promise<LineItemTreeNode[]> {
+  async getLineItemDescendants(transactionLineId: string, itemCode: string): Promise<LineItemTreeNode[]> {
     try {
-      const parent = await this.findLineItemByCode(transactionId, itemCode)
+      const parent = await this.findLineItemByCode(transactionLineId, itemCode)
       if (!parent || !parent.children) {
         return []
       }
@@ -828,15 +813,15 @@ export class TransactionLineItemsEnhancedService {
   /**
    * Get line item statistics
    */
-  async getLineItemStats(transactionId: string): Promise<{
+  async getLineItemStats(transactionLineId: string): Promise<{
     totalItems: number;
     rootItems: number;
     maxDepth: number;
     totalValue: number;
   }> {
     try {
-      const tree = await this.getLineItemsTree(transactionId)
-      const flatItems = await this.getLineItemsList(transactionId)
+      const tree = await this.getLineItemsTree(transactionLineId)
+      const flatItems = await this.getLineItemsList(transactionLineId)
       
       let maxDepth = 0
       const calculateMaxDepth = (nodes: LineItemTreeNode[], currentDepth: number) => {
@@ -867,9 +852,9 @@ export class TransactionLineItemsEnhancedService {
   /**
    * Get line item hierarchy path (breadcrumbs)
    */
-  async getLineItemPath(transactionId: string, itemCode: string): Promise<LineItemTreeNode[]> {
+  async getLineItemPath(transactionLineId: string, itemCode: string): Promise<LineItemTreeNode[]> {
     try {
-      const items = await this.getLineItemsList(transactionId);
+      const items = await this.getLineItemsList(transactionLineId);
       const path: LineItemTreeNode[] = [];
       
       // Build path from root to current item
@@ -1029,7 +1014,6 @@ class TransactionLineItemsCatalogService {
     item_code?: string
     item_name: string
     item_name_ar?: string
-    description?: string
     quantity?: number
     unit_price?: number
     unit_of_measure?: string
@@ -1049,7 +1033,6 @@ class TransactionLineItemsCatalogService {
           item_code: itemCode,
           item_name: itemData.item_name,
           item_name_ar: itemData.item_name_ar || null,
-          description: itemData.description || null,
           quantity: itemData.quantity || 1,
           unit_price: itemData.unit_price || 0,
           unit_of_measure: itemData.unit_of_measure || 'piece',
@@ -1075,7 +1058,6 @@ class TransactionLineItemsCatalogService {
     item_code?: string
     item_name?: string
     item_name_ar?: string
-    description?: string
     quantity?: number
     unit_price?: number
     unit_of_measure?: string
@@ -1083,13 +1065,21 @@ class TransactionLineItemsCatalogService {
     position?: number
   }): Promise<DbTxLineItem> {
     try {
+      // Whitelist fields that exist in the current schema
+      const allowed: any = {}
+      if (updates.item_code !== undefined) allowed.item_code = updates.item_code
+      if (updates.item_name !== undefined) allowed.item_name = updates.item_name
+      if (updates.item_name_ar !== undefined) allowed.item_name_ar = updates.item_name_ar
+      if (updates.quantity !== undefined) allowed.quantity = updates.quantity
+      if (updates.unit_price !== undefined) allowed.unit_price = updates.unit_price
+      if (updates.unit_of_measure !== undefined) allowed.unit_of_measure = updates.unit_of_measure
+      if (updates.is_active !== undefined) allowed.is_active = updates.is_active
+      if (updates.position !== undefined) allowed.line_number = updates.position
+      allowed.updated_at = new Date().toISOString()
+
       const { data, error } = await supabase
         .from('transaction_line_items')
-        .update({
-          ...updates,
-          line_number: updates.position,
-          updated_at: new Date().toISOString()
-        })
+        .update(allowed)
         .eq('id', id)
         .eq('org_id', orgId)
         .is('transaction_id', null) // Ensure it's a catalog item
