@@ -1,12 +1,22 @@
 import React, { useState, useEffect } from 'react'
 import type { EditableTxLineItem } from '../../services/transaction-line-items'
+import CostAnalysisModal from './CostAnalysisModal'
 
 export interface TransactionLineItemsEditorProps {
-  transactionId: string
+  transactionLineId: string
   orgId: string
   items: EditableTxLineItem[]
   onChange: (items: EditableTxLineItem[]) => void
   disabled?: boolean
+  // Cost analysis data
+  workItems?: Array<{ id: string; code: string; name: string }>
+  analysisItems?: Record<string, { code: string; name: string }>
+  costCenters?: Array<{ id: string; code: string; name: string }>
+  transactionLineDefaults?: {
+    work_item_id?: string | null
+    analysis_work_item_id?: string | null
+    sub_tree_id?: string | null
+  }
 }
 
 /**
@@ -21,13 +31,15 @@ export interface TransactionLineItemsEditorProps {
  * ✅ Real-time total updates
  */
 export const TransactionLineItemsEditor: React.FC<TransactionLineItemsEditorProps> = ({
-  transactionId,
+  transactionLineId,
   orgId,
   items,
   onChange,
   disabled = false,
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [costModalOpen, setCostModalOpen] = useState(false)
+  const [selectedItemForCost, setSelectedItemForCost] = useState<EditableTxLineItem | null>(null)
 
   // Calculate totals
   const calculateLineTotal = (item: EditableTxLineItem): number => {
@@ -291,6 +303,18 @@ export const TransactionLineItemsEditor: React.FC<TransactionLineItemsEditorProp
                       <div className="flex justify-center gap-1">
                         <button
                           type="button"
+                          onClick={() => {
+                            setSelectedItemForCost(item)
+                            setCostModalOpen(true)
+                          }}
+                          className="btn btn-ghost btn-sm text-green-600 hover:text-green-800"
+                          title="تحديد التكاليف - Cost Analysis"
+                          disabled={disabled}
+                        >
+                          💰
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => duplicateItem(index)}
                           className="btn btn-ghost btn-sm text-blue-600 hover:text-blue-800"
                           title="تكرار البند"
@@ -349,6 +373,29 @@ export const TransactionLineItemsEditor: React.FC<TransactionLineItemsEditorProp
           </div>
         </div>
       )}
+
+      {/* Cost Analysis Modal */}
+      <CostAnalysisModal
+        item={selectedItemForCost}
+        isOpen={costModalOpen}
+        onClose={() => {
+          setCostModalOpen(false)
+          setSelectedItemForCost(null)
+        }}
+        onSave={(updatedItem) => {
+          // Find and update the item in the list
+          const index = items.findIndex(i => i.id === updatedItem.id)
+          if (index !== -1) {
+            const newItems = [...items]
+            newItems[index] = updatedItem
+            onChange(newItems)
+          }
+        }}
+        workItems={workItems || []}
+        analysisItems={analysisItems || {}}
+        costCenters={costCenters || []}
+        transactionLineDefaults={transactionLineDefaults}
+      />
     </div>
   )
 }

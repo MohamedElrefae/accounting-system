@@ -12,7 +12,7 @@ const TemplateLibraryPage = React.lazy(() => import('./pages/MainData/DocumentTe
 const TemplateEditorPage = React.lazy(() => import('./pages/MainData/DocumentTemplates/TemplateEditor'));
 const TemplateViewerPage = React.lazy(() => import('./pages/MainData/DocumentTemplates/TemplateViewer'));
 const DocumentApprovalsPage = React.lazy(() => import('./pages/Approvals/DocumentApprovals'));
-const ExpensesCategoriesPage = React.lazy(() => import('./pages/MainData/ExpensesCategories'));
+const SubTreePage = React.lazy(() => import('./pages/MainData/SubTree'));
 const WorkItemsPage = React.lazy(() => import('./pages/MainData/WorkItems'));
 const CostCentersPage = React.lazy(() => import('./pages/MainData/CostCenters'));
 const TransactionLineItemsCatalogPage = React.lazy(() => import('./pages/MainData/TransactionLineItems'));
@@ -23,9 +23,7 @@ const ExportTestPage = React.lazy(() => import('./pages/ExportTestPage'));
 const DocumentControlsBarTest = React.lazy(() => import('./features/documents/components/DocumentControlsBarTest'));
 const DocumentControlsBarRTLTest = React.lazy(() => import('./features/documents/components/DocumentControlsBarRTLTest'));
 const TransactionsPage = React.lazy(() => import('./pages/Transactions/Transactions'));
-const Gl2JournalsPage = React.lazy(() => import('./pages/Transactions/Gl2Journals'));
-const TransactionsGL2Page = React.lazy(() => import('./pages/Transactions/TransactionsGL2'));
-const CreateJournalGL2Page = React.lazy(() => import('./pages/Transactions/CreateJournalGL2'));
+// GL2 pages removed in unified model
 const TxLineItemsPage = React.lazy(() => import('./pages/Transactions/TransactionLineItems'))
 const TransactionDetailsPage = React.lazy(() => import('./pages/Transactions/TransactionDetails'))
 const GeneralLedgerPage = React.lazy(() => import('./pages/Reports/GeneralLedger'))
@@ -164,9 +162,9 @@ const App: React.FC = () => {
           {/* Main Data */}
           <Route path="/main-data/accounts-tree" element={<React.Suspense fallback={<>Loading...</>}><AccountsTreeLazy /></React.Suspense>} />
           <Route path="/main-data/sub-tree" element={
-            <RequirePermission perm="sub_tree.view">
+<RequirePermission perm="sub_tree.view">
               <React.Suspense fallback={<div>Loading...</div>}>
-                <ExpensesCategoriesPage />
+                <SubTreePage />
               </React.Suspense>
             </RequirePermission>
           } />
@@ -259,21 +257,7 @@ const App: React.FC = () => {
               <TransactionsPage />
             </React.Suspense>
           } />
-<Route path="/transactions/gl2" element={
-            <React.Suspense fallback={<div>Loading...</div>}>
-              <Gl2JournalsPage />
-            </React.Suspense>
-          } />
-          <Route path="/transactions/gl2-advanced" element={
-            <React.Suspense fallback={<div>Loading...</div>}>
-              <TransactionsGL2Page />
-            </React.Suspense>
-          } />
-          <Route path="/transactions/gl2-create" element={
-            <React.Suspense fallback={<div>Loading...</div>}>
-              <CreateJournalGL2Page />
-            </React.Suspense>
-          } />
+{/* GL2 routes removed in unified model */}
           <Route path="/transactions/:id" element={
             <React.Suspense fallback={<div>Loading...</div>}>
               <TransactionDetailsPage />

@@ -32,6 +32,9 @@ interface ResizableTableProps<T extends RowRecord> {
   isLoading?: boolean
   emptyMessage?: string
   frozenLeftCount?: number
+  // New: highlight selected row (id or index) and row id getter for generic data
+  highlightRowId?: string | number
+  getRowId?: (row: T, index: number) => string | number
 }
 
 function ResizableTable<T extends RowRecord>({
@@ -46,6 +49,8 @@ function ResizableTable<T extends RowRecord>({
   isLoading = false,
   emptyMessage = 'لا توجد بيانات',
   frozenLeftCount = 0,
+  highlightRowId,
+  getRowId,
 }: ResizableTableProps<T>) {
   const [isResizing, setIsResizing] = useState<string | null>(null)
   const tableRef = useRef<HTMLTableElement>(null)
@@ -235,32 +240,37 @@ function ResizableTable<T extends RowRecord>({
               </td>
             </tr>
           ) : (
-            data.map((row, rowIndex) => (
-              <tr
-                key={rowIndex}
-                className={onRowClick ? 'clickable-row' : ''}
-                style={{ height: `${rowHeight}px` }}
-                onClick={() => onRowClick?.(row, rowIndex)}
-              >
-                {visibleColumns.map((column, cidx) => (
-                  <td
-                    key={column.key}
-                    className={`resizable-td ${column.type || 'text'}-cell ${frozenByFlag[cidx] ? 'frozen' : ''} ${isRTL ? 'rtl' : 'ltr'}`}
-                    style={{ 
-                      width: `${column.width}px`,
-                      minWidth: `${column.minWidth || 80}px`,
-                      maxWidth: `${column.maxWidth || 500}px`,
-                      ...(frozenByFlag[cidx] && !isRTL ? { left: `${stickyLeftOffsets[cidx]}px` } : {}),
-                      ...(frozenByFlag[cidx] && isRTL ? { right: `${stickyRightOffsets[cidx]}px` } : {}),
-                    }}
-                  >
-                    <div className="td-content">
-                      {getCellContent(row, column, rowIndex)}
-                    </div>
-                  </td>
-                ))}
-              </tr>
-            ))
+            data.map((row, rowIndex) => {
+              const rowId = getRowId ? getRowId(row, rowIndex) : rowIndex
+              const isSelected = highlightRowId !== undefined && highlightRowId === rowId
+              return (
+                <tr
+                  key={rowIndex}
+                  className={`${onRowClick ? 'clickable-row' : ''} ${isSelected ? 'selected-row' : ''}`}
+                  style={{ height: `${rowHeight}px` }}
+                  onClick={() => onRowClick?.(row, rowIndex)}
+                  data-row-id={String(rowId)}
+                >
+                  {visibleColumns.map((column, cidx) => (
+                    <td
+                      key={column.key}
+                      className={`resizable-td ${column.type || 'text'}-cell ${frozenByFlag[cidx] ? 'frozen' : ''} ${isRTL ? 'rtl' : 'ltr'}`}
+                      style={{ 
+                        width: `${column.width}px`,
+                        minWidth: `${column.minWidth || 80}px`,
+                        maxWidth: `${column.maxWidth || 500}px`,
+                        ...(frozenByFlag[cidx] && !isRTL ? { left: `${stickyLeftOffsets[cidx]}px` } : {}),
+                        ...(frozenByFlag[cidx] && isRTL ? { right: `${stickyRightOffsets[cidx]}px` } : {}),
+                      }}
+                    >
+                      <div className="td-content">
+                        {getCellContent(row, column, rowIndex)}
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+              )
+            })
           )}
         </tbody>
       </table>

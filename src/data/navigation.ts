@@ -154,33 +154,7 @@ const baseNavigation: NavigationItem[] = [
         path: "/transactions/all",
         requiredPermission: "transactions.read.all"
       },
-      {
-        id: "gl2-journals",
-        label: "GL2 Journals (Pilot)",
-        titleEn: "GL2 Journals (Pilot)",
-        titleAr: "قيود GL2 (تجريبي)",
-        icon: "receipt",
-        path: "/transactions/gl2",
-        requiredPermission: "transactions.read.all"
-      },
-{
-        id: "gl2-journals-full",
-        label: "GL2 Journals (Full)",
-        titleEn: "GL2 Journals (Full)",
-        titleAr: "قيود GL2 (كاملة)",
-        icon: "receipt",
-        path: "/transactions/gl2-advanced",
-        requiredPermission: "transactions.read.all"
-      },
-      {
-        id: "gl2-create",
-        label: "Create GL2 Journal",
-        titleEn: "Create GL2 Journal",
-        titleAr: "إنشاء قيد GL2",
-        icon: "add",
-        path: "/transactions/gl2-create",
-        requiredPermission: "transactions.read.all"
-      },
+// GL2 menu items removed in unified model
       {
         id: "assign-cost-analysis",
         label: "Assign Cost Analysis",

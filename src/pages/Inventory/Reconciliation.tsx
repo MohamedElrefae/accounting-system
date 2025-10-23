@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { Box, Button, Container, Paper, Stack, Typography } from '@mui/material'
-import { DataGrid, GridColDef } from '@mui/x-data-grid'
+import { DataGrid, type GridColDef } from '@mui/x-data-grid'
 import { ReconciliationService, type ReconSession } from '@/services/inventory/reconciliation'
 import { useNavigate } from 'react-router-dom'
 

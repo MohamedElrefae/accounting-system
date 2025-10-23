@@ -1,0 +1,274 @@
+{
+  "name": "gl2_migration_summary",
+  "version": "1.0.0",
+  "last_updated": "<AUTO>",
+  "overview": {
+    "objective": "Replace legacy single-line transactions with a robust multi-line GL model (GL2) using side-by-side schema and compatibility views.",
+    "strategy": [
+      "Build GL2 alongside legacy",
+      "Introduce feature flags and compatibility views",
+      "Route reads/writes incrementally to GL2",
+      "Provide lifecycle UI for post/void/reverse"
+    ]
+  },
+  "goals": [
+    "Multi-line journals with enforced balance and immutability",
+    "RLS aligned to org membership",
+    "Security-definer RPCs for create/post/void/reverse",
+    "Backward-compatible read interfaces",
+    "UI support: list, details, actions, export, runtime toggles"
+  ],
+  "non_goals": [
+    "Historical backfill of all legacy transactions (this phase)",
+    "Immediate deprecation of legacy write path"
+  ],
+  "architecture": {
+    "schemas": ["gl2", "legacy_compat", "public"],
+    "tables": [
+      {"name": "gl2.journal_entries", "role": "header"},
+      {"name": "gl2.journal_lines", "role": "lines"},
+      {"name": "gl2.journal_line_dimensions", "role": "line_dimensions"}
+    ],
+    "access_control": {
+      "rls": true,
+      "membership_source": "org_memberships"
+    },
+    "views": {
+      "compat": [
+        "legacy_compat.v_journals_single_line",
+        "legacy_compat.v_journals_single_line_posted",
+        "legacy_compat.v_journals_collapsed"
+      ],
+      "public_wrappers": [
+        "public.v_gl2_journals_single_line_all",
+        "public.v_gl2_journals_collapsed"
+      ],
+      "enriched": "v_gl2_journals_enriched (includes effective_date and dimension columns)"
+    },
+    "rpcs": [
+      "api_create_journal",
+      "api_post_journal",
+      "api_void_journal",
+      "api_reverse_journal"
+    ],
+    "feature_flags": {
+      "file": "src/config/featureFlags.ts",
+      "read_mode": ["legacy", "gl2_single_line", "gl2_collapsed"],
+      "write_mode": ["legacy", "gl2"],
+      "runtime_override": true
+    }
+  },
+  "database": {
+    "constraints": [
+      "Enforce balance on post",
+      "Immutability of posted journals"
+    ],
+    "reference_data": [
+      "Seeded organization/branch/project",
+      "Lean chart of accounts"
+    ],
+    "rls_policies": {
+      "visibility": "based on org_memberships",
+      "actions": ["create", "post", "void", "reverse"]
+    }
+  },
+  "views": {
+    "public.v_gl2_journals_single_line_all": {
+      "columns": [
+        "journal_id",
+        "number",
+        "doc_date",
+        "posting_date",
+        "debit_account_code",
+        "credit_account_code",
+        "amount",
+        "status"
+      ],
+      "source": "legacy_compat.v_journals_single_line"
+    },
+    "public.v_gl2_journals_collapsed": {
+      "columns": [
+        "journal_id",
+        "number",
+        "doc_date",
+        "posting_date",
+        "total_debits",
+        "total_credits",
+        "debit_account_code",
+        "credit_account_code",
+        "status"
+      ],
+      "source": "legacy_compat.v_journals_collapsed"
+    },
+    "enriched": {
+      "name": "v_gl2_journals_enriched",
+      "notes": "Exposes effective_date and first-line dimension columns for filtering"
+    }
+  },
+  "rpcs": {
+    "api_create_journal": {
+      "payload": {
+        "p_org_id": "uuid",
+        "p_number": "text",
+        "p_doc_type": "text",
+        "p_doc_date": "date",
+        "p_description": "text?",
+        "p_source_module": "text?",
+        "p_source_ref_id": "text?",
+        "p_entity_code": "text?",
+        "p_lines": [
+          {
+            "account_code": "text",
+            "debit_base": "numeric",
+            "credit_base": "numeric",
+            "description": "text?",
+            "dimensions": {
+              "project_id": "uuid|code?",
+              "cost_center_id": "uuid|code?",
+              "work_item_id": "uuid|code?",
+              "analysis_work_item_id": "uuid|code?",
+              "classification_id": "uuid|code?",
+              "expenses_category_id": "uuid|code?"
+            }
+          }
+        ]
+      },
+      "returns": "draft journal id"
+    },
+    "api_post_journal": {
+      "payload": {"p_journal_id": "uuid", "p_posting_date": "date"},
+      "effect": "updates status to posted, locks lines"
+    },
+    "api_void_journal": {
+      "payload": {"p_journal_id": "uuid"},
+      "effect": "updates status to voided"
+    },
+    "api_reverse_journal": {
+      "payload": {"p_journal_id": "uuid", "p_reverse_date": "date"},
+      "effect": "creates reversing journal, copies dimensions"
+    }
+  },
+  "services": {
+    "file": "src/services/transactions.ts",
+    "routes": {
+      "getTransactions": {
+        "gl2_mode": true,
+        "source": "v_gl2_journals_enriched",
+        "filters": [
+          "search",
+          "effective_date range",
+          "amount range",
+          "orgId",
+          "approvalStatus",
+          "classificationId",
+          "expensesCategoryId",
+          "workItemId",
+          "analysisWorkItemId",
+          "costCenterId",
+          "projectId"
+        ],
+        "mapping": "GL2 rows -> legacy shape"
+      },
+      "createJournalUnified": "rpc api_create_journal",
+      "postJournalUnified": "rpc api_post_journal",
+      "voidJournalGL2": "rpc api_void_journal",
+      "reverseJournalGL2": "rpc api_reverse_journal",
+      "getGL2JournalDetails": "select header/lines/dimensions"
+    }
+  },
+  "ui": {
+    "pages": [
+      {
+        "path": "src/pages/Transactions/Gl2Journals.tsx",
+        "features": ["list GL2", "csv export", "runtime toggle"]
+      },
+      {
+        "path": "src/pages/Transactions/TransactionsGL2.tsx",
+        "features": ["force GL2 read mode", "reuses full transactions"]
+      },
+      {
+        "path": "src/pages/Transactions/Gl2DetailsDrawer.tsx",
+        "features": ["details header/lines/dimensions", "post", "void", "reverse"]
+      },
+      {
+        "path": "src/pages/Transactions/Transactions.tsx",
+        "features": ["runtime toggle", "XLSX export via ExportButtons", "open GL2 drawer in GL2 mode"]
+      },
+      {
+        "path": "src/pages/Transactions/CreateJournalGL2.tsx",
+        "features": ["create draft", "line-level dimensions"]
+      }
+    ],
+    "components": [
+      {
+        "path": "src/components/Common/AsyncAutocomplete.tsx",
+        "features": ["debounce", "keyboard nav", "clear", "loading"]
+      },
+      {
+        "path": "src/components/Common/DraggableResizableDialog.tsx",
+        "features": ["drag by title", "resize handle", "persist size/pos"]
+      }
+    ]
+  },
+  "phases": [
+    {"phase": 1, "name": "Side-by-side schema/RPCs/views", "status": "complete"},
+    {"phase": 2, "name": "Read-only pilot via flags", "status": "complete"},
+    {"phase": 3, "name": "Lifecycle actions (post/void/reverse)", "status": "complete"},
+    {"phase": 4, "name": "Write APIs + UI (dimensions)", "status": "complete"},
+    {"phase": 5, "name": "Full-page integration + export", "status": "complete"},
+    {"phase": 6, "name": "Filters/enriched view coverage", "status": "complete"},
+    {"phase": 7, "name": "Validation & acceptance", "status": "pending"},
+    {"phase": 8, "name": "Legacy write decommission (optional)", "status": "pending"}
+  ],
+  "pending_work": {
+    "views_rest": ["Confirm public views columns+grants", "notify pgrst, 'reload schema'"] ,
+    "performance": ["Indexes on gl2.journal_entries(status,posting_date,org_id)", "Indexes for common dimensions"],
+    "testing": ["RPC/UI smoke tests", "Balance validation scripts"],
+    "ux": ["Banner read-mode toggle", "Row click opens drawer", "Persist read-mode override"],
+    "decommission": ["Decide legacy write retirement timeline"]
+  },
+  "verification": {
+    "sql": [
+      "Call api_create_journal and verify entries/lines",
+      "Call api_post_journal and check status/immutability",
+      "Call api_void_journal and api_reverse_journal and verify"
+    ],
+    "rest": [
+      "Ensure public views exist and accessible",
+      "Run notify pgrst, 'reload schema' after view/grant changes"
+    ],
+    "ui": [
+      "Toggle read mode on Full page and verify GL2 data",
+      "Open details drawer and exercise Post/Void/Reverse",
+      "Export XLSX via ExportButtons"
+    ]
+  },
+  "rollback": {
+    "app": "Set READ_MODE/WRITE_MODE to 'legacy' and clear runtime overrides",
+    "db": "Keep GL2 schema; revert view definitions if needed"
+  },
+  "inventory": {
+    "schemas": ["gl2", "legacy_compat", "public"],
+    "tables": ["gl2.journal_entries", "gl2.journal_lines", "gl2.journal_line_dimensions"],
+    "views": [
+      "legacy_compat.v_journals_single_line",
+      "legacy_compat.v_journals_single_line_posted",
+      "legacy_compat.v_journals_collapsed",
+      "public.v_gl2_journals_single_line_all",
+      "public.v_gl2_journals_collapsed",
+      "v_gl2_journals_enriched"
+    ],
+    "rpcs": ["api_create_journal", "api_post_journal", "api_void_journal", "api_reverse_journal"],
+    "feature_flags": ["READ_MODE", "WRITE_MODE"],
+    "ui_paths": [
+      "src/pages/Transactions/Gl2Journals.tsx",
+      "src/pages/Transactions/TransactionsGL2.tsx",
+      "src/pages/Transactions/Gl2DetailsDrawer.tsx",
+      "src/pages/Transactions/Transactions.tsx"
+    ]
+  },
+  "ops": {
+    "schema_cache": "Run notify pgrst, 'reload schema' after DDL/grants",
+    "rls": "Ensure org_memberships for user/service role to act on journals"
+  }
+}

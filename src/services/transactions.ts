@@ -2,71 +2,31 @@
 // to either legacy or gl2 data paths based on feature flags. They are additive
 // and should not break existing imports.
 
-import { featureFlags, getReadMode } from '../config/featureFlags';
+// GL2 feature flags removed; unified model only
 import { supabase } from '../utils/supabase'
 import { formatDateForSupabase } from '../utils/dateHelpers'
 import { getTransactionNumberConfig } from './company-config'
+import { getReadMode } from '../config/featureFlags'
 
 export type UnifiedListParams = { limit?: number };
 
-// Unified list that switches based on READ_MODE
+// GL2 journal listing/reading removed — use unified data sources (transactions + transaction_lines).
 export async function listJournalsUnified(params?: UnifiedListParams) {
-  const { READ_MODE } = featureFlags;
   const limit = params?.limit ?? 50;
-
-  if (READ_MODE === 'legacy') {
-    // Keep legacy behavior by default; adjust source as needed
-    // Falls back to an existing enriched view if available
-    return supabase
-      .from('transactions_enriched')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(limit);
-  }
-
-  if (READ_MODE === 'gl2_single_line') {
-    return supabase
-      .from('legacy_compat.v_journals_single_line_posted')
-      .select('journal_id, number, doc_date, posting_date, debit_account_code, credit_account_code, amount, status')
-      .order('posting_date', { ascending: false })
-      .limit(limit);
-  }
-
-  // gl2_collapsed
   return supabase
-    .from('legacy_compat.v_journals_collapsed')
-    .select('journal_id, number, doc_date, posting_date, total_debits, total_credits, debit_account_code, credit_account_code, status')
-    .order('posting_date', { ascending: false })
+    .from('transactions_enriched')
+    .select('*')
+    .order('created_at', { ascending: false })
     .limit(limit);
 }
 
-// Unified detail fetch by journal id
 export async function getJournalDetailsUnified(journalId: string) {
-  const { READ_MODE } = featureFlags;
-
-  if (READ_MODE === 'legacy') {
-    // Legacy: keep existing detail behavior if present
-    return supabase
-      .from('transactions_enriched')
-      .select('*')
-      .eq('id', journalId)
-      .single();
-  }
-
-  // GL2: fetch header + lines
-  const header = await supabase
-    .from('gl2.journal_entries')
-    .select('id, org_id, number, doc_type, doc_ref, doc_date, posting_date, status, description, source_module, source_reference_id')
+  // Fallback to enriched transactions view by id
+  return supabase
+    .from('transactions_enriched')
+    .select('*')
     .eq('id', journalId)
     .single();
-
-  const lines = await supabase
-    .from('gl2.journal_lines')
-    .select('line_no, account_id, debit_base, credit_base, description, accounts:account_id(code, name)')
-    .eq('journal_entry_id', journalId)
-    .order('line_no', { ascending: true });
-
-  return { header, lines };
 }
 
 export type CreateJournalUnifiedArgs = {
@@ -89,83 +49,44 @@ export type CreateJournalUnifiedArgs = {
   }>;
 };
 
-// Unified create that switches based on WRITE_MODE
-export async function createJournalUnified(args: CreateJournalUnifiedArgs) {
-  const { WRITE_MODE } = featureFlags;
-
-  if (WRITE_MODE === 'legacy') {
-    // Not implementing legacy write here to avoid breaking existing flows
-    throw new Error('Legacy write path is disabled for unified API');
-  }
-
-  const payload = {
-    p_org_id: args.orgId,
-    p_number: args.number,
-    p_doc_type: args.docType,
-    p_doc_date: args.docDate,
-    p_description: args.description ?? null,
-    p_source_module: args.sourceModule ?? 'manual',
-    p_source_ref_id: args.sourceRefId ?? null,
-    p_entity_code: args.entityCode ?? null,
-    // Pass through dimensions per-line as provided; the DB function must handle them
-    p_lines: args.lines,
-  } as const;
-
-  return supabase.rpc('api_create_journal', payload);
+// GL2 journal create/post removed — use transactions + transaction_lines flows instead.
+export async function createJournalUnified(_args: CreateJournalUnifiedArgs) {
+  throw new Error('Removed: GL2 journal creation disabled. Use transactions + transaction_lines.');
 }
 
-export async function postJournalUnified(journalId: string, postingDate?: string) {
-  const { WRITE_MODE } = featureFlags;
-
-  if (WRITE_MODE === 'legacy') {
-    throw new Error('Legacy write path is disabled for unified API');
-  }
-
-  const payload = {
-    p_journal_id: journalId,
-    p_posting_date: postingDate ?? new Date().toISOString().slice(0, 10),
-  } as const;
-
-return supabase.rpc('api_post_journal', payload);
+export async function postJournalUnified(_journalId: string, _postingDate?: string) {
+  throw new Error('Removed: GL2 journal posting disabled. Use post_transaction with transaction lines.');
 }
 
-// Fetch GL2 header + lines + dimensions
-export async function getGL2JournalDetails(journalId: string) {
-  const header = await supabase
-    .from('gl2.journal_entries')
-    .select('id, org_id, number, doc_type, doc_ref, doc_date, posting_date, status, description, source_module, source_reference_id')
-    .eq('id', journalId)
-    .single();
-
-  const lines = await supabase
-    .from('gl2.journal_lines')
-    .select('id, line_no, account_id, debit_base, credit_base, description, accounts:account_id(code, name)')
-    .eq('journal_entry_id', journalId)
-    .order('line_no', { ascending: true });
-
-  const dims = await supabase
-    .from('gl2.journal_line_dimensions')
-    .select('journal_line_id, dimension_key, dimension_value')
-    .in('journal_line_id', (lines.data || []).map((l:any)=>l.id));
-
-  const dimsByLine: Record<string, {key: string, value: string}[]> = {};
-  (dims.data || []).forEach((d:any) => {
-    const k = String(d.journal_line_id);
-    if (!dimsByLine[k]) dimsByLine[k] = [];
-    dimsByLine[k].push({ key: d.dimension_key, value: d.dimension_value });
-  });
-
-  return { header, lines, dimensions: dimsByLine };
+// Removed: GL2 helpers — use unified transactions and transaction_lines.
+export async function getGL2JournalDetails(_journalId: string) {
+  throw new Error('Removed: GL2 journal details disabled. Use unified transactions + lines.');
 }
 
-// Void journal (requires DB function api_void_journal)
-export async function voidJournalGL2(journalId: string) {
-  return supabase.rpc('api_void_journal', { p_journal_id: journalId });
+export async function voidJournalGL2(_journalId: string) {
+  throw new Error('Removed: GL2 void disabled.');
 }
 
-// Reverse journal (requires DB function api_reverse_journal)
-export async function reverseJournalGL2(journalId: string, reverseDate?: string) {
-  return supabase.rpc('api_reverse_journal', { p_journal_id: journalId, p_reverse_date: reverseDate ?? new Date().toISOString().slice(0,10) });
+export async function reverseJournalGL2(_journalId: string, _reverseDate?: string) {
+  throw new Error('Removed: GL2 reverse disabled.');
+}
+
+// Helper: fetch a transaction header with its lines (for edit forms)
+import { getTransactionLines } from './transaction-lines'
+
+export async function getTransactionWithLines(transactionId: string) {
+  if (!transactionId) throw new Error('transactionId is required')
+
+  const { data: header, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('id', transactionId)
+    .single()
+
+  if (error) throw error
+
+  const lines = await getTransactionLines(transactionId)
+  return { header, lines }
 }
 
 
@@ -426,8 +347,8 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
   const from = (page - 1) * pageSize
   const to = from + pageSize - 1
 
-// If GL2 read override is active, route to public GL2 views and map into legacy shape
-  if (getReadMode() !== 'legacy') {
+// Use main transactions table (not GL2 view)
+  if (false) { // Disabled: Always use main transactions table
     const fromIdx = from;
     const toIdx = to;
 
@@ -541,16 +462,10 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
     return { rows: rows as any, total: count ?? rows.length };
   }
 
-  // Dynamic query with organization, project, classification, and cost center joins
+  // Dynamic query - no joins (relationships don't exist in schema)
   let query = supabase
     .from('transactions')
-    .select(`
-      *,
-      organizations!left(name),
-      projects!left(name),
-      transaction_classification!left(code, name),
-      cost_centers!left(code, name)
-    `, { count: 'exact' })
+    .select('*', { count: 'exact' })
     .order('entry_date', { ascending: false })
 
   if (scope === 'my') {
@@ -600,16 +515,8 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
   const { data, error, count } = await query.range(from, to)
   if (error) throw error
   
-  // Transform the data to include organization, project, and cost center information
-  const transformedData = (data || []).map((row: any) => ({
-    ...row,
-    organization_name: row.organizations?.name || null,
-    project_name: row.projects?.name || null,
-    cost_center_code: row.cost_centers?.code || null,
-    cost_center_name: row.cost_centers?.name || null
-  }))
-  
-  return { rows: transformedData as (TransactionRecord & { organization_name?: string; project_name?: string; cost_center_code?: string; cost_center_name?: string })[], total: count ?? 0 }
+  // Return data as-is (no joins available)
+  return { rows: (data || []) as TransactionRecord[], total: count ?? 0 }
 }
 
 export interface CreateTransactionInput {

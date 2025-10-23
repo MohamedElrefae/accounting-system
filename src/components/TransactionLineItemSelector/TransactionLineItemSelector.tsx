@@ -28,10 +28,30 @@ import {
   Add as AddIcon
 } from '@mui/icons-material'
 import { useToast } from '../../contexts/ToastContext'
-import { transactionLineItemsCatalogService } from '../../services/transaction-line-items-enhanced'
-import type { DbTxLineItem } from '../../services/transaction-line-items'
+import { lineItemsCatalogService } from '../../services/line-items-catalog'
 
-export interface SelectedLineItem extends DbTxLineItem {
+// Minimal catalog item shape used by this selector
+interface SelectorRow {
+  id: string
+  item_code: string | null
+  item_name: string | null
+  item_name_ar: string | null
+  parent_id?: string | null
+  unit_of_measure?: string | null
+  unit_price?: number | null
+  is_active?: boolean
+}
+
+export interface SelectedLineItem {
+  id: string
+  item_code: string | null
+  item_name: string | null
+  item_name_ar: string | null
+  level: number
+  quantity_selected: number
+  unit_price_override: number
+  total_amount: number
+}
   level: number
   quantity_selected: number
   unit_price_override: number
@@ -64,7 +84,7 @@ const TransactionLineItemSelector: React.FC<TransactionLineItemSelectorProps> = 
   const { showToast } = useToast()
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
-  const [items, setItems] = useState<DbTxLineItem[]>([])
+const [items, setItems] = useState<SelectorRow[]>([])
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [tempSelections, setTempSelections] = useState<Map<string, SelectedLineItem>>(new Map())
   const [filterLevel, setFilterLevel] = useState<number | 'all'>('all')
@@ -76,8 +96,18 @@ const TransactionLineItemSelector: React.FC<TransactionLineItemSelectorProps> = 
     const loadItems = async () => {
       setLoading(true)
       try {
-        const catalogItems = await transactionLineItemsCatalogService.getCatalogItems(orgId, true)
-        setItems(catalogItems)
+const catalogItems = await lineItemsCatalogService.toSelectorItems(orgId)
+        // Map to local shape
+        setItems(catalogItems.map(ci => ({
+          id: ci.id,
+          item_code: ci.item_code,
+          item_name: ci.item_name,
+          item_name_ar: ci.item_name_ar || null,
+          parent_id: ci.parent_id ?? null,
+          unit_of_measure: ci.unit_of_measure ?? null,
+          unit_price: ci.unit_price ?? 0,
+          is_active: ci.is_active,
+        })))
         
         // Initialize temp selections from existing selected items
         const tempMap = new Map<string, SelectedLineItem>()
@@ -169,16 +199,20 @@ const TransactionLineItemSelector: React.FC<TransactionLineItemSelectorProps> = 
     })
   }
 
-  const handleItemSelect = (item: DbTxLineItem & { level: number }, checked: boolean) => {
+const handleItemSelect = (item: SelectorRow & { level: number }, checked: boolean) => {
     setTempSelections(prev => {
       const newMap = new Map(prev)
       
       if (checked) {
-        const selectedItem: SelectedLineItem = {
-          ...item,
-          quantity_selected: item.quantity || 1,
+const selectedItem: SelectedLineItem = {
+          id: item.id,
+          item_code: item.item_code || null,
+          item_name: item.item_name || null,
+          item_name_ar: item.item_name_ar || null,
+          level: item.level,
+          quantity_selected: 1,
           unit_price_override: item.unit_price || 0,
-          total_amount: (item.quantity || 1) * (item.unit_price || 0)
+          total_amount: 1 * (item.unit_price || 0)
         }
         newMap.set(item.id, selectedItem)
       } else {
@@ -188,11 +222,15 @@ const TransactionLineItemSelector: React.FC<TransactionLineItemSelectorProps> = 
       // If not multiSelect, clear other selections
       if (!multiSelect && checked) {
         newMap.clear()
-        const selectedItem: SelectedLineItem = {
-          ...item,
-          quantity_selected: item.quantity || 1,
+const selectedItem: SelectedLineItem = {
+          id: item.id,
+          item_code: item.item_code || null,
+          item_name: item.item_name || null,
+          item_name_ar: item.item_name_ar || null,
+          level: item.level,
+          quantity_selected: 1,
           unit_price_override: item.unit_price || 0,
-          total_amount: (item.quantity || 1) * (item.unit_price || 0)
+          total_amount: 1 * (item.unit_price || 0)
         }
         newMap.set(item.id, selectedItem)
       }

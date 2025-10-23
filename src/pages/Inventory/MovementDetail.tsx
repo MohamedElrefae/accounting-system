@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { Box, Button, Container, Paper, Stack, Typography, Tooltip, Select, MenuItem, Checkbox, ListItemText } from '@mui/material'
-import { DataGrid, GridColDef } from '@mui/x-data-grid'
+import { DataGrid, type GridColDef } from '@mui/x-data-grid'
 import { InventoryMovementService, type MovementDetailRow } from '@/services/inventory/reports'
 import { getActiveOrgId } from '@/utils/org'
 import { useLocation } from 'react-router-dom'

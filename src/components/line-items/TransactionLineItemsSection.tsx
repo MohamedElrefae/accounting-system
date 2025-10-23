@@ -3,9 +3,18 @@ import { TransactionLineItemsEditor } from './TransactionLineItemsEditor'
 import { transactionLineItemsService, type EditableTxLineItem } from '../../services/transaction-line-items'
 
 export interface TransactionLineItemsSectionProps {
-  transactionId: string
+  transactionLineId: string
   orgId: string
   disabled?: boolean
+  // Cost analysis data
+  workItems?: Array<{ id: string; code: string; name: string }>
+  analysisItems?: Record<string, { code: string; name: string }>
+  costCenters?: Array<{ id: string; code: string; name: string }>
+  transactionLineDefaults?: {
+    work_item_id?: string | null
+    analysis_work_item_id?: string | null
+    sub_tree_id?: string | null
+  }
 }
 
 /**
@@ -13,9 +22,13 @@ export interface TransactionLineItemsSectionProps {
  * Loads from DB, allows editing, and persists via upsertMany.
  */
 export const TransactionLineItemsSection: React.FC<TransactionLineItemsSectionProps> = ({
-  transactionId,
+  transactionLineId,
   orgId,
   disabled = false,
+  workItems,
+  analysisItems,
+  costCenters,
+  transactionLineDefaults,
 }) => {
   const [items, setItems] = useState<EditableTxLineItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -30,7 +43,7 @@ export const TransactionLineItemsSection: React.FC<TransactionLineItemsSectionPr
       setError(null)
       setSuccess(null)
       try {
-        const rows = await transactionLineItemsService.listByTransaction(transactionId)
+        const rows = await transactionLineItemsService.listByTransactionLine(transactionLineId)
         if (!mounted) return
         const mapped: EditableTxLineItem[] = rows.map(r => ({
           id: r.id,
@@ -56,14 +69,14 @@ export const TransactionLineItemsSection: React.FC<TransactionLineItemsSectionPr
     }
     load()
     return () => { mounted = false }
-  }, [transactionId])
+  }, [transactionLineId])
 
   const save = async () => {
     setSaving(true)
     setError(null)
     setSuccess(null)
     try {
-      await transactionLineItemsService.upsertMany(transactionId, items)
+      await transactionLineItemsService.upsertMany(transactionLineId, items)
       setSuccess('Saved')
     } catch (e: any) {
       setError(e?.message || 'Save failed')
@@ -87,11 +100,15 @@ export const TransactionLineItemsSection: React.FC<TransactionLineItemsSectionPr
       {success && <div className="text-success">{success}</div>}
 
       <TransactionLineItemsEditor
-        transactionId={transactionId}
+        transactionLineId={transactionLineId}
         orgId={orgId}
         items={items}
         onChange={setItems}
         disabled={disabled || loading || saving}
+        workItems={workItems}
+        analysisItems={analysisItems}
+        costCenters={costCenters}
+        transactionLineDefaults={transactionLineDefaults}
       />
     </section>
   )

@@ -344,46 +344,85 @@ const Dashboard: React.FC = () => {
       
       const categoryTotals = await getCategoryTotals(balanceFilters);
       
-      // Get accounts for transaction categorization
+      // Get accounts for transaction categorization (support id and code lookups)
       const { data: accts, error: acctErr } = await supabase
         .from('accounts')
-        .select('id, name, category, normal_balance');
+        .select('id, code, name, category, normal_balance');
       if (acctErr) throw acctErr;
-      const acctMap: Record<string, { id: string; name?: string | null; category?: string | null; normal_balance?: 'debit' | 'credit' | null }> = {};
+      const acctById: Record<string, { id: string; code?: string | null; name?: string | null; category?: string | null; normal_balance?: 'debit' | 'credit' | null }> = {};
+      const acctByCode: Record<string, { id: string; code?: string | null; name?: string | null; category?: string | null; normal_balance?: 'debit' | 'credit' | null }> = {};
       for (const a of accts || []) {
-        acctMap[a.id] = { id: a.id, name: a.name, category: (a as any).category ?? null, normal_balance: (a as any).normal_balance ?? null };
+        const rec = { id: a.id, code: (a as any).code ?? null, name: (a as any).name ?? null, category: (a as any).category ?? null, normal_balance: (a as any).normal_balance ?? null };
+        acctById[a.id] = rec;
+        if ((a as any).code) acctByCode[(a as any).code] = rec;
       }
 
       // 1) Recent 10 transactions
-      let recentQ = supabase
-        .from('transactions')
-        .select('id, entry_date, description, amount, debit_account_id, credit_account_id, is_posted')
-        .order('entry_date', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(10);
-      recentQ = applyScope(recentQ);
-      // Apply posting filter to recent transactions if in Posted-only mode
-      if (postedOnly) {
-        recentQ = recentQ.eq('is_posted', true);
-      }
-      const { data: txRecent, error: txErr } = await recentQ;
-      if (txErr) throw txErr;
-      const rows = txRecent || [];
+      const { getReadMode } = await import('../config/featureFlags');
+      const readMode = getReadMode();
 
-      const recentDerived: RecentRow[] = rows.map(r => {
-        const debitCat = acctMap[r.debit_account_id]?.category || null;
-        const creditCat = acctMap[r.credit_account_id]?.category || null;
-        // Only classify as income if credit account is revenue; classify as expense if debit account is expense.
-        // Do NOT treat equity/liability/asset movements as income.
-        let type: 'income' | 'expense' = 'income';
-        if (debitCat === 'expense') type = 'expense';
-        else if (creditCat === 'revenue') type = 'income';
-        let category: string | null = null;
-        if (type === 'expense') category = acctMap[r.debit_account_id]?.name ?? debitCat ?? null;
-        else category = acctMap[r.credit_account_id]?.name ?? creditCat ?? null;
-        return { id: r.id, entry_date: r.entry_date, description: r.description, amount: r.amount, debit_account_id: r.debit_account_id, credit_account_id: r.credit_account_id, type, category } as RecentRow;
-      });
-      setRecent(recentDerived);
+      let rows: any[] = [];
+      if (readMode !== 'legacy') {
+        // Use enriched multi-line journals view
+        let recentQ = supabase
+          .from('v_gl2_journals_enriched')
+          .select('journal_id, org_id, number, doc_date, posting_date, status, debit_account_code, credit_account_code, amount')
+          .order('posting_date', { ascending: false, nullsFirst: false })
+          .limit(10);
+        recentQ = applyScope(recentQ);
+        if (postedOnly) recentQ = recentQ.eq('status', 'posted');
+        const { data: txRecent, error: txErr } = await recentQ as any;
+        if (txErr) throw txErr;
+        rows = txRecent || [];
+
+        const recentDerived: RecentRow[] = rows.map(r => {
+          const debitCat = r.debit_account_code ? acctByCode[r.debit_account_code]?.category || null : null;
+          const creditCat = r.credit_account_code ? acctByCode[r.credit_account_code]?.category || null : null;
+          let type: 'income' | 'expense' = 'income';
+          if (debitCat === 'expense') type = 'expense';
+          else if (creditCat === 'revenue') type = 'income';
+          let category: string | null = null;
+          if (type === 'expense') category = (r.debit_account_code && (acctByCode[r.debit_account_code]?.name ?? debitCat)) ?? null;
+          else category = (r.credit_account_code && (acctByCode[r.credit_account_code]?.name ?? creditCat)) ?? null;
+          return {
+            id: r.journal_id,
+            entry_date: r.doc_date || r.posting_date,
+            description: '',
+            amount: Number(r.amount ?? 0),
+            debit_account_id: r.debit_account_code, // code when in GL2 mode
+            credit_account_id: r.credit_account_code, // code when in GL2 mode
+            type,
+            category,
+          } as RecentRow;
+        });
+        setRecent(recentDerived);
+      } else {
+        // Legacy single-line transactions table
+        let recentQ = supabase
+          .from('transactions')
+          .select('id, entry_date, description, amount, debit_account_id, credit_account_id, is_posted')
+          .order('entry_date', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(10);
+        recentQ = applyScope(recentQ);
+        if (postedOnly) recentQ = recentQ.eq('is_posted', true);
+        const { data: txRecent, error: txErr } = await recentQ;
+        if (txErr) throw txErr;
+        rows = txRecent || [];
+
+        const recentDerived: RecentRow[] = rows.map(r => {
+          const debitCat = acctById[r.debit_account_id]?.category || null;
+          const creditCat = acctById[r.credit_account_id]?.category || null;
+          let type: 'income' | 'expense' = 'income';
+          if (debitCat === 'expense') type = 'expense';
+          else if (creditCat === 'revenue') type = 'income';
+          let category: string | null = null;
+          if (type === 'expense') category = acctById[r.debit_account_id]?.name ?? debitCat ?? null;
+          else category = acctById[r.credit_account_id]?.name ?? creditCat ?? null;
+          return { id: r.id, entry_date: r.entry_date, description: r.description, amount: r.amount, debit_account_id: r.debit_account_id, credit_account_id: r.credit_account_id, type, category } as RecentRow;
+        });
+        setRecent(recentDerived);
+      }
 
       // 2) Window for charts: last 6 months
       const now = new Date();
@@ -395,32 +434,38 @@ const Dashboard: React.FC = () => {
         startStr = start.toISOString().slice(0, 10);
       }
 
-      let rangeQ = supabase
-        .from('transactions')
-        .select('id, entry_date, amount, debit_account_id, credit_account_id, is_posted')
-        .gte('entry_date', startStr)
-        .order('entry_date', { ascending: true });
-      if (dateTo) {
-        rangeQ = rangeQ.lte('entry_date', dateTo);
+      // Range data for charts (last 6 months), switch by read mode
+      let txs: any[] = [];
+      if (readMode !== 'legacy') {
+        let rangeQ = supabase
+          .from('v_gl2_journals_enriched')
+          .select('journal_id, posting_date, doc_date, amount, debit_account_code, credit_account_code, status')
+          .gte('posting_date', startStr)
+          .order('posting_date', { ascending: true });
+        if (dateTo) rangeQ = rangeQ.lte('posting_date', dateTo);
+        rangeQ = applyScope(rangeQ);
+        if (postedOnly) rangeQ = rangeQ.eq('status', 'posted');
+        const { data: txRange, error: rangeErr } = await rangeQ as any;
+        if (rangeErr) throw rangeErr;
+        txs = txRange || [];
+      } else {
+        let rangeQ = supabase
+          .from('transactions')
+          .select('id, entry_date, amount, debit_account_id, credit_account_id, is_posted')
+          .gte('entry_date', startStr)
+          .order('entry_date', { ascending: true });
+        if (dateTo) rangeQ = rangeQ.lte('entry_date', dateTo);
+        rangeQ = applyScope(rangeQ);
+        if (postedOnly) rangeQ = rangeQ.eq('is_posted', true);
+        const { data: txRange, error: rangeErr } = await rangeQ;
+        if (rangeErr) throw rangeErr;
+        txs = txRange || [];
       }
-      if (dateTo) {
-        rangeQ = rangeQ.lte('entry_date', dateTo);
-      }
-      rangeQ = applyScope(rangeQ);
-      // Only filter by posting status if postedOnly is true
-      if (postedOnly) {
-        rangeQ = rangeQ.eq('is_posted', true);
-      }
-      // If All mode (postedOnly = false), include both posted and unposted transactions
-      const { data: txRange, error: rangeErr } = await rangeQ;
-      if (rangeErr) throw rangeErr;
-      const txs = txRange || [];
 
       // Build monthly buckets using consistent formatting
       const monthKeys: string[] = [];
       for (let i = 5; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        // Use organization number format for consistent month display
         const key = d.toLocaleString(numberFormat || (language === 'ar' ? 'ar-SA' : 'en-US'), { month: 'short', year: '2-digit' });
         monthKeys.push(key);
       }
@@ -436,14 +481,17 @@ const Dashboard: React.FC = () => {
 
       // Build revenue/expenses by month from transactions (informational)
       for (const r of txs) {
-        const d = new Date(r.entry_date);
+        const dateVal = (r as any).entry_date || (r as any).doc_date || (r as any).posting_date;
+        const d = new Date(dateVal);
         const key = d.toLocaleString(numberFormat || (language === 'ar' ? 'ar-SA' : 'en-US'), { month: 'short', year: '2-digit' });
         const idx = monthKeys.indexOf(key);
-        const creditCat = acctMap[r.credit_account_id]?.category || null;
-        const debitCat = acctMap[r.debit_account_id]?.category || null;
-        if (idx >= 0 && (!postedOnly || r.is_posted)) {
-          if (creditCat === 'revenue') revenueByMonth[idx] += r.amount;
-          if (debitCat === 'expense') expensesByMonth[idx] += r.amount;
+        const creditCat = (r as any).credit_account_id ? (acctById[(r as any).credit_account_id]?.category || null) : ((r as any).credit_account_code ? (acctByCode[(r as any).credit_account_code]?.category || null) : null);
+        const debitCat = (r as any).debit_account_id ? (acctById[(r as any).debit_account_id]?.category || null) : ((r as any).debit_account_code ? (acctByCode[(r as any).debit_account_code]?.category || null) : null);
+        const isPosted = (r as any).is_posted ?? (String((r as any).status || '').toLowerCase() === 'posted');
+        const amt = Number((r as any).amount ?? 0);
+        if (idx >= 0 && (!postedOnly || isPosted)) {
+          if (creditCat === 'revenue') revenueByMonth[idx] += amt;
+          if (debitCat === 'expense') expensesByMonth[idx] += amt;
         }
       }
       const netProfit = totalRevenue - totalExpenses;

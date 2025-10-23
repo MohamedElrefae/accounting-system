@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Box, Button, Container, Paper, Stack, Typography, Tooltip, Select, MenuItem, Checkbox, ListItemText } from '@mui/material'
 import { FilterBar } from '@/components/Common/FilterBar'
-import { DataGrid, GridColDef } from '@mui/x-data-grid'
+import { DataGrid, type GridColDef } from '@mui/x-data-grid'
 import { useNavigate } from 'react-router-dom'
 import { InventoryReportsService, type MovementSummaryRow } from '@/services/inventory/reports'
 import { getActiveOrgId } from '@/utils/org'

@@ -60,14 +60,23 @@ export async function getCompanyConfig(): Promise<CompanyConfig> {
       .select('*')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        // No config exists, create default
-        return await createDefaultConfig()
-      }
       throw error
+    }
+
+    // If no row exists, return in-memory defaults without writing to DB
+    if (!data) {
+      const fallback = {
+        ...DEFAULT_COMPANY_CONFIG,
+        id: 'default',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      } as CompanyConfig
+      configCache = fallback
+      configCacheTime = now
+      return fallback
     }
 
     configCache = data as CompanyConfig
@@ -89,28 +98,17 @@ export async function getCompanyConfig(): Promise<CompanyConfig> {
  * Create default company configuration
  */
 async function createDefaultConfig(): Promise<CompanyConfig> {
-  try {
-    const { data, error } = await supabase
-      .from('company_config')
-      .insert(DEFAULT_COMPANY_CONFIG)
-      .select('*')
-      .single()
-
-    if (error) throw error
-
-    configCache = data as CompanyConfig
-    configCacheTime = Date.now()
-    return configCache
-  } catch (error) {
-    console.error('Error creating default config:', error)
-    // Return default config as fallback
-    return {
-      ...DEFAULT_COMPANY_CONFIG,
-      id: 'default',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    } as CompanyConfig
-  }
+  // Do not attempt to write a row automatically; return in-memory defaults.
+  // This avoids 400 errors when optional columns differ per environment and respects RLS.
+  const fallback = {
+    ...DEFAULT_COMPANY_CONFIG,
+    id: 'default',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  } as CompanyConfig
+  configCache = fallback
+  configCacheTime = Date.now()
+  return fallback
 }
 
 /**

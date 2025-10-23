@@ -35,6 +35,9 @@ import { transactionValidationAPI } from '../../services/transaction-validation-
 import { getCompanyConfig } from '../../services/company-config'
 import TransactionAnalysisModal from '../../components/Transactions/TransactionAnalysisModal'
 import AttachDocumentsPanel from '../../components/documents/AttachDocumentsPanel'
+import { getReadMode } from '../../config/featureFlags'
+import TransactionsHeaderTable from './TransactionsHeaderTable'
+import TransactionLinesTable from './TransactionLinesTable'
 
 interface FilterState {
   dateFrom: string
@@ -65,19 +68,26 @@ const TransactionsPage: React.FC = () => {
   // Unified form state
   const [formOpen, setFormOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<TransactionRecord | null>(null)
+  const [creatingDraft, setCreatingDraft] = useState<boolean>(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [detailsFor, setDetailsFor] = useState<TransactionRecord | null>(null)
+  const [createdTxId, setCreatedTxId] = useState<string | null>(null)
   const [audit, setAudit] = useState<TransactionAudit[]>([])
   const [approvalHistory, setApprovalHistory] = useState<ApprovalHistoryRow[]>([])
+  // Keep create-mode title even after header insert until user saves draft/post
+  const [keepCreateTitle, setKeepCreateTitle] = useState<boolean>(false)
   
   // Cost Analysis Modal state
   const [analysisModalOpen, setAnalysisModalOpen] = useState(false)
   const [analysisTransactionId, setAnalysisTransactionId] = useState<string | null>(null)
+  const [analysisTransactionLineId, setAnalysisTransactionLineId] = useState<string | null>(null)
   const [analysisTransaction, setAnalysisTransaction] = useState<TransactionRecord | null>(null)
 
   // Documents panel state
   const [documentsOpen, setDocumentsOpen] = useState(false)
   const [documentsFor, setDocumentsFor] = useState<TransactionRecord | null>(null)
+  const [documentsForLine, setDocumentsForLine] = useState<any | null>(null)
+
 
   // Documents panel layout state with persistence
   const [docsPanelPosition, setDocsPanelPosition] = useState<{ x: number; y: number }>(() => {
@@ -146,15 +156,17 @@ const TransactionsPage: React.FC = () => {
   const formRef = React.useRef<UnifiedCRUDFormHandle>(null)
   
   // Function to open cost analysis modal
-  const openCostAnalysisModal = (transaction: TransactionRecord) => {
+  const openCostAnalysisModal = (transaction: TransactionRecord, opts?: { transactionLineId?: string }) => {
     setAnalysisTransaction(transaction)
     setAnalysisTransactionId(transaction.id)
+    setAnalysisTransactionLineId(opts?.transactionLineId || null)
     setAnalysisModalOpen(true)
   }
   
   const closeCostAnalysisModal = () => {
     setAnalysisModalOpen(false)
     setAnalysisTransactionId(null)
+    setAnalysisTransactionLineId(null)
     setAnalysisTransaction(null)
   }
 
@@ -232,6 +244,62 @@ const TransactionsPage: React.FC = () => {
   useEffect(() => {
     try { localStorage.setItem('transactions_table_wrap', wrapMode ? '1' : '0') } catch {}
   }, [wrapMode])
+
+  // Transaction & Line selection state
+  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null)
+  const [selectedLineId, setSelectedLineId] = useState<string | null>(null)
+  
+  // Lines state for bottom table
+  const [transactionLines, setTransactionLines] = useState<any[]>([])
+  const [lineWrapMode, setLineWrapMode] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem('transactions_lines_table_wrap')
+      return raw ? raw === '1' : false
+    } catch { return false }
+  })
+
+  // Persist line wrap mode selection
+  useEffect(() => {
+    try { localStorage.setItem('transactions_lines_table_wrap', lineWrapMode ? '1' : '0') } catch {}
+  }, [lineWrapMode])
+  
+  // Fetch transaction lines when transaction is selected
+  useEffect(() => {
+    const fetchLines = async () => {
+      console.log('🔄 useEffect triggered, selectedTransactionId:', selectedTransactionId);
+      
+      if (!selectedTransactionId) {
+        console.log('⚠️ No transaction selected, clearing lines');
+        setTransactionLines([])
+        setSelectedLineId(null)
+        return
+      }
+      try {
+        console.log('📡 Querying transaction_lines for transaction:', selectedTransactionId);
+        const { data, error } = await supabase
+          .from('transaction_lines')
+          .select('*')
+          .eq('transaction_id', selectedTransactionId)
+          .order('line_no', { ascending: true })
+        
+        if (error) {
+          console.error('❌ Supabase error fetching lines:', error);
+          setTransactionLines([])
+        } else if (Array.isArray(data)) {
+          console.log('✅ Lines fetched successfully:', data.length, 'lines for transaction', selectedTransactionId);
+          console.log('📊 Line data:', data);
+          setTransactionLines(data)
+        } else {
+          console.warn('⚠️ Unexpected data format:', data);
+          setTransactionLines([])
+        }
+      } catch (error) {
+        console.error('❌ Exception fetching lines:', error)
+        setTransactionLines([])
+      }
+    }
+    fetchLines()
+  }, [selectedTransactionId])
   
   // Refresh Analysis Work Items label cache when org/project filter changes
   useEffect(() => {
@@ -254,8 +322,11 @@ const TransactionsPage: React.FC = () => {
     })()
   }, [orgFilterId, projectFilterId, organizations])
   
-  // Column configuration state
-  const [columnConfigOpen, setColumnConfigOpen] = useState(false)
+  // Column configuration state (renamed for clarity - headers table)
+  const [headersColumnConfigOpen, setHeadersColumnConfigOpen] = useState(false)
+  
+  // Column configuration state for lines table
+  const [lineColumnsConfigOpen, setLineColumnsConfigOpen] = useState(false)
   
   // Transactions config modal state
   const [transactionsConfigOpen, setTransactionsConfigOpen] = useState(false)
@@ -495,7 +566,7 @@ const TransactionsPage: React.FC = () => {
     })()
   }, [])
 
-  // Default column configuration for transactions table
+  // Default column configuration for transactions table (documents column moved to lines table)
   const defaultColumns: ColumnConfig[] = useMemo(() => [
     { key: 'entry_number', label: 'رقم القيد', visible: true, width: 120, minWidth: 100, maxWidth: 200, type: 'text', resizable: true },
     { key: 'entry_date', label: 'التاريخ', visible: true, width: 130, minWidth: 120, maxWidth: 180, type: 'date', resizable: true },
@@ -515,12 +586,10 @@ const TransactionsPage: React.FC = () => {
     { key: 'created_by_name', label: 'أنشئت بواسطة', visible: false, width: 140, minWidth: 120, maxWidth: 200, type: 'text', resizable: true },
     { key: 'posted_by_name', label: 'مرحلة بواسطة', visible: false, width: 140, minWidth: 120, maxWidth: 200, type: 'text', resizable: true },
     { key: 'approval_status', label: 'حالة الاعتماد', visible: true, width: 140, minWidth: 120, maxWidth: 200, type: 'badge', resizable: false },
-    { key: 'documents_count', label: 'عدد المرفقات', visible: true, width: 100, minWidth: 80, maxWidth: 140, type: 'number', resizable: true },
-    { key: 'documents', label: 'المستندات', visible: true, width: 130, minWidth: 110, maxWidth: 180, type: 'actions', resizable: true },
     { key: 'actions', label: 'الإجراءات', visible: true, width: 220, minWidth: 180, maxWidth: 400, type: 'actions', resizable: true }
   ], [])
 
-  // Column preferences hook
+  // Column preferences hook for headers table
   const {
     columns,
     handleColumnResize,
@@ -529,6 +598,35 @@ const TransactionsPage: React.FC = () => {
   } = useColumnPreferences({
     storageKey: 'transactions_table',
     defaultColumns,
+    userId: currentUserId || undefined
+  })
+
+  // Default column configuration for lines table
+  const defaultLineColumns: ColumnConfig[] = useMemo(() => [
+    { key: 'line_no', label: 'رقم السطر', visible: true, width: 80, minWidth: 60, maxWidth: 120, type: 'number', resizable: true },
+    { key: 'account_label', label: 'الحساب', visible: true, width: 200, minWidth: 150, maxWidth: 300, type: 'text', resizable: true },
+    { key: 'debit_amount', label: 'المبلغ المدين', visible: true, width: 120, minWidth: 100, maxWidth: 180, type: 'currency', resizable: true },
+    { key: 'credit_amount', label: 'المبلغ الدائن', visible: true, width: 120, minWidth: 100, maxWidth: 180, type: 'currency', resizable: true },
+    { key: 'description', label: 'البيان', visible: true, width: 200, minWidth: 150, maxWidth: 300, type: 'text', resizable: true },
+    { key: 'project_label', label: 'المشروع', visible: true, width: 150, minWidth: 120, maxWidth: 220, type: 'text', resizable: true },
+    { key: 'cost_center_label', label: 'مركز التكلفة', visible: true, width: 150, minWidth: 120, maxWidth: 220, type: 'text', resizable: true },
+    { key: 'work_item_label', label: 'عنصر العمل', visible: false, width: 150, minWidth: 120, maxWidth: 220, type: 'text', resizable: true },
+    { key: 'classification_label', label: 'التصنيف', visible: false, width: 150, minWidth: 120, maxWidth: 220, type: 'text', resizable: true },
+    { key: 'sub_tree_label', label: 'الشجرة الفرعية', visible: false, width: 150, minWidth: 120, maxWidth: 220, type: 'text', resizable: true },
+    { key: 'cost_analysis', label: 'التكلفة', visible: true, width: 120, minWidth: 100, maxWidth: 180, type: 'actions', resizable: true },
+    { key: 'documents', label: 'المستندات', visible: true, width: 120, minWidth: 100, maxWidth: 180, type: 'actions', resizable: true },
+    { key: 'actions', label: 'الإجراءات', visible: true, width: 120, minWidth: 100, maxWidth: 180, type: 'actions', resizable: true }
+  ], [])
+
+  // Column preferences hook for lines table
+  const {
+    columns: lineColumns,
+    handleColumnResize: handleLineColumnResize,
+    handleColumnConfigChange: handleLineColumnConfigChange,
+    resetToDefaults: resetLineColumnsToDefaults
+  } = useColumnPreferences({
+    storageKey: 'transactions_lines_table',
+    defaultColumns: defaultLineColumns,
     userId: currentUserId || undefined
   })
 
@@ -623,6 +721,8 @@ const TransactionsPage: React.FC = () => {
   // When opening the CRUD form, refresh accounts to pick up newly added accounts from the tree
   useEffect(() => {
     if (!formOpen) return
+    // Runtime verification badge log
+    console.log('🟢 line-editor v2 active', { createdTxId, isEditing: !!editingTx })
     getAccounts().then(setAccounts).catch(() => {})
     
     // Load categories for ALL organizations to ensure dropdown works for any selected org
@@ -665,30 +765,53 @@ const TransactionsPage: React.FC = () => {
   }, [formOpen, editingTx, organizations])
 
   async function reload() {
+    console.log('🚀 Reload triggered with filters:', {
+      mode,
+      approvalFilter,
+      debitFilterId: debitFilterId || 'none',
+      creditFilterId: creditFilterId || 'none',
+      orgFilterId: orgFilterId || 'none',
+      page,
+      pageSize
+    });
+    
+    const filtersToUse = {
+      scope: mode === 'my' ? 'my' : 'all',
+      pendingOnly: mode === 'pending',
+      search: searchTerm,
+      dateFrom: filters.dateFrom || undefined,
+      dateTo: filters.dateTo || undefined,
+      amountFrom: filters.amountFrom ? parseFloat(filters.amountFrom) : undefined,
+      amountTo: filters.amountTo ? parseFloat(filters.amountTo) : undefined,
+      debitAccountId: debitFilterId || undefined,
+      creditAccountId: creditFilterId || undefined,
+      orgId: orgFilterId || undefined,
+      projectId: projectFilterId || undefined,
+      classificationId: classificationFilterId || undefined,
+      expensesCategoryId: expensesCategoryFilterId || undefined,
+      workItemId: workItemFilterId || undefined,
+      costCenterId: costCenterFilterId || undefined,
+      analysisWorkItemId: (filters as any).analysis_work_item_id || undefined,
+      approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted' | 'approved' | 'draft' | 'rejected' | 'revision_requested' | 'cancelled' | 'posted')) : undefined,
+    };
+    console.log('🔍 Calling getTransactions with filters:', filtersToUse);
+    
     const { rows, total } = await getTransactions({
-      filters: {
-        scope: mode === 'my' ? 'my' : 'all',
-        pendingOnly: mode === 'pending',
-        search: searchTerm,
-        dateFrom: filters.dateFrom || undefined,
-        dateTo: filters.dateTo || undefined,
-        amountFrom: filters.amountFrom ? parseFloat(filters.amountFrom) : undefined,
-        amountTo: filters.amountTo ? parseFloat(filters.amountTo) : undefined,
-        debitAccountId: debitFilterId || undefined,
-        creditAccountId: creditFilterId || undefined,
-        orgId: orgFilterId || undefined,
-        projectId: projectFilterId || undefined,
-        classificationId: classificationFilterId || undefined,
-        expensesCategoryId: expensesCategoryFilterId || undefined,
-        workItemId: workItemFilterId || undefined,
-        costCenterId: costCenterFilterId || undefined,
-        analysisWorkItemId: (filters as any).analysis_work_item_id || undefined,
-approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted' | 'approved' | 'draft' | 'rejected' | 'revision_requested' | 'cancelled' | 'posted')) : undefined,
-      },
+      filters: filtersToUse,
       page,
       pageSize,
     })
-    setTransactions(rows)
+    
+    console.log('📊 Response from getTransactions:', {
+      rowCount: rows?.length || 0,
+      totalCount: total,
+      statuses: rows?.map((r: any) => r.approval_status).filter((v: any, i: number, a: any[]) => a.indexOf(v) === i),
+      hasContent: rows && rows.length > 0
+    });
+    console.log('🗂️ Full transaction list:', rows);
+    console.log('🐛 DEBUG: Setting transactions state with', rows?.length || 0, 'rows');
+    
+    setTransactions(rows || [])
     setTotalCount(total)
 
     // Load expenses categories for all orgs present in the page results (union)
@@ -876,22 +999,6 @@ approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted
     return prepareTableData(columns, rows)
   }, [paged, userNames, accounts, categories, workItems, analysisItemsMap, organizations, projects])
 
-  // Create unified form configuration
-  const transactionFormConfig = useMemo(() => {
-    return createTransactionFormConfig(
-      editingTx !== null,
-      accounts,
-      projects,
-      organizations,
-      classifications,
-      editingTx || undefined,
-      categories,
-      // Prefer work items for current org (MAIN or edit org)
-      workItems,
-      costCenters
-    )
-  }, [editingTx, accounts, projects, organizations, classifications, categories, workItems, costCenters])
-  
   // Snapshot initial form data at open time to prevent clearing user selections
   const initialFormDataRef = React.useRef<any | null>(null)
   
@@ -959,42 +1066,41 @@ approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted
     try {
       setIsSaving(true)
 
-      // Perform backend validation before saving
-      try {
-        if (!transactionValidationAPI || typeof transactionValidationAPI.validateTransactionBeforeSave !== 'function') {
-          console.warn('Transaction validation API not available, skipping backend validation')
-          throw new Error('Validation API not available')
-        }
-        
-        const validationResult = await transactionValidationAPI.validateTransactionBeforeSave({
-          debit_account_id: data.debit_account_id,
-          credit_account_id: data.credit_account_id,
-          amount: parseFloat(data.amount),
-          description: data.description,
-          entry_date: data.entry_date,
-          transaction_id: editingTx?.id
-        })
+      // Perform backend validation only when editing an existing transaction (header-only create has no lines yet)
+      if (editingTx) {
+        try {
+          if (!transactionValidationAPI || typeof transactionValidationAPI.validateTransactionBeforeSave !== 'function') {
+            console.warn('Transaction validation API not available, skipping backend validation')
+            throw new Error('Validation API not available')
+          }
+          
+          const validationResult = await transactionValidationAPI.validateTransactionBeforeSave({
+            transaction_id: editingTx.id,
+            description: data.description,
+            entry_date: data.entry_date,
+          })
 
-        // Show validation warnings (but allow proceeding)
-        if (validationResult.warnings.length > 0) {
-          const warningMessage = validationResult.warnings.map(w => w.message).join('\n')
-          const proceed = window.confirm(`تحذيرات التحقق:\n${warningMessage}\n\nهل تريد المتابعة؟`)
-          if (!proceed) {
+          // Show validation warnings (but allow proceeding)
+          if (validationResult.warnings.length > 0) {
+            const warningMessage = validationResult.warnings.map((w: any) => w.message).join('\n')
+            const proceed = window.confirm(`تحذيرات التحقق:\n${warningMessage}\n\nهل تريد المتابعة؟`)
+            if (!proceed) {
+              setIsSaving(false)
+              return
+            }
+          }
+
+          // Block submission if there are errors
+          if (!validationResult.is_valid) {
+            const errorMessage = validationResult.errors.map((e: any) => e.message).join('\n')
+            showToast(`أخطاء في التحقق من صحة المعاملة:\n${errorMessage}`, { severity: 'error' })
             setIsSaving(false)
             return
           }
+        } catch (validationError) {
+          console.warn('Backend validation skipped for header-only or failed gracefully:', validationError)
+          // Continue with normal processing if backend validation fails
         }
-
-        // Block submission if there are errors
-        if (!validationResult.is_valid) {
-          const errorMessage = validationResult.errors.map(e => e.message).join('\n')
-          showToast(`أخطاء في التحقق من صحة المعاملة:\n${errorMessage}`, { severity: 'error' })
-          setIsSaving(false)
-          return
-        }
-      } catch (validationError) {
-        console.warn('Backend validation failed, proceeding with client validation only:', validationError)
-        // Continue with normal processing if backend validation fails
       }
 
       if (editingTx) {
@@ -1023,63 +1129,39 @@ approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted
         // Ensure server truth is reflected (joins, computed fields)
         await reload()
       } else {
-        // Persist last selected debit/credit for convenience in next entries
-        try {
-          localStorage.setItem('tx_last_debit_account_id', String(data.debit_account_id || ''))
-          localStorage.setItem('tx_last_credit_account_id', String(data.credit_account_id || ''))
-        } catch {}
-        // Create new transaction with optimistic update
-        const tempId = `temp-${Date.now()}`
-        const temp: TransactionRecord = {
-          id: tempId,
-          entry_number: data.entry_number,
+        // Create draft header (header-only fields)
+        const payload = {
           entry_date: data.entry_date,
           description: data.description,
           reference_number: data.reference_number || null,
-          debit_account_id: data.debit_account_id,
-          credit_account_id: data.credit_account_id,
-          amount: parseFloat(data.amount),
-          notes: data.notes || null,
           org_id: data.organization_id || null,
-          project_id: data.project_id || null,
-          is_posted: false,
-          posted_at: null,
-          posted_by: null,
-          created_by: currentUserId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+        } as const
+        const { data: created, error } = await supabase
+          .from('transactions')
+          .insert(payload)
+          .select('*')
+          .single()
+        if (error) throw error
+        const createdEnriched = enrichTx(created as unknown as TransactionRecord)
+        // Keep panel open, switch to edit mode so lines section is available
+        setEditingTx(createdEnriched)
+        setCreatedTxId(createdEnriched.id)
+        setKeepCreateTitle(true)
+        initialFormDataRef.current = {
+          entry_number: createdEnriched.entry_number || '—',
+          entry_date: createdEnriched.entry_date,
+          description: createdEnriched.description || '',
+          reference_number: createdEnriched.reference_number || '',
+          organization_id: createdEnriched.org_id || '',
+          project_id: createdEnriched.project_id || ''
         }
-        // Enrich optimistic row for immediate display
-        const tempEnriched = enrichTx(temp)
-        setTransactions(prev => [tempEnriched as any, ...prev])
-
-    const rec = await createTransaction({
-          entry_number: data.entry_number,
-          entry_date: data.entry_date,
-          description: data.description,
-          reference_number: data.reference_number || undefined,
-          debit_account_id: data.debit_account_id,
-          credit_account_id: data.credit_account_id,
-          amount: parseFloat(data.amount),
-          notes: data.notes || undefined,
-          classification_id: data.classification_id || undefined,
-          sub_tree_id: data.sub_tree_id || undefined,
-          work_item_id: data.work_item_id || undefined,
-          analysis_work_item_id: data.analysis_work_item_id || undefined,
-          cost_center_id: data.cost_center_id || undefined,
-          org_id: data.organization_id || undefined,
-          project_id: data.project_id || undefined,
-        })
-        // Replace temp with real and enrich for display
-        const recEnriched = enrichTx(rec)
-        setTransactions(prev => prev.map(t => t.id === tempId ? (recEnriched as any) : t))
-        showToast('تم إنشاء المعاملة', { severity: 'success' })
-        // Refresh to load full server-side record
-        await reload()
+        setFormOpen(true)
+        // Also add to list on top
+        setTransactions(prev => [createdEnriched as any, ...prev])
+        showToast('تم إنشاء مسودة المعاملة — أضف القيود التفصيلية ثم احفظ المسودة', { severity: 'success' })
       }
 
-      setEditingTx(null)
-      setFormOpen(false)
+      // Keep panel open in edit mode after header creation; do not close here
     } catch (e: any) {
       // Rollback optimistic update if it was a create
       if (!editingTx) {
@@ -1114,16 +1196,125 @@ approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted
     }
   }
 
+  // Lines summary state for current editing transaction
+  const [lines, setLines] = useState<any[]>([])
+  const [linesTotals, setLinesTotals] = useState<{ debits: number; credits: number; count: number; balanced: boolean }>({ debits: 0, credits: 0, count: 0, balanced: false })
+
+  // Section 2: single-row line entry form (mapped to transaction_lines)
+  const [lineForm, setLineForm] = useState<{ 
+    id?: string | null;
+    account_id: string;
+    debit_amount: string;
+    credit_amount: string;
+    description: string;
+    project_id?: string;
+    cost_center_id?: string;
+    work_item_id?: string;
+    analysis_work_item_id?: string;
+    classification_id?: string;
+    sub_tree_id?: string;
+  }>({ id: null, account_id: '', debit_amount: '', credit_amount: '', description: '', project_id: '', cost_center_id: '', work_item_id: '', analysis_work_item_id: '', classification_id: '', sub_tree_id: '' })
+  const [editingLine, setEditingLine] = useState<boolean>(false)
+
+  const resetLineForm = () => setLineForm({ id: null, account_id: '', debit_amount: '', credit_amount: '', description: '', project_id: '', cost_center_id: '', work_item_id: '', analysis_work_item_id: '', classification_id: '', sub_tree_id: '' })
+
+  const submitLine = async () => {
+    const txId = editingTx?.id || createdTxId
+    if (!txId) return
+    const d = Number(lineForm.debit_amount || 0)
+    const c = Number(lineForm.credit_amount || 0)
+    if ((d > 0 && c > 0) || (d === 0 && c === 0)) {
+      showToast('يجب أن يكون السطر إما مدين أو دائن فقط', { severity: 'error' })
+      return
+    }
+    try {
+      if (editingLine && lineForm.id) {
+        const { error } = await supabase
+          .from('transaction_lines')
+          .update({ 
+            account_id: lineForm.account_id, 
+            debit_amount: d, 
+            credit_amount: c, 
+            description: lineForm.description || null,
+            project_id: lineForm.project_id || null,
+            cost_center_id: lineForm.cost_center_id || null,
+            work_item_id: lineForm.work_item_id || null,
+            analysis_work_item_id: lineForm.analysis_work_item_id || null,
+            classification_id: lineForm.classification_id || null,
+            sub_tree_id: lineForm.sub_tree_id || null,
+          })
+          .eq('id', lineForm.id)
+        if (error) throw error
+        showToast('تم تحديث السطر', { severity: 'success' })
+      } else {
+        const nextLineNo = (lines[lines.length - 1]?.line_no || 0) + 1
+        const { error } = await supabase
+          .from('transaction_lines')
+          .insert({ 
+            transaction_id: txId, 
+            line_no: nextLineNo, 
+            account_id: lineForm.account_id, 
+            debit_amount: d, 
+            credit_amount: c, 
+            description: lineForm.description || null,
+            project_id: lineForm.project_id || null,
+            cost_center_id: lineForm.cost_center_id || null,
+            work_item_id: lineForm.work_item_id || null,
+            analysis_work_item_id: lineForm.analysis_work_item_id || null,
+            classification_id: lineForm.classification_id || null,
+            sub_tree_id: lineForm.sub_tree_id || null,
+          })
+        if (error) throw error
+        showToast('تم إضافة السطر', { severity: 'success' })
+      }
+      resetLineForm()
+      setEditingLine(false)
+    } catch (e: any) {
+      showToast(e?.message || 'فشل حفظ السطر', { severity: 'error' })
+    }
+  }
+
+  // Poll lines when form open and editingTx is set (simple, minimal-change wiring)
+  useEffect(() => {
+    let timer: any = null
+    const tick = async () => {
+      try {
+        const txId = editingTx?.id || createdTxId
+        if (formOpen && txId) {
+          const { data, error } = await supabase
+            .from('transaction_lines')
+            .select('*')
+            .eq('transaction_id', txId)
+            .order('line_no', { ascending: true })
+          if (!error && Array.isArray(data)) {
+            setLines(data)
+            const d = data.reduce((s, l: any) => s + Number(l.debit_amount || 0), 0)
+            const c = data.reduce((s, l: any) => s + Number(l.credit_amount || 0), 0)
+            setLinesTotals({ debits: d, credits: c, count: data.length, balanced: Math.abs(d - c) < 0.01 && data.length >= 2 })
+          }
+        }
+      } catch {}
+      timer = setTimeout(tick, 1200)
+    }
+    tick()
+    return () => { if (timer) clearTimeout(timer) }
+  }, [formOpen, editingTx, createdTxId])
+
   const handleFormCancel = () => {
     setEditingTx(null)
+    setCreatedTxId(null)
     setFormOpen(false)
+    setCreatingDraft(false)
+    setKeepCreateTitle(false)
     _setFormErrors({})
   }
 
   const openNewTransactionForm = () => {
+    // Open panel in header-only mode; user fills data then submits to create header
     setEditingTx(null)
-    // Snapshot initial data for a new record, including last selected debit/credit
+    setKeepCreateTitle(true)
     initialFormDataRef.current = buildInitialFormDataForCreate()
+    setCreatingDraft(false)
     setFormOpen(true)
   }
 
@@ -1236,7 +1427,7 @@ approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted
               </button>
             </WithPermission>
           )}
-          <button className="ultimate-btn ultimate-btn-edit" onClick={() => setColumnConfigOpen(true)}>
+          <button className="ultimate-btn ultimate-btn-edit" onClick={() => setHeadersColumnConfigOpen(true)}>
             <div className="btn-content"><span className="btn-text">⚙️ إعدادات الأعمدة</span></div>
           </button>
           <ExportButtons
@@ -1533,6 +1724,7 @@ approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted
               <div className="btn-content"><span className="btn-text">استعادة الافتراضي</span></div>
             </button>
           </div>
+          {/* GL2 read-mode toggle removed for unified model */}
           <div className="transactions-pagination">
             <button className="ultimate-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}><div className="btn-content"><span className="btn-text">السابق</span></div></button>
             <span>صفحة {page} من {Math.max(1, Math.ceil(totalCount / pageSize))}</span>
@@ -1545,6 +1737,284 @@ approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted
             </select>
           </div>
         </div>
+        
+        {/* SECTION 1: TRANSACTION HEADERS TABLE (T1) */}
+        <div className="transactions-section headers-section">
+          <div className="section-header">
+            <h2>المعاملات (رؤوس القيود)</h2>
+            <div className="section-controls">
+              <button 
+                className="ultimate-btn ultimate-btn-edit"
+                onClick={() => setHeadersColumnConfigOpen(true)}
+                title="إعدادات أعمدة جدول المعاملات"
+              >
+                <div className="btn-content"><span className="btn-text">⚙️ إعدادات الأعمدة</span></div>
+              </button>
+            </div>
+          </div>
+          
+          {/* Toolbar and pagination for headers table */}
+          <div className="transactions-tablebar">
+            <div className="transactions-toolbar">
+              <span className="transactions-count">عدد السجلات: {totalCount}</span>
+              <label className="wrap-toggle">
+                <input
+                  type="checkbox"
+                  checked={wrapMode}
+                  onChange={(e) => setWrapMode(e.target.checked)}
+                />
+                <span>التفاف النص</span>
+              </label>
+              <button className="ultimate-btn" onClick={() => reload().catch(() => {})}>
+                <div className="btn-content"><span className="btn-text">تحديث</span></div>
+              </button>
+              <button
+                className="ultimate-btn ultimate-btn-warning"
+                onClick={async () => {
+                  try {
+                    setWrapMode(false)
+                    try { localStorage.setItem('transactions_table_wrap', '0') } catch {}
+                    handleColumnConfigChange(defaultColumns)
+                    if (currentUserId) {
+                      const mod = await import('../../services/column-preferences')
+                      await mod.upsertUserColumnPreferences({
+                        tableKey: 'transactions_table',
+                        columnConfig: { columns: defaultColumns, wrapMode: false },
+                        version: 1,
+                      })
+                    }
+                    showToast('تمت استعادة الإعدادات الافتراضية للجدول', { severity: 'success' })
+                  } catch (e: any) {
+                    showToast('فشل استعادة الإعدادات الافتراضية', { severity: 'error' })
+                  }
+                }}
+                title="استعادة الإعدادات الافتراضية"
+              >
+                <div className="btn-content"><span className="btn-text">استعادة الافتراضي</span></div>
+              </button>
+            </div>
+            <div className="transactions-pagination">
+              <button className="ultimate-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}><div className="btn-content"><span className="btn-text">السابق</span></div></button>
+              <span>صفحة {page} من {Math.max(1, Math.ceil(totalCount / pageSize))}</span>
+              <button className="ultimate-btn" onClick={() => setPage(p => Math.min(Math.ceil(totalCount / pageSize) || 1, p + 1))} disabled={page >= Math.ceil(totalCount / pageSize)}><div className="btn-content"><span className="btn-text">التالي</span></div></button>
+              <select className="filter-select" value={pageSize} onChange={e => { setPageSize(parseInt(e.target.value) || 20); setPage(1) }}>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+          </div>
+          
+          {/* Headers table (T1) */}
+          <TransactionsHeaderTable
+            key={`headers-table-${transactions.length}`}
+            transactions={transactions}
+            accounts={accounts}
+            organizations={organizations}
+            projects={projects}
+            categories={categories}
+            workItems={workItems}
+            analysisItemsMap={analysisItemsMap}
+            classifications={classifications}
+            userNames={userNames}
+            columns={columns}
+            wrapMode={wrapMode}
+            loading={loading}
+            onColumnResize={handleColumnResize}
+            onSelectTransaction={(tx) => {
+              setSelectedTransactionId(tx.id)
+              setSelectedLineId(null)
+            }}
+            selectedTransactionId={selectedTransactionId}
+            onEdit={(tx) => {
+              setKeepCreateTitle(false)
+              setEditingTx(tx)
+              initialFormDataRef.current = buildInitialFormDataForEdit(tx)
+              setFormOpen(true)
+            }}
+            onDelete={handleDelete}
+            onOpenDetails={async (tx) => {
+              setDetailsFor(tx)
+              try {
+                const rows = await getTransactionAudit(tx.id)
+                setAudit(rows)
+              } catch {}
+              try {
+                const hist = await getApprovalHistoryByTransactionId(tx.id)
+                setApprovalHistory(hist)
+              } catch {}
+              setDetailsOpen(true)
+            }}
+            onOpenDocuments={(tx) => {
+              setDocumentsFor(tx)
+              setDocumentsOpen(true)
+            }}
+            onOpenCostAnalysis={openCostAnalysisModal}
+            onSubmit={(id) => {
+              setSubmitTargetId(id)
+              setSubmitNote('')
+              setSubmitOpen(true)
+            }}
+            onApprove={(id) => openReview('approve', id)}
+            onRevise={(id) => openReview('revise', id)}
+            onReject={(id) => openReview('reject', id)}
+            onResubmit={(id) => {
+              setSubmitTargetId(id)
+              setSubmitNote('')
+              setSubmitOpen(true)
+            }}
+            onPost={async (id) => {
+              try {
+                await withRetry(() => postTransaction(id))
+                showToast('تم الترحيل', { severity: 'success' })
+                await reload()
+              } catch (e: any) {
+                showToast(formatSupabaseError(e) || 'فشل ترحيل المعاملة', { severity: 'error' })
+              }
+            }}
+            onCancelSubmission={async (id) => {
+              try {
+                await withRetry(() => cancelSubmission(id))
+                showToast('تم إلغاء الإرسال', { severity: 'success' })
+                await reload()
+              } catch (e: any) {
+                showToast(formatSupabaseError(e) || 'تعذر إلغاء الإرسال', { severity: 'error' })
+              }
+            }}
+            mode={mode}
+            currentUserId={currentUserId || undefined}
+            hasPerm={hasPerm}
+          />
+        </div>
+        
+        {/* DIVIDER */}
+        <div className="transactions-section-divider">
+          <span>القيود التفصيلية للمعاملة المحددة</span>
+        </div>
+        
+        {/* SECTION 2: TRANSACTION LINES TABLE (T2) */}
+        <div className="transactions-section lines-section">
+          <div className="section-header">
+            <h2>القيود التفصيلية</h2>
+            <div className="section-controls">
+              <button 
+                className="ultimate-btn ultimate-btn-edit"
+                onClick={() => setLineColumnsConfigOpen(true)}
+                disabled={!selectedTransactionId}
+                title="إعدادات أعمدة جدول القيود التفصيلية"
+              >
+                <div className="btn-content"><span className="btn-text">⚙️ إعدادات الأعمدة</span></div>
+              </button>
+              <label className="wrap-toggle">
+                <input
+                  type="checkbox"
+                  checked={lineWrapMode}
+                  onChange={(e) => setLineWrapMode(e.target.checked)}
+                />
+                <span>التفاف النص</span>
+              </label>
+              <button
+                className="ultimate-btn ultimate-btn-warning"
+                onClick={async () => {
+                  try {
+                    setLineWrapMode(false)
+                    try { localStorage.setItem('transactions_lines_table_wrap', '0') } catch {}
+                    handleLineColumnConfigChange(defaultLineColumns)
+                    if (currentUserId) {
+                      const mod = await import('../../services/column-preferences')
+                      await mod.upsertUserColumnPreferences({
+                        tableKey: 'transactions_lines_table',
+                        columnConfig: { columns: defaultLineColumns, wrapMode: false },
+                        version: 1,
+                      })
+                    }
+                    showToast('تمت استعادة الإعدادات الافتراضية للجدول', { severity: 'success' })
+                  } catch (e: any) {
+                    showToast('فشل استعادة الإعدادات الافتراضية', { severity: 'error' })
+                  }
+                }}
+                title="استعادة الإعدادات الافتراضية"
+                disabled={!selectedTransactionId}
+              >
+                <div className="btn-content"><span className="btn-text">استعادة الافتراضي</span></div>
+              </button>
+            </div>
+          </div>
+          
+          {/* Lines table (T2) */}
+          <TransactionLinesTable
+            lines={transactionLines}
+            accounts={accounts}
+            projects={projects}
+            categories={categories}
+            workItems={workItems}
+            costCenters={costCenters}
+            classifications={classifications}
+            columns={lineColumns}
+            wrapMode={lineWrapMode}
+            loading={loading}
+            selectedLineId={selectedLineId}
+            onColumnResize={handleLineColumnResize}
+            onEditLine={(line) => {
+              setLineForm({
+                id: line.id,
+                account_id: line.account_id,
+                debit_amount: String(line.debit_amount || 0),
+                credit_amount: String(line.credit_amount || 0),
+                description: line.description || '',
+                project_id: line.project_id || '',
+                cost_center_id: line.cost_center_id || '',
+                work_item_id: line.work_item_id || '',
+                analysis_work_item_id: line.analysis_work_item_id || '',
+                classification_id: line.classification_id || '',
+                sub_tree_id: line.sub_tree_id || ''
+              })
+              setEditingLine(true)
+            }}
+            onDeleteLine={async (id) => {
+              const ok = window.confirm('هل تريد حذف هذا السطر؟')
+              if (!ok) return
+              try {
+                const { error } = await supabase
+                  .from('transaction_lines')
+                  .delete()
+                  .eq('id', id)
+                if (error) throw error
+                showToast('تم حذف السطر', { severity: 'success' })
+                if (selectedTransactionId) {
+                  const { data } = await supabase
+                    .from('transaction_lines')
+                    .select('*')
+                    .eq('transaction_id', selectedTransactionId)
+                    .order('line_no', { ascending: true })
+                  if (data) setTransactionLines(data)
+                }
+              } catch (e: any) {
+                showToast(e?.message || 'فشل حذف السطر', { severity: 'error' })
+              }
+            }}
+            onSelectLine={(line) => setSelectedLineId(line.id)}
+            onOpenDocuments={(line) => {
+              setDocumentsFor(line as any)
+              setDocumentsOpen(true)
+            }}
+            onOpenCostAnalysis={(line) => {
+              if (!line.transaction_id) {
+                showToast('خطأ: معرف المعاملة غير صحيح', { severity: 'error' })
+                return
+              }
+              setAnalysisTransaction({ id: line.transaction_id } as any)
+              setAnalysisTransactionId(line.transaction_id)
+              setAnalysisTransactionLineId(line.id)
+              openCostAnalysisModal({ id: line.transaction_id } as any, { transactionLineId: line.id })
+            }}
+          />
+        </div>
+      </div>
+
+      {/* OLD CODE BELOW - TO BE REMOVED */}
+      <div style={{display: 'none'}}>
         <ResizableTable
           columns={columns}
           data={tableData}
@@ -1698,6 +2168,7 @@ approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted
                   {/* Edit (my) */}
                   {mode === 'my' && !row.original.is_posted && hasPerm('transactions.update') && row.original.created_by === currentUserId && (
                     <button className="ultimate-btn ultimate-btn-edit" onClick={() => {
+                      setKeepCreateTitle(false)
                       setEditingTx(row.original)
                       // Snapshot initial data for edit
                       initialFormDataRef.current = buildInitialFormDataForEdit(row.original)
@@ -1707,6 +2178,7 @@ approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted
                   {/* Edit (all) via manage */}
                   {mode === 'all' && !row.original.is_posted && hasPerm('transactions.manage') && (
                     <button className="ultimate-btn ultimate-btn-edit" onClick={() => {
+                      setKeepCreateTitle(false)
                       setEditingTx(row.original)
                       // Snapshot initial data for edit
                       initialFormDataRef.current = buildInitialFormDataForEdit(row.original)
@@ -1732,7 +2204,7 @@ approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted
       
       {/* Unified Transaction Form Panel */}
       <DraggableResizablePanel
-        title={editingTx ? 'تعديل المعاملة' : 'معاملة جديدة'}
+        title={keepCreateTitle ? 'إضافة المعاملة' : (editingTx ? 'تعديل المعاملة' : 'إضافة المعاملة')}
         isOpen={formOpen}
         onClose={handleFormCancel}
         position={panelPosition}
@@ -1755,6 +2227,19 @@ approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted
         }}
       >
           <div className="panel-actions">
+            <span className="ultimate-btn ultimate-btn-neutral" title="runtime flag" style={{ minHeight: 28, padding: '4px 8px' }}>
+              <span className="btn-text">line-editor v2 active</span>
+            </span>
+            {!(editingTx || createdTxId) && (
+              <button
+                className="ultimate-btn ultimate-btn-success"
+                title="إضافة قيود المعاملة"
+                onClick={() => formRef.current?.submit()}
+                style={{ fontSize: '12px', padding: '6px 10px' }}
+              >
+                <div className="btn-content"><span className="btn-text">إضافة قيود المعاملة</span></div>
+              </button>
+            )}
             <button
               className="ultimate-btn"
               title="تحديث قائمة الحسابات"
@@ -1798,15 +2283,203 @@ approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted
               <div className="btn-content"><span className="btn-text">🔄 إعادة تعيين</span></div>
             </button>
           </div>
+          {/* Header form (visible before header creation) */}
           <UnifiedCRUDForm
             ref={formRef}
-            config={transactionFormConfig}
+            config={createTransactionFormConfig(
+              !!(editingTx || createdTxId),
+              accounts,
+              projects,
+              organizations,
+              classifications,
+              editingTx || undefined,
+              categories,
+              workItems,
+              costCenters,
+              { headerOnly: !(editingTx || createdTxId) }
+            )}
             initialData={initialFormDataRef.current || (editingTx ? buildInitialFormDataForEdit(editingTx) : buildInitialFormDataForCreate())}
             resetOnInitialDataChange={false}
             onSubmit={handleFormSubmit}
             onCancel={handleFormCancel}
             isLoading={isSaving}
           />
+
+          {/* Section 1 + 3: Line editor and summary inside one block when editing */}
+          {(editingTx || createdTxId) && (
+            <div>
+              <div style={{ marginTop: 0 }}>
+                <h3 style={{ marginBottom: 8 }}>إضافة قيود المعاملة</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 120px 120px 1.2fr 1fr 1fr', gap: 8, alignItems: 'center' }}>
+                  <div>
+                    <SearchableSelect
+                      id="line_account"
+                      value={lineForm.account_id}
+                      options={accounts.filter(a=>a.is_postable).sort((x,y)=>x.code.localeCompare(y.code)).map(a=>({ value: a.id, label: `${a.code} - ${a.name}`, searchText: `${a.code} ${a.name}`.toLowerCase() }))}
+                      onChange={(val) => setLineForm(f => ({ ...f, account_id: String(val||'') }))}
+                      placeholder="اختر الحساب…"
+                    />
+                  </div>
+                  <div>
+                    <input type="number" step="0.01" placeholder="مدين" value={lineForm.debit_amount} onChange={e => setLineForm(f => ({ ...f, debit_amount: e.target.value, credit_amount: '' }))} style={{ width: '100%', textAlign: 'right' }} />
+                  </div>
+                  <div>
+                    <input type="number" step="0.01" placeholder="دائن" value={lineForm.credit_amount} onChange={e => setLineForm(f => ({ ...f, credit_amount: e.target.value, debit_amount: '' }))} style={{ width: '100%', textAlign: 'right' }} />
+                  </div>
+                  <div>
+                    <input type="text" placeholder="البيان" value={lineForm.description} onChange={e => setLineForm(f => ({ ...f, description: e.target.value }))} style={{ width: '100%' }} />
+                  </div>
+                  <div>
+                    <SearchableSelect
+                      id="line_project"
+                      value={lineForm.project_id || ''}
+                      options={[{ value: '', label: 'بدون مشروع', searchText: '' }, ...projects.map(p=>({ value:p.id, label:`${p.code} - ${p.name}`, searchText:`${p.code} ${p.name}`.toLowerCase() }))]}
+                      onChange={(val) => setLineForm(f => ({ ...f, project_id: String(val||'') }))}
+                      placeholder="المشروع"
+                    />
+                  </div>
+                  <div>
+                    <SearchableSelect
+                      id="line_cost_center"
+                      value={lineForm.cost_center_id || ''}
+                      options={[{ value:'', label:'بدون مركز تكلفة', searchText:'' }, ...costCenters.map(cc=>({ value:cc.id, label:`${cc.code} - ${cc.name}`, searchText:`${cc.code} ${cc.name}`.toLowerCase() }))]}
+                      onChange={(val) => setLineForm(f => ({ ...f, cost_center_id: String(val||'') }))}
+                      placeholder="مركز التكلفة"
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, alignItems: 'center', marginTop: 8 }}>
+                  <div>
+                    <SearchableSelect
+                      id="line_work_item"
+                      value={lineForm.work_item_id || ''}
+                      options={[{ value:'', label:'بدون عنصر', searchText:'' }, ...workItems.map(w=>({ value:w.id, label:`${w.code} - ${w.name}`, searchText:`${w.code} ${w.name}`.toLowerCase() }))]}
+                      onChange={(val) => setLineForm(f => ({ ...f, work_item_id: String(val||'') }))}
+                      placeholder="عنصر العمل"
+                    />
+                  </div>
+                  <div>
+                    <SearchableSelect
+                      id="line_classification"
+                      value={lineForm.classification_id || ''}
+                      options={[{ value:'', label:'بدون تصنيف', searchText:'' }, ...classifications.map(c=>({ value:c.id, label:`${c.code} - ${c.name}`, searchText:`${c.code} ${c.name}`.toLowerCase() }))]}
+                      onChange={(val) => setLineForm(f => ({ ...f, classification_id: String(val||'') }))}
+                      placeholder="تصنيف المعاملة"
+                    />
+                  </div>
+                  <div>
+                    <SearchableSelect
+                      id="line_sub_tree"
+                      value={lineForm.sub_tree_id || ''}
+                      options={[{ value:'', label:'بدون عقدة', searchText:'' }, ...categories.map(cat=>({ value:cat.id, label:`${cat.code} - ${cat.description}`, searchText:`${cat.code} ${cat.description}`.toLowerCase() }))]}
+                      onChange={(val) => setLineForm(f => ({ ...f, sub_tree_id: String(val||'') }))}
+                      placeholder="الشجرة الفرعية"
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                    <button className="ultimate-btn ultimate-btn-success" onClick={submitLine} disabled={!lineForm.account_id}>
+                      <div className="btn-content"><span className="btn-text">{editingLine ? 'تحديث السطر' : 'إضافة السطر'}</span></div>
+                    </button>
+                    {editingLine && (
+                      <button className="ultimate-btn ultimate-btn-warning" onClick={() => { resetLineForm(); setEditingLine(false) }}>
+                        <div className="btn-content"><span className="btn-text">إلغاء</span></div>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 'var(--spacing-lg)' }}>
+                <h3 style={{ marginBottom: 8 }}>ملخص القيود</h3>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'center' }}>#</th>
+                        <th>الحساب</th>
+                        <th style={{ textAlign: 'right' }}>مدين</th>
+                        <th style={{ textAlign: 'right' }}>دائن</th>
+                        <th>البيان</th>
+                        <th style={{ textAlign: 'center' }}>إجراءات</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lines.map((l: any, idx: number) => (
+                        <tr key={l.id || idx}>
+                          <td style={{ textAlign: 'center' }}>{l.line_no}</td>
+                          <td>{(() => {
+                            const acc = accounts.find(a => a.id === l.account_id)
+                            return acc ? `${acc.code} - ${acc.name}` : l.account_id
+                          })()}</td>
+                          <td style={{ textAlign: 'right' }}>{Number(l.debit_amount || 0).toLocaleString('ar-EG')}</td>
+                          <td style={{ textAlign: 'right' }}>{Number(l.credit_amount || 0).toLocaleString('ar-EG')}</td>
+                          <td>{l.description || ''}</td>
+                          <td style={{ textAlign: 'center', display: 'flex', gap: 6, justifyContent: 'center' }}>
+                            <button
+                              className="ultimate-btn ultimate-btn-edit"
+                              onClick={() => {
+                                setLineForm({ 
+                                  id: l.id, 
+                                  account_id: l.account_id, 
+                                  debit_amount: l.debit_amount ? String(l.debit_amount) : '', 
+                                  credit_amount: l.credit_amount ? String(l.credit_amount) : '', 
+                                  description: l.description || '',
+                                  project_id: l.project_id || '',
+                                  cost_center_id: l.cost_center_id || '',
+                                  work_item_id: l.work_item_id || '',
+                                  analysis_work_item_id: l.analysis_work_item_id || '',
+                                  classification_id: l.classification_id || '',
+                                  sub_tree_id: l.sub_tree_id || '',
+                                })
+                                setEditingLine(true)
+                                window.scrollTo({ top: 0, behavior: 'smooth' })
+                              }}
+                            >
+                              <div className="btn-content"><span className="btn-text">Edit</span></div>
+                            </button>
+                            <button
+                              className="ultimate-btn ultimate-btn-delete"
+                              onClick={async () => {
+                                try {
+                                  await supabase.from('transaction_lines').delete().eq('id', l.id)
+                                  showToast('تم حذف السطر', { severity: 'success' })
+                                } catch (e: any) {
+                                  showToast(e?.message || 'فشل حذف السطر', { severity: 'error' })
+                                }
+                              }}
+                            >
+                              <div className="btn-content"><span className="btn-text">Delete</span></div>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <strong>الإجمالي مدين:</strong> {linesTotals.debits.toLocaleString('ar-EG')} —
+                    <strong> الإجمالي دائن:</strong> {linesTotals.credits.toLocaleString('ar-EG')} —
+                    <strong> الفرق:</strong> {(linesTotals.debits - linesTotals.credits).toFixed(2)} {linesTotals.balanced ? '✅ متوازن' : '❌ غير متوازن'} —
+                    <strong> عدد الأسطر:</strong> {linesTotals.count}
+                  </div>
+                  <button
+                    className="ultimate-btn ultimate-btn-success"
+                    disabled={!linesTotals.balanced}
+                    onClick={() => {
+                      setFormOpen(false)
+                      setEditingTx(null)
+                      setCreatingDraft(false)
+                      showToast('تم حفظ المسودة بنجاح', { severity: 'success' })
+                      void reload()
+                    }}
+                  >
+                    <div className="btn-content"><span className="btn-text">Save draft</span></div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
       </DraggableResizablePanel>
       
       {/* Details Panel */}
@@ -2193,29 +2866,46 @@ approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted
       <TransactionAnalysisModal
         open={analysisModalOpen}
         transactionId={analysisTransactionId}
+        transactionLineId={analysisTransactionLineId}
         onClose={closeCostAnalysisModal}
         entryNumber={analysisTransaction?.entry_number}
         description={analysisTransaction?.description}
         effectiveTolerance={1.0}
         transactionAmount={analysisTransaction?.amount}
         orgId={analysisTransaction?.org_id || ''}
+        workItems={workItems}
+        costCenters={costCenters}
       />
       
-      {/* Column Configuration Modal */}
+      {/* Column Configuration Modal - Headers Table */}
       <ColumnConfiguration
         columns={columns}
         onConfigChange={handleColumnConfigChange}
-        isOpen={columnConfigOpen}
-        onClose={() => setColumnConfigOpen(false)}
+        isOpen={headersColumnConfigOpen}
+        onClose={() => setHeadersColumnConfigOpen(false)}
         onReset={resetToDefaults}
       />
 
+      {/* Column Configuration Modal - Lines Table */}
+      <ColumnConfiguration
+        columns={lineColumns}
+        onConfigChange={handleLineColumnConfigChange}
+        isOpen={lineColumnsConfigOpen}
+        onClose={() => setLineColumnsConfigOpen(false)}
+        onReset={resetLineColumnsToDefaults}
+      />
+
+
       {/* Documents Panel */}
-      {documentsOpen && documentsFor && (
+      {documentsOpen && (documentsFor || documentsForLine) && (
         <DraggableResizablePanel
-          title={`مستندات المعاملة - ${documentsFor.entry_number}`}
+          title={documentsForLine ? `مستندات القيد التفصيلي` : `مستندات المعاملة - ${documentsFor?.entry_number}`}
           isOpen={documentsOpen}
-          onClose={() => setDocumentsOpen(false)}
+          onClose={() => {
+            setDocumentsOpen(false)
+            setDocumentsFor(null)
+            setDocumentsForLine(null)
+          }}
           position={docsPanelPosition}
           size={docsPanelSize}
           onMove={setDocsPanelPosition}
@@ -2281,9 +2971,10 @@ approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted
             </button>
           </div>
           <AttachDocumentsPanel
-            orgId={documentsFor.org_id || ''}
-            transactionId={documentsFor.id}
-            projectId={documentsFor.project_id || undefined}
+            orgId={documentsFor?.org_id || ''}
+            transactionId={documentsFor?.id}
+            transactionLineId={documentsForLine?.id}
+            projectId={documentsFor?.project_id || undefined}
           />
         </DraggableResizablePanel>
       )}

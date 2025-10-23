@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Box, Button, Container, Paper, Stack, Typography, Tooltip } from '@mui/material'
-import { DataGrid, GridColDef } from '@mui/x-data-grid'
+import { DataGrid, type GridColDef } from '@mui/x-data-grid'
 import { supabase } from '@/utils/supabase'
 import { getActiveOrgId } from '@/utils/org'
 import { ProjectSelect } from '@/components/Inventory/ProjectSelect'
