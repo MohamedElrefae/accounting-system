@@ -14,7 +14,7 @@ interface ProjectFormData {
   code: string;
   name: string;
   description: string;
-  organization_id: string;
+  org_id: string;
   status: 'active' | 'inactive' | 'completed';
   start_date: string;
   end_date: string;
@@ -28,11 +28,11 @@ const ProjectManagement: React.FC = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState<ProjectFormData>({
+const [formData, setFormData] = useState<ProjectFormData>({
     code: '',
     name: '',
     description: '',
-    organization_id: '',
+    org_id: '',
     status: 'active',
     start_date: '',
     end_date: '',
@@ -76,11 +76,11 @@ const ProjectManagement: React.FC = () => {
 
   const handleAdd = () => {
     setEditingProject(null);
-    setFormData({
+setFormData({
       code: '',
       name: '',
       description: '',
-      organization_id: '',
+      org_id: '',
       status: 'active',
       start_date: '',
       end_date: '',
@@ -95,7 +95,7 @@ const ProjectManagement: React.FC = () => {
       code: project.code,
       name: project.name,
       description: project.description || '',
-      organization_id: (project as any).organization_id || '',
+org_id: (project as any).org_id || '',
       status: project.status,
       start_date: project.start_date || '',
       end_date: project.end_date || '',
@@ -228,10 +228,10 @@ const ProjectManagement: React.FC = () => {
                     </div>
                   </div>
                   
-                  {(project as any).organization_id && (
+                  {(project as any).org_id && (
                     <div className={styles.organizationInfo}>
                       <Building className={styles.organizationIcon} size={16} />
-                      <span>{getOrganizationName((project as any).organization_id)}</span>
+                      <span>{getOrganizationName((project as any).org_id)}</span>
                     </div>
                   )}
                   
@@ -335,11 +335,11 @@ const ProjectManagement: React.FC = () => {
                   </div>
 
                   <div className={styles.formField}>
-                    <label htmlFor="organization_id">المؤسسة</label>
+<label htmlFor="org_id">المؤسسة</label>
                     <select
-                      id="organization_id"
-                      value={formData.organization_id}
-                      onChange={(e) => setFormData(prev => ({ ...prev, organization_id: e.target.value }))}
+                      id="org_id"
+                      value={formData.org_id}
+                      onChange={(e) => setFormData(prev => ({ ...prev, org_id: e.target.value }))}
                     >
                       <option value="">بدون مؤسسة</option>
                       {organizations.map((org) => (

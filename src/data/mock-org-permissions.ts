@@ -1,5 +1,6 @@
-// Mock org-level permission matrix for development.
-// This is intentionally simple and can be replaced by real auth integration later.
+// DEPRECATED: Mock org-level permission matrix for development.
+// Note: org memberships are now roleless. This mock remains only for app-level role/permission demos.
+// Prefer checking membership via DB helpers and using the enterprise permissions system.
 
 export type OrgPermission = string;
 

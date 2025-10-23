@@ -130,7 +130,8 @@ export const createTransactionFormConfig = (
   existingTransaction?: TransactionRecord | null,
   expensesCategories: ExpensesCategoryRow[] = [],
   workItems: WorkItemRow[] = [],
-  costCenters: Array<{ id: string; code: string; name: string; name_ar?: string | null; project_id?: string | null; level: number }> = []
+  costCenters: Array<{ id: string; code: string; name: string; name_ar?: string | null; project_id?: string | null; level: number }> = [],
+  options?: { linesBalanced?: boolean; linesCount?: number; headerOnly?: boolean }
 ): FormConfig => {
   
   console.log('🌳 createTransactionFormConfig called with:', {
@@ -142,7 +143,10 @@ export const createTransactionFormConfig = (
     expensesCategoriesCount: expensesCategories.length,
     workItemsCount: workItems.length,
     costCentersCount: costCenters.length,
-    existingTransaction: !!existingTransaction
+    existingTransaction: !!existingTransaction,
+    headerOnly: !!options?.headerOnly,
+    linesBalanced: options?.linesBalanced,
+    linesCount: options?.linesCount,
   });
   
   // Build hierarchical (level-based) options with real tree nodes and level headers
@@ -334,7 +338,7 @@ export const createTransactionFormConfig = (
     searchText: `${cc.code} ${cc.name} ${cc.name_ar || ''}`.toLowerCase()
   }));
 
-  const fields: FormField[] = [
+  let fields: FormField[] = [
     {
       id: 'entry_number',
       type: 'text',
@@ -375,8 +379,9 @@ export const createTransactionFormConfig = (
     {
       id: 'debit_account_id',
       type: 'searchable-select',
-      label: 'الحساب المدين',
-      required: true,
+      label: 'الحساب المدين (معطل - النموذج متعدد الأسطر)',
+      required: false,
+      conditionalLogic: () => false,
       options: [{ value: '', label: 'اختر الحساب المدين...', searchText: '' }, ...flatPostableOptions],
       icon: <Building2 size={16} />,
       validation: (value: unknown) => {
@@ -401,8 +406,9 @@ export const createTransactionFormConfig = (
     {
       id: 'credit_account_id',
       type: 'searchable-select',
-      label: 'الحساب الدائن',
-      required: true,
+      label: 'الحساب الدائن (معطل - النموذج متعدد الأسطر)',
+      required: false,
+      conditionalLogic: () => false,
       options: [{ value: '', label: 'اختر الحساب الدائن...', searchText: '' }, ...flatPostableOptions],
       icon: <Building2 size={16} />,
       validation: (value: unknown) => {
@@ -427,9 +433,10 @@ export const createTransactionFormConfig = (
     {
       id: 'amount',
       type: 'number',
-      label: 'المبلغ',
+      label: 'المبلغ (معطل - يُشتق من مجموع القيود)',
       placeholder: '0.00',
-      required: true,
+      required: false,
+      conditionalLogic: () => false,
       min: 0.01,
       step: 0.01,
       icon: <DollarSign size={16} />,
@@ -578,6 +585,11 @@ export const createTransactionFormConfig = (
     }
   ];
 
+  // Header-only mode: keep only entry_date, description, reference_number, organization_id
+  if (options?.headerOnly) {
+    fields = fields.filter(f => ['entry_date','description','reference_number','organization_id'].includes(f.id))
+  }
+
   // Default values for the form
   // Default values for the form
   // const _defaultValues: any = {
@@ -601,88 +613,18 @@ export const createTransactionFormConfig = (
     fields,
     submitLabel: isEditing ? '💾 حفظ التعديلات' : '✨ إضافة المعاملة',
     cancelLabel: '❌ إلغاء',
-    customValidator: async (data: Record<string, unknown>) => {
+    customValidator: async (_data: Record<string, unknown>) => {
       const errors: ValidationError[] = [];
       const warnings: ValidationError[] = [];
-      
-      // Cross-field validation: Debit and Credit accounts must be different
-      const fd = data as { 
-        debit_account_id?: string; 
-        credit_account_id?: string; 
-        amount?: string | number; 
-        sub_tree_id?: string;
-        classification_id?: string;
-        cost_center_id?: string;
-        description?: string;
-        entry_date?: string;
-      };
-      if (fd.debit_account_id && fd.credit_account_id && fd.debit_account_id === fd.credit_account_id) {
-        errors.push({ 
-          field: 'credit_account_id', 
-          message: 'الحساب المدين والدائن يجب أن يكونا مختلفين' 
-        });
+
+      // Multiline gating: require balanced lines and at least two
+      if (options && options.linesBalanced === false) {
+        errors.push({ field: 'description', message: 'قيود المعاملة غير متوازنة — إجمالي المدين يجب أن يساوي إجمالي الدائن' });
       }
-      
-      // Amount cross-validation
-      const amountVal = typeof fd.amount === 'string' ? parseFloat(fd.amount) : Number(fd.amount);
-      if (isNaN(amountVal) || amountVal <= 0) {
-        errors.push({ 
-          field: 'amount', 
-          message: 'يرجى إدخال مبلغ صحيح أكبر من صفر' 
-        });
+      if (options && typeof options.linesCount === 'number' && options.linesCount < 2) {
+        errors.push({ field: 'description', message: 'يجب إضافة سطرين على الأقل قبل الحفظ' });
       }
 
-      // Smart validation using the safe validation wrapper
-      if (fd.debit_account_id && fd.credit_account_id && amountVal > 0) {
-        try {
-          const validationValidator = transactionValidator.createCustomValidator();
-          // Run asynchronously but do not block the sync validator contract
-          void validationValidator(data).then((smartValidation) => {
-            try {
-              if (smartValidation.errors) {
-                // Surface via console for now; UI can display on submit
-                console.warn('Async validation errors', smartValidation.errors)
-              }
-              if (smartValidation.warnings) {
-                console.info('Async validation warnings', smartValidation.warnings)
-              }
-            } catch {}
-          }).catch(() => {})
-        } catch (validationError) {
-          console.error('Transaction validation failed:', validationError);
-          // Add a warning that validation service is unavailable
-          warnings.push({
-            field: 'description',
-            message: '⚠️ نظام التحقق الذكي من المعاملات غير متوفر حالياً'
-          });
-        }
-      }
-
-      // Require expenses category if either side is an expense account (both sides rule)
-      const debit = accounts.find(a => a.id === fd.debit_account_id);
-      const credit = accounts.find(a => a.id === fd.credit_account_id);
-      const isExpense = (acc?: Account) => {
-        const c = (acc?.category || '').toLowerCase();
-        return c === 'expense' || c === 'expenses';
-      };
-      if ((isExpense(debit) || isExpense(credit)) && (!fd.sub_tree_id || String(fd.sub_tree_id).trim() === '')) {
-        errors.push({
-          field: 'sub_tree_id',
-          message: 'عقدة الشجرة الفرعية مطلوبة عند اختيار حساب مصروف على أي من الجانبين'
-        });
-      }
-      
-      // Require cost center if classification requires post_to_costs
-      if (fd.classification_id) {
-        const selectedClassification = classifications.find(c => c.id === fd.classification_id);
-        if (selectedClassification?.post_to_costs && (!fd.cost_center_id || String(fd.cost_center_id).trim() === '')) {
-          errors.push({
-            field: 'cost_center_id',
-            message: 'مركز التكلفة مطلوب عند اختيار تصنيف يتطلب تسجيل التكاليف'
-          });
-        }
-      }
-      
       return {
         isValid: errors.length === 0,
         errors,
@@ -735,7 +677,11 @@ export const createTransactionFormConfig = (
       dependsOnAny: subTreeField.dependsOnAny
     });
   } else {
-    console.error('🌳 ERROR: sub_tree_id field NOT FOUND in final config!');
+    if (options?.headerOnly) {
+      console.log('🌳 sub_tree_id omitted in header-only mode');
+    } else {
+      console.warn('🌳 sub_tree_id field not present in final config');
+    }
   }
   
   return finalConfig;

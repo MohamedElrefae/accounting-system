@@ -7,6 +7,24 @@
   direction: rtl;
 }
 
+/* Compact variant for tables/unified dense rows */
+.compact {
+  min-width: 220px;
+}
+.compact .selectButton {
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+.compact .searchInput {
+  padding: 8px 14px 8px 44px;
+  font-size: 14px;
+}
+.compact .option {
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
 .container:focus {
   outline: none;
 }

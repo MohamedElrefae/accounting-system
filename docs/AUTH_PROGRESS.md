@@ -14,8 +14,8 @@ Key Observations (from schema/data snapshots)
   - Table includes resource/action columns; example entries show invoices.* and users.read.
   - Super Admin role has broad mappings (per role_permissions_matrix snapshot).
   - Owner/Admin/Manager/Viewer mappings need full permission catalog available to populate completely.
-- org_memberships:
-  - manager role exists for e84e1ac0-2240-4e37-b747-a01daa44ae4b in org bc16…
+- org_memberships (UPDATED):
+  - Membership is now roleless (binary). A row (org_id, user_id) indicates membership only. Any prior references to org_memberships.role are legacy and should be ignored.
 - user_roles (no org_id column):
   - After sync, assignments are global (org_id = null).
   - e84e… has Manager and Super Admin roles globally.
@@ -49,7 +49,7 @@ What We Added/Changed
 - rpc_sync_memberships_to_user_roles(p_org_id uuid):
   - Resilient to roles.id type (uses roles.id%TYPE).
   - If user_roles.org_id exists: writes org-scoped bindings; else writes global (current case).
-  - Maps org_memberships.role (or role_tier) to Owner/Admin/Manager/Viewer IDs.
+  - NOTE: org_memberships is roleless now; mapping from membership to roles (if needed) must use application rules or separate tables, not org_memberships.role.
 
 5) Invites (compatible with existing user_invitations)
 - Added org_id to existing public.user_invitations + FK + indexes (no new table).

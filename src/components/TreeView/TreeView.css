@@ -19,7 +19,7 @@
 /* Tree Header */
 .tree-node.tree-header {
   background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover));
-  color: white;
+  color: var(--on-accent);
   font-weight: 600;
   font-size: 0.9rem;
   border-bottom: 2px solid var(--border-color);
@@ -34,7 +34,7 @@
 }
 
 .tree-header .header-text {
-  color: white;
+  color: var(--on-accent);
   font-weight: 600;
   font-size: 0.9rem;
 }
@@ -179,7 +179,7 @@ html[data-theme='light'] .tree-node-code {
   display: inline-block;
   padding: 0.25rem 0.5rem;
   background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover));
-  color: white;
+  color: var(--on-accent);
   border-radius: var(--radius-md);
   font-family: monospace;
   font-size: 0.85rem;
@@ -280,7 +280,7 @@ html[data-theme='light'] .tree-node-code {
   box-shadow: 
     0 2px 4px rgba(0, 0, 0, 0.1),
     0 1px 2px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    inset 0 1px 0 color-mix(in srgb, var(--on-accent) 10%, transparent);
 }
 
 .ultimate-btn:disabled {
@@ -295,7 +295,7 @@ html[data-theme='light'] .tree-node-code {
   box-shadow: 
     0 4px 8px rgba(0, 0, 0, 0.15),
     0 2px 4px rgba(0, 0, 0, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    inset 0 1px 0 color-mix(in srgb, var(--on-accent) 20%, transparent);
 }
 
 .ultimate-btn:not(:disabled):active {
@@ -444,7 +444,7 @@ html[data-theme='light'] .tree-node-code {
   position: absolute;
   inset: -2px;
   border-radius: var(--radius-md);
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--on-accent) 40%, transparent), transparent);
   animation: loading-pulse 1.5s linear infinite;
 }
 

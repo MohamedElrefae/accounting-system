@@ -1,5 +1,7 @@
 # Transaction System Fixes - Current Status
 
+Note: For the Inventory module roadmap and progress, see `docs/inventory-implementation-plan.md`.
+
 ## ✅ **COMPLETED**
 
 ### 1. **Database Migration Created**

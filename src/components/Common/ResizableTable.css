@@ -75,7 +75,7 @@
   background: var(--border);
 }
 
-.resizable-th:last-child {
+.resizable-th:last-of-type {
   border-right: none;
 }
 
@@ -134,7 +134,7 @@
   position: relative;
 }
 
-.resizable-td:last-child {
+.resizable-td:last-of-type {
   border-right: none;
 }
 
@@ -200,19 +200,29 @@
 
 /* Row styling */
 .resizable-table tbody tr {
-  transition: background-color 0.15s ease;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.resizable-table tbody tr:hover {
+/* Ensure hover/selected colors apply across ALL cells, including sticky ones */
+.resizable-table tbody tr:hover .resizable-td {
   background: var(--hover-bg);
+}
+
+/* Selected row state (replicates sidebar active visual) */
+.resizable-table tbody tr.selected-row .resizable-td {
+  background: var(--selected_bg) !important;
+}
+
+/* Direction-aware accent bar using inset box-shadow (no overlay, keeps buttons clickable) */
+.resizable-table:dir(ltr) tbody tr.selected-row {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.resizable-table:dir(rtl) tbody tr.selected-row {
+  box-shadow: inset -3px 0 0 var(--accent);
 }
 
 .clickable-row {
   cursor: pointer;
-}
-
-.clickable-row:hover {
-  background: var(--selected_bg) !important;
 }
 
 .empty-row {

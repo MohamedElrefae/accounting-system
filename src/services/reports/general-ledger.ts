@@ -58,14 +58,19 @@ export interface GLRow {
 const UNCLASSIFIED_UUID = '00000000-0000-0000-0000-000000000000';
 
 export async function fetchGeneralLedgerReport(filters: GLFilters): Promise<GLRow[]> {
+  // Normalize empty strings to null for date and project filters
+  const dateFrom = filters.dateFrom && filters.dateFrom.trim() !== '' ? filters.dateFrom : null;
+  const dateTo = filters.dateTo && filters.dateTo.trim() !== '' ? filters.dateTo : null;
+  const projectId = filters.projectId && filters.projectId.trim() !== '' ? filters.projectId : null;
+
   const { data, error } = await supabase.rpc('get_general_ledger_report_filtered', {
     p_account_id: filters.accountId ?? null,
-    p_date_from: filters.dateFrom ?? null,
-    p_date_to: filters.dateTo ?? null,
+    p_date_from: dateFrom,
+    p_date_to: dateTo,
     p_org_id: filters.orgId ?? null,
-    p_project_id: filters.projectId ?? null,
+    p_project_id: projectId,
     p_include_opening: filters.includeOpening ?? true,
-    p_posted_only: filters.postedOnly ?? true,
+    p_posted_only: filters.postedOnly ?? false,
     p_limit: filters.limit ?? null,
     p_offset: filters.offset ?? null,
     // IMPORTANT: send zero-UUID sentinel for Unclassified
@@ -73,7 +78,7 @@ export async function fetchGeneralLedgerReport(filters: GLFilters): Promise<GLRo
       ? UNCLASSIFIED_UUID
       : (filters.classificationId ?? null),
     p_analysis_work_item_id: filters.analysisWorkItemId ?? null,
-        p_sub_tree_id: filters.expensesCategoryId,
+    p_sub_tree_id: filters.expensesCategoryId ?? null,
   })
 
   if (error) throw error

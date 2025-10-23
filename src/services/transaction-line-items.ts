@@ -2,66 +2,91 @@ import { supabase } from '../utils/supabase'
 
 export interface DbTxLineItem {
   id: string
-  transaction_id: string
+  transaction_line_id?: string | null
   org_id: string | null
   line_number: number
-  item_code: string | null
-  item_name: string | null
-  item_name_ar: string | null
-  description: string | null
-  description_ar: string | null
+  // Display-only fields (not stored on table):
+  item_code?: string | null
+  item_name?: string | null
   unit_of_measure: string | null
   analysis_work_item_id: string | null
   sub_tree_id: string | null
   quantity: number
   percentage: number
   unit_price: number
-  discount_amount: number | null
-  tax_amount: number | null
   total_amount: number | null
-  line_item_id?: string | null
+  line_item_catalog_id?: string | null
   created_at: string
   updated_at: string
 }
 
 export interface EditableTxLineItem {
   id?: string
+  transaction_line_id?: string | null
   line_number: number
   quantity: number
   percentage?: number
   unit_price: number
-  discount_amount?: number
-  tax_amount?: number
   unit_of_measure?: string | null
+  // Display-only inputs; not persisted on table
   item_code?: string | null
   item_name?: string | null
   analysis_work_item_id?: string | null
   sub_tree_id?: string | null
-  line_item_id?: string | null
+  line_item_catalog_id?: string | null
 }
 
 export function computeLineTotal(row: EditableTxLineItem): number {
   const qty = Number(row.quantity || 0)
   const unit = Number(row.unit_price || 0)
   const pct = Number(row.percentage == null ? 100 : row.percentage)
-  const disc = Number(row.discount_amount || 0)
-  const tax = Number(row.tax_amount || 0)
-  return qty * unit * (pct / 100) - disc + tax
+  // Match DB: quantity * (percentage/100) * unit_price
+  return qty * unit * (pct / 100)
 }
 
 export class TransactionLineItemsService {
+  /**
+   * Note: transaction_line_items are now linked to transaction_lines, not transactions directly.
+   * Use listByTransactionLine() instead.
+   * @deprecated Use listByTransactionLine(transactionLineId) instead
+   */
   async listByTransaction(transactionId: string): Promise<DbTxLineItem[]> {
+    throw new Error('listByTransaction() is deprecated. Use listByTransactionLine(transactionLineId) instead.')
+  }
+
+  async listByTransactionLine(transactionLineId: string): Promise<DbTxLineItem[]> {
     const { data, error } = await supabase
       .from('transaction_line_items')
-      .select('*')
-      .eq('transaction_id', transactionId)
+      .select(`
+        id, transaction_line_id, org_id, line_number,
+        quantity, percentage, unit_price, unit_of_measure,
+        analysis_work_item_id, sub_tree_id,
+        total_amount, line_item_catalog_id,
+        created_at, updated_at
+      `)
+      .eq('transaction_line_id', transactionLineId)
       .order('line_number', { ascending: true })
       .order('id', { ascending: true })
     if (error) throw error
     return (data || []) as DbTxLineItem[]
   }
 
-  async upsertMany(transactionId: string, items: EditableTxLineItem[]): Promise<void> {
+  async countByTransactionLine(transactionLineId: string): Promise<number> {
+    const { count, error } = await supabase
+      .from('transaction_line_items')
+      .select('*', { count: 'exact', head: true })
+      .eq('transaction_line_id', transactionLineId)
+    if (error) throw error
+    return count || 0
+  }
+
+  /**
+   * Upsert many items by transaction_line_id.
+   * Note: This now works with transaction_line_id, not transaction_id.
+   * @param transactionLineId - The transaction_line_id to scope the operation
+   * @param items - Items to insert/update/delete
+   */
+  async upsertMany(transactionLineId: string, items: EditableTxLineItem[]): Promise<void> {
     // Normalize defaults
     const normalized = items.map(it => ({
       ...it,
@@ -70,31 +95,27 @@ export class TransactionLineItemsService {
       tax_amount: it.tax_amount == null ? 0 : it.tax_amount,
     }))
 
-    // Fetch existing ids for diff
+    // Fetch existing ids for this transaction_line
     const { data: existing, error: readErr } = await supabase
       .from('transaction_line_items')
       .select('id')
-      .eq('transaction_id', transactionId)
+      .eq('transaction_line_id', transactionLineId)
     if (readErr) throw readErr
 
     const existingIds = new Set((existing || []).map(r => r.id as string))
     const incomingIds = new Set(normalized.filter(x => x.id).map(x => x.id as string))
 
     const toInsert = normalized.filter(x => !x.id).map(x => ({
-      transaction_id: transactionId,
+      transaction_line_id: transactionLineId,
       line_number: x.line_number,
       quantity: x.quantity,
       percentage: x.percentage,
       unit_price: x.unit_price,
-      discount_amount: x.discount_amount,
-      tax_amount: x.tax_amount,
       unit_of_measure: x.unit_of_measure ?? null,
-      item_code: x.item_code ?? null,
-      item_name: x.item_name ?? null,
       analysis_work_item_id: x.analysis_work_item_id ?? null,
       sub_tree_id: x.sub_tree_id ?? null,
-      line_item_id: x.line_item_id ?? null,
-      // total_amount remains null; compute in views/clients
+      line_item_catalog_id: x.line_item_catalog_id ?? null,
+      org_id: undefined, // Will be set by DB default or policy
     }))
 
     const toUpdate = normalized.filter(x => x.id).map(x => ({
@@ -103,14 +124,10 @@ export class TransactionLineItemsService {
       quantity: x.quantity,
       percentage: x.percentage,
       unit_price: x.unit_price,
-      discount_amount: x.discount_amount,
-      tax_amount: x.tax_amount,
       unit_of_measure: x.unit_of_measure ?? null,
-      item_code: x.item_code ?? null,
-      item_name: x.item_name ?? null,
       analysis_work_item_id: x.analysis_work_item_id ?? null,
       sub_tree_id: x.sub_tree_id ?? null,
-      line_item_id: x.line_item_id ?? null,
+      line_item_catalog_id: x.line_item_catalog_id ?? null,
       updated_at: new Date().toISOString(),
     }))
 
@@ -135,7 +152,7 @@ export class TransactionLineItemsService {
         .from('transaction_line_items')
         .delete()
         .in('id', toDelete)
-        .eq('transaction_id', transactionId)
+        .eq('transaction_line_id', transactionLineId)
       if (error) throw error
     }
   }

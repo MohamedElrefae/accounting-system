@@ -7,13 +7,12 @@ describe('summarizeFiscal', () => {
   })
 
   it('aggregates counts with a mock client', async () => {
+    const chain = (data: any) => ({ eq: () => ({ eq: () => ({ data }) }) })
     const mockClient = {
       from: (table: string) => ({
-        select: () => ({
-          eq: () => ({ data: table === 'fiscal_periods' ? [
-            { status: 'open' }, { status: 'locked' }, { status: 'closed' }, { status: 'open' }
-          ] : [{ id: 1 }, { id: 2 }] })
-        })
+        select: () => chain(table === 'fiscal_periods' ? [
+          { status: 'open' }, { status: 'locked' }, { status: 'closed' }, { status: 'open' }
+        ] : [{ id: 1 }, { id: 2 }])
       }),
       rpc: () => ({ data: { warnings: [{}, {}], errors: [{}] } })
     }

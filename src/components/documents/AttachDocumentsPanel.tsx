@@ -11,11 +11,13 @@ import DocumentDetailsPanel from './DocumentDetailsPanel';
 
 interface AttachDocumentsPanelProps {
   orgId: string;
-  transactionId: string;
+  transactionId?: string;
+  transactionLineId?: string;
+  transactionLineItemId?: string;
   projectId?: string;
 }
 
-export default function AttachDocumentsPanel({ orgId, transactionId, projectId }: AttachDocumentsPanelProps) {
+export default function AttachDocumentsPanel({ orgId, transactionId, transactionLineId, transactionLineItemId, projectId }: AttachDocumentsPanelProps) {
   const [docs, setDocs] = useState<svc.Document[]>([]);
   const uploader = useUploadDocument();
   const { showToast } = useToast();
@@ -28,21 +30,30 @@ export default function AttachDocumentsPanel({ orgId, transactionId, projectId }
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
 
+  // Determine entity type and ID - prioritize transaction_line_items
+  const entityType = transactionLineItemId 
+    ? 'transaction_line_items' 
+    : transactionLineId 
+    ? 'transaction_lines' 
+    : 'transactions';
+  const entityId = transactionLineItemId || transactionLineId || transactionId;
+
   const refresh = async () => {
-    const linked = await svc.getLinkedDocuments('transactions', transactionId);
+    if (!entityId) return;
+    const linked = await svc.getLinkedDocuments(entityType as any, entityId);
     setDocs(linked);
   };
 
   useEffect(() => {
     refresh();
-  }, [transactionId]);
+  }, [transactionId, transactionLineId, transactionLineItemId]);
 
   const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !entityId) return;
     try {
       const { document } = await uploader.mutateAsync({ orgId, title: file.name, file, projectId });
-      await svc.linkDocument(document.id, 'transactions', transactionId);
+      await svc.linkDocument(document.id, entityType as any, entityId);
       await refresh();
       showToast('تم رفع وربط المستند', { severity: 'success' });
     } catch (e: any) {
@@ -51,8 +62,9 @@ export default function AttachDocumentsPanel({ orgId, transactionId, projectId }
   };
 
   const handleUnlink = async (id: string) => {
+    if (!entityId) return;
     try {
-      await svc.unlinkDocument(id, 'transactions', transactionId);
+      await svc.unlinkDocument(id, entityType as any, entityId);
       await refresh();
       showToast('تم إلغاء ربط المستند', { severity: 'info' });
     } catch (e: any) {
@@ -92,9 +104,10 @@ export default function AttachDocumentsPanel({ orgId, transactionId, projectId }
               {selectedIds.length === docs.length ? 'Deselect All' : 'Select All'}
             </Button>
             <Button color="error" size="small" variant="outlined" disabled={selectedIds.length === 0} onClick={async () => {
+              if (!entityId) return;
               try {
                 for (const id of selectedIds) {
-                  await svc.unlinkDocument(id, 'transactions', transactionId);
+                  await svc.unlinkDocument(id, entityType as any, entityId);
                 }
                 setSelectedIds([]);
                 await refresh();
@@ -143,14 +156,16 @@ export default function AttachDocumentsPanel({ orgId, transactionId, projectId }
         onClose={() => setPickerOpen(false)}
         orgId={orgId}
         onSelect={async (doc) => {
-          await svc.linkDocument(doc.id, 'transactions', transactionId);
+          if (!entityId) return;
+          await svc.linkDocument(doc.id, entityType as any, entityId);
           setPickerOpen(false);
           await refresh();
         }}
         multiple
         onSelectMany={async (docs) => {
+          if (!entityId) return;
           for (const d of docs) {
-            await svc.linkDocument(d.id, 'transactions', transactionId);
+            await svc.linkDocument(d.id, entityType as any, entityId);
           }
           await refresh();
         }}
@@ -159,8 +174,8 @@ export default function AttachDocumentsPanel({ orgId, transactionId, projectId }
         open={genOpen}
         onClose={() => setGenOpen(false)}
         orgId={orgId}
-        entityType="transactions"
-        entityId={transactionId}
+        entityType={entityType as any}
+        entityId={entityId!}
       />
 
       {/* Document details panel */}

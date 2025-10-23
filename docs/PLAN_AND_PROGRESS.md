@@ -165,6 +165,25 @@ This document captures the plan, progress, and remaining work for the recent enh
 
 ## 8) Next Steps
 
+### 8.1 Short-term polish (implemented)
+- Opening Balance Import: server validation breakdown exports (CSV/JSON per section)
+- Opening Balance Import: polling fallback for job status + realtime subscription
+- Opening Balance Import: Reconciliation panel with PeriodClosingService and persisted period input
+- Opening Balance Import: Compact Audit Trail panel with CSV/JSON export
+- ValidationResults: accordion breakdowns with counts and number formatting
+
+### 8.2 Near-term polish (planned next)
+- Make identifiers clickable and copyable in history/audit lists and breakdowns where IDs are shown
+- Right-align and format numeric columns across tables (history, audit, breakdowns)
+- Optional navigation from IDs to relevant pages (e.g., Account Explorer) guarded by route capabilities
+- Totals footer rows in breakdown tables (sum totals, count rows)
+- Add unit tests for new UI helpers (formatting, copy-to-clipboard actions)
+
+### 8.3 Backend integration follow-ups
+- Fetch more detailed audit entries when available (opening balance import lifecycle events)
+- Reconciliation: add currency-awareness and per-segment reconciliation when API supports it
+- Approval flow wiring for opening balances
+
 1. Open PRs from develop → main (or maintain direct pushes if preferred)
 2. Prioritize remaining tasks above; I can create issues and link them to milestones
 3. Plan the next SQL-backed feature carefully with a single migration and a user approval gate

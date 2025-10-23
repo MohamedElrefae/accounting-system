@@ -1,13 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import './TransactionAnalysisModal.css'
 import ExportButtons from '../../components/Common/ExportButtons'
 import { createStandardColumns } from '../../hooks/useUniversalExport'
 import type { UniversalTableData } from '../../utils/UniversalExportManager'
-import { listLineItems, upsertLineItems, computeLineTotal, type TransactionLineItem } from '../../services/cost-analysis'
+import { listLineItems, upsertLineItems, bulkReplaceLineItems, computeLineTotal, validateItems, deleteLineItem, type TransactionLineItem } from '../../services/cost-analysis'
 import { supabase } from '../../utils/supabase'
 import { listAnalysisWorkItems } from '../../services/analysis-work-items'
 import { getCompanyConfig } from '../../services/company-config'
-import type { DbTxLineItem } from '../../services/transaction-line-items'
+import { lineItemsCatalogService, type CatalogSelectorItem } from '../../services/line-items-catalog'
+import { getExpensesCategoriesList } from '../../services/sub-tree'
+import { listWorkItemsUnion } from '../../services/work-items'
+import { SearchableDropdown } from '../Common/SearchableDropdown'
 
 // Types for the analysis data
 interface TransactionAnalysisDetail {
@@ -78,9 +81,16 @@ async function getTransactionAnalysisDetail(transactionId: string): Promise<Tran
   }
 }
 
+interface WorkItem {
+  id: string
+  code: string
+  name: string
+}
+
 interface Props {
   open: boolean
   transactionId: string | null
+  transactionLineId: string | null // Selected GL line to attach/view items
   onClose: () => void
   // Optional: pass known fields to avoid initial blank header
   entryNumber?: string
@@ -89,13 +99,15 @@ interface Props {
   // Additional props for full functionality
   transactionAmount?: number
   orgId?: string
+  // Cost dimension data for dropdowns
+  workItems?: WorkItem[]
 }
 
 type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'fullscreen' | 'custom'
 
 type ModalConfig = {
   size: ModalSize
-  defaultTab: 'header' | 'transaction_line_items' | 'by_item' | 'by_cost_center' | 'by_category'
+  defaultTab: 'header' | 'line_items' | 'by_item' | 'by_cost_center' | 'by_category'
   showExport: boolean
 }
 
@@ -126,12 +138,15 @@ const formatNumber = (n: number | null | undefined) => {
 const TransactionAnalysisModal: React.FC<Props> = ({ 
   open, 
   transactionId, 
+  transactionLineId,
   onClose, 
   entryNumber, 
   description, 
   effectiveTolerance,
   transactionAmount,
-  orgId
+  orgId,
+  workItems = [],
+  costCenters = []
 }) => {
   const [loading, setLoading] = useState(false)
   const contentRef = React.useRef<HTMLDivElement | null>(null)
@@ -145,7 +160,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({
       const raw = localStorage.getItem(storageKey)
       if (raw) return JSON.parse(raw) as ModalConfig
     } catch { /* ignore */ }
-    return { size: 'xl', defaultTab: 'header', showExport: true }
+    return { size: 'xl', defaultTab: 'line_items', showExport: true }
   }
   const [config, setConfig] = useState<ModalConfig>(loadConfig())
   const [showSettings, setShowSettings] = useState(false)
@@ -173,27 +188,57 @@ const TransactionAnalysisModal: React.FC<Props> = ({
   const [lineItems, setLineItems] = useState<TransactionLineItem[]>([])
   const [analysisWorkItems, setAnalysisWorkItems] = useState<AnalysisWorkItem[]>([])
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([])
+  const [loadedWorkItems, setLoadedWorkItems] = useState<WorkItem[]>([])
+  const [loadedSubTree, setLoadedSubTree] = useState<any[]>([])
   const [currency, setCurrency] = useState<string>('SAR')
+  const [selectedForDelete, setSelectedForDelete] = useState<Set<number>>(new Set())
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
   const [rowsByItem, setRowsByItem] = useState<Array<{ analysis_work_item_id: string; analysis_work_item_code: string; analysis_work_item_name: string; amount: number }>>([])
   const [rowsByCC, setRowsByCC] = useState<Array<{ cost_center_id: string; cost_center_code: string; cost_center_name: string; amount: number }>>([])
   const [rowsByCat, setRowsByCat] = useState<Array<{ expenses_category_id: string; expenses_category_code: string; expenses_category_name: string; amount: number }>>([])
+  const [selectedItemIndex, setSelectedItemIndex] = useState<number | null>(null)
+  
+  // State for cost dimension editing
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [editingDimensions, setEditingDimensions] = useState<{
+    work_item_id: string | null
+    analysis_work_item_id: string | null
+    sub_tree_id: string | null
+  } | null>(null)
 
 
+  const lastLoadKeyRef = useRef<string>('')
   useEffect(() => {
     let cancelled = false
+    const key = `${open}:${transactionId || ''}:${transactionLineId || ''}:${orgId || ''}`
+    if (key === lastLoadKeyRef.current) return
+    lastLoadKeyRef.current = key
+
     async function load() {
       if (!open || !transactionId) return
       setLoading(true)
-      // Apply default tab from config for every open
-      setTab(loadConfig().defaultTab)
+      // Force default to line items tab for clarity
+      setTab('line_items')
       setError('')
       try {
-        // Load all data in parallel
-        const [analysisDetail, lineItemsData, workItems, categories, companyConfig] = await Promise.all([
+        // Resolve effective org id for loading org-scoped resources
+        let effectiveOrg = orgId || ''
+        if (!effectiveOrg) {
+          const { data: tx } = await supabase
+            .from('transactions')
+            .select('org_id')
+            .eq('id', transactionId)
+            .single()
+          effectiveOrg = tx?.org_id || ''
+        }
+
+        // Load all data (skip org-scoped lists if we still lack org)
+        const [analysisDetail, lineItemsData, analysisItemsList, workItemsList, subTreeData, categories, companyConfig] = await Promise.all([
           getTransactionAnalysisDetail(transactionId),
-          listLineItems(transactionId).catch(() => []),
-          listAnalysisWorkItems({ orgId: orgId || '', includeInactive: false }).catch(() => []),
-          // Skip expenses categories for now to avoid the undefined org_id issue
+          listLineItems(transactionId, transactionLineId || undefined).catch(() => []),
+          effectiveOrg ? listAnalysisWorkItems({ orgId: effectiveOrg, includeInactive: false }).catch(() => []) : Promise.resolve([]),
+          effectiveOrg ? listWorkItemsUnion(effectiveOrg, null, true).catch(() => []) : Promise.resolve([]),
+          effectiveOrg ? getExpensesCategoriesList(effectiveOrg, false).catch(() => []) : Promise.resolve([]),
           Promise.resolve([]),
           getCompanyConfig().catch(() => ({ currency_code: 'SAR' }))
         ])
@@ -201,7 +246,9 @@ const TransactionAnalysisModal: React.FC<Props> = ({
         if (!cancelled) {
           setData(analysisDetail)
           setLineItems(lineItemsData || [])
-          setAnalysisWorkItems(workItems.map(w => ({ id: w.id, code: w.code, name: w.name })))
+          setAnalysisWorkItems(analysisItemsList.map(w => ({ id: w.id, code: w.code, name: w.name })))
+          setLoadedWorkItems(workItemsList || [])
+          setLoadedSubTree(subTreeData || [])
           setExpenseCategories(categories.map(c => ({ id: c.id, code: c.code, description: c.description })))
           setCurrency(companyConfig.currency_code || 'SAR')
           
@@ -228,7 +275,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({
     }
     window.addEventListener('keydown', onKey)
     return () => { cancelled = true; window.removeEventListener('keydown', onKey) }
-  }, [open, transactionId, onClose, orgId])
+  }, [open, transactionId, transactionLineId, orgId])
 
   // Recenter the modal when opening or when switching size preset
   useEffect(() => {
@@ -376,6 +423,19 @@ const TransactionAnalysisModal: React.FC<Props> = ({
   const header = useMemo(() => {
     return data ?? null
   }, [data])
+  
+  // Merge work items from props and locally loaded data
+  const effectiveWorkItems = useMemo(() => {
+    const combined = new Map<string, WorkItem>()
+    // Add props-based items first
+    workItems.forEach(w => combined.set(w.id, w))
+    // Add locally loaded items (will override if same ID)
+    loadedWorkItems.forEach(w => combined.set(w.id, w))
+    return Array.from(combined.values())
+  }, [workItems, loadedWorkItems])
+  
+  // Effective sub tree list (expenses categories)
+  const effectiveSubTree = useMemo(() => loadedSubTree || [], [loadedSubTree])
 
   // Helper function for unit labels - moved before useMemo hooks to fix hoisting issue
   const getUnitLabel = (unit: string) => {
@@ -882,6 +942,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({
   const addLineItem = () => {
     const newItem: TransactionLineItem = {
       transaction_id: transactionId!,
+      transaction_line_id: transactionLineId || undefined,
       line_number: lineItems.length + 1,
       item_code: '',
       item_name: '',
@@ -897,31 +958,47 @@ const TransactionAnalysisModal: React.FC<Props> = ({
       org_id: orgId
     }
     setLineItems(prev => [...prev, newItem])
+    // Auto-select the newly added item
+    setSelectedItemIndex(lineItems.length)
   }
 
   // Catalog items state for dropdown
-  const [catalogItems, setCatalogItems] = useState<DbTxLineItem[]>([])
+  const [catalogItems, setCatalogItems] = useState<CatalogSelectorItem[]>([])
   const [loadingCatalog, setLoadingCatalog] = useState(false)
   
   
   // Load catalog items when modal opens
   useEffect(() => {
     const loadCatalogItems = async () => {
-      if (!open || !orgId) return
+      if (!open) return
       setLoadingCatalog(true)
       try {
-        const { transactionLineItemsCatalogService } = await import('../../services/transaction-line-items-enhanced')
-        const items = await transactionLineItemsCatalogService.getCatalogItems(orgId, true)
+        let effectiveOrgId = orgId || ''
+        if (!effectiveOrgId && transactionId) {
+          // Fallback: read org_id from the transaction
+          const { data: tx, error: txErr } = await supabase
+            .from('transactions')
+            .select('org_id')
+            .eq('id', transactionId)
+            .single()
+          if (!txErr && tx?.org_id) effectiveOrgId = tx.org_id
+        }
+        if (!effectiveOrgId) {
+          setCatalogItems([])
+          return
+        }
+        const items = await lineItemsCatalogService.toSelectorItems(effectiveOrgId)
         setCatalogItems(items)
       } catch (error) {
         console.error('Failed to load catalog items:', error)
+        setCatalogItems([])
       } finally {
         setLoadingCatalog(false)
       }
     }
     
     loadCatalogItems()
-  }, [open, orgId])
+  }, [open, orgId, transactionId])
   
   
   // Function to add item from catalog (used by both dropdown and dialog)
@@ -931,31 +1008,104 @@ const TransactionAnalysisModal: React.FC<Props> = ({
     
     const newItem: TransactionLineItem = {
       transaction_id: transactionId!,
+      transaction_line_id: transactionLineId || undefined,
       line_number: lineItems.length + 1,
+      line_item_catalog_id: catalogItem.id,
       item_code: catalogItem.item_code,
       item_name: catalogItem.item_name,
       item_name_ar: catalogItem.item_name_ar,
-      description: catalogItem.description,
-      quantity: catalogItem.quantity || 1,
+      description: '',
+      quantity: 1,
       percentage: 100,
       unit_price: catalogItem.unit_price || 0,
-      unit_of_measure: catalogItem.unit_of_measure,
-      analysis_work_item_id: catalogItem.analysis_work_item_id,
-      sub_tree_id: catalogItem.sub_tree_id,
+      unit_of_measure: catalogItem.unit_of_measure || 'piece',
+      analysis_work_item_id: null,
+      sub_tree_id: null,
       org_id: orgId
     }
     
     setLineItems(prev => [...prev, newItem])
+    // Auto-select the newly added item
+    setSelectedItemIndex(lineItems.length)
   }
   
   
-  // Function to remove line item
-  const removeLineItem = (index: number) => {
+  // Function to remove line item - delete from DB first if it has an ID
+  const removeLineItem = async (index: number) => {
+    const item = lineItems[index]
+    if (!item) return
+    
+    // If item has a database ID, delete it first
+    if (item.id && item.id !== 'undefined') {
+      try {
+        await deleteLineItem(item.id)
+      } catch (e: any) {
+        console.error('Failed to delete line item:', e)
+        setError(`فشل حذف البند: ${e.message}`)
+        return
+      }
+    }
+    
+    // Then remove from local state and renumber
     setLineItems(prev => {
       const filtered = prev.filter((_, i) => i !== index)
       // Renumber the remaining items
       return filtered.map((item, i) => ({ ...item, line_number: i + 1 }))
     })
+  }
+  
+  // Function to duplicate a line item
+  const duplicateLineItem = (index: number) => {
+    const item = lineItems[index]
+    if (!item) return
+    
+    const duplicated: TransactionLineItem = {
+      ...item,
+      id: undefined, // Remove ID so it creates new on save
+      line_number: lineItems.length + 1,
+      created_at: undefined,
+      updated_at: undefined
+    }
+    
+    setLineItems(prev => [...prev, duplicated])
+    // Auto-scroll to duplicated item
+    setTimeout(() => {
+      const lastRow = document.querySelector('table tbody tr:last-child')
+      lastRow?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 100)
+  }
+  
+  // Function to bulk delete selected items
+  const bulkDeleteSelected = async () => {
+    setSaving(true)
+    try {
+      const indices = Array.from(selectedForDelete).sort((a, b) => b - a) // Delete from end first
+      
+      for (const idx of indices) {
+        const item = lineItems[idx]
+        if (item?.id && item.id !== 'undefined') {
+          try {
+            await deleteLineItem(item.id)
+          } catch (e: any) {
+            console.error(`Failed to delete item at index ${idx}:`, e)
+          }
+        }
+      }
+      
+      // Remove from local state and renumber
+      setLineItems(prev => {
+        const filtered = prev.filter((_, i) => !selectedForDelete.has(i))
+        return filtered.map((item, i) => ({ ...item, line_number: i + 1 }))
+      })
+      
+      setSelectedForDelete(new Set())
+      setShowBulkDeleteConfirm(false)
+    } catch (e: any) {
+      console.error('Bulk delete failed:', e)
+      setError(`فشل حذف البنود: ${e.message}`)
+    } finally {
+      setSaving(false)
+    }
   }
   
   // Function to update line item
@@ -980,19 +1130,61 @@ const TransactionAnalysisModal: React.FC<Props> = ({
     if (!transactionId) return
     setSaving(true)
     try {
-      await upsertLineItems(transactionId, lineItems)
-      // Reload data
+      // Validate items before saving
+      const { ok, errors } = validateItems(lineItems)
+      if (!ok) {
+        setError('تحقق من البيانات: ' + errors.join(', '))
+        setSaving(false)
+        return
+      }
+      
+      // Save to database - use upsert for safe insert/update
+      // This preserves existing items and only adds/modifies what's needed
+      // Items deleted from UI are gone (removeLineItem already removed them from state)
+      await upsertLineItems(transactionId, lineItems, { transactionLineId: transactionLineId || undefined })
+      
+      // Reload data to verify persistence
       const [analysisDetail, lineItemsData] = await Promise.all([
         getTransactionAnalysisDetail(transactionId),
-        listLineItems(transactionId)
+        listLineItems(transactionId, transactionLineId || undefined)
       ])
       setData(analysisDetail)
       setLineItems(lineItemsData)
-      setTab('header')
+      setError('') // Clear any previous errors
+      
+      // Show success and switch to header tab
+      setTimeout(() => setTab('header'), 500)
     } catch (e: any) {
+      console.error('Error saving line items:', e)
       setError(e.message || 'فشل في حفظ بنود التكلفة')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // Function to save cost dimensions for a single line item
+  const saveCostDimension = async (lineItemId: string, updatedItem: TransactionLineItem) => {
+    // Only save if the item has a valid ID (was already saved to DB)
+    if (!lineItemId || lineItemId === 'undefined' || typeof lineItemId !== 'string' || lineItemId.trim() === '') {
+      console.warn('Skipping cost dimension save for unsaved item (no ID)')
+      return
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('transaction_line_items')
+        .update({
+          work_item_id: updatedItem.work_item_id || null,
+          analysis_work_item_id: updatedItem.analysis_work_item_id || null,
+          sub_tree_id: updatedItem.sub_tree_id || null
+        })
+        .eq('id', lineItemId)
+
+      if (error) throw error
+      // Success - item saved to database
+    } catch (e: any) {
+      console.error('Failed to save cost dimension:', e.message)
+      setError(`Failed to save cost dimension: ${e.message}`)
     }
   }
 
@@ -1132,7 +1324,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({
         >
           <div>
             <h3 className="modal-title" style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--text, #eaeaea)' }}>
-              تحليل التكلفة والبنود التفصيلية
+              تحليل تكلفة سطر المعاملة - البنود التفصيلية
             </h3>
             <div style={{ color: '#a3a3a3', fontSize: 12, marginTop: 4 }}>
               {entryNumber ? `رقم القيد: ${entryNumber}` : header?.entry_number ? `رقم القيد: ${header.entry_number}` : ''}
@@ -1140,6 +1332,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({
               {typeof effectiveTolerance === 'number' && (
                 <span style={{ marginInlineStart: 8 }}>(الهامش: {effectiveTolerance})</span>
               )}
+              <div style={{ fontSize: '11px', marginTop: '4px', fontStyle: 'italic' }}>تحليل تفصيلي لبنود التكلفة المرتبطة بسطر المعاملة المحدد</div>
             </div>
           </div>
           <div className="button-container" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -1301,7 +1494,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({
               {/* Export Options for Summary */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <h3 style={{ margin: 0, color: 'var(--text, #eaeaea)', fontSize: '18px' }}>
-                  ملخص تحليل التكلفة
+                  ملخص تحليل التكلفة - سطر المعاملة
                 </h3>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <button 
@@ -1317,7 +1510,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({
                     <ExportButtons 
                       data={prepareSummaryExportData}
                       config={{
-                        title: `تحليل التكلفة - ${entryNumber || header?.entry_number || 'غير محدد'}`,
+                        title: `تحليل التكلفة - سطر المعاملة: ${entryNumber || header?.entry_number || 'غير محدد'}`,
                         subtitle: `${description || header?.description || ''} - تاريخ: ${new Date().toLocaleDateString('ar-EG')}`,
                         useArabicNumerals: true,
                         rtlLayout: true,
@@ -1344,7 +1537,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({
                       borderRadius: '8px',
                       padding: '16px'
                     }}>
-                      <div style={{ color: '#a3a3a3', fontSize: '12px', marginBottom: 8 }}>مبلغ المعاملة الأصلي</div>
+                      <div style={{ color: '#a3a3a3', fontSize: '12px', marginBottom: 8 }}>مبلغ سطر المعاملة</div>
                       <div style={{ fontSize: '18px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#3b82f6' }}>
                         {formatCurrency(header?.transaction_amount || transactionAmount, currency)}
                       </div>
@@ -1538,14 +1731,73 @@ const TransactionAnalysisModal: React.FC<Props> = ({
           {!loading && !error && tab === 'line_items' && (
             <>
             <div>
+              {/* Bulk delete confirmation dialog */}
+              {showBulkDeleteConfirm && (
+                <div style={{
+                  padding: '12px',
+                  marginBottom: '12px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid #ef4444',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <span style={{ color: '#ef4444', fontSize: '14px', fontWeight: 600 }}>
+                    حذف {selectedForDelete.size} بند(أ)؟
+                  </span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button 
+                      className="ultimate-btn ultimate-btn-delete"
+                      onClick={bulkDeleteSelected}
+                      disabled={saving}
+                    >
+                      <div className="btn-content"><span className="btn-text">{saving ? 'جاري الحذف...' : 'تأكيد الحذف'}</span></div>
+                    </button>
+                    <button 
+                      className="ultimate-btn ultimate-btn-edit"
+                      onClick={() => setShowBulkDeleteConfirm(false)}
+                      disabled={saving}
+                    >
+                      <div className="btn-content"><span className="btn-text">إلغاء</span></div>
+                    </button>
+                  </div>
+                </div>
+              )}
+              
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
-                <h4 style={{ margin: 0, color: 'var(--text, #eaeaea)' }}>بنود التكلفة التفصيلية</h4>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <h4 style={{ margin: 0, color: 'var(--text, #eaeaea)' }}>بنود التكلفة التفصيلية</h4>
+                  {selectedForDelete.size > 0 && (
+                    <span style={{ color: '#f59e0b', fontSize: '12px', fontWeight: 600 }}>
+                      ({selectedForDelete.size} محدد)
+                    </span>
+                  )}
+                </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {selectedForDelete.size > 0 && (
+                    <>
+                      <button 
+                        className="ultimate-btn ultimate-btn-delete"
+                        onClick={() => setShowBulkDeleteConfirm(true)}
+                        disabled={saving}
+                      >
+                        <div className="btn-content"><span className="btn-text">🗑️ حذف المحدد</span></div>
+                      </button>
+                      <button 
+                        className="ultimate-btn ultimate-btn-edit"
+                        onClick={() => setSelectedForDelete(new Set())}
+                        disabled={saving}
+                      >
+                        <div className="btn-content"><span className="btn-text">إلغاء التحديد</span></div>
+                      </button>
+                    </>
+                  )}
                   {config.showExport && lineItems.length > 0 && (
                     <ExportButtons 
                       data={prepareLineItemsExportData}
                       config={{
-                        title: `بنوح التكلفة التفصيلية - ${entryNumber || header?.entry_number || 'غير محدد'}`,
+                        title: `بنود التكلفة التفصيلية - سطر المعاملة: ${entryNumber || header?.entry_number || 'غير محدد'}`,
                         subtitle: `${description || header?.description || ''} - عدد البنود: ${lineItems.length}`,
                         useArabicNumerals: true,
                         rtlLayout: true,
@@ -1591,6 +1843,19 @@ const TransactionAnalysisModal: React.FC<Props> = ({
                   }}>
                     <thead>
                       <tr style={{ backgroundColor: 'var(--surface-2, #1a1a1a)' }}>
+                        <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '1px solid var(--border, rgba(255,255,255,0.12))', minWidth: '40px' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={selectedForDelete.size === lineItems.length && lineItems.length > 0}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedForDelete(new Set(lineItems.map((_, i) => i)))
+                              } else {
+                                setSelectedForDelete(new Set())
+                              }
+                            }}
+                          />
+                        </th>
                         <th style={{ padding: '12px 8px', textAlign: 'right', borderBottom: '1px solid var(--border, rgba(255,255,255,0.12))', minWidth: '60px' }}>الكود</th>
                         <th style={{ padding: '12px 8px', textAlign: 'right', borderBottom: '1px solid var(--border, rgba(255,255,255,0.12))' }}>البند</th>
                         <th style={{ padding: '12px 8px', textAlign: 'right', borderBottom: '1px solid var(--border, rgba(255,255,255,0.12))', minWidth: '80px' }}>الكمية</th>
@@ -1598,13 +1863,16 @@ const TransactionAnalysisModal: React.FC<Props> = ({
                         <th style={{ padding: '12px 8px', textAlign: 'right', borderBottom: '1px solid var(--border, rgba(255,255,255,0.12))', minWidth: '100px' }}>سعر الوحدة</th>
                         <th style={{ padding: '12px 8px', textAlign: 'right', borderBottom: '1px solid var(--border, rgba(255,255,255,0.12))', minWidth: '100px' }}>وحدة القياس</th>
                         <th style={{ padding: '12px 8px', textAlign: 'right', borderBottom: '1px solid var(--border, rgba(255,255,255,0.12))', minWidth: '120px' }}>الإجمالي</th>
+                        <th style={{ padding: '12px 8px', textAlign: 'right', borderBottom: '1px solid var(--border, rgba(255,255,255,0.12))', minWidth: '120px' }}>📌 عنصر العمل</th>
+                        <th style={{ padding: '12px 8px', textAlign: 'right', borderBottom: '1px solid var(--border, rgba(255,255,255,0.12))', minWidth: '120px' }}>🔍 بند التحليل</th>
+                        <th style={{ padding: '12px 8px', textAlign: 'right', borderBottom: '1px solid var(--border, rgba(255,255,255,0.12))', minWidth: '140px' }}>📂 الشجرة الفرعية</th>
                         <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '1px solid var(--border, rgba(255,255,255,0.12))', minWidth: '80px' }}>العمليات</th>
                       </tr>
                     </thead>
                     <tbody>
                       {/* Add new item row */}
                       <tr style={{ backgroundColor: 'var(--surface-2, #1a1a1a)', borderBottom: '2px solid var(--border, rgba(255,255,255,0.12))' }}>
-                        <td colSpan={8} style={{ padding: '12px 8px' }}>
+                        <td colSpan={12} style={{ padding: '12px 8px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <span style={{ color: 'var(--text, #eaeaea)', fontSize: '14px', fontWeight: 600 }}>
                               اختيار بند من الكتالوج:
@@ -1643,27 +1911,42 @@ const TransactionAnalysisModal: React.FC<Props> = ({
                       
                       {/* Existing items */}
                       {lineItems.map((item, index) => (
-                        <tr key={index} style={{ borderBottom: '1px solid var(--border, rgba(255,255,255,0.08))' }}>
-                          <td style={{ padding: '8px' }}>
+                        <tr key={index} style={{ borderBottom: '1px solid var(--border, rgba(255,255,255,0.08))', backgroundColor: selectedItemIndex === index ? 'rgba(59, 130, 246, 0.2)' : 'transparent' }}>
+                          <td style={{ padding: '8px', textAlign: 'center', minWidth: '40px' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={selectedForDelete.has(index)}
+                              onChange={(e) => {
+                                e.stopPropagation()
+                                const updated = new Set(selectedForDelete)
+                                if (e.target.checked) {
+                                  updated.add(index)
+                                } else {
+                                  updated.delete(index)
+                                }
+                                setSelectedForDelete(updated)
+                              }}
+                            />
+                          </td>
+                          <td style={{ padding: '8px' }} onClick={() => setSelectedItemIndex(index)}>
                             {/* Show dropdown if no item selected, otherwise show code */}
                             {!item.item_code ? (
                               <select
-                                onChange={(e) => {
-                                  if (e.target.value) {
-                                    const catalogItem = catalogItems.find(cat => cat.id === e.target.value)
-                                    if (catalogItem) {
-                                      updateLineItem(index, {
-                                        item_code: catalogItem.item_code,
-                                        item_name: catalogItem.item_name,
-                                        item_name_ar: catalogItem.item_name_ar,
-                                        unit_price: catalogItem.unit_price || 0,
-                                        unit_of_measure: catalogItem.unit_of_measure,
-                                        analysis_work_item_id: catalogItem.analysis_work_item_id,
-                                        sub_tree_id: catalogItem.sub_tree_id
-                                      })
-                                    }
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  const catalogItem = catalogItems.find(cat => cat.id === e.target.value)
+                                  if (catalogItem) {
+                                    updateLineItem(index, {
+                                      line_item_catalog_id: catalogItem.id,
+                                      item_code: catalogItem.item_code,
+                                      item_name: catalogItem.item_name,
+                                      item_name_ar: catalogItem.item_name_ar,
+                                      unit_price: catalogItem.unit_price || 0,
+                                      unit_of_measure: catalogItem.unit_of_measure || 'piece',
+                                    })
                                   }
-                                }}
+                                }
+                              }}
                                 disabled={loadingCatalog}
                                 style={{
                                   width: '100%',
@@ -1787,30 +2070,96 @@ const TransactionAnalysisModal: React.FC<Props> = ({
                           }}>
                             {formatCurrency(item.total_amount || 0, currency)}
                           </td>
+                          {/* Work Item Dropdown - Searchable */}
+                          <td style={{ padding: '8px' }}>
+                            <SearchableDropdown
+                              items={effectiveWorkItems.map(w => ({ id: (w as any).id, code: (w as any).code, name: (w as any).name, name_ar: (w as any).name_ar }))}
+                              value={item.work_item_id || null}
+                              onChange={(id) => updateLineItem(index, { work_item_id: id })}
+                              placeholder="— بحث —"
+                              maxVisibleItems={50}
+                            />
+                          </td>
+                          <td style={{ padding: '8px' }}>
+                            <SearchableDropdown
+                              items={analysisWorkItems.map(a => ({
+                                id: a.id,
+                                code: a.code,
+                                name: a.name
+                              }))}
+                              value={item.analysis_work_item_id || null}
+                              onChange={(id) => updateLineItem(index, { analysis_work_item_id: id })}
+                              placeholder="— بحث —"
+                              maxVisibleItems={50}
+                            />
+                          </td>
+                          {/* Expenses Sub-Tree Dropdown - Searchable */}
+                          <td style={{ padding: '8px' }}>
+                            <SearchableDropdown
+                              items={effectiveSubTree.map((st: any) => ({ id: st.id, code: st.code, name: st.description || st.name, name_ar: st.name_ar }))}
+                              value={item.sub_tree_id || null}
+                              onChange={(id) => updateLineItem(index, { sub_tree_id: id })}
+                              placeholder="— بحث —"
+                              maxVisibleItems={50}
+                            />
+                          </td>
                           <td style={{ padding: '8px', textAlign: 'center' }}>
-                            <button
-                              onClick={() => removeLineItem(index)}
-                              style={{
-                                padding: '4px 8px',
-                                border: '1px solid #ef4444',
-                                borderRadius: '4px',
-                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                color: '#ef4444',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              حذف
-                            </button>
+                            <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                              <button
+                                onClick={() => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  duplicateLineItem(index)
+                                }}
+                                disabled={saving}
+                                title="نسخ البند"
+                                style={{
+                                  padding: '4px 6px',
+                                  border: '1px solid #3b82f6',
+                                  borderRadius: '4px',
+                                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                  color: '#3b82f6',
+                                  cursor: saving ? 'not-allowed' : 'pointer',
+                                  opacity: saving ? 0.5 : 1,
+                                  fontSize: '10px'
+                                }}
+                              >
+                                📄
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  removeLineItem(index)
+                                }}
+                                disabled={saving}
+                                title="حذف البند"
+                                style={{
+                                  padding: '4px 6px',
+                                  border: '1px solid #ef4444',
+                                  borderRadius: '4px',
+                                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                  color: '#ef4444',
+                                  cursor: saving ? 'not-allowed' : 'pointer',
+                                  opacity: saving ? 0.5 : 1,
+                                  fontSize: '10px'
+                                }}
+                              >
+                                {saving ? '...' : '🗑️'}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr style={{ backgroundColor: 'var(--surface-2, #1a1a1a)', fontWeight: 700 }}>
-                        <td colSpan={6} style={{ padding: '12px 8px', textAlign: 'left' }}>الإجمالي</td>
+                        <td colSpan={8} style={{ padding: '12px 8px', textAlign: 'left' }}>الإجمالي</td>
                         <td style={{ padding: '12px 8px', fontVariantNumeric: 'tabular-nums', color: 'var(--success, #22c55e)' }}>
                           {formatCurrency(lineItems.reduce((sum, item) => sum + (item.total_amount || 0), 0), currency)}
                         </td>
+                        <td></td>
+                        <td></td>
                         <td></td>
                       </tr>
                     </tfoot>

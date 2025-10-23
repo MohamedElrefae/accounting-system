@@ -6,6 +6,7 @@ import { CostPerformanceAnalytics, type CostPoint } from '@/components/Fiscal/Co
 import { LoadingOverlay } from '@/components/Fiscal/LoadingOverlay'
 import { ConstructionProgressIntegration } from '@/services/ConstructionProgressIntegration'
 import { ConstructionCostAllocation } from '@/services/ConstructionCostAllocation'
+import { ConstructionComplianceManager } from '@/services/ConstructionComplianceManager'
 import { ConstructionComplianceMonitor, type ComplianceItem } from '@/components/Fiscal/ConstructionComplianceMonitor'
 import { SubcontractorManagementInterface, type SubcontractorItem } from '@/components/Fiscal/SubcontractorManagementInterface'
 import { MaterialManagementDashboard, type MaterialItem } from '@/components/Fiscal/MaterialManagementDashboard'
@@ -36,6 +37,13 @@ export default function ConstructionDashboardPage() {
   const [materials, setMaterials] = React.useState<MaterialItem[]>([])
 
   const load = React.useCallback(async () => {
+    // Skip loading if no valid orgId is available
+    if (!orgId || orgId.trim() === '') {
+      setPhases([]); setCompliance([]); setSubs([]); setMaterials([]); setCosts([])
+      setError('Please select an organization to view construction data')
+      return
+    }
+    
     // Fetch from real tables via services
     setLoading(true)
     setError(null)

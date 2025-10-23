@@ -1,0 +1,197 @@
+===============================================================================
+TRANSACTION_LINE_ITEMS SCHEMA & TRIGGER FIXES - SUMMARY
+===============================================================================
+
+STATUS: ✅ ALL FILES READY TO DEPLOY
+
+===============================================================================
+3 SQL FILES CREATED:
+===============================================================================
+
+1. CORRECTED_COMPREHENSIVE_FIX.sql
+   ✅ Location: /database/CORRECTED_COMPREHENSIVE_FIX.sql
+   ✅ What it does:
+      - Adds transaction_line_id column (if missing)
+      - Adds sub_tree_id column (if missing)
+      - Drops old triggers with incorrect logic
+      - Recreates 4 trigger functions with corrected column references:
+        * fn_guard_selectable_leaf_tli() - uses transaction_line_id
+        * fn_unselect_parent_tli() - uses transaction_line_id
+        * fn_tli_update_path() - uses transaction_line_id
+        * update_transaction_line_items_summary() - NO array_agg error!
+
+2. TEST_transaction_line_items_insert.sql
+   ✅ Location: /database/TEST_transaction_line_items_insert.sql
+   ✅ What it does:
+      - Finds or creates test transaction
+      - Inserts line item #1 (100% quantity)
+      - Verifies trigger updated transaction summary
+      - Inserts line item #2 (90% quantity = 10% discount)
+      - Verifies summary recalculated correctly
+      - Displays all line items
+      - ROLLBACK (cleans up test data)
+   ✅ Fixed: RAISE statement syntax error (removed trailing colon)
+
+3. diagnose-migration-issues.sql
+   ✅ Location: /database/diagnose-migration-issues.sql
+   ✅ What it does:
+      - Checks for policies on transaction_line_items
+      - Lists all triggers and functions
+      - Verifies table columns
+      - Checks indexes
+      - Displays overall schema status
+
+===============================================================================
+IMPLEMENTATION STEPS:
+===============================================================================
+
+STEP 1: Apply the comprehensive fix
+   Command:
+   psql -U postgres -d accounting_system -f database/CORRECTED_COMPREHENSIVE_FIX.sql
+   
+   Expected output:
+   "Triggers recreated successfully!"
+   ...followed by trigger verification table...
+
+STEP 2: Run tests
+   Command:
+   psql -U postgres -d accounting_system -f database/TEST_transaction_line_items_insert.sql
+   
+   Expected output:
+   Using transaction_line_id: [UUID]
+   TEST 1: Line item inserted successfully!
+   TEST 2: Verifying transaction summary was updated...
+   has_line_items: true, line_items_count: 1, line_items_total: 5000.00
+   TEST 3: Second line item inserted!
+   TEST 4: Verifying updated transaction summary...
+   has_line_items: true, line_items_count: 2, line_items_total: 9500.00
+   TEST 5: Final line items for transaction [UUID]:
+   Line 1: Test Material - Qty: 100, Pct: 100.00, Price: 50.00, Total: 5000.00
+   Line 2: Discounted Item - Qty: 50, Pct: 90.00, Price: 100.00, Total: 4500.00
+
+STEP 3: (Optional) Run diagnostics
+   Command:
+   psql -U postgres -d accounting_system -f database/diagnose-migration-issues.sql
+   
+   Expected output:
+   - 4 custom triggers listed
+   - 4 related functions listed
+   - transaction_line_id, total_amount, sub_tree_id columns confirmed
+
+STEP 4: Test in UI
+   1. Open your accounting application
+   2. Create or open a transaction
+   3. Add a line item
+   4. Verify: No errors, calculations work
+
+===============================================================================
+KEY CHANGES FROM OLD TO NEW:
+===============================================================================
+
+COLUMN RENAMES:
+   OLD: transaction_id          → NEW: transaction_line_id
+   OLD: expenses_category_id    → NEW: sub_tree_id
+   
+TRIGGER FIXES:
+   OLD: IF NEW.transaction_id IS NULL THEN...        ❌ Column didn't exist
+   NEW: IF NEW.transaction_line_id IS NULL THEN...   ✅ Correct column
+   
+ARRAY_AGG ERROR FIX:
+   OLD: SELECT array_agg(...) FROM...                ❌ Not allowed in triggers
+   NEW: SELECT SUM(...), COUNT(*) FROM...            ✅ Scalar functions work
+
+CALCULATION FORMULA (unchanged):
+   Total = Quantity × (Percentage / 100) × Unit Price
+   Example: 100 × (100/100) × 50 = 5000.00 ✓
+   Example: 50 × (90/100) × 100 = 4500.00 ✓ (10% discount)
+
+===============================================================================
+DOCUMENTATION:
+===============================================================================
+
+Complete documentation available in:
+   ✅ IMPLEMENTATION_GUIDE_CORRECTED_TRIGGERS.md
+      - Detailed explanation of all changes
+      - Column mapping reference
+      - Trigger function details
+      - Troubleshooting guide
+      - API updates needed
+      - Rollback procedures
+
+===============================================================================
+TESTING CHECKLIST:
+===============================================================================
+
+Before deployment:
+  □ Read this summary
+  □ Read IMPLEMENTATION_GUIDE_CORRECTED_TRIGGERS.md
+  □ Review CORRECTED_COMPREHENSIVE_FIX.sql
+  □ Review TEST_transaction_line_items_insert.sql
+
+During deployment:
+  □ Run Step 1: CORRECTED_COMPREHENSIVE_FIX.sql
+  □ Verify: "Triggers recreated successfully!" message
+  □ Run Step 2: TEST_transaction_line_items_insert.sql
+  □ Verify: All 5 tests pass with correct totals
+  □ (Optional) Run Step 3: diagnose-migration-issues.sql
+  □ Verify: No warnings or errors
+
+After deployment:
+  □ Test in UI: Add line item to transaction
+  □ Verify: Calculations work (Qty × Pct × Price = Total)
+  □ Verify: Transaction summary updates automatically
+  □ Verify: No error messages
+
+===============================================================================
+ERROR RESOLUTION:
+===============================================================================
+
+If you see "Column transaction_id does not exist":
+   → Run CORRECTED_COMPREHENSIVE_FIX.sql
+
+If you see "array_agg is an aggregate function":
+   → Run CORRECTED_COMPREHENSIVE_FIX.sql (already fixed)
+
+If triggers don't fire:
+   → Check RLS policies: SELECT * FROM pg_policies WHERE tablename = 'transaction_line_items';
+
+If line items insert but transaction summary doesn't update:
+   → Verify transaction_line_id is NOT NULL in inserted rows
+   → Run diagnostic: SELECT transaction_line_id FROM transaction_line_items LIMIT 5;
+
+===============================================================================
+WHAT EACH TRIGGER DOES:
+===============================================================================
+
+1. fn_guard_selectable_leaf_tli()
+   - Prevents parent items from being marked as selectable
+   - Only leaf nodes (items with no children) can be selectable
+   - Fires: BEFORE INSERT/UPDATE
+
+2. fn_unselect_parent_tli()
+   - When a child item is added, parent becomes unselectable
+   - Maintains hierarchical integrity
+   - Fires: AFTER INSERT
+
+3. fn_tli_update_path()
+   - Maintains hierarchical path (e.g., "materials.concrete.rebar")
+   - Used for efficient tree traversal
+   - Only processes catalog items (transaction_line_id IS NULL)
+   - Fires: BEFORE INSERT/UPDATE
+
+4. update_transaction_line_items_summary()
+   - **MAIN TRIGGER**: Recalculates transaction totals
+   - Updates: line_items_total, line_items_count, has_line_items
+   - Only processes transaction items (transaction_line_id IS NOT NULL)
+   - Uses SUM() and COUNT() (no array_agg!)
+   - Fires: AFTER INSERT/UPDATE/DELETE
+
+===============================================================================
+DEPLOYMENT TIME ESTIMATE: 5-10 minutes
+RISK LEVEL: Low (all changes are idempotent with IF NOT EXISTS)
+ROLLBACK: Simple - just drop the new triggers and recreate old ones
+===============================================================================
+
+✅ READY TO DEPLOY!
+
+Next step: Run CORRECTED_COMPREHENSIVE_FIX.sql

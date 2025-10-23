@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import styles from './AnalysisWorkItems.module.css'
+import './AccountsTree.css'
 import { useToast } from '../../contexts/ToastContext'
 import { getOrganizations, type Organization } from '../../services/organization'
 import { getActiveProjects, type Project } from '../../services/projects'
@@ -35,6 +36,8 @@ import {
 } from '@mui/material'
 import ExportButtons from '../../components/Common/ExportButtons'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
+
+const APP_FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif";
 
 async function getInitialOrgId(): Promise<string> { 
   try { 
@@ -106,7 +109,8 @@ const AnalysisWorkItemsPage: React.FC = () => {
     if (!orgId) return
     setLoading(true)
     try {
-      const list = await listAnalysisWorkItems({ orgId, projectId: projectId || null, search: (search || '').trim() || undefined, onlyWithTx: false, includeInactive: true })
+      // Do not pass projectId; listing is org-level. Project selection should only affect totals (not implemented here).
+      const list = await listAnalysisWorkItems({ orgId, search: (search || '').trim() || undefined, onlyWithTx: false, includeInactive: true })
       setRows(list)
     } catch (e: any) {
       showToast(e?.message || 'Failed to load', { severity: 'error' })
@@ -206,27 +210,52 @@ const AnalysisWorkItemsPage: React.FC = () => {
   }
 
   return (
-    <div className={styles.container} dir="rtl">
-      <div className={styles.header}>
-        <Typography className={styles.title}>Analysis Work Items / بنود الاعمال التحليلية</Typography>
-        <div className={styles.toolbar}>
+    <div className="accounts-page" dir="rtl">
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1 className="page-title">بنود الاعمال التحليلية</h1>
+        </div>
+        <div className="page-actions">
+          {canCreate && (
+            <button className="ultimate-btn ultimate-btn-add" onClick={openCreate} title="إضافة بند جديد">
+              <div className="btn-content"><span className="btn-text">+ بند جديد</span></div>
+            </button>
+          )}
+          <ExportButtons data={exportData} config={{ title: 'Analysis Work Items', rtlLayout: true }} size="small" />
+        </div>
+      </div>
+
+      <div className="controls-container">
+        <div className="search-and-filters">
+          <div className="search-input-wrapper">
+            <input
+              type="text"
+              placeholder="ابحث بالكود أو الاسم..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="search-input"
+            />
+            <span className="icon">🔍</span>
+          </div>
+
           <FormControl size="small">
-            <InputLabel>Organization</InputLabel>
-            <Select label="Organization" value={orgId} onChange={async (e) => { 
+            <InputLabel>المؤسسة</InputLabel>
+            <Select label="المؤسسة" value={orgId} onChange={async (e) => { 
               const v = String(e.target.value); 
               setOrgId(v); 
               try { 
                 const { setActiveOrgId } = await import('../../utils/org'); 
                 setActiveOrgId?.(v); 
-              } catch { /* ignore org utils errors */ }
+              } catch {}
               await reload();
             }}>
               {orgs.map(o => (<MenuItem key={o.id} value={o.id}>{o.code} - {o.name}</MenuItem>))}
             </Select>
           </FormControl>
+
           <FormControl size="small">
-            <InputLabel>Project (filter)</InputLabel>
-            <Select label="Project (filter)" value={projectId} onChange={(e) => {
+            <InputLabel>المشروع (لنطاق الإجماليات)</InputLabel>
+            <Select label="المشروع (لنطاق الإجماليات)" value={projectId} onChange={(e) => {
               const v = String(e.target.value)
               setProjectId(v)
               ;(async () => {
@@ -237,53 +266,84 @@ const AnalysisWorkItemsPage: React.FC = () => {
                 await reload()
               })()
             }}>
-              <MenuItem value="">All Projects</MenuItem>
+              <MenuItem value="">كل المشروعات</MenuItem>
               {projects.map(p => (<MenuItem key={p.id} value={p.id}>{p.code} - {p.name}</MenuItem>))}
             </Select>
           </FormControl>
-          <TextField size="small" label="Search / بحث" value={search} onChange={(e) => setSearch(e.target.value)} />
-          {canCreate && (<button className={styles.button} onClick={openCreate}>New / جديد</button>)}
-          <ExportButtons data={exportData} config={{ title: 'Analysis Work Items', rtlLayout: true }} size="small" />
+        </div>
+        <div className="view-mode-toggle">
+          <button className="view-mode-btn active">عرض جدول</button>
         </div>
       </div>
 
-      <div className={styles.content}>
-        <Card className={styles.card}>
-          <CardContent className={styles.cardBody}>
+      <div className="content-area">
+        <div className={styles.card}>
+          <div className={styles.cardBody}>
             <div className={styles.tableContainer}>
               {loading ? (
-                <Typography>Loading...</Typography>
+                <Typography>جاري التحميل...</Typography>
               ) : (
-                <Table size="small" stickyHeader>
-                  <TableHead>
+                <Table className={styles.dataTable} size="small" stickyHeader sx={{ '& .MuiTableCell-root': { py: 1.25 } }}>
+                  <colgroup>
+                    <col style={{ width: '140px' }} />
+                    <col />
+                    <col />
+                    <col style={{ width: '120px' }} />
+                    <col style={{ width: '120px' }} />
+                    <col style={{ width: '140px' }} />
+                    <col style={{ width: '140px' }} />
+                    <col style={{ width: '140px' }} />
+                    <col style={{ width: '280px' }} />
+                  </colgroup>
+                  <TableHead sx={{ '& th': { background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover))', color: 'var(--on-accent)', fontWeight: 600 } }}>
                     <TableRow>
-                      <TableCell>Code</TableCell>
-                      <TableCell>Name</TableCell>
-                      <TableCell>Arabic Name</TableCell>
-                      <TableCell>Active</TableCell>
-                      <TableCell>Has Tx</TableCell>
-                      <TableCell align="right">Total Debit</TableCell>
-                      <TableCell align="right">Total Credit</TableCell>
-                      <TableCell align="right">Net</TableCell>
-                      <TableCell align="right">Actions</TableCell>
+                      <TableCell>الكود</TableCell>
+                      <TableCell>الاسم</TableCell>
+                      <TableCell>الاسم العربي</TableCell>
+                      <TableCell>الحالة</TableCell>
+                      <TableCell>به معاملات</TableCell>
+                      <TableCell align="right">إجمالي مدين</TableCell>
+                      <TableCell align="right">إجمالي دائن</TableCell>
+                      <TableCell align="right">الصافي</TableCell>
+                      <TableCell className={styles.actionsCell} align="right" sx={{ minWidth: 280 }}>الإجراءات</TableCell>
                     </TableRow>
                   </TableHead>
-                  <TableBody>
+                  <TableBody sx={{ '& tr:hover': { backgroundColor: 'var(--hover-bg)' } }}>
                     {filtered.map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell>{r.code}</TableCell>
+                      <TableRow hover key={r.id}>
+                        <TableCell className={`table-code-cell ${styles.codeCol}`}>{r.code}</TableCell>
                         <TableCell>{r.name}</TableCell>
                         <TableCell>{r.name_ar || ''}</TableCell>
-                        <TableCell><Checkbox checked={!!r.is_active} disabled /></TableCell>
-                        <TableCell><Checkbox checked={!!r.has_transactions} disabled /></TableCell>
+                        <TableCell>
+                          <span className={`status-badge ${r.is_active ? 'status-active' : 'status-inactive'}`}>
+                            {r.is_active ? 'نشط' : 'غير نشط'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`status-badge ${r.has_transactions ? 'status-active' : 'status-inactive'}`}>
+                            {r.has_transactions ? 'نعم' : 'لا'}
+                          </span>
+                        </TableCell>
                         <TableCell align="right">{Number(r.total_debit_amount || 0).toLocaleString()}</TableCell>
                         <TableCell align="right">{Number(r.total_credit_amount || 0).toLocaleString()}</TableCell>
                         <TableCell align="right">{Number(r.net_amount || 0).toLocaleString()}</TableCell>
-                        <TableCell align="right">
+                        <TableCell className={styles.actionsCell} align="right" sx={{ minWidth: 280 }}>
                           <div className={styles.rowActions}>
-                            {canUpdate && (<button className={styles.button} onClick={() => openEdit(r)}>Edit</button>)}
-                            {canUpdate && (<button className={styles.button} onClick={() => handleToggleActive(r)}>{r.is_active ? 'Disable' : 'Enable'}</button>)}
-                            {canDelete && (<button className={styles.button} disabled={!!r.has_transactions} onClick={() => handleDelete(r)}>Delete</button>)}
+                            {canUpdate && (
+                              <button className="ultimate-btn ultimate-btn-edit" onClick={() => openEdit(r)} title="تعديل">
+                                <div className="btn-content"><span className="btn-text">تعديل</span></div>
+                              </button>
+                            )}
+                            {canUpdate && (
+                              <button className={`ultimate-btn ${r.is_active ? 'ultimate-btn-warning' : 'ultimate-btn-success'}`} onClick={() => handleToggleActive(r)} title={r.is_active ? 'تعطيل' : 'تفعيل'}>
+                                <div className="btn-content"><span className="btn-text">{r.is_active ? 'تعطيل' : 'تفعيل'}</span></div>
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button className="ultimate-btn ultimate-btn-delete" disabled={!!r.has_transactions} onClick={() => handleDelete(r)} title="حذف">
+                                <div className="btn-content"><span className="btn-text">حذف</span></div>
+                              </button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -292,24 +352,26 @@ const AnalysisWorkItemsPage: React.FC = () => {
                 </Table>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{editingId ? 'Edit / تعديل' : 'New / جديد'}</DialogTitle>
+        <DialogTitle>{editingId ? 'تعديل' : 'إضافة بند جديد'}</DialogTitle>
         <DialogContent>
-          <TextField fullWidth margin="dense" label="Code / الكود" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
-          <TextField fullWidth margin="dense" label="Name / الاسم" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <TextField fullWidth margin="dense" label="Arabic Name / الاسم العربي" value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} />
-          <TextField fullWidth margin="dense" multiline minRows={2} label="Description / الوصف" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          <TextField fullWidth margin="dense" label="الكود" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+          <TextField fullWidth margin="dense" label="الاسم" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <TextField fullWidth margin="dense" label="الاسم العربي" value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} />
+          <TextField fullWidth margin="dense" multiline minRows={2} label="الوصف" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           <div className={styles.footerActions}>
-            <Checkbox checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} /> Active
+            <Checkbox checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} /> نشط
           </div>
         </DialogContent>
         <DialogActions>
-          <button className={styles.button} onClick={() => setOpen(false)}>Close</button>
-          {(editingId ? canUpdate : canCreate) && <button className={styles.button} onClick={handleSave}>Save</button>}
+          <button className="ultimate-btn ultimate-btn-delete" onClick={() => setOpen(false)}>إغلاق</button>
+          {(editingId ? canUpdate : canCreate) && (
+            <button className="ultimate-btn ultimate-btn-add" onClick={handleSave}>حفظ</button>
+          )}
         </DialogActions>
       </Dialog>
     </div>

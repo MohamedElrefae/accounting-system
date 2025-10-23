@@ -56,10 +56,24 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [showControls, setShowControls] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  // When starting a drag while docked/maximized, we temporarily allow free drag
+  const freeDragRef = useRef(false);
 
-// Handle dragging
-const handleMouseDown = (e: React.MouseEvent) => {
-    if (isMaximized || isDocked) return;
+  // Handle dragging
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // If user tries to drag while docked/maximized, first reset to free mode
+    if (isMaximized || isDocked) {
+      onResetPosition();
+      freeDragRef.current = true;
+    }
+    // Allow left mouse button only (when button is available); some environments may not set button on mousedown
+    if (typeof e.button === 'number' && e.button !== 0) return;
+    const targetEl = e.target as HTMLElement;
+    // If clicking inside actions area (buttons etc.), don't start a drag
+    if (targetEl?.closest(`.${styles.actions}`)) return;
+    // Also ignore direct interactive elements just in case
+    if (targetEl?.closest('button, a, input, textarea, select, [role="button"]')) return;
+
     e.preventDefault();
     
     setIsDragging(true);
@@ -69,10 +83,17 @@ const handleMouseDown = (e: React.MouseEvent) => {
       origX: position.x,
       origY: position.y
     });
+
+    // Improve UX during drag
+    try {
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'grabbing';
+    } catch {}
   };
 
-const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (isDragging && !isMaximized && !isDocked) {
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    const canMove = isDragging && (!isMaximized || freeDragRef.current) && (!isDocked || freeDragRef.current);
+    if (canMove) {
       // Compute unclamped new position
       let nextX = e.clientX - dragStart.x;
       let nextY = e.clientY - dragStart.y;
@@ -90,12 +111,18 @@ const handleMouseMove = useCallback((e: MouseEvent) => {
         }
       }
 
+      // Allow the panel to move partially off-screen while keeping a visible margin
+      const visibleMargin = 32; // px that must remain visible
+      const minX = Math.min(0, window.innerWidth - size.width + visibleMargin);
+      const maxX = Math.max(0, window.innerWidth - visibleMargin);
+      const minY = Math.min(0, window.innerHeight - size.height + visibleMargin);
+      const maxY = Math.max(0, window.innerHeight - visibleMargin);
+
       const newPosition = {
-        x: Math.max(0, Math.min(window.innerWidth - size.width, nextX)),
-        y: Math.max(0, Math.min(window.innerHeight - size.height, nextY))
+        x: Math.max(minX, Math.min(maxX, nextX)),
+        y: Math.max(minY, Math.min(maxY, nextY))
       };
-      onMove(newPosition);
-    } else if (isResizing && !isMaximized && !isDocked) {
+    } else if (isResizing && (!isMaximized || freeDragRef.current) && (!isDocked || freeDragRef.current)) {
       let newWidth = Math.max(400, resizeStart.width + (e.clientX - resizeStart.x));
       let newHeight = Math.max(300, resizeStart.height + (e.clientY - resizeStart.y));
 
@@ -119,11 +146,53 @@ const handleMouseMove = useCallback((e: MouseEvent) => {
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
     setIsResizing(false);
+    freeDragRef.current = false;
+    // Restore selection and cursor
+    try {
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    } catch {}
+  }, []);
+
+  // Touch handlers (support drag/resize on touch devices)
+  const handleTouchStart: React.TouchEventHandler<HTMLDivElement> = (e) => {
+    if (isMaximized || isDocked) {
+      onResetPosition();
+      freeDragRef.current = true;
+    }
+    const touch = e.touches[0];
+    if (!touch) return;
+    setIsDragging(true);
+    setDragStart({ x: touch.clientX - position.x, y: touch.clientY - position.y, origX: position.x, origY: position.y });
+    try { document.body.style.userSelect = 'none'; document.body.style.cursor = 'grabbing'; } catch {}
+  };
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    if (!isDragging || (isMaximized && !freeDragRef.current) || (isDocked && !freeDragRef.current)) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    e.preventDefault();
+    let nextX = touch.clientX - dragStart.x;
+    let nextY = touch.clientY - dragStart.y;
+    const visibleMargin = 32;
+    const minX = Math.min(0, window.innerWidth - size.width + visibleMargin);
+    const maxX = Math.max(0, window.innerWidth - visibleMargin);
+    const minY = Math.min(0, window.innerHeight - size.height + visibleMargin);
+    const maxY = Math.max(0, window.innerHeight - visibleMargin);
+    onMove({ x: Math.max(minX, Math.min(maxX, nextX)), y: Math.max(minY, Math.min(maxY, nextY)) });
+  }, [isDragging, isMaximized, isDocked, dragStart.x, dragStart.y, size.width, size.height, onMove]);
+  const handleTouchEnd = useCallback(() => {
+    setIsDragging(false);
+    setIsResizing(false);
+    freeDragRef.current = false;
+    try { document.body.style.userSelect = ''; document.body.style.cursor = ''; } catch {}
   }, []);
 
   // Handle resizing
-const handleResizeStart = (e: React.MouseEvent) => {
-    if (isMaximized || isDocked) return;
+  const handleResizeStart = (e: React.MouseEvent) => {
+    if (isMaximized || isDocked) {
+      onResetPosition();
+      freeDragRef.current = true;
+    }
     
     e.preventDefault();
     e.stopPropagation();
@@ -134,20 +203,45 @@ const handleResizeStart = (e: React.MouseEvent) => {
       width: size.width,
       height: size.height
     });
+    try {
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'nwse-resize';
+    } catch {}
   };
 
   useEffect(() => {
     if (isDragging || isResizing) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
+      // Touch support
+      document.addEventListener('touchmove', handleTouchMove, { passive: false });
+      document.addEventListener('touchend', handleTouchEnd);
       
       return () => {
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('touchmove', handleTouchMove as any);
+        document.removeEventListener('touchend', handleTouchEnd as any);
       };
     }
     return undefined;
-  }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
+  }, [isDragging, isResizing, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
+
+  // Keyboard escape hatch: ESC resets layout (undock/unmaximize + reset position)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+      if (e.key === 'Escape') {
+        onResetPosition();
+        try {
+          document.body.style.userSelect = '';
+          document.body.style.cursor = '';
+        } catch {}
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen, onResetPosition]);
 
   // Calculate panel style based on state
   const getPanelStyle = (): React.CSSProperties => {
@@ -219,6 +313,9 @@ const handleResizeStart = (e: React.MouseEvent) => {
             borderTopRightRadius: isMaximized ? 0 : '10px'
           }}
           onMouseDown={handleMouseDown}
+          onTouchStart={handleTouchStart}
+          onDoubleClick={onResetPosition}
+          title="انقر مرتين لإعادة التمركز وفك التثبيت"
         >
           <div className={styles.titleLeft}>
             <Move size={16} />
@@ -315,7 +412,7 @@ const handleResizeStart = (e: React.MouseEvent) => {
         {showControls && !isMaximized && !isDocked && (
           <div className={styles.sizeIndicator}>
             <span>{size.width} × {size.height}</span>
-{presetName ? <span className={styles.presetName}>— {presetName}</span> : null}
+            {presetName ? <span className={styles.presetName}>— {presetName}</span> : null}
           </div>
         )}
 

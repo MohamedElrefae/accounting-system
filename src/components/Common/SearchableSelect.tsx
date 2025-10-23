@@ -25,6 +25,8 @@ interface SearchableSelectProps {
   // Optional drilldown modal
   showDrilldownModal?: boolean;
   treeOptions?: SearchableSelectOption[];
+  // Compact mode for dense layouts (tables)
+  compact?: boolean;
 }
 
 const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -40,6 +42,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   error = false,
   showDrilldownModal = false,
   treeOptions,
+  compact = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isTreeOpen, setIsTreeOpen] = useState(false);
@@ -325,6 +328,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
 
   const containerClasses = [
     styles.container,
+    compact ? styles.compact : '',
     error ? styles.error : '',
     disabled ? styles.disabled : '',
     isOpen ? styles.open : '',

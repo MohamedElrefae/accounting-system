@@ -207,7 +207,7 @@
 
 .account-line { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 1rem; border-bottom: 1px solid var(--border-color); transition: background-color 0.2s ease; background: var(--surface); }
 .account-line:hover { background-color: var(--hover-bg); }
-.account-line:last-child { border-bottom: none; }
+.account-line:last-of-type { border-bottom: none; }
 .account-info { display: flex; align-items: center; gap: 1rem; flex: 1; }
 .account-code { font-family: 'Courier New', monospace; font-weight: 600; color: var(--accent); min-width: 80px; font-size: 0.9rem; }
 .account-name { color: var(--text); font-weight: 500; flex: 1; }
@@ -352,7 +352,7 @@
   color: var(--text);
 }
 
-.calculation-line:last-child {
+.calculation-line:last-of-type {
   border-bottom: none;
 }
 
@@ -464,7 +464,7 @@
   background: var(--surface);
 }
 
-.ratio-line:last-child {
+.ratio-line:last-of-type {
   border-bottom: none;
 }
 
@@ -573,7 +573,7 @@
   color: var(--text);
 }
 
-.balance-sheet-calculations .calculation-line:last-child {
+.balance-sheet-calculations .calculation-line:last-of-type {
   border-bottom: none;
 }
 
@@ -619,7 +619,7 @@
   background: var(--surface);
 }
 
-.balance-sheet-ratios .ratio-line:last-child {
+.balance-sheet-ratios .ratio-line:last-of-type {
   border-bottom: none;
 }
 

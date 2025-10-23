@@ -3,6 +3,7 @@ import { useIdleLogout } from './hooks/useIdleLogout';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import useAppStore from './store/useAppStore';
+import { ArabicLanguageService } from './services/ArabicLanguageService';
 import DashboardLayout from './components/layout/DashboardLayout';
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const AccountsTreeLazy = React.lazy(() => import('./pages/MainData/AccountsTree'));
@@ -11,7 +12,7 @@ const TemplateLibraryPage = React.lazy(() => import('./pages/MainData/DocumentTe
 const TemplateEditorPage = React.lazy(() => import('./pages/MainData/DocumentTemplates/TemplateEditor'));
 const TemplateViewerPage = React.lazy(() => import('./pages/MainData/DocumentTemplates/TemplateViewer'));
 const DocumentApprovalsPage = React.lazy(() => import('./pages/Approvals/DocumentApprovals'));
-const ExpensesCategoriesPage = React.lazy(() => import('./pages/MainData/ExpensesCategories'));
+const SubTreePage = React.lazy(() => import('./pages/MainData/SubTree'));
 const WorkItemsPage = React.lazy(() => import('./pages/MainData/WorkItems'));
 const CostCentersPage = React.lazy(() => import('./pages/MainData/CostCenters'));
 const TransactionLineItemsCatalogPage = React.lazy(() => import('./pages/MainData/TransactionLineItems'));
@@ -22,7 +23,9 @@ const ExportTestPage = React.lazy(() => import('./pages/ExportTestPage'));
 const DocumentControlsBarTest = React.lazy(() => import('./features/documents/components/DocumentControlsBarTest'));
 const DocumentControlsBarRTLTest = React.lazy(() => import('./features/documents/components/DocumentControlsBarRTLTest'));
 const TransactionsPage = React.lazy(() => import('./pages/Transactions/Transactions'));
-const TxLineItemsPage = React.lazy(() => import('./pages/Transactions/TransactionLineItems'));
+// GL2 pages removed in unified model
+const TxLineItemsPage = React.lazy(() => import('./pages/Transactions/TransactionLineItems'))
+const TransactionDetailsPage = React.lazy(() => import('./pages/Transactions/TransactionDetails'))
 const GeneralLedgerPage = React.lazy(() => import('./pages/Reports/GeneralLedger'))
 const ProfitLossPage = React.lazy(() => import('./pages/Reports/ProfitLoss'))
 const BalanceSheetPage = React.lazy(() => import('./pages/Reports/BalanceSheet'))
@@ -35,6 +38,11 @@ const DocumentsPage = React.lazy(() => import('./pages/Documents/Documents'))
 const OpeningBalanceImportPage = React.lazy(() => import('./pages/Fiscal/OpeningBalanceImport'))
 const FiscalYearDashboardPage = React.lazy(() => import('./pages/Fiscal/FiscalYearDashboard'))
 const FiscalPeriodManagerPage = React.lazy(() => import('./pages/Fiscal/FiscalPeriodManager'))
+// Enhanced components with Arabic/RTL support
+const EnhancedFiscalHubPage = React.lazy(() => import('./pages/Fiscal/EnhancedFiscalHub'))
+const EnhancedOpeningBalanceImportPage = React.lazy(() => import('./pages/Fiscal/EnhancedOpeningBalanceImport'))
+const EnhancedFiscalYearDashboardPage = React.lazy(() => import('./pages/Fiscal/EnhancedFiscalYearDashboard'))
+const EnhancedFiscalPeriodManagerPage = React.lazy(() => import('./pages/Fiscal/EnhancedFiscalPeriodManager'))
 const ConstructionDashboardPage = React.lazy(() => import('./pages/Fiscal/ConstructionDashboard'))
 const OpeningBalanceApprovalWorkflowPage = React.lazy(() => import('./pages/Fiscal/OpeningBalanceApprovalWorkflow'))
 const ValidationRuleManagerPage = React.lazy(() => import('./pages/Fiscal/ValidationRuleManager'))
@@ -104,10 +112,12 @@ const App: React.FC = () => {
   useIdleLogout();
   const { language } = useAppStore();
 
-  // Ensure document direction is set on mount and language changes
+  // Ensure document direction AND ArabicLanguageService state are set on mount and language changes
   useEffect(() => {
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = language;
+    // Keep the ArabicLanguageService in sync so useArabicLanguage() reflects the UI language
+    ArabicLanguageService.setLanguage(language === 'ar' ? 'ar' : 'en')
   }, [language]);
 
   return (
@@ -152,9 +162,9 @@ const App: React.FC = () => {
           {/* Main Data */}
           <Route path="/main-data/accounts-tree" element={<React.Suspense fallback={<>Loading...</>}><AccountsTreeLazy /></React.Suspense>} />
           <Route path="/main-data/sub-tree" element={
-            <RequirePermission perm="sub_tree.view">
+<RequirePermission perm="sub_tree.view">
               <React.Suspense fallback={<div>Loading...</div>}>
-                <ExpensesCategoriesPage />
+                <SubTreePage />
               </React.Suspense>
             </RequirePermission>
           } />
@@ -242,9 +252,15 @@ const App: React.FC = () => {
               </React.Suspense>
             </RequirePermission>
           } />
-          <Route path="/transactions/all" element={
+<Route path="/transactions/all" element={
             <React.Suspense fallback={<div>Loading...</div>}>
               <TransactionsPage />
+            </React.Suspense>
+          } />
+{/* GL2 routes removed in unified model */}
+          <Route path="/transactions/:id" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <TransactionDetailsPage />
             </React.Suspense>
           } />
           <Route path="/transactions/assign-cost-analysis" element={
@@ -376,6 +392,27 @@ const App: React.FC = () => {
               <FiscalPeriodManagerPage />
             </React.Suspense>
           } />
+          {/* Enhanced Fiscal Management with Arabic/RTL Support */}
+          <Route path="/fiscal/enhanced" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <EnhancedFiscalHubPage />
+            </React.Suspense>
+          } />
+          <Route path="/fiscal/enhanced/opening-balance-import" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <EnhancedOpeningBalanceImportPage />
+            </React.Suspense>
+          } />
+          <Route path="/fiscal/enhanced/dashboard" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Fiscal/EnhancedFiscalYearDashboard.safe')))}
+            </React.Suspense>
+          } />
+          <Route path="/fiscal/enhanced/periods" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <EnhancedFiscalPeriodManagerPage />
+            </React.Suspense>
+          } />
           <Route path="/fiscal/construction" element={
             <React.Suspense fallback={<div>Loading...</div>}>
               <ConstructionDashboardPage />
@@ -412,10 +449,117 @@ const App: React.FC = () => {
             </React.Suspense>
           } />
 
-          {/* Inventory */}
-          <Route path="/inventory/items" element={<PlaceholderPage title="Items Management" />} />
-            <Route path="/inventory/movements" element={<PlaceholderPage title="Stock Movements" />} />
-            <Route path="/inventory/reports" element={<PlaceholderPage title="Stock Reports" />} />
+{/* Inventory */}
+<Route path="/inventory" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/InventoryDashboard')))}
+            </React.Suspense>
+          } />
+<Route path="/inventory/materials" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/Materials')))}
+            </React.Suspense>
+          } />
+<Route path="/inventory/locations" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/Locations')))}
+            </React.Suspense>
+          } />
+<Route path="/inventory/on-hand" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/OnHand')))}
+            </React.Suspense>
+          } />
+<Route path="/inventory/movements" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/Movements')))}
+            </React.Suspense>
+          } />
+<Route path="/inventory/valuation" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/Valuation')))}
+            </React.Suspense>
+          } />
+<Route path="/inventory/ageing" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/Ageing')))}
+            </React.Suspense>
+          } />
+<Route path="/inventory/reconciliation" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/Reconciliation')))}
+            </React.Suspense>
+          } />
+<Route path="/inventory/reconciliation/:sessionId" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/ReconciliationSession')))}
+            </React.Suspense>
+          } />
+<Route path="/inventory/movement-summary" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/MovementSummary')))}
+            </React.Suspense>
+          } />
+<Route path="/inventory/movement-detail" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/MovementDetail')))}
+            </React.Suspense>
+          } />
+<Route path="/inventory/project-movement-summary" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/ProjectMovementSummary')))}
+            </React.Suspense>
+          } />
+<Route path="/inventory/valuation-by-project" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/ValuationByProject')))}
+            </React.Suspense>
+          } />
+<Route path="/inventory/receive" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/Receive')))}
+            </React.Suspense>
+          } />
+<Route path="/inventory/issue" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/Issue')))}
+            </React.Suspense>
+          } />
+<Route path="/inventory/transfer" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/Transfer')))}
+            </React.Suspense>
+          } />
+<Route path="/inventory/adjust" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/Adjust')))}
+            </React.Suspense>
+          } />
+<Route path="/inventory/returns" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/Returns')))}
+            </React.Suspense>
+          } />
+<Route path="/inventory/kpis" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              {React.createElement(React.lazy(() => import('./pages/Inventory/KPIDashboard')))}
+            </React.Suspense>
+          } />
+          <Route path="/inventory/settings" element={
+            <RequirePermission perm="inventory.manage">
+              <React.Suspense fallback={<div>Loading...</div>}>
+                {React.createElement(React.lazy(() => import('./pages/Inventory/InventorySettings')))}
+              </React.Suspense>
+            </RequirePermission>
+          } />
+<Route path="/inventory/documents/:id" element={
+            <RequirePermission perm="inventory.view">
+              <React.Suspense fallback={<div>Loading...</div>}>
+                {React.createElement(React.lazy(() => import('./pages/Inventory/DocumentDetails')))}
+              </React.Suspense>
+            </RequirePermission>
+          } />
+          <Route path="/inventory/reports" element={<PlaceholderPage title="Stock Reports" />} />
             
             {/* Settings */}
             <Route path="/settings/company" element={<Navigate to="/settings/organization-management" replace />} />

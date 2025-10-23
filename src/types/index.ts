@@ -103,11 +103,10 @@ export interface Project {
   name: string;
   name_ar?: string;
   description?: string;
-  organization_id?: string;
+  org_id?: string;
   status: "active" | "inactive" | "completed";
   start_date?: string;
   end_date?: string;
-  budget?: number;
   budget_amount?: number;
   created_at: string;
   updated_at: string;

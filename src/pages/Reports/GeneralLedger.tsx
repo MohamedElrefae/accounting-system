@@ -118,6 +118,9 @@ const GeneralLedger: React.FC = () => {
   const [accountOptions, setAccountOptions] = useState<LookupOption[]>([])
   const [classificationOptions, setClassificationOptions] = useState<LookupOption[]>([])
   
+  // Initialize useGlobalProjectGL BEFORE any effects that reference it
+  const [useGlobalProjectGL, setUseGlobalProjectGL] = useState<boolean>(() => { try { return localStorage.getItem('gl:useGlobalProject') === '1' } catch { return false } })
+
   useEffect(() => {
     if (!useGlobalProjectGL) return
     try { setProjectId(getActiveProjectId() || '') } catch {}
@@ -129,7 +132,6 @@ const GeneralLedger: React.FC = () => {
   const [densityMode, setDensityMode] = useState<DensityMode>('normal')
   // Numbers-only (hide currency symbol) setting for exports
   const [numbersOnly, setNumbersOnly] = useState<boolean>(true)
-  const [useGlobalProjectGL, setUseGlobalProjectGL] = useState<boolean>(() => { try { return localStorage.getItem('gl:useGlobalProject') === '1' } catch { return true } })
   const debouncedSearch = useDebounced(searchTerm, 300)
   const searchInputRef = useRef<HTMLInputElement>(null)
   // Jump to account code (overview)

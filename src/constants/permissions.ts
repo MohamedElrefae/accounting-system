@@ -421,6 +421,20 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         description: 'Transfer inventory between locations',
         descriptionAr: 'نقل المخزون بين المواقع',
         category: 'inventory'
+      },
+      {
+        name: 'inventory.approve',
+        nameAr: 'اعتماد المخزون',
+        description: 'Approve inventory documents (receipt/issue/transfer/adjust/return)',
+        descriptionAr: 'اعتماد مستندات المخزون (توريد/صرف/نقل/تسوية/مرتجع)',
+        category: 'inventory'
+      },
+      {
+        name: 'inventory.post',
+        nameAr: 'ترحيل المخزون',
+        description: 'Post approved inventory documents to GL',
+        descriptionAr: 'ترحيل مستندات المخزون المعتمدة إلى دفتر الأستاذ',
+        category: 'inventory'
       }
     ]
   },
@@ -577,6 +591,8 @@ export const PERMISSIONS = {
   INVENTORY_MANAGE: 'inventory.manage',
   INVENTORY_ADJUST: 'inventory.adjust',
   INVENTORY_TRANSFER: 'inventory.transfer',
+  INVENTORY_APPROVE: 'inventory.approve',
+  INVENTORY_POST: 'inventory.post',
   
   // Settings
   SETTINGS_VIEW: 'settings.view',

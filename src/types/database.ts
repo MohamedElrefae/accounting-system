@@ -196,7 +196,6 @@ export interface Journal extends BaseEntity {
 export interface OrgMembership {
   org_id: DatabaseId;
   user_id: DatabaseId;
-  role: 'viewer' | 'manager' | 'admin';
   created_at?: Timestamp;
 }
 
