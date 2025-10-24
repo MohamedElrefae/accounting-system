@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { getAccounts, getTransactionAudit, getCurrentUserId, getProjects, getUserDisplayMap, type Account, type TransactionRecord, type Project } from '../../services/transactions'
 import { listWorkItemsAll } from '../../services/work-items'
 import type { WorkItemRow } from '../../types/work-items'
+import { listAnalysisWorkItems } from '../../services/analysis-work-items'
 import { getOrganizations } from '../../services/organization'
 import { getActiveProjectId } from '../../utils/org'
 import { getAllTransactionClassifications, type TransactionClassification } from '../../services/transaction-classification'
@@ -46,6 +47,7 @@ const TransactionsEnrichedPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [userNames, setUserNames] = useState<Record<string, string>>({})
+  const [analysisItemsMap, setAnalysisItemsMap] = useState<Record<string, { code: string; name: string }>>({})
 
   const [filters, setFilters] = useState<FilterState>({ dateFrom: '', dateTo: '', amountFrom: '', amountTo: '' })
   const [debitFilterId, setDebitFilterId] = useState<string>('')
@@ -156,6 +158,17 @@ const TransactionsEnrichedPage: React.FC = () => {
       } else setWorkItems([])
     } catch {}
 
+    // Analysis Work Items map for labels
+    try {
+      const orgIds = Array.from(new Set((rows || []).map(r => r.org_id).filter(Boolean))) as string[]
+      const merged: Record<string, { code: string; name: string }> = {}
+      for (const orgId of orgIds) {
+        const list = await listAnalysisWorkItems({ orgId, projectId: projectFilterId || null, onlyWithTx: false, includeInactive: true }).catch(() => [])
+        for (const a of list as any[]) merged[a.id] = { code: a.code, name: a.name }
+      }
+      setAnalysisItemsMap(merged)
+    } catch {}
+
     // resolve creator/poster names
     const ids: string[] = []
     rows.forEach(t => { if (t.created_by) ids.push(t.created_by); if (t.posted_by) ids.push(t.posted_by!) })
@@ -168,18 +181,17 @@ const TransactionsEnrichedPage: React.FC = () => {
     { key: 'entry_number', label: 'رقم القيد', visible: true, width: 120, minWidth: 100, maxWidth: 200, type: 'text', resizable: true },
     { key: 'entry_date', label: 'التاريخ', visible: true, width: 130, minWidth: 120, maxWidth: 180, type: 'date', resizable: true },
     { key: 'description', label: 'البيان', visible: true, width: 250, minWidth: 200, maxWidth: 400, type: 'text', resizable: true },
-    { key: 'debit_account_id', label: 'الحساب المدين', visible: true, width: 200, minWidth: 150, maxWidth: 300, type: 'text', resizable: true },
-    { key: 'credit_account_id', label: 'الحساب الدائن', visible: true, width: 200, minWidth: 150, maxWidth: 300, type: 'text', resizable: true },
+    { key: 'debit_account_label', label: 'الحساب المدين', visible: true, width: 220, minWidth: 160, maxWidth: 320, type: 'text', resizable: true },
+    { key: 'credit_account_label', label: 'الحساب الدائن', visible: true, width: 220, minWidth: 160, maxWidth: 320, type: 'text', resizable: true },
     { key: 'amount', label: 'المبلغ', visible: true, width: 140, minWidth: 120, maxWidth: 200, type: 'currency', resizable: true },
-    { key: 'classification_id', label: 'التصنيف', visible: true, width: 160, minWidth: 120, maxWidth: 220, type: 'text', resizable: true },
-    { key: 'sub_tree_id', label: 'الشجرة الفرعية', visible: true, width: 200, minWidth: 140, maxWidth: 280, type: 'text', resizable: true },
-    { key: 'work_item_id', label: 'عنصر العمل', visible: true, width: 200, minWidth: 140, maxWidth: 280, type: 'text', resizable: true },
-    { key: 'analysis_work_item_id', label: 'بند التحليل', visible: true, width: 200, minWidth: 140, maxWidth: 280, type: 'text', resizable: true },
-    { key: 'organization_name', label: 'المؤسسة', visible: true, width: 180, minWidth: 150, maxWidth: 250, type: 'text', resizable: true },
-    { key: 'project_name', label: 'المشروع', visible: true, width: 180, minWidth: 150, maxWidth: 250, type: 'text', resizable: true },
-    { key: 'cost_center_id', label: 'مركز التكلفة', visible: true, width: 180, minWidth: 150, maxWidth: 250, type: 'text', resizable: true },
+    { key: 'classification_label', label: 'التصنيف', visible: true, width: 200, minWidth: 140, maxWidth: 280, type: 'text', resizable: true },
+    { key: 'sub_tree_label', label: 'الشجرة الفرعية', visible: true, width: 220, minWidth: 160, maxWidth: 320, type: 'text', resizable: true },
+    { key: 'work_item_label', label: 'عنصر العمل', visible: true, width: 220, minWidth: 160, maxWidth: 320, type: 'text', resizable: true },
+    { key: 'analysis_work_item_label', label: 'بند التحليل', visible: true, width: 220, minWidth: 160, maxWidth: 320, type: 'text', resizable: true },
+    { key: 'organization_label', label: 'المؤسسة', visible: true, width: 200, minWidth: 160, maxWidth: 300, type: 'text', resizable: true },
+    { key: 'project_label', label: 'المشروع', visible: true, width: 200, minWidth: 160, maxWidth: 300, type: 'text', resizable: true },
+    { key: 'cost_center_label', label: 'مركز التكلفة', visible: true, width: 200, minWidth: 160, maxWidth: 300, type: 'text', resizable: true },
     { key: 'approval_status', label: 'حالة الاعتماد', visible: true, width: 140, minWidth: 120, maxWidth: 200, type: 'badge', resizable: false },
-    { key: 'actions', label: 'الإجراءات', visible: true, width: 220, minWidth: 180, maxWidth: 400, type: 'actions', resizable: true },
   ], [])
 
   const { columns, handleColumnResize, handleColumnConfigChange } = useColumnPreferences({
@@ -219,6 +231,8 @@ const TransactionsEnrichedPage: React.FC = () => {
   const tableData = useMemo(() => {
     const catMap: Record<string, string> = {}
     for (const c of categories) { catMap[c.id] = `${c.code} - ${c.description}` }
+    const classMap: Record<string, string> = {}
+    for (const c of classifications) { classMap[c.id] = `${c.code} - ${c.name}` }
     return paged.map((t: any) => ({
       entry_number: t.entry_number,
       entry_date: t.entry_date,
@@ -228,20 +242,19 @@ const TransactionsEnrichedPage: React.FC = () => {
       amount: t.amount,
       sub_tree_label: t.sub_tree_id ? (catMap[t.sub_tree_id] || '—') : '—',
       work_item_label: (() => { const wi = workItems.find(w => w.id === (t.work_item_id || '')); return wi ? `${wi.code} - ${wi.name}` : '—' })(),
-      analysis_work_item_label: '—',
-      classification_name: '—',
-      organization_name: organizations.find(o => o.id === (t.org_id || ''))?.name || '—',
-      project_name: projects.find(p => p.id === (t.project_id || ''))?.name || '—',
-      cost_center_label: '—',
+      analysis_work_item_label: (() => { const id = t.analysis_work_item_id || ''; const a = id ? analysisItemsMap[id] : undefined; return a ? `${a.code} - ${a.name}` : '—' })(),
+      classification_label: t.classification_code ? `${t.classification_code} - ${t.classification_name || ''}` : (classMap[t.classification_id || ''] || '—'),
+      organization_label: (() => { const o = organizations.find(o => o.id === (t.org_id || '')); return o ? `${o.code} - ${o.name}` : '—' })(),
+      project_label: (() => { const p = projects.find(p => p.id === (t.project_id || '')); return p ? `${p.code} - ${p.name}` : (t.project_code ? `${t.project_code} - ${t.project_name || ''}` : '—') })(),
+      cost_center_label: t.cost_center_code && t.cost_center_name ? `${t.cost_center_code} - ${t.cost_center_name}` : '—',
       reference_number: t.reference_number || '—',
       notes: t.notes || '—',
       created_by_name: t.created_by ? (userNames[t.created_by] || t.created_by.substring(0, 8)) : '—',
       posted_by_name: t.posted_by ? (userNames[t.posted_by] || t.posted_by.substring(0, 8)) : '—',
       approval_status: t.is_posted ? 'posted' : (t.approval_status || 'draft'),
-      actions: null,
       original: t,
     }))
-  }, [paged, accounts, userNames, categories, workItems, organizations, projects])
+  }, [paged, accounts, userNames, categories, workItems, analysisItemsMap, organizations, projects, classifications])
 
   if (loading) return <div className="loading-container"><div className="loading-spinner" />جاري التحميل...</div>
   if (error) return <div className="error-container">خطأ: {error}</div>
