@@ -95,11 +95,32 @@ BEGIN
 
   RETURN QUERY
   SELECT 
-    t.id, t.entry_number, t.entry_date, t.description, t.reference_number,
-    t.debit_account_id, t.credit_account_id, t.amount, t.notes,
-    t.classification_id, t.sub_tree_id, t.work_item_id, t.analysis_work_item_id, t.cost_center_id,
-    t.project_id, t.org_id, t.is_posted, t.approval_status, t.created_by, t.posted_by,
-    t.created_at, t.updated_at,
+    t.id,
+    t.entry_number,
+    t.entry_date,
+    t.description,
+    t.reference_number,
+    NULL::uuid AS debit_account_id,
+    NULL::uuid AS credit_account_id,
+    (
+      SELECT GREATEST(COALESCE(SUM(tl.debit_amount),0), COALESCE(SUM(tl.credit_amount),0))
+      FROM public.transaction_lines tl
+      WHERE tl.transaction_id = t.id
+    ) AS amount,
+    t.notes,
+    NULL::uuid AS classification_id,
+    NULL::uuid AS sub_tree_id,
+    NULL::uuid AS work_item_id,
+    NULL::uuid AS analysis_work_item_id,
+    NULL::uuid AS cost_center_id,
+    t.project_id,
+    t.org_id,
+    t.is_posted,
+    t.approval_status,
+    t.created_by,
+    t.posted_by,
+    t.created_at,
+    t.updated_at,
     v_total
   FROM public.transactions t
   JOIN page_ids p ON p.id = t.id
