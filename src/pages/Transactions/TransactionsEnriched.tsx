@@ -159,15 +159,6 @@ const TransactionsEnrichedPage: React.FC = () => {
     try { setUserNames(await getUserDisplayMap(ids)) } catch {}
   }
 
-  useEffect(() => {
-    (async () => {
-      if (!selectedTransactionId) { setTransactionLines([]); setSelectedLineId(null); return }
-      try {
-        const lines = await getEnrichedLinesByTransactionId(selectedTransactionId)
-        setTransactionLines(lines)
-      } catch { setTransactionLines([]) }
-    })()
-  }, [selectedTransactionId])
 
   // Column configs (use separate storage keys for enriched page)
   const defaultColumns: ColumnConfig[] = useMemo(() => [
