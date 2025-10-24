@@ -28,16 +28,18 @@ export function isColumnPreferencesRpcDisabled(): boolean {
 }
 
 export async function getUserColumnPreferences(tableKey: string): Promise<UserColumnPreferencesRow | null> {
-  if (COLUMN_PREFS_RPC_DISABLED) return null
-  const { data, error } = await supabase.rpc('get_user_column_preferences', { p_table_key: tableKey })
-  if (error) {
-    if (shouldDisableRpc(error)) {
-      COLUMN_PREFS_RPC_DISABLED = true
-    }
-    // Treat as no preferences
-    return null
+  if (!COLUMN_PREFS_RPC_DISABLED) {
+    const { data, error } = await supabase.rpc('get_user_column_preferences', { p_table_key: tableKey })
+    if (!error) return (data as UserColumnPreferencesRow) ?? null
+    if (shouldDisableRpc(error)) COLUMN_PREFS_RPC_DISABLED = true
   }
-  return (data as UserColumnPreferencesRow) ?? null
+  // Fallback: direct table read (uses RLS)
+  const { data: row } = await supabase
+    .from('user_column_preferences')
+    .select('*')
+    .eq('table_key', tableKey)
+    .maybeSingle()
+  return (row as UserColumnPreferencesRow) ?? null
 }
 
 export async function upsertUserColumnPreferences(params: {
@@ -45,18 +47,21 @@ export async function upsertUserColumnPreferences(params: {
   columnConfig: any
   version?: number
 }): Promise<UserColumnPreferencesRow | null> {
-  if (COLUMN_PREFS_RPC_DISABLED) return null
   const { tableKey, columnConfig, version = 1 } = params
-  const { data, error } = await supabase.rpc('upsert_user_column_preferences', {
-    p_table_key: tableKey,
-    p_column_config: columnConfig,
-    p_version: version,
-  })
-  if (error) {
-    if (shouldDisableRpc(error)) {
-      COLUMN_PREFS_RPC_DISABLED = true
-    }
-    return null
+  if (!COLUMN_PREFS_RPC_DISABLED) {
+    const { data, error } = await supabase.rpc('upsert_user_column_preferences', {
+      p_table_key: tableKey,
+      p_column_config: columnConfig,
+      p_version: version,
+    })
+    if (!error) return (data as UserColumnPreferencesRow) ?? null
+    if (shouldDisableRpc(error)) COLUMN_PREFS_RPC_DISABLED = true
   }
-  return (data as UserColumnPreferencesRow) ?? null
+  // Fallback: table upsert (RLS should set user_id to current user via trigger/policy or rely on unique per user)
+  const { data: up } = await supabase
+    .from('user_column_preferences')
+    .upsert({ table_key: tableKey, column_config: columnConfig, version }, { onConflict: 'user_id,table_key' })
+    .select('*')
+    .maybeSingle()
+  return (up as UserColumnPreferencesRow) ?? null
 }

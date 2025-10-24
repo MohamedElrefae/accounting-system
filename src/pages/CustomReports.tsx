@@ -10,7 +10,6 @@ import {
   Stepper,
   Step,
   StepLabel,
-  Grid,
   Paper,
   Divider,
   Tabs,
@@ -25,6 +24,7 @@ import {
   Checkbox,
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
+import Grid from '@mui/material/Unstable_Grid2';
 import PlayIcon from '@mui/icons-material/PlayArrow';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -633,12 +633,14 @@ const CustomReports: React.FC = () => {
         </TabPanel>
 
         <TabPanel value={activeTab} index={1}>
-          <ReportResults
+<ReportResults
             data={builderState.lastExecutionResult}
             loading={builderState.isExecuting}
             error={builderState.error}
             onExport={canExport ? handleExportReport : undefined}
             onSave={canCreate ? () => setSaveDialogOpen(true) : undefined}
+            dataset={builderState.selectedDataset}
+            tableKey={builderState.selectedDataset ? `reports/custom/${builderState.selectedDataset.key || builderState.selectedDataset.id}` : undefined}
           />
         </TabPanel>
       </Paper>

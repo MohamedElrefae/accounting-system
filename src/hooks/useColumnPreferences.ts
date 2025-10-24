@@ -156,7 +156,6 @@ export const useColumnPreferences = ({
         if (res && res.column_config && Array.isArray(res.column_config.columns)) {
           const merged = mergeWithDefaults(res.column_config.columns as ColumnConfig[], defaultColumns)
           setColumns(merged)
-          savePreferences(merged)
         }
       } catch {
         // Silent: fall back to local

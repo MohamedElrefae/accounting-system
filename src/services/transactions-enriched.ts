@@ -1,0 +1,56 @@
+import { supabase } from '../utils/supabase'
+import { getCurrentUserId, type TransactionRecord, type PagedResult, type ListTransactionsFilters, type ListTransactionsOptions } from './transactions'
+
+export interface EnrichedHeaderListOptions extends ListTransactionsOptions {}
+
+// Calls SQL RPC list_transactions_enriched_headers to get DISTINCT transaction headers
+export async function getTransactionsEnrichedHeaders(options?: EnrichedHeaderListOptions): Promise<PagedResult<TransactionRecord>> {
+  const scope = options?.filters?.scope ?? 'all'
+  const pendingOnly = options?.filters?.pendingOnly ?? false
+  const page = options?.page ?? 1
+  const pageSize = options?.pageSize ?? 20
+
+  const f: ListTransactionsFilters | undefined = options?.filters
+  const createdBy = scope === 'my' ? (await getCurrentUserId()) : null
+
+  const { data, error } = await supabase.rpc('list_transactions_enriched_headers', {
+    p_scope: scope,
+    p_pending_only: pendingOnly,
+    p_search: f?.search || null,
+    p_date_from: f?.dateFrom || null,
+    p_date_to: f?.dateTo || null,
+    p_amount_from: f?.amountFrom ?? null,
+    p_amount_to: f?.amountTo ?? null,
+    p_debit_account_id: f?.debitAccountId || null,
+    p_credit_account_id: f?.creditAccountId || null,
+    p_project_id: f?.projectId || null,
+    p_org_id: f?.orgId || null,
+    p_classification_id: f?.classificationId || null,
+    p_sub_tree_id: f?.expensesCategoryId || null,
+    p_work_item_id: f?.workItemId || null,
+    p_analysis_work_item_id: f?.analysisWorkItemId || null,
+    p_cost_center_id: f?.costCenterId || null,
+    p_approval_status: f?.approvalStatus || null,
+    p_created_by: createdBy || null,
+    p_page: page,
+    p_page_size: pageSize,
+  } as any)
+
+  if (error) throw error
+  const rows = (data || []) as unknown as (TransactionRecord & { total_count?: number })[]
+  const total = rows.length > 0 && typeof rows[0].total_count === 'number' ? Number(rows[0].total_count) : 0
+  // Strip helper column if present
+  const cleaned = rows.map(({ total_count, ...rest }) => rest as TransactionRecord)
+  return { rows: cleaned, total }
+}
+
+// Fetch transaction lines from the enriched view for a given transaction id
+export async function getEnrichedLinesByTransactionId(transactionId: string): Promise<any[]> {
+  const { data, error } = await supabase
+    .from('transactions_enriched_v2')
+    .select('*')
+    .eq('id', transactionId)
+    .order('line_no', { ascending: true })
+  if (error) throw error
+  return Array.isArray(data) ? data : []
+}

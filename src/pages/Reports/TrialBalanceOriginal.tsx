@@ -157,7 +157,7 @@ export default function TrialBalanceOriginal() {
       // Use GL Summary function directly for guaranteed consistency with all financial reports
       // This ensures 100% consistency with Trial Balance All Levels, Balance Sheet, P&L, etc.
       
-      const { data: glSummaryData, error: glError } = await supabase.rpc('get_gl_account_summary', {
+const { data: glSummaryData, error: glError } = await supabase.rpc('get_gl_account_summary_filtered', {
         p_date_from: dateFrom,
         p_date_to: dateTo,
         p_org_id: orgId || null,
@@ -166,13 +166,9 @@ export default function TrialBalanceOriginal() {
         p_limit: null,
         p_offset: null,
         p_classification_id: null,
-        p_cost_center_id: null,
-        p_work_item_id: null,
+        p_analysis_work_item_id: null,
         p_expenses_category_id: null,
-        p_debit_account_id: null,
-        p_credit_account_id: null,
-        p_amount_min: null,
-        p_amount_max: null
+        p_sub_tree_id: null
       })
       
       if (glError) throw glError

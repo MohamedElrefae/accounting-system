@@ -22,6 +22,27 @@ export type {
 };
 
 // Helper functions for mock data
+function normalizeDatasetRow(row: any): ReportDataset {
+  const fieldsArray: any[] = Array.isArray(row.fields) ? row.fields : [];
+  const allowed = Array.isArray(row.allowed_fields) && row.allowed_fields.length > 0
+    ? row.allowed_fields
+    : fieldsArray.map((x) => x.key ?? x.name).filter(Boolean);
+  const tableName = row.table_name || row.base_view || 'unknown_view';
+  return {
+    id: row.id ?? row.key, // fall back to key when id column is not present
+    key: row.key ?? row.id,
+    name: row.name,
+    description: row.description ?? undefined,
+    table_name: tableName,
+    base_view: row.base_view ?? null,
+    fields: row.fields ?? undefined,
+    is_active: row.is_active ?? true,
+    allowed_fields: allowed,
+    required_permissions: row.required_permissions ?? [],
+    created_at: row.created_at ?? new Date().toISOString(),
+    updated_at: row.updated_at ?? new Date().toISOString(),
+  } as ReportDataset;
+}
 function getMockReportDatasets(): ReportDataset[] {
   return SAMPLE_DATASETS.map((dataset, index) => ({
     id: `mock_${index + 1}`,
@@ -60,10 +81,9 @@ function getMockReportFields(datasetId: string): ReportField[] {
 export async function getReportDatasets(): Promise<ReportDataset[]> {
   try {
     const { data, error } = await supabase
-      .from('report_datasets')
-      .select('*')
-      .eq('is_active', true)
-      .order('name', { ascending: true });
+.from('report_datasets')
+          .select('*')
+          .order('name', { ascending: true });
 
     if (error) {
       console.error('Database error fetching report datasets:', error);
@@ -81,7 +101,6 @@ export async function getReportDatasets(): Promise<ReportDataset[]> {
         const { data: newData, error: newError } = await supabase
           .from('report_datasets')
           .select('*')
-          .eq('is_active', true)
           .order('name', { ascending: true });
         
         if (newError || !newData || newData.length === 0) {
@@ -90,7 +109,8 @@ export async function getReportDatasets(): Promise<ReportDataset[]> {
         }
         
         console.log(`✅ Successfully populated and loaded ${newData.length} datasets from database`);
-        return (newData as ReportDataset[]) || [];
+        // Normalize shape for UI (map base_view/fields to expected props)
+        return (newData as any[]).map((row) => normalizeDatasetRow(row));
       } catch (populateError) {
         console.error('Error populating sample datasets:', populateError);
         return getMockReportDatasets();
@@ -98,7 +118,7 @@ export async function getReportDatasets(): Promise<ReportDataset[]> {
     }
 
     console.log(`✅ Loaded ${data.length} datasets from database`);
-    return (data as ReportDataset[]) || [];
+    return (data as any[]).map((row) => normalizeDatasetRow(row));
   } catch (error) {
     console.error('Critical error accessing database:', error);
     console.warn('Falling back to mock data');
@@ -109,59 +129,80 @@ export async function getReportDatasets(): Promise<ReportDataset[]> {
 /**
  * Get a specific report dataset by ID
  */
-export async function getReportDataset(id: string): Promise<ReportDataset | null> {
-  const { data, error } = await supabase
+export async function getReportDataset(idOrKey: string): Promise<ReportDataset | null> {
+  // Prefer lookup by key first (most deployments only have `key` column)
+  let res = await supabase
     .from('report_datasets')
     .select('*')
-    .eq('id', id)
-    .eq('is_active', true)
-    .single();
+    .eq('key', idOrKey)
+    .maybeSingle();
+  if (!res.error && res.data) return res.data as ReportDataset;
 
-  if (error) {
-    if (error.code === 'PGRST116') return null; // Not found
-    console.error('Error fetching report dataset:', error);
-    throw error;
+  // Fallback to id if present
+  res = await supabase
+    .from('report_datasets')
+    .select('*')
+    .eq('id', idOrKey)
+    .maybeSingle();
+  if (!res.error && res.data) return res.data as ReportDataset;
+  if (res.error && res.error.code !== 'PGRST116') {
+    console.warn('getReportDataset fallback error:', res.error);
   }
-
-  return data as ReportDataset;
+  return null;
 }
 
 /**
  * Get available fields for a dataset using the RPC function
  */
 export async function getDatasetFields(datasetId: string): Promise<ReportField[]> {
+  const dsId = datasetId ?? '';
   // If it's a mock dataset ID, return mock fields
-  if (datasetId.startsWith('mock_')) {
-    return getMockReportFields(datasetId);
+  if (dsId && dsId.startsWith('mock_')) {
+    return getMockReportFields(dsId);
   }
 
+  // Preferred: read fields JSON from report_datasets (no RPC dependency)
+  try {
+    const { data } = await supabase
+      .from('report_datasets')
+      .select('fields')
+      .eq('key', dsId)
+      .maybeSingle();
+    const f = (data as any)?.fields as Array<any> | null | undefined;
+    if (Array.isArray(f)) {
+      return f.map((x) => ({
+        name: x.key ?? x.name,
+        label: x.label ?? (x.key ?? x.name),
+        type: (x.type ?? 'text') as any,
+        filterable: true,
+        sortable: true,
+        groupable: true,
+      }));
+    }
+  } catch {/* ignore */}
+
+  // Fallback: RPC if available
   try {
     const { data, error } = await supabase.rpc('get_dataset_fields', {
-      p_dataset_id: datasetId
+      p_dataset_id: dsId
     });
+    if (!error && data) return (data as ReportField[]) || [];
+  } catch {/* ignore */}
 
-    if (error) {
-      console.warn('Error fetching dataset fields, using mock data:', error);
-      // Try to get mock fields if available
-      return getMockReportFields(datasetId);
-    }
-
-    return (data as ReportField[]) || [];
-  } catch (error) {
-    console.warn('Error accessing dataset fields, using mock data:', error);
-    return getMockReportFields(datasetId);
-  }
+  // Last resort: empty (UI prevents next steps) or mock if you prefer
+  return [];
 }
 
 /**
  * Execute a custom report using the secure RPC function
  */
 export async function runCustomReport(params: RunReportParams): Promise<ReportResult> {
+  const datasetId = params.dataset_id ?? '';
   // If it's a mock dataset ID, return mock data
-  if (params.dataset_id.startsWith('mock_')) {
+  if (datasetId && datasetId.startsWith('mock_')) {
     return {
       columns: params.selected_fields.map(field => {
-        const mockFields = getMockReportFields(params.dataset_id);
+        const mockFields = getMockReportFields(datasetId);
         const fieldInfo = mockFields.find(f => f.name === field);
         return {
           field,
@@ -174,39 +215,110 @@ export async function runCustomReport(params: RunReportParams): Promise<ReportRe
       execution_time_ms: Math.floor(Math.random() * 100) + 50
     };
   }
+  if (!datasetId) {
+    throw new Error('dataset_id is required');
+  }
 
-  try {
-    const { data, error } = await supabase.rpc('run_custom_report', {
-      p_dataset_id: params.dataset_id,
-      p_selected_fields: params.selected_fields,
-      p_filters: params.filters,
-      p_sorts: params.sorts,
-      p_group_by: params.group_by,
-      p_limit: params.limit || 1000
-    });
+  // Query the dataset base view directly (avoid RPC dependency)
+  const dataset = await getReportDataset(params.dataset_id);
+  if (!dataset) throw new Error('Dataset not found');
+  const viewRaw = dataset.base_view || dataset.table_name;
+  const view = (viewRaw || '').replace(/^public\./, '');
+  // Filter requested fields to those defined in dataset.fields (if provided)
+  const dsFieldsMeta = Array.isArray((dataset as any).fields) ? (dataset as any).fields as any[] : [];
+  const allowedKeys = dsFieldsMeta.map((x) => (x.key ?? x.name)).filter(Boolean) as string[];
+  let fields = (params.selected_fields && params.selected_fields.length > 0)
+    ? params.selected_fields.slice()
+    : (dataset.allowed_fields && dataset.allowed_fields.length > 0 ? dataset.allowed_fields.slice() : []);
+  if (allowedKeys.length) {
+    fields = fields.filter((f) => allowedKeys.includes(f));
+    if (fields.length === 0) fields = allowedKeys.slice(0, Math.min(allowedKeys.length, 15));
+  }
+  if (fields.length === 0) fields = ['*'];
 
-    if (error) {
-      console.warn('Error running custom report, using mock data:', error);
-      // Return mock data
-      return {
-        columns: params.selected_fields.map(field => ({ field, label: field, type: 'text' })),
-        data: generateMockReportData(params.selected_fields, params.limit || 20).data,
-        total_count: params.limit || 20,
-        execution_time_ms: Math.floor(Math.random() * 100) + 50
-      };
-    }
+  const selectStr = fields.includes('*') ? '*' : fields.join(',');
+  let q = supabase.from(view).select(selectStr, { count: 'exact' });
 
-    return data as ReportResult;
-  } catch (error) {
-    console.warn('Error running custom report, using mock data:', error);
-    // Return mock data
+  // Apply filters
+  for (const f of params.filters || []) {
+    const op = f.operator;
+    const name = f.field;
+    const val = f.value;
+    if (op === 'eq') q = q.eq(name, val);
+    else if (op === 'neq') q = q.neq(name, val);
+    else if (op === 'gt') q = q.gt(name, val);
+    else if (op === 'gte') q = q.gte(name, val);
+    else if (op === 'lt') q = q.lt(name, val);
+    else if (op === 'lte') q = q.lte(name, val);
+    else if (op === 'like') q = q.like(name, val);
+    else if (op === 'ilike') q = q.ilike(name, val);
+    else if (op === 'in') q = q.in(name, Array.isArray(val) ? val : String(val).split(','));
+    else if (op === 'not_in') q = q.not(name, 'in', Array.isArray(val) ? val : String(val).split(','));
+    else if (op === 'is_null') q = q.is(name, null);
+    else if (op === 'not_null') q = q.not(name, 'is', null);
+  }
+
+  // Sorts
+  for (const s of params.sorts || []) {
+    q = q.order(s.field, { ascending: s.direction === 'asc' });
+  }
+
+  // Limit
+  if (params.limit && params.limit > 0) q = q.limit(params.limit);
+
+  const t0 = performance.now();
+  const { data, error, count } = await q;
+  const t1 = performance.now();
+  if (error) {
+    // If columns are invalid, retry with select '*'
+    try {
+      if (selectStr !== '*') {
+        const tRetry0 = performance.now();
+        const retry = await supabase.from(view).select('*', { count: 'exact' }).limit(params.limit || 20);
+        const tRetry1 = performance.now();
+        if (!retry.error) {
+          const retryData = retry.data as any[];
+          const retryCount = typeof retry.count === 'number' ? retry.count : (retryData?.length || 0);
+          // Derive columns from data keys
+          const inferredFields = Array.isArray(retryData) && retryData.length > 0 ? Object.keys(retryData[0] as Record<string, any>) : [];
+          const inferredColumns = inferredFields.map((f) => ({ field: f, label: f, type: 'text' as string }));
+          return {
+            columns: inferredColumns,
+            data: retryData || [],
+            total_count: retryCount,
+            execution_time_ms: Math.max(1, Math.round((tRetry1 - tRetry0) + (t1 - t0))),
+          };
+        }
+      }
+    } catch {/* ignore */}
+    console.warn('Direct view query failed, returning mock data:', error);
     return {
-      columns: params.selected_fields.map(field => ({ field, label: field, type: 'text' })),
-      data: generateMockReportData(params.selected_fields, params.limit || 20).data,
+      columns: (fields.includes('*') ? [] : fields).map((field) => ({ field, label: field, type: 'text' })),
+      data: generateMockReportData(fields.includes('*') ? ['col1','col2'] : fields, params.limit || 20).data,
       total_count: params.limit || 20,
-      execution_time_ms: Math.floor(Math.random() * 100) + 50
+      execution_time_ms: Math.max(1, Math.round(t1 - t0)),
     };
   }
+
+  // Build columns from dataset.fields if present; if selecting '*', infer from data keys
+  const dsFields = (dataset as any)?.fields as Array<any> | undefined;
+  const fieldListForColumns: string[] = fields.includes('*')
+    ? (Array.isArray(data) && data.length > 0 ? Object.keys(data[0] as Record<string, any>) : [])
+    : fields;
+  let columns = fieldListForColumns.map((f) => ({ field: f, label: f, type: 'text' as string }));
+  if (Array.isArray(dsFields)) {
+    columns = fieldListForColumns.map((f) => {
+      const meta = dsFields.find((x) => (x.key ?? x.name) === f);
+      return { field: f, label: meta?.label || f, type: meta?.type || 'text' };
+    });
+  }
+
+  return {
+    columns,
+    data: (data as any[]) || [],
+    total_count: typeof count === 'number' ? count : ((data as any[])?.length || 0),
+    execution_time_ms: Math.max(1, Math.round(t1 - t0)),
+  };
 }
 
 /**

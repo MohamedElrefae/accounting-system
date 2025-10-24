@@ -23,6 +23,7 @@ const ExportTestPage = React.lazy(() => import('./pages/ExportTestPage'));
 const DocumentControlsBarTest = React.lazy(() => import('./features/documents/components/DocumentControlsBarTest'));
 const DocumentControlsBarRTLTest = React.lazy(() => import('./features/documents/components/DocumentControlsBarRTLTest'));
 const TransactionsPage = React.lazy(() => import('./pages/Transactions/Transactions'));
+const TransactionsEnrichedPage = React.lazy(() => import('./pages/Transactions/TransactionsEnriched'));
 // GL2 pages removed in unified model
 const TxLineItemsPage = React.lazy(() => import('./pages/Transactions/TransactionLineItems'))
 const TransactionDetailsPage = React.lazy(() => import('./pages/Transactions/TransactionDetails'))
@@ -252,9 +253,14 @@ const App: React.FC = () => {
               </React.Suspense>
             </RequirePermission>
           } />
-<Route path="/transactions/all" element={
+          <Route path="/transactions/all" element={
             <React.Suspense fallback={<div>Loading...</div>}>
               <TransactionsPage />
+            </React.Suspense>
+          } />
+          <Route path="/transactions/my-enriched" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <TransactionsEnrichedPage />
             </React.Suspense>
           } />
 {/* GL2 routes removed in unified model */}

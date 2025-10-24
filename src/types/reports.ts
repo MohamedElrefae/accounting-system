@@ -1,9 +1,17 @@
 export interface ReportDataset {
   id: string;
+  // Optional stable key from DB (report_datasets.key)
+  key?: string;
   name: string;
   description?: string;
+  // For legacy/mocked datasets we used table_name. For DB-backed datasets we may have base_view instead.
   table_name: string;
+  // DB-backed datasets may store JSON field descriptors in `fields`
   allowed_fields: string[];
+  // Extra optional DB columns (not always present in mock data)
+  base_view?: string | null;
+  fields?: any;
+  is_active?: boolean;
   required_permissions?: string[];
   created_at: string;
   updated_at: string;
@@ -140,6 +148,9 @@ export interface ReportResultsProps {
   error?: string | null;
   onExport?: (format: 'csv' | 'xlsx' | 'pdf') => void;
   onSave?: () => void;
+  // Optional dataset info to enable per-user column preferences
+  dataset?: ReportDataset | null;
+  tableKey?: string;
 }
 
 // Service interfaces
