@@ -49,7 +49,7 @@ export async function getEnrichedLinesByTransactionId(transactionId: string): Pr
   const { data, error } = await supabase
     .from('transactions_enriched_v2')
     .select('*')
-    .eq('id', transactionId)
+    .eq('transaction_id', transactionId)
     .order('line_no', { ascending: true })
   if (error) throw error
   return Array.isArray(data) ? data : []
