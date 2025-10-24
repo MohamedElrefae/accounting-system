@@ -24,7 +24,6 @@ import type { ColumnConfig } from '../../components/Common/ColumnConfiguration'
 import useColumnPreferences from '../../hooks/useColumnPreferences'
 import SearchableSelect, { type SearchableSelectOption } from '../../components/Common/SearchableSelect'
 import { supabase } from '../../utils/supabase'
-import TransactionsHeaderTable from './TransactionsHeaderTable'
 import { getTransactionsEnrichedView } from '../../services/transactions-enriched'
 
 interface FilterState {
