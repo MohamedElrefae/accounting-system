@@ -57,7 +57,7 @@ BEGIN
   IF v_size <= 0 THEN v_size := 20; END IF;
 
   WITH filtered AS (
-    SELECT e.id
+    SELECT e.transaction_id AS id
     FROM public.transactions_enriched_v2 e
     WHERE (p_scope <> 'my' OR (p_created_by IS NOT NULL AND e.created_by = p_created_by))
       AND (NOT p_pending_only OR (e.is_posted = false AND e.approval_status = 'submitted'))
@@ -80,7 +80,7 @@ BEGIN
            OR (p_approval_status = 'posted' AND e.is_posted = true)
            OR (p_approval_status <> 'posted' AND e.approval_status = p_approval_status)
           )
-    GROUP BY e.id
+    GROUP BY e.transaction_id
   ),
   counts AS (
     SELECT COUNT(*)::bigint AS total FROM filtered
