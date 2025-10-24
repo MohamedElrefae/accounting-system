@@ -54,3 +54,56 @@ export async function getEnrichedLinesByTransactionId(transactionId: string): Pr
   if (error) throw error
   return Array.isArray(data) ? data : []
 }
+
+export interface EnrichedViewFilters {
+  search?: string
+  dateFrom?: string
+  dateTo?: string
+  amountFrom?: number
+  amountTo?: number
+  debitAccountId?: string
+  creditAccountId?: string
+  projectId?: string
+  orgId?: string
+  classificationId?: string
+  expensesCategoryId?: string
+  workItemId?: string
+  analysisWorkItemId?: string
+  costCenterId?: string
+  approvalStatus?: 'draft' | 'submitted' | 'revision_requested' | 'approved' | 'rejected' | 'cancelled' | 'posted'
+}
+
+export async function getTransactionsEnrichedView(filters: EnrichedViewFilters, page = 1, pageSize = 20): Promise<PagedResult<any>> {
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+
+  let q = supabase
+    .from('transactions_enriched_v2')
+    .select('*', { count: 'exact' })
+    .order('entry_date', { ascending: false })
+
+  const f = filters || {}
+  if (f.search && f.search.trim()) {
+    const s = f.search.trim()
+    q = (q as any).or(`entry_number.ilike.%${s}%,description.ilike.%${s}%,reference_number.ilike.%${s}%,notes.ilike.%${s}%`)
+  }
+  if (f.dateFrom) q = q.gte('entry_date', f.dateFrom)
+  if (f.dateTo) q = q.lte('entry_date', f.dateTo)
+  if (f.amountFrom != null) q = q.gte('amount', f.amountFrom)
+  if (f.amountTo != null) q = q.lte('amount', f.amountTo)
+  if (f.debitAccountId) q = q.eq('debit_account_id', f.debitAccountId)
+  if (f.creditAccountId) q = q.eq('credit_account_id', f.creditAccountId)
+  if (f.projectId) q = q.eq('project_id', f.projectId)
+  if (f.orgId) q = q.eq('org_id', f.orgId)
+  if (f.classificationId) q = q.eq('classification_id', f.classificationId)
+  if (f.expensesCategoryId) q = q.eq('sub_tree_id', f.expensesCategoryId)
+  if (f.workItemId) q = q.eq('work_item_id', f.workItemId)
+  if (f.analysisWorkItemId) q = q.eq('analysis_work_item_id', f.analysisWorkItemId)
+  if (f.costCenterId) q = q.eq('cost_center_id', f.costCenterId)
+  if (f.approvalStatus === 'posted') q = q.eq('is_posted', true)
+  else if (f.approvalStatus) q = q.eq('approval_status', f.approvalStatus)
+
+  const { data, error, count } = await q.range(from, to)
+  if (error) throw error
+  return { rows: (data || []) as any[], total: count ?? 0 }
+}

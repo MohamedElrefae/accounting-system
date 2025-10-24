@@ -26,7 +26,7 @@ import SearchableSelect, { type SearchableSelectOption } from '../../components/
 import { supabase } from '../../utils/supabase'
 import TransactionsHeaderTable from './TransactionsHeaderTable'
 import TransactionLinesTable from './TransactionLinesTable'
-import { getTransactionsEnrichedHeaders, getEnrichedLinesByTransactionId } from '../../services/transactions-enriched'
+import { getTransactionsEnrichedView, getEnrichedLinesByTransactionId } from '../../services/transactions-enriched'
 
 interface FilterState {
   dateFrom: string
@@ -40,7 +40,7 @@ const TransactionsEnrichedPage: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([])
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [classifications, setClassifications] = useState<TransactionClassification[]>([])
-  const [transactions, setTransactions] = useState<TransactionRecord[]>([])
+  const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [categories, setCategories] = useState<ExpensesCategoryRow[]>([])
@@ -133,8 +133,8 @@ const TransactionsEnrichedPage: React.FC = () => {
       approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any) : undefined,
     }
 
-    const { rows, total } = await getTransactionsEnrichedHeaders({ filters: filtersToUse, page, pageSize })
-    setTransactions(rows)
+    const { rows, total } = await getTransactionsEnrichedView(filtersToUse, page, pageSize)
+    setRows(rows)
     setTotalCount(total)
 
     // Load supporting maps (categories/work items) for current orgs in page
@@ -227,7 +227,7 @@ const TransactionsEnrichedPage: React.FC = () => {
   }
 
   // Prepare data for table renderers similar to original page
-  const paged = transactions
+  const paged = rows
   const tableData = useMemo(() => {
     const catMap: Record<string, string> = {}
     for (const c of categories) { catMap[c.id] = `${c.code} - ${c.description}` }
@@ -325,31 +325,16 @@ const TransactionsEnrichedPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Headers table */}
-        <TransactionsHeaderTable
-          key={`headers-table-${transactions.length}`}
-          transactions={transactions}
-          accounts={accounts}
-          organizations={organizations}
-          projects={projects}
-          categories={categories}
-          workItems={workItems}
-          analysisItemsMap={{}}
-          classifications={classifications}
-          userNames={userNames}
+        {/* Single-table view from transactions_enriched_v2 */}
+        <ResizableTable
           columns={columns}
-          wrapMode={wrapMode}
-          loading={loading}
-          onColumnResize={handleColumnResize}
-          onSelectTransaction={(tx) => { setSelectedTransactionId(tx.id); setSelectedLineId(null) }}
-          selectedTransactionId={selectedTransactionId}
-          onEdit={() => {/* optional: open edit panel if needed */}}
-          onDelete={() => {/* optional */}}
-          onOpenDetails={async (tx) => {
-            try { const rows = await getTransactionAudit(tx.id); console.log(rows) } catch {}
-          }}
-          onOpenDocuments={() => {}}
-          onOpenCostAnalysis={() => {}}
+          data={tableData as any}
+          onColumnResize={handleColumnResize as any}
+          className={`transactions-resizable-table ${wrapMode ? 'wrap' : 'nowrap'}`}
+          isLoading={loading}
+          emptyMessage="لا توجد معاملات"
+          getRowId={(row) => (row as any).original?.id ?? (row as any).id}
+          onRowClick={(row) => { setSelectedTransactionId((row as any).original?.transaction_id || (row as any).original?.id || null); setSelectedLineId(null) }}
         />
 
         {/* Lines table (enriched) */}
