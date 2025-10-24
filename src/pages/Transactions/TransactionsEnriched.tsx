@@ -14,7 +14,6 @@ import './Transactions.css'
 import { useToast } from '../../contexts/ToastContext'
 import ExportButtons from '../../components/Common/ExportButtons'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
-import UnifiedTransactionDetailsPanel from '../../components/Transactions/UnifiedTransactionDetailsPanel'
 import { getApprovalHistoryByTransactionId, type ApprovalHistoryRow } from '../../services/approvals'
 import PermissionBadge from '../../components/Common/PermissionBadge'
 import { WithPermission } from '../../components/Common/withPermission'
@@ -357,26 +356,23 @@ const TransactionsEnrichedPage: React.FC = () => {
         <TransactionLinesTable
           key={`lines-table-${selectedTransactionId}-${transactionLines.length}`}
           lines={transactionLines as any}
-          lineColumns={lineColumns}
+          columns={lineColumns}
           wrapMode={lineWrapMode}
+          loading={false}
           onColumnResize={handleLineColumnResize}
           onSelectLine={(line: any) => setSelectedLineId(line?.line_id || line?.id || null)}
-          selectedLineId={selectedLineId}
+          selectedLineId={selectedLineId || undefined}
           accounts={accounts}
           projects={projects}
-          costCenters={[]}
           categories={categories}
+          workItems={workItems}
+          costCenters={[]}
+          classifications={classifications}
+          onEditLine={() => {}}
+          onDeleteLine={() => {}}
         />
       </div>
 
-      {/* Details side panel (reuse) */}
-      <UnifiedTransactionDetailsPanel
-        open={false}
-        onClose={() => {}}
-        transaction={null as any}
-        audit={[]}
-        approvalHistory={[]}
-      />
 
 
       {/* Permissions diagnostic (optional) */}
