@@ -284,6 +284,54 @@ const TransactionsEnrichedPage: React.FC = () => {
         return p ? `${p.code} - ${p.name}` : '—'
       })()
 
+      // Sub-tree list (if arrays provided)
+      const stCodes: string[] = Array.isArray((t as any).expenses_categories_codes) ? (t as any).expenses_categories_codes : []
+      const stNames: string[] = Array.isArray((t as any).expenses_categories_names) ? (t as any).expenses_categories_names : []
+      const subTreeList = stCodes.length ? stCodes.map((code, i) => `${code} - ${stNames[i] || ''}`.trim()) : []
+
+      // Work items list (if arrays provided)
+      const wCodes: string[] = Array.isArray((t as any).work_items_codes) ? (t as any).work_items_codes : []
+      const wNames: string[] = Array.isArray((t as any).work_items_names) ? (t as any).work_items_names : []
+      const workItemList = wCodes.length ? wCodes.map((code, i) => `${code} - ${wNames[i] || ''}`.trim()) : []
+
+      // Analysis items list (if arrays provided)
+      const aCodes: string[] = Array.isArray((t as any).analysis_work_items_codes) ? (t as any).analysis_work_items_codes : []
+      const aNames: string[] = Array.isArray((t as any).analysis_work_items_names) ? (t as any).analysis_work_items_names : []
+      const analysisItemList = aCodes.length ? aCodes.map((code, i) => `${code} - ${aNames[i] || ''}`.trim()) : []
+
+      // Cost centers list (if arrays provided)
+      const ccCodesArr: string[] = Array.isArray((t as any).cost_centers_codes) ? (t as any).cost_centers_codes : []
+      const ccNamesArr: string[] = Array.isArray((t as any).cost_centers_names) ? (t as any).cost_centers_names : []
+      const costCenterList = ccCodesArr.length ? ccCodesArr.map((code, i) => `${code} - ${ccNamesArr[i] || ''}`.trim()) : []
+
+      const subTreeLabel = (() => {
+        if (subTreeList.length > 1) return 'متعدد'
+        if (subTreeList.length === 1) return subTreeList[0]
+        return t.expenses_category_id ? (catMap[t.expenses_category_id] || '—') : '—'
+      })()
+
+      const workItemLabel = (() => {
+        if (workItemList.length > 1) return 'متعدد'
+        if (workItemList.length === 1) return workItemList[0]
+        const wi = workItems.find(w => w.id === (t.work_item_id || ''))
+        return wi ? `${wi.code} - ${wi.name}` : '—'
+      })()
+
+      const analysisLabel = (() => {
+        if (analysisItemList.length > 1) return 'متعدد'
+        if (analysisItemList.length === 1) return analysisItemList[0]
+        const id = t.analysis_work_item_id || ''
+        const a = id ? analysisItemsMap[id] : undefined
+        return a ? `${a.code} - ${a.name}` : (t.analysis_work_item_code ? `${t.analysis_work_item_code} - ${t.analysis_work_item_name || ''}` : '—')
+      })()
+
+      const costCenterLabel = (() => {
+        if (costCenterList.length > 1) return 'متعدد'
+        if (costCenterList.length === 1) return costCenterList[0]
+        const cc = costCenters.find(cc => cc.id === (t.cost_center_id || ''))
+        return cc ? `${cc.code} - ${cc.name}` : '—'
+      })()
+
       return {
         entry_number: t.entry_number,
         entry_date: t.entry_date,
@@ -291,13 +339,13 @@ const TransactionsEnrichedPage: React.FC = () => {
         debit_account_label: debitLabel,
         credit_account_label: creditLabel,
         amount: t.amount,
-        sub_tree_label: t.expenses_category_id ? (catMap[t.expenses_category_id] || '—') : '—',
-        work_item_label: (() => { const wi = workItems.find(w => w.id === (t.work_item_id || '')); return wi ? `${wi.code} - ${wi.name}` : '—' })(),
-        analysis_work_item_label: (() => { const id = t.analysis_work_item_id || ''; const a = id ? analysisItemsMap[id] : undefined; return a ? `${a.code} - ${a.name}` : (t.analysis_work_item_code ? `${t.analysis_work_item_code} - ${t.analysis_work_item_name || ''}` : '—') })(),
+        sub_tree_label: subTreeLabel,
+        work_item_label: workItemLabel,
+        analysis_work_item_label: analysisLabel,
         classification_label: t.classification_name ? `${t.classification_name}` : (classMap[t.classification_id || ''] || '—'),
         organization_label: (() => { const o = organizations.find(o => o.id === (t.org_id || '')); return o ? `${o.code} - ${o.name}` : '—' })(),
         project_label: projectLabel,
-        cost_center_label: (() => { const cc = costCenters.find(cc => cc.id === (t.cost_center_id || '')); return cc ? `${cc.code} - ${cc.name}` : '—' })(),
+        cost_center_label: costCenterLabel,
         reference_number: t.reference_number || '—',
         notes: t.notes || '—',
         created_by_name: t.created_by ? (userNames[t.created_by] || t.created_by.substring(0, 8)) : '—',
@@ -307,6 +355,10 @@ const TransactionsEnrichedPage: React.FC = () => {
         _debit_list: debitList,
         _credit_list: creditList,
         _project_list: projectList,
+        _sub_tree_list: subTreeList,
+        _work_item_list: workItemList,
+        _analysis_item_list: analysisItemList,
+        _cost_center_list: costCenterList,
         original: t,
       }
     })
@@ -425,6 +477,18 @@ const TransactionsEnrichedPage: React.FC = () => {
             }
             if (column.key === 'project_label' && Array.isArray(row._project_list) && row._project_list.length > 1) {
               return <span title={row._project_list.join('\n')}>{String(value || 'متعدد')}</span>
+            }
+            if (column.key === 'sub_tree_label' && Array.isArray(row._sub_tree_list) && row._sub_tree_list.length > 1) {
+              return <span title={row._sub_tree_list.join('\n')}>{String(value || 'متعدد')}</span>
+            }
+            if (column.key === 'work_item_label' && Array.isArray(row._work_item_list) && row._work_item_list.length > 1) {
+              return <span title={row._work_item_list.join('\n')}>{String(value || 'متعدد')}</span>
+            }
+            if (column.key === 'analysis_work_item_label' && Array.isArray(row._analysis_item_list) && row._analysis_item_list.length > 1) {
+              return <span title={row._analysis_item_list.join('\n')}>{String(value || 'متعدد')}</span>
+            }
+            if (column.key === 'cost_center_label' && Array.isArray(row._cost_center_list) && row._cost_center_list.length > 1) {
+              return <span title={row._cost_center_list.join('\n')}>{String(value || 'متعدد')}</span>
             }
             return undefined
           }}
