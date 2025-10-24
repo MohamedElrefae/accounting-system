@@ -49,6 +49,13 @@ const TransactionsEnrichedPage: React.FC = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [userNames, setUserNames] = useState<Record<string, string>>({})
   const [analysisItemsMap, setAnalysisItemsMap] = useState<Record<string, { code: string; name: string }>>({})
+  const [dimLists, setDimLists] = useState<Record<string, {
+    projects?: string[]
+    subTrees?: string[]
+    workItems?: string[]
+    analysis?: string[]
+    costCenters?: string[]
+  }>>({})
 
   const [filters, setFilters] = useState<FilterState>({ dateFrom: '', dateTo: '', amountFrom: '', amountTo: '' })
   const [debitFilterId, setDebitFilterId] = useState<string>('')
@@ -137,6 +144,40 @@ const TransactionsEnrichedPage: React.FC = () => {
     const { rows, total } = await getTransactionsEnrichedView(filtersToUse, page, pageSize)
     setRows(rows)
     setTotalCount(total)
+
+    // Preload dimension lists from transaction_lines for current page
+    try {
+      const ids: string[] = (rows || []).map((r: any) => r.transaction_id || r.id).filter(Boolean)
+      if (ids.length) {
+        const { data: lineRows } = await supabase
+          .from('transaction_lines')
+          .select('transaction_id, project_id, cost_center_id, work_item_id, analysis_work_item_id, sub_tree_id')
+          .in('transaction_id', ids as any)
+        const map: Record<string, any> = {}
+        ;(lineRows || []).forEach((lr: any) => {
+          const k = lr.transaction_id
+          if (!map[k]) map[k] = { projects: new Set<string>(), subTrees: new Set<string>(), workItems: new Set<string>(), analysis: new Set<string>(), costCenters: new Set<string>() }
+          if (lr.project_id) map[k].projects.add(lr.project_id)
+          if (lr.sub_tree_id) map[k].subTrees.add(lr.sub_tree_id)
+          if (lr.work_item_id) map[k].workItems.add(lr.work_item_id)
+          if (lr.analysis_work_item_id) map[k].analysis.add(lr.analysis_work_item_id)
+          if (lr.cost_center_id) map[k].costCenters.add(lr.cost_center_id)
+        })
+        const finalized: Record<string, any> = {}
+        Object.entries(map).forEach(([k, v]: any) => {
+          finalized[k] = {
+            projects: Array.from(v.projects || []),
+            subTrees: Array.from(v.subTrees || []),
+            workItems: Array.from(v.workItems || []),
+            analysis: Array.from(v.analysis || []),
+            costCenters: Array.from(v.costCenters || []),
+          }
+        })
+        setDimLists(finalized)
+      } else {
+        setDimLists({})
+      }
+    } catch {}
 
     // Load supporting maps (categories/work items) for current orgs in page
     try {
@@ -254,8 +295,9 @@ const TransactionsEnrichedPage: React.FC = () => {
       const debitList = dCodes.map((code, i) => `${code} - ${dNames[i] || ''}`.trim())
       const creditList = cCodes.map((code, i) => `${code} - ${cNames[i] || ''}`.trim())
 
-      // Project list (for tooltip)
-      const pids: string[] = Array.isArray(t.project_ids) ? t.project_ids : []
+      // Project list (from aggregated lines if present, else from view array)
+      const aggProjIds: string[] = Array.isArray(agg.projects) && agg.projects.length ? agg.projects : []
+      const pids: string[] = aggProjIds.length ? aggProjIds : (Array.isArray(t.project_ids) ? t.project_ids : [])
       const projectList = pids
         .map((id: string) => {
           const p = projects.find(pp => pp.id === id)
@@ -284,25 +326,34 @@ const TransactionsEnrichedPage: React.FC = () => {
         return p ? `${p.code} - ${p.name}` : '—'
       })()
 
-      // Sub-tree list (if arrays provided)
-      const stCodes: string[] = Array.isArray((t as any).expenses_categories_codes) ? (t as any).expenses_categories_codes : []
-      const stNames: string[] = Array.isArray((t as any).expenses_categories_names) ? (t as any).expenses_categories_names : []
-      const subTreeList = stCodes.length ? stCodes.map((code, i) => `${code} - ${stNames[i] || ''}`.trim()) : []
+      // Build lists from transaction_lines aggregation (preferred)
+      const txId = t.transaction_id || t.id
+      const agg = dimLists[txId] || {}
 
-      // Work items list (if arrays provided)
-      const wCodes: string[] = Array.isArray((t as any).work_items_codes) ? (t as any).work_items_codes : []
-      const wNames: string[] = Array.isArray((t as any).work_items_names) ? (t as any).work_items_names : []
-      const workItemList = wCodes.length ? wCodes.map((code, i) => `${code} - ${wNames[i] || ''}`.trim()) : []
+      // Sub-tree list (compute code-name from ids if present)
+      const subTreeIds: string[] = Array.isArray(agg.subTrees) && agg.subTrees.length ? agg.subTrees : []
+      const subTreeList = subTreeIds.map(id => catMap[id] || id)
 
-      // Analysis items list (if arrays provided)
-      const aCodes: string[] = Array.isArray((t as any).analysis_work_items_codes) ? (t as any).analysis_work_items_codes : []
-      const aNames: string[] = Array.isArray((t as any).analysis_work_items_names) ? (t as any).analysis_work_items_names : []
-      const analysisItemList = aCodes.length ? aCodes.map((code, i) => `${code} - ${aNames[i] || ''}`.trim()) : []
+      // Work items list
+      const workItemIds: string[] = Array.isArray(agg.workItems) && agg.workItems.length ? agg.workItems : []
+      const workItemList = workItemIds.map(id => {
+        const wi = workItems.find(w => w.id === id)
+        return wi ? `${wi.code} - ${wi.name}` : id
+      })
 
-      // Cost centers list (if arrays provided)
-      const ccCodesArr: string[] = Array.isArray((t as any).cost_centers_codes) ? (t as any).cost_centers_codes : []
-      const ccNamesArr: string[] = Array.isArray((t as any).cost_centers_names) ? (t as any).cost_centers_names : []
-      const costCenterList = ccCodesArr.length ? ccCodesArr.map((code, i) => `${code} - ${ccNamesArr[i] || ''}`.trim()) : []
+      // Analysis items list
+      const analysisIds: string[] = Array.isArray(agg.analysis) && agg.analysis.length ? agg.analysis : []
+      const analysisItemList = analysisIds.map(id => {
+        const a = analysisItemsMap[id]
+        return a ? `${a.code} - ${a.name}` : id
+      })
+
+      // Cost centers list
+      const ccIds: string[] = Array.isArray(agg.costCenters) && agg.costCenters.length ? agg.costCenters : []
+      const costCenterList = ccIds.map(id => {
+        const cc = costCenters.find(cc => cc.id === id)
+        return cc ? `${cc.code} - ${cc.name}` : id
+      })
 
       const subTreeLabel = (() => {
         if (subTreeList.length > 1) return 'متعدد'
