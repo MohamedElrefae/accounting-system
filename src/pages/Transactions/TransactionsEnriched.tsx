@@ -25,8 +25,7 @@ import useColumnPreferences from '../../hooks/useColumnPreferences'
 import SearchableSelect, { type SearchableSelectOption } from '../../components/Common/SearchableSelect'
 import { supabase } from '../../utils/supabase'
 import TransactionsHeaderTable from './TransactionsHeaderTable'
-import TransactionLinesTable from './TransactionLinesTable'
-import { getTransactionsEnrichedView, getEnrichedLinesByTransactionId } from '../../services/transactions-enriched'
+import { getTransactionsEnrichedView } from '../../services/transactions-enriched'
 
 interface FilterState {
   dateFrom: string
@@ -65,9 +64,6 @@ const TransactionsEnrichedPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(20)
   const [totalCount, setTotalCount] = useState(0)
 
-  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null)
-  const [selectedLineId, setSelectedLineId] = useState<string | null>(null)
-  const [transactionLines, setTransactionLines] = useState<any[]>([])
 
   const location = useLocation()
   const hasPerm = useHasPermission()
@@ -164,7 +160,6 @@ const TransactionsEnrichedPage: React.FC = () => {
     try { setUserNames(await getUserDisplayMap(ids)) } catch {}
   }
 
-  // Fetch enriched lines when a transaction is selected
   useEffect(() => {
     (async () => {
       if (!selectedTransactionId) { setTransactionLines([]); setSelectedLineId(null); return }
@@ -235,8 +230,8 @@ const TransactionsEnrichedPage: React.FC = () => {
       entry_number: t.entry_number,
       entry_date: t.entry_date,
       description: t.description,
-      debit_account_label: accountLabel(t.debit_account_id),
-      credit_account_label: accountLabel(t.credit_account_id),
+      debit_account_label: (t.debit_account_label || (t.debit_account_code ? `${t.debit_account_code} - ${t.debit_account_name || ''}`.trim() : accountLabel(t.debit_account_id))) || '—',
+      credit_account_label: (t.credit_account_label || (t.credit_account_code ? `${t.credit_account_code} - ${t.credit_account_name || ''}`.trim() : accountLabel(t.credit_account_id))) || '—',
       amount: t.amount,
       sub_tree_label: t.sub_tree_id ? (catMap[t.sub_tree_id] || '—') : '—',
       work_item_label: (() => { const wi = workItems.find(w => w.id === (t.work_item_id || '')); return wi ? `${wi.code} - ${wi.name}` : '—' })(),
@@ -294,14 +289,38 @@ const TransactionsEnrichedPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Filters (subset matching original UX) */}
+      {/* Filters (complete set) */}
       <div className="transactions-filters-row">
+        {/* Search */}
         <input placeholder="بحث..." value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setPage(1) }} className="filter-input filter-input--search" />
+        {/* Date range */}
         <input type="date" value={filters.dateFrom} onChange={e => { setFilters({ ...filters, dateFrom: e.target.value }); setPage(1) }} className="filter-input filter-input--date" />
         <input type="date" value={filters.dateTo} onChange={e => { setFilters({ ...filters, dateTo: e.target.value }); setPage(1) }} className="filter-input filter-input--date" />
+        {/* Approval */}
         <select value={approvalFilter === 'all' ? '' : approvalFilter} onChange={e => { const v = (e.target.value || 'all') as any; setApprovalFilter(v); setPage(1) }} className="filter-select filter-select--approval"><option value="">حالة الاعتماد</option><option value="approved">معتمدة</option><option value="posted">مرحلة</option><option value="submitted">مُرسلة</option><option value="revision_requested">طلب تعديل</option><option value="draft">مسودة</option><option value="rejected">مرفوضة</option><option value="cancelled">ملغاة</option></select>
+        {/* Org & Project */}
         <select value={orgFilterId} onChange={e => { setOrgFilterId(e.target.value); setPage(1) }} className="filter-select filter-select--org"><option value="">جميع المؤسسات</option>{organizations.map(o => (<option key={o.id} value={o.id}>{`${o.code} - ${o.name}`.substring(0, 40)}</option>))}</select>
         <select value={projectFilterId} onChange={e => { setProjectFilterId(e.target.value); setPage(1) }} className="filter-select filter-select--project"><option value="">جميع المشاريع</option>{projects.map(p => (<option key={p.id} value={p.id}>{`${p.code} - ${p.name}`.substring(0, 40)}</option>))}</select>
+        {/* Debit/Credit account */}
+        <div style={{ minWidth: 280 }}>
+          <SearchableSelect id="enriched.filter.debit" value={debitFilterId} options={[{ value: '', label: 'جميع الحسابات المدينة', searchText: '' }, ...accounts.slice().sort((a,b)=>a.code.localeCompare(b.code)).map(a=>({value:a.id,label:`${a.code} - ${a.name}`,searchText:`${a.code} ${a.name}`.toLowerCase()}))]} onChange={(v) => { setDebitFilterId(v); setPage(1) }} placeholder="جميع الحسابات المدينة" clearable={true} />
+        </div>
+        <div style={{ minWidth: 280 }}>
+          <SearchableSelect id="enriched.filter.credit" value={creditFilterId} options={[{ value: '', label: 'جميع الحسابات الدائنة', searchText: '' }, ...accounts.slice().sort((a,b)=>a.code.localeCompare(b.code)).map(a=>({value:a.id,label:`${a.code} - ${a.name}`,searchText:`${a.code} ${a.name}`.toLowerCase()}))]} onChange={(v) => { setCreditFilterId(v); setPage(1) }} placeholder="جميع الحسابات الدائنة" clearable={true} />
+        </div>
+        {/* Classification */}
+        <select value={classificationFilterId} onChange={e => { setClassificationFilterId(e.target.value); setPage(1) }} className="filter-select filter-select--classification"><option value="">جميع التصنيفات</option>{classifications.map(c => (<option key={c.id} value={c.id}>{`${c.code} - ${c.name}`.substring(0, 40)}</option>))}</select>
+        {/* Sub-tree */}
+        <select value={expensesCategoryFilterId} onChange={e => { setExpensesCategoryFilterId(e.target.value); setPage(1) }} className="filter-select filter-select--expenses"><option value="">جميع الشجرة الفرعية</option>{categories.slice().sort((a,b)=>`${a.code} - ${a.description}`.localeCompare(`${b.code} - ${b.description}`)).map(cat => (<option key={cat.id} value={cat.id}>{`${cat.code} - ${cat.description}`.substring(0, 52)}</option>))}</select>
+        {/* Work item */}
+        <select value={workItemFilterId} onChange={e => { setWorkItemFilterId(e.target.value); setPage(1) }} className="filter-select filter-select--workitem"><option value="">جميع عناصر العمل</option>{workItems.slice().sort((a,b)=>`${a.code} - ${a.name}`.localeCompare(`${b.code} - ${b.name}`)).map(w => (<option key={w.id} value={w.id}>{`${w.code} - ${w.name}`.substring(0, 52)}</option>))}</select>
+        {/* Analysis work item */}
+        <select value={(filters as any).analysis_work_item_id || ''} onChange={e => { (setFilters as any)({ ...filters, analysis_work_item_id: e.target.value }); setPage(1) }} className="filter-select filter-select--analysisworkitem"><option value="">جميع بنود التحليل</option>{Object.entries({}).map(([id,a]) => (<option key={id} value={id}>{id}</option>))}</select>
+        {/* Cost center */}
+        <select value={costCenterFilterId} onChange={e => { setCostCenterFilterId(e.target.value); setPage(1) }} className="filter-select filter-select--costcenter"><option value="">جميع مراكز التكلفة</option></select>
+        {/* Amount range */}
+        <input type="number" placeholder="من مبلغ" value={filters.amountFrom} onChange={e => { setFilters({ ...filters, amountFrom: e.target.value }); setPage(1) }} className="filter-input filter-input--amount" />
+        <input type="number" placeholder="إلى مبلغ" value={filters.amountTo} onChange={e => { setFilters({ ...filters, amountTo: e.target.value }); setPage(1) }} className="filter-input filter-input--amount" />
       </div>
 
       <div className="transactions-content">
@@ -334,28 +353,9 @@ const TransactionsEnrichedPage: React.FC = () => {
           isLoading={loading}
           emptyMessage="لا توجد معاملات"
           getRowId={(row) => (row as any).original?.id ?? (row as any).id}
-          onRowClick={(row) => { setSelectedTransactionId((row as any).original?.transaction_id || (row as any).original?.id || null); setSelectedLineId(null) }}
         />
 
-        {/* Lines table (enriched) */}
-        <TransactionLinesTable
-          key={`lines-table-${selectedTransactionId}-${transactionLines.length}`}
-          lines={transactionLines as any}
-          columns={lineColumns}
-          wrapMode={lineWrapMode}
-          loading={false}
-          onColumnResize={handleLineColumnResize}
-          onSelectLine={(line: any) => setSelectedLineId(line?.line_id || line?.id || null)}
-          selectedLineId={selectedLineId || undefined}
-          accounts={accounts}
-          projects={projects}
-          categories={categories}
-          workItems={workItems}
-          costCenters={[]}
-          classifications={classifications}
-          onEditLine={() => {}}
-          onDeleteLine={() => {}}
-        />
+        {/* Bottom lines table removed in single-table mode */}
       </div>
 
 
