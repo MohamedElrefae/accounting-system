@@ -44,6 +44,7 @@ const TransactionsEnrichedPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [categories, setCategories] = useState<ExpensesCategoryRow[]>([])
   const [workItems, setWorkItems] = useState<WorkItemRow[]>([])
+  const [costCenters, setCostCenters] = useState<Array<{ id: string; code: string; name: string }>>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [userNames, setUserNames] = useState<Record<string, string>>({})
@@ -158,6 +159,17 @@ const TransactionsEnrichedPage: React.FC = () => {
       } else setWorkItems([])
     } catch {}
 
+    // Load cost centers for orgs
+    try {
+      const orgIds = Array.from(new Set((rows || []).map(r => r.org_id).filter(Boolean))) as string[]
+      const merged: Record<string, { id: string; code: string; name: string }> = {}
+      for (const id of orgIds) {
+        const list = await getCostCentersForSelector(id).catch(() => [])
+        for (const cc of list as any[]) merged[cc.id] = { id: cc.id, code: cc.code, name: cc.name }
+      }
+      setCostCenters(Object.values(merged))
+    } catch {}
+
     // Analysis Work Items map for labels
     try {
       const orgIds = Array.from(new Set((rows || []).map(r => r.org_id).filter(Boolean))) as string[]
@@ -237,16 +249,28 @@ const TransactionsEnrichedPage: React.FC = () => {
       entry_number: t.entry_number,
       entry_date: t.entry_date,
       description: t.description,
-      debit_account_label: (t.debit_account_label || (t.debit_account_code ? `${t.debit_account_code} - ${t.debit_account_name || ''}`.trim() : accountLabel(t.debit_account_id))) || '—',
-      credit_account_label: (t.credit_account_label || (t.credit_account_code ? `${t.credit_account_code} - ${t.credit_account_name || ''}`.trim() : accountLabel(t.credit_account_id))) || '—',
+      debit_account_label: (() => {
+        if (t.debit_account_code) return `${t.debit_account_code} - ${t.debit_account_name || ''}`.trim()
+        const codes: string[] = Array.isArray(t.debit_accounts_codes) ? t.debit_accounts_codes : []
+        const names: string[] = Array.isArray(t.debit_accounts_names) ? t.debit_accounts_names : []
+        if (codes.length) return `${codes[0]} - ${names[0] || ''}`.trim()
+        return accountLabel(t.debit_account_id) || '—'
+      })(),
+      credit_account_label: (() => {
+        if (t.credit_account_code) return `${t.credit_account_code} - ${t.credit_account_name || ''}`.trim()
+        const codes: string[] = Array.isArray(t.credit_accounts_codes) ? t.credit_accounts_codes : []
+        const names: string[] = Array.isArray(t.credit_accounts_names) ? t.credit_accounts_names : []
+        if (codes.length) return `${codes[0]} - ${names[0] || ''}`.trim()
+        return accountLabel(t.credit_account_id) || '—'
+      })(),
       amount: t.amount,
-      sub_tree_label: t.sub_tree_id ? (catMap[t.sub_tree_id] || '—') : '—',
+      sub_tree_label: t.expenses_category_id ? (catMap[t.expenses_category_id] || '—') : '—',
       work_item_label: (() => { const wi = workItems.find(w => w.id === (t.work_item_id || '')); return wi ? `${wi.code} - ${wi.name}` : '—' })(),
-      analysis_work_item_label: (() => { const id = t.analysis_work_item_id || ''; const a = id ? analysisItemsMap[id] : undefined; return a ? `${a.code} - ${a.name}` : '—' })(),
-      classification_label: t.classification_code ? `${t.classification_code} - ${t.classification_name || ''}` : (classMap[t.classification_id || ''] || '—'),
+      analysis_work_item_label: (() => { const id = t.analysis_work_item_id || ''; const a = id ? analysisItemsMap[id] : undefined; return a ? `${a.code} - ${a.name}` : (t.analysis_work_item_code ? `${t.analysis_work_item_code} - ${t.analysis_work_item_name || ''}` : '—') })(),
+      classification_label: t.classification_name ? `${t.classification_name}` : (classMap[t.classification_id || ''] || '—'),
       organization_label: (() => { const o = organizations.find(o => o.id === (t.org_id || '')); return o ? `${o.code} - ${o.name}` : '—' })(),
-      project_label: (() => { const p = projects.find(p => p.id === (t.project_id || '')); return p ? `${p.code} - ${p.name}` : (t.project_code ? `${t.project_code} - ${t.project_name || ''}` : '—') })(),
-      cost_center_label: t.cost_center_code && t.cost_center_name ? `${t.cost_center_code} - ${t.cost_center_name}` : '—',
+      project_label: (() => { const p = projects.find(p => p.id === (t.project_id || '')); return p ? `${p.code} - ${p.name}` : '—' })(),
+      cost_center_label: (() => { const cc = costCenters.find(cc => cc.id === (t.cost_center_id || '')); return cc ? `${cc.code} - ${cc.name}` : '—' })(),
       reference_number: t.reference_number || '—',
       notes: t.notes || '—',
       created_by_name: t.created_by ? (userNames[t.created_by] || t.created_by.substring(0, 8)) : '—',
