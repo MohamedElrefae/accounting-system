@@ -58,7 +58,7 @@ BEGIN
 
   RETURN QUERY
   WITH base AS (
-    SELECT t.id, t.entry_date, t.created_at
+    SELECT t.id AS tx_id, t.entry_date, t.created_at
     FROM public.transactions t
     WHERE (p_scope <> 'my' OR (p_created_by IS NOT NULL AND t.created_by = p_created_by))
       AND (NOT p_pending_only OR (t.is_posted = false AND t.approval_status = 'submitted'))
@@ -74,13 +74,13 @@ BEGIN
           )
   ),
   ordered AS (
-    SELECT b.id,
+    SELECT b.tx_id,
            ROW_NUMBER() OVER (ORDER BY b.entry_date DESC, b.created_at DESC) AS rn,
-           COUNT(*) OVER () AS total_count
+           COUNT(*) OVER () AS total_count_i
     FROM base b
   ),
   paged AS (
-    SELECT id, total_count
+    SELECT tx_id, total_count_i
     FROM ordered
     WHERE rn > v_from AND rn <= v_from + v_size
   )
@@ -111,9 +111,9 @@ BEGIN
     t.posted_by,
     t.created_at,
     t.updated_at,
-    paged.total_count
+    paged.total_count_i AS total_count
   FROM public.transactions t
-  JOIN paged ON paged.id = t.id
+  JOIN paged ON paged.tx_id = t.id
   ORDER BY t.entry_date DESC, t.created_at DESC;
 END$$;
 

@@ -18,9 +18,6 @@ import UnifiedTransactionDetailsPanel from '../../components/Transactions/Unifie
 import { getApprovalHistoryByTransactionId, type ApprovalHistoryRow } from '../../services/approvals'
 import PermissionBadge from '../../components/Common/PermissionBadge'
 import { WithPermission } from '../../components/Common/withPermission'
-import UnifiedCRUDForm, { type UnifiedCRUDFormHandle } from '../../components/Common/UnifiedCRUDForm'
-import DraggableResizablePanel from '../../components/Common/DraggableResizablePanel'
-import { createTransactionFormConfig } from '../../components/Transactions/TransactionFormConfig'
 import { getCostCentersForSelector } from '../../services/cost-centers'
 import ResizableTable from '../../components/Common/ResizableTable'
 import ColumnConfiguration from '../../components/Common/ColumnConfiguration'
@@ -381,10 +378,6 @@ const TransactionsEnrichedPage: React.FC = () => {
         approvalHistory={[]}
       />
 
-      {/* Placeholder for CRUD form if needed */}
-      <DraggableResizablePanel open={false} onClose={() => {}} title="" initialPosition={{ x: 100, y: 100 }} initialSize={{ width: 800, height: 700 }}>
-        <UnifiedCRUDForm ref={React.createRef<UnifiedCRUDFormHandle>()} config={createTransactionFormConfig({ accounts, organizations, projects })} initialData={{}} onSubmit={async () => {}} onCancel={() => {}} loading={false} errors={{}} />
-      </DraggableResizablePanel>
 
       {/* Permissions diagnostic (optional) */}
       <div className="diag-panel" style={{ display: 'none' }}>
