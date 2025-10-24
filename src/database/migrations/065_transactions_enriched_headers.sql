@@ -57,30 +57,29 @@ BEGIN
   IF v_size <= 0 THEN v_size := 20; END IF;
 
   WITH filtered AS (
-    SELECT e.transaction_id AS id
-    FROM public.transactions_enriched_v2 e
-    WHERE (p_scope <> 'my' OR (p_created_by IS NOT NULL AND e.created_by = p_created_by))
-      AND (NOT p_pending_only OR (e.is_posted = false AND e.approval_status = 'submitted'))
-      AND (p_search IS NULL OR e.entry_number ILIKE '%'||p_search||'%' OR e.description ILIKE '%'||p_search||'%' OR e.reference_number ILIKE '%'||p_search||'%' OR e.notes ILIKE '%'||p_search||'%')
-      AND (p_date_from IS NULL OR e.entry_date >= p_date_from)
-      AND (p_date_to IS NULL OR e.entry_date <= p_date_to)
-      AND (p_amount_from IS NULL OR e.amount >= p_amount_from)
-      AND (p_amount_to IS NULL OR e.amount <= p_amount_to)
-      AND (p_debit_account_id IS NULL OR e.debit_account_id = p_debit_account_id)
-      AND (p_credit_account_id IS NULL OR e.credit_account_id = p_credit_account_id)
-      AND (p_project_id IS NULL OR e.project_id = p_project_id)
-      AND (p_org_id IS NULL OR e.org_id = p_org_id)
-      AND (p_classification_id IS NULL OR e.classification_id = p_classification_id)
-      AND (p_sub_tree_id IS NULL OR e.sub_tree_id = p_sub_tree_id)
-      AND (p_work_item_id IS NULL OR e.work_item_id = p_work_item_id)
-      AND (p_analysis_work_item_id IS NULL OR e.analysis_work_item_id = p_analysis_work_item_id)
-      AND (p_cost_center_id IS NULL OR e.cost_center_id = p_cost_center_id)
+    SELECT t.id
+    FROM public.transactions t
+    WHERE (p_scope <> 'my' OR (p_created_by IS NOT NULL AND t.created_by = p_created_by))
+      AND (NOT p_pending_only OR (t.is_posted = false AND t.approval_status = 'submitted'))
+      AND (p_search IS NULL OR t.entry_number ILIKE '%'||p_search||'%' OR t.description ILIKE '%'||p_search||'%' OR t.reference_number ILIKE '%'||p_search||'%' OR t.notes ILIKE '%'||p_search||'%')
+      AND (p_date_from IS NULL OR t.entry_date >= p_date_from)
+      AND (p_date_to IS NULL OR t.entry_date <= p_date_to)
+      AND (p_amount_from IS NULL OR t.amount >= p_amount_from)
+      AND (p_amount_to IS NULL OR t.amount <= p_amount_to)
+      AND (p_debit_account_id IS NULL OR t.debit_account_id = p_debit_account_id)
+      AND (p_credit_account_id IS NULL OR t.credit_account_id = p_credit_account_id)
+      AND (p_project_id IS NULL OR t.project_id = p_project_id)
+      AND (p_org_id IS NULL OR t.org_id = p_org_id)
+      AND (p_classification_id IS NULL OR t.classification_id = p_classification_id)
+      AND (p_sub_tree_id IS NULL OR t.sub_tree_id = p_sub_tree_id)
+      AND (p_work_item_id IS NULL OR t.work_item_id = p_work_item_id)
+      AND (p_analysis_work_item_id IS NULL OR t.analysis_work_item_id = p_analysis_work_item_id)
+      AND (p_cost_center_id IS NULL OR t.cost_center_id = p_cost_center_id)
       AND (
            p_approval_status IS NULL
-           OR (p_approval_status = 'posted' AND e.is_posted = true)
-           OR (p_approval_status <> 'posted' AND e.approval_status = p_approval_status)
+           OR (p_approval_status = 'posted' AND t.is_posted = true)
+           OR (p_approval_status <> 'posted' AND t.approval_status = p_approval_status)
           )
-    GROUP BY e.transaction_id
   ),
   counts AS (
     SELECT COUNT(*)::bigint AS total FROM filtered
