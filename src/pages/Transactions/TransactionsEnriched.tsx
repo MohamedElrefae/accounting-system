@@ -245,39 +245,71 @@ const TransactionsEnrichedPage: React.FC = () => {
     for (const c of categories) { catMap[c.id] = `${c.code} - ${c.description}` }
     const classMap: Record<string, string> = {}
     for (const c of classifications) { classMap[c.id] = `${c.code} - ${c.name}` }
-    return paged.map((t: any) => ({
-      entry_number: t.entry_number,
-      entry_date: t.entry_date,
-      description: t.description,
-      debit_account_label: (() => {
+    return paged.map((t: any) => {
+      // Accounts lists (for tooltip)
+      const dCodes: string[] = Array.isArray(t.debit_accounts_codes) ? t.debit_accounts_codes : []
+      const dNames: string[] = Array.isArray(t.debit_accounts_names) ? t.debit_accounts_names : []
+      const cCodes: string[] = Array.isArray(t.credit_accounts_codes) ? t.credit_accounts_codes : []
+      const cNames: string[] = Array.isArray(t.credit_accounts_names) ? t.credit_accounts_names : []
+      const debitList = dCodes.map((code, i) => `${code} - ${dNames[i] || ''}`.trim())
+      const creditList = cCodes.map((code, i) => `${code} - ${cNames[i] || ''}`.trim())
+
+      // Project list (for tooltip)
+      const pids: string[] = Array.isArray(t.project_ids) ? t.project_ids : []
+      const projectList = pids
+        .map((id: string) => {
+          const p = projects.find(pp => pp.id === id)
+          return p ? `${p.code} - ${p.name}` : id
+        })
+        .filter(Boolean)
+
+      const debitLabel = (() => {
         if (t.debit_account_code) return `${t.debit_account_code} - ${t.debit_account_name || ''}`.trim()
-        const codes: string[] = Array.isArray(t.debit_accounts_codes) ? t.debit_accounts_codes : []
-        const names: string[] = Array.isArray(t.debit_accounts_names) ? t.debit_accounts_names : []
-        if (codes.length) return `${codes[0]} - ${names[0] || ''}`.trim()
+        if (debitList.length > 1) return 'متعدد'
+        if (debitList.length === 1) return debitList[0]
         return accountLabel(t.debit_account_id) || '—'
-      })(),
-      credit_account_label: (() => {
+      })()
+
+      const creditLabel = (() => {
         if (t.credit_account_code) return `${t.credit_account_code} - ${t.credit_account_name || ''}`.trim()
-        const codes: string[] = Array.isArray(t.credit_accounts_codes) ? t.credit_accounts_codes : []
-        const names: string[] = Array.isArray(t.credit_accounts_names) ? t.credit_accounts_names : []
-        if (codes.length) return `${codes[0]} - ${names[0] || ''}`.trim()
+        if (creditList.length > 1) return 'متعدد'
+        if (creditList.length === 1) return creditList[0]
         return accountLabel(t.credit_account_id) || '—'
-      })(),
-      amount: t.amount,
-      sub_tree_label: t.expenses_category_id ? (catMap[t.expenses_category_id] || '—') : '—',
-      work_item_label: (() => { const wi = workItems.find(w => w.id === (t.work_item_id || '')); return wi ? `${wi.code} - ${wi.name}` : '—' })(),
-      analysis_work_item_label: (() => { const id = t.analysis_work_item_id || ''; const a = id ? analysisItemsMap[id] : undefined; return a ? `${a.code} - ${a.name}` : (t.analysis_work_item_code ? `${t.analysis_work_item_code} - ${t.analysis_work_item_name || ''}` : '—') })(),
-      classification_label: t.classification_name ? `${t.classification_name}` : (classMap[t.classification_id || ''] || '—'),
-      organization_label: (() => { const o = organizations.find(o => o.id === (t.org_id || '')); return o ? `${o.code} - ${o.name}` : '—' })(),
-      project_label: (() => { const p = projects.find(p => p.id === (t.project_id || '')); return p ? `${p.code} - ${p.name}` : '—' })(),
-      cost_center_label: (() => { const cc = costCenters.find(cc => cc.id === (t.cost_center_id || '')); return cc ? `${cc.code} - ${cc.name}` : '—' })(),
-      reference_number: t.reference_number || '—',
-      notes: t.notes || '—',
-      created_by_name: t.created_by ? (userNames[t.created_by] || t.created_by.substring(0, 8)) : '—',
-      posted_by_name: t.posted_by ? (userNames[t.posted_by] || t.posted_by.substring(0, 8)) : '—',
-      approval_status: t.is_posted ? 'posted' : (t.approval_status || 'draft'),
-      original: t,
-    }))
+      })()
+
+      const projectLabel = (() => {
+        if (projectList.length > 1) return 'متعدد'
+        if (projectList.length === 1) return projectList[0]
+        const p = projects.find(p => p.id === (t.project_id || ''))
+        return p ? `${p.code} - ${p.name}` : '—'
+      })()
+
+      return {
+        entry_number: t.entry_number,
+        entry_date: t.entry_date,
+        description: t.description,
+        debit_account_label: debitLabel,
+        credit_account_label: creditLabel,
+        amount: t.amount,
+        sub_tree_label: t.expenses_category_id ? (catMap[t.expenses_category_id] || '—') : '—',
+        work_item_label: (() => { const wi = workItems.find(w => w.id === (t.work_item_id || '')); return wi ? `${wi.code} - ${wi.name}` : '—' })(),
+        analysis_work_item_label: (() => { const id = t.analysis_work_item_id || ''; const a = id ? analysisItemsMap[id] : undefined; return a ? `${a.code} - ${a.name}` : (t.analysis_work_item_code ? `${t.analysis_work_item_code} - ${t.analysis_work_item_name || ''}` : '—') })(),
+        classification_label: t.classification_name ? `${t.classification_name}` : (classMap[t.classification_id || ''] || '—'),
+        organization_label: (() => { const o = organizations.find(o => o.id === (t.org_id || '')); return o ? `${o.code} - ${o.name}` : '—' })(),
+        project_label: projectLabel,
+        cost_center_label: (() => { const cc = costCenters.find(cc => cc.id === (t.cost_center_id || '')); return cc ? `${cc.code} - ${cc.name}` : '—' })(),
+        reference_number: t.reference_number || '—',
+        notes: t.notes || '—',
+        created_by_name: t.created_by ? (userNames[t.created_by] || t.created_by.substring(0, 8)) : '—',
+        posted_by_name: t.posted_by ? (userNames[t.posted_by] || t.posted_by.substring(0, 8)) : '—',
+        approval_status: t.is_posted ? 'posted' : (t.approval_status || 'draft'),
+        // Tooltips lists
+        _debit_list: debitList,
+        _credit_list: creditList,
+        _project_list: projectList,
+        original: t,
+      }
+    })
   }, [paged, accounts, userNames, categories, workItems, analysisItemsMap, organizations, projects, classifications])
 
   if (loading) return <div className="loading-container"><div className="loading-spinner" />جاري التحميل...</div>
@@ -383,6 +415,19 @@ const TransactionsEnrichedPage: React.FC = () => {
           isLoading={loading}
           emptyMessage="لا توجد معاملات"
           getRowId={(row) => (row as any).original?.id ?? (row as any).id}
+          renderCell={(value, column, row: any) => {
+            // Tooltips for multiple values
+            if (column.key === 'debit_account_label' && Array.isArray(row._debit_list) && row._debit_list.length > 1) {
+              return <span title={row._debit_list.join('\n')}>{String(value || 'متعدد')}</span>
+            }
+            if (column.key === 'credit_account_label' && Array.isArray(row._credit_list) && row._credit_list.length > 1) {
+              return <span title={row._credit_list.join('\n')}>{String(value || 'متعدد')}</span>
+            }
+            if (column.key === 'project_label' && Array.isArray(row._project_list) && row._project_list.length > 1) {
+              return <span title={row._project_list.join('\n')}>{String(value || 'متعدد')}</span>
+            }
+            return undefined
+          }}
         />
 
         {/* Bottom lines table removed in single-table mode */}
