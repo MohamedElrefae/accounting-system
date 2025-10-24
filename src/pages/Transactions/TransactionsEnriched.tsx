@@ -109,9 +109,11 @@ const TransactionsEnrichedPage: React.FC = () => {
   useEffect(() => { reload().catch(() => {}) }, [searchTerm, filters.dateFrom, filters.dateTo, filters.amountFrom, filters.amountTo, debitFilterId, creditFilterId, orgFilterId, projectFilterId, classificationFilterId, expensesCategoryFilterId, workItemFilterId, costCenterFilterId, approvalFilter, page, pageSize])
 
   async function reload() {
+    // Determine mode from route: /transactions/my-enriched vs /transactions/all-enriched
+    const mode: 'my' | 'all' = location.pathname.includes('/transactions/my-enriched') ? 'my' : 'all'
+
     const filtersToUse = {
-      scope: 'my' as const,
-      pendingOnly: false,
+      scope: mode,
       search: searchTerm,
       dateFrom: filters.dateFrom || undefined,
       dateTo: filters.dateTo || undefined,
@@ -126,7 +128,8 @@ const TransactionsEnrichedPage: React.FC = () => {
       workItemId: workItemFilterId || undefined,
       costCenterId: costCenterFilterId || undefined,
       approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any) : undefined,
-    }
+      createdBy: currentUserId || undefined,
+    } as any
 
     const { rows, total } = await getTransactionsEnrichedView(filtersToUse, page, pageSize)
     setRows(rows)

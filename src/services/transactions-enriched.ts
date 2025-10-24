@@ -71,6 +71,8 @@ export interface EnrichedViewFilters {
   analysisWorkItemId?: string
   costCenterId?: string
   approvalStatus?: 'draft' | 'submitted' | 'revision_requested' | 'approved' | 'rejected' | 'cancelled' | 'posted'
+  scope?: 'my' | 'all'
+  createdBy?: string | null
 }
 
 export async function getTransactionsEnrichedView(filters: EnrichedViewFilters, page = 1, pageSize = 20): Promise<PagedResult<any>> {
@@ -102,6 +104,9 @@ export async function getTransactionsEnrichedView(filters: EnrichedViewFilters, 
   if (f.costCenterId) q = q.eq('cost_center_id', f.costCenterId)
   if (f.approvalStatus === 'posted') q = q.eq('is_posted', true)
   else if (f.approvalStatus) q = q.eq('approval_status', f.approvalStatus)
+
+  // Scope: restrict to current user's rows if required
+  if (f.scope === 'my' && f.createdBy) q = q.eq('created_by', f.createdBy)
 
   const { data, error, count } = await q.range(from, to)
   if (error) throw error

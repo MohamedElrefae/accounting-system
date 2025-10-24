@@ -263,6 +263,11 @@ const App: React.FC = () => {
               <TransactionsEnrichedPage />
             </React.Suspense>
           } />
+          <Route path="/transactions/all-enriched" element={
+            <React.Suspense fallback={<div>Loading...</div>}>
+              <TransactionsEnrichedPage />
+            </React.Suspense>
+          } />
 {/* GL2 routes removed in unified model */}
           <Route path="/transactions/:id" element={
             <React.Suspense fallback={<div>Loading...</div>}>

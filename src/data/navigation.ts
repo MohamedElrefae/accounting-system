@@ -146,6 +146,15 @@ const baseNavigation: NavigationItem[] = [
         requiredPermission: "transactions.read.own"
       },
       {
+        id: "all-transactions-enriched",
+        label: "All Transactions (Enriched)", 
+        titleEn: "All Transactions (Enriched)",
+        titleAr: "جميع المعاملات (محسّن)",
+        icon: "list",
+        path: "/transactions/all-enriched",
+        requiredPermission: "transactions.read.all"
+      },
+      {
         id: "pending-transactions",
         label: "Pending Approval",
         titleEn: "Pending Approval", 
