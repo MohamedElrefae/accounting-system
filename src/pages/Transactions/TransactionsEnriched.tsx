@@ -290,7 +290,7 @@ const TransactionsEnrichedPage: React.FC = () => {
               debit_account: accountLabel(t.debit_account_id),
               credit_account: accountLabel(t.credit_account_id),
               amount: t.amount,
-            }))}
+            })))}
             config={{ title: 'تقرير المعاملات (محسّن)', rtlLayout: true, useArabicNumerals: true }}
             size="small"
             layout="horizontal"
