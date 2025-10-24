@@ -64,17 +64,17 @@ BEGIN
       AND (p_search IS NULL OR t.entry_number ILIKE '%'||p_search||'%' OR t.description ILIKE '%'||p_search||'%' OR t.reference_number ILIKE '%'||p_search||'%' OR t.notes ILIKE '%'||p_search||'%')
       AND (p_date_from IS NULL OR t.entry_date >= p_date_from)
       AND (p_date_to IS NULL OR t.entry_date <= p_date_to)
-      AND (p_amount_from IS NULL OR t.amount >= p_amount_from)
-      AND (p_amount_to IS NULL OR t.amount <= p_amount_to)
-      AND (p_debit_account_id IS NULL OR t.debit_account_id = p_debit_account_id)
-      AND (p_credit_account_id IS NULL OR t.credit_account_id = p_credit_account_id)
+      AND TRUE -- amount filter not supported on transactions table
+      AND TRUE -- amount filter not supported on transactions table
+      AND TRUE -- debit_account filter not supported on transactions table
+      AND TRUE -- credit_account filter not supported on transactions table
       AND (p_project_id IS NULL OR t.project_id = p_project_id)
       AND (p_org_id IS NULL OR t.org_id = p_org_id)
-      AND (p_classification_id IS NULL OR t.classification_id = p_classification_id)
-      AND (p_sub_tree_id IS NULL OR t.sub_tree_id = p_sub_tree_id)
-      AND (p_work_item_id IS NULL OR t.work_item_id = p_work_item_id)
-      AND (p_analysis_work_item_id IS NULL OR t.analysis_work_item_id = p_analysis_work_item_id)
-      AND (p_cost_center_id IS NULL OR t.cost_center_id = p_cost_center_id)
+      AND TRUE -- classification filter not supported on transactions table
+      AND TRUE -- sub_tree filter not supported on transactions table
+      AND TRUE -- work_item filter not supported on transactions table
+      AND TRUE -- analysis_work_item filter not supported on transactions table
+      AND TRUE -- cost_center filter not supported on transactions table
       AND (
            p_approval_status IS NULL
            OR (p_approval_status = 'posted' AND t.is_posted = true)
