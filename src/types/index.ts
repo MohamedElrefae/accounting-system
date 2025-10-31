@@ -88,7 +88,7 @@ export interface Organization {
   code: string;
   name: string;
   description?: string;
-  status: "active" | "inactive";
+  status: "active" | "inactive" | "suspended" | "archived";
   address?: string;
   phone?: string;
   email?: string;

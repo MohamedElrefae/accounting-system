@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { getAccounts, getTransactions, createTransaction, createTransactionWithLines, deleteTransaction, updateTransaction, getTransactionAudit, getCurrentUserId, getProjects, approveTransaction, requestRevision, rejectTransaction, submitTransaction, cancelSubmission, postTransaction, getUserDisplayMap, type Account, type TransactionRecord, type TransactionAudit, type Project } from '../../services/transactions'
+import { getAccounts, getTransactions, createTransaction, deleteTransaction, updateTransaction, getTransactionAudit, getCurrentUserId, getProjects, approveTransaction, requestRevision, rejectTransaction, submitTransaction, cancelSubmission, postTransaction, getUserDisplayMap, type Account, type TransactionRecord, type TransactionAudit, type Project } from '../../services/transactions'
 import { getTransactionLines } from '../../services/transaction-lines'
 import { uploadDocument, linkDocumentToTransactionLine } from '../../services/documents'
 import { listWorkItemsAll } from '../../services/work-items'
@@ -76,7 +76,7 @@ const TransactionsPage: React.FC = () => {
   // Unified form state
   const [formOpen, setFormOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
-  const [editingTx, setEditingTx] = useState<TransactionRecord | null>(null)
+    const [editingTx, setEditingTx] = useState<TransactionRecord | null>(null)
   const [creatingDraft, setCreatingDraft] = useState<boolean>(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [detailsFor, setDetailsFor] = useState<TransactionRecord | null>(null)
@@ -3009,62 +3009,7 @@ const TransactionsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Enhanced Transaction Wizard with Material-UI and Attachments */}
-      <TransactionWizard
-        open={wizardOpen}
-        onClose={() => setWizardOpen(false)}
-        onSubmit={async (data) => {
-          // Handle the enhanced wizard submission with attachments
-          try {
-            const result = await createTransactionWithLines(data)
-            
-            // Handle attachments if any
-            if (data.attachments) {
-              const transactionId = result.transaction_id
-              
-              // Upload transaction-level attachments
-              if (data.attachments.transaction && data.attachments.transaction.length > 0) {
-                for (const file of data.attachments.transaction) {
-                  await uploadDocument(file, transactionId, null, data.org_id, data.project_id)
-                  // Transaction-level docs are already linked by uploadDocument
-                }
-              }
-              
-              // Upload line-level attachments
-              if (data.attachments.lines && Object.keys(data.attachments.lines).length > 0) {
-                // Get created lines to link attachments
-                const lines = await getTransactionLines(transactionId)
-                
-                for (const [lineIdx, files] of Object.entries(data.attachments.lines)) {
-                  const lineNumber = Number(lineIdx) + 1
-                  const line = lines.find(l => l.line_no === lineNumber)
-                  
-                  if (line && files.length > 0) {
-                    for (const file of files) {
-                      const docId = await uploadDocument(file, transactionId, null, data.org_id, data.project_id)
-                      await linkDocumentToTransactionLine(docId, line.id)
-                    }
-                  }
-                }
-              }
-            }
-            
-            showToast('تم إنشاء المعاملة بنجاح', { severity: 'success' })
-            await reload()
-          } catch (err: any) {
-            showToast(err.message || 'فشل حفظ المعاملة', { severity: 'error' })
-            throw err
-          }
-        }}
-        accounts={accounts}
-        projects={projects}
-        organizations={organizations}
-        classifications={classifications}
-        categories={categories}
-        workItems={workItems}
-        costCenters={costCenters}
-      />
-
+      
       {/* Transaction Analysis Modal */}
       <TransactionAnalysisModal
         open={analysisModalOpen}
@@ -3183,6 +3128,20 @@ const TransactionsPage: React.FC = () => {
           />
         </DraggableResizablePanel>
       )}
+
+      {/* Simple Transaction Wizard */}
+      <TransactionWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onSubmit={async (data) => {
+          console.log('New transaction data:', data)
+          // TODO: Implement transaction creation logic
+          await reload()
+        }}
+        accounts={accounts}
+        projects={projects}
+        organizations={organizations}
+      />
     </div>
   )
 }

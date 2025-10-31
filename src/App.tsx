@@ -5,6 +5,8 @@ import { useAuth } from './contexts/AuthContext';
 import useAppStore from './store/useAppStore';
 import { ArabicLanguageService } from './services/ArabicLanguageService';
 import DashboardLayout from './components/layout/DashboardLayout';
+import './utils/testSupabaseConnection'; // Auto-test Supabase connection
+import './utils/debugOrganizations'; // Debug organizations loading
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const AccountsTreeLazy = React.lazy(() => import('./pages/MainData/AccountsTree'));
 const DocumentCategoriesPage = React.lazy(() => import('./pages/MainData/DocumentCategories'));
@@ -53,6 +55,7 @@ const ApprovalNotificationCenterPage = React.lazy(() => import('./pages/Fiscal/A
 const PerformanceDashboardPage = React.lazy(() => import('./pages/PerformanceDashboard'))
 import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
+import ErrorBoundary from './components/Common/ErrorBoundary';
 import { ForgotPassword } from './components/auth/ForgotPassword';
 import { ResetPassword } from './components/auth/ResetPassword';
 import AuthDebug from './pages/AuthDebug';
@@ -243,7 +246,9 @@ const App: React.FC = () => {
           {/* Transactions - Single row entry */}
           <Route path="/transactions/my" element={
             <React.Suspense fallback={<div>Loading...</div>}>
-              <TransactionsPage />
+              <ErrorBoundary>
+                <TransactionsPage />
+              </ErrorBoundary>
             </React.Suspense>
           } />
           <Route path="/transactions/pending" element={

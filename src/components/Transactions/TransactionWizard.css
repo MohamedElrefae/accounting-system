@@ -1,0 +1,46 @@
+.transaction-wizard {
+  direction: rtl;
+  text-align: right;
+}
+
+.transaction-wizard .MuiStepper-root {
+  direction: rtl;
+}
+
+.transaction-wizard .MuiStep-root {
+  text-align: right;
+}
+
+.transaction-wizard .MuiStepLabel-label {
+  text-align: right;
+}
+
+.transaction-wizard input,
+.transaction-wizard textarea,
+.transaction-wizard select {
+  text-align: right;
+  direction: rtl;
+}
+
+.transaction-wizard .MuiTableCell-root {
+  text-align: right;
+}
+
+.transaction-wizard .MuiFormControl-root {
+  direction: rtl;
+}
+
+.transaction-wizard .MuiInputLabel-root {
+  right: 0;
+  left: auto;
+  transform-origin: top right;
+}
+
+.transaction-wizard .MuiSelect-select {
+  text-align: right;
+}
+
+.transaction-wizard .MuiMenuItem-root {
+  justify-content: flex-end;
+  text-align: right;
+}

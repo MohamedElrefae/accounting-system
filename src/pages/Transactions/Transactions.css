@@ -3,33 +3,72 @@
 
 .transactions-container { display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden; }
 
-.transactions-header { display: flex; align-items: center; justify-content: space-between; padding: 1.5rem; border-bottom: 1px solid rgba(0,0,0,0.1); }
-.transactions-title { margin: 0; font-size: 1.75rem; font-weight: 700; }
+.transactions-header { 
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between; 
+  padding: 1.5rem; 
+  border-bottom: 3px solid #3b82f6;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.transactions-title { 
+  margin: 0; 
+  font-size: 1.75rem; 
+  font-weight: 700;
+  color: #f1f5f9;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
 .transactions-actions { display: flex; align-items: center; gap: 0.75rem; }
 
 .controls-container { padding: 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid rgba(0,0,0,0.1); flex-wrap: wrap; }
 
-/* New: Filters row (moved from inline styles) */
+/* New: Filters row (moved from inline styles) - ENHANCED CONTRAST */
 .transactions-filters-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 0;
+  gap: 12px;
+  padding: 16px;
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
-  background-color: var(--surface);
+  border-bottom: 2px solid #334155;
+  font-size: 14px;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+  margin-bottom: 4px;
 }
 
-/* Inputs/selects used in filters row */
+/* Inputs/selects used in filters row - ENHANCED CONTRAST */
 .filter-input,
 .filter-select {
-  font-size: 12px;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background-color: var(--field_bg);
-  color: var(--text);
+  font-size: 14px;
+  padding: 9px 14px;
+  border: 2px solid #475569;
+  border-radius: 8px;
+  background-color: #1e293b;
+  color: #f1f5f9;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  min-height: 40px;
+}
+
+.filter-input:hover,
+.filter-select:hover {
+  border-color: #3b82f6;
+  background-color: #0f172a;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+
+.filter-input:focus,
+.filter-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+  background-color: #0f172a;
+}
+
+.filter-input::placeholder {
+  color: #94a3b8;
+  opacity: 0.9;
 }
 
 /* Specific widths */
@@ -65,17 +104,121 @@
 
 .transactions-content { flex-grow: 1; overflow: hidden; padding: 1rem; width: 100%; display: flex; flex-direction: column; }
 
-/* Themed toolbar and pagination (no inline styles) */
-.transactions-tablebar { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.1)); background: var(--surface, #0f0f0f); border-radius: 8px; }
-.transactions-toolbar { display: inline-flex; align-items: center; gap: 8px; }
-.transactions-count { color: var(--text-secondary, #a3a3a3); font-weight: 600; }
-.wrap-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
-.transactions-pagination { display: inline-flex; align-items: center; gap: 8px; }
+/* Themed toolbar and pagination - ENHANCED CONTRAST */
+.transactions-tablebar { 
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between; 
+  padding: 16px; 
+  border-bottom: 2px solid #334155;
+  background: #1e293b;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+}
+.transactions-toolbar { 
+  display: inline-flex; 
+  align-items: center; 
+  gap: 12px; 
+}
+.transactions-count { 
+  color: #f1f5f9;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border-radius: 8px;
+  border: 1px solid #60a5fa;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+.wrap-toggle { 
+  display: inline-flex; 
+  align-items: center; 
+  gap: 8px; 
+  font-size: 14px; 
+  color: #f1f5f9;
+  font-weight: 600;
+  padding: 8px 14px;
+  background: #334155;
+  border-radius: 8px;
+  border: 2px solid #475569;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.wrap-toggle:hover {
+  background: #475569;
+  border-color: #3b82f6;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.2);
+}
+.transactions-pagination { 
+  display: inline-flex; 
+  align-items: center; 
+  gap: 10px; 
+}
 
-.transactions-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.transactions-table th, .transactions-table td { padding: 1rem; text-align: right; border-bottom: 1px solid rgba(0,0,0,0.1); }
-.transactions-table th { font-weight: 600; position: sticky; top: 0; z-index: 10; }
-.amount-cell { font-family: monospace; font-weight: bold; color: #3b82f6; }
+.transactions-table { 
+  width: 100%; 
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  background: #0f172a;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.transactions-table th, .transactions-table td { 
+  padding: 14px 16px; 
+  text-align: right; 
+  border-bottom: 1px solid #334155;
+}
+.transactions-table th { 
+  font-weight: 700;
+  font-size: 14px;
+  position: sticky; 
+  top: 0; 
+  z-index: 10;
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+  color: #f1f5f9;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  border-bottom: 3px solid #3b82f6;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+.transactions-table tbody tr {
+  transition: all 0.2s ease;
+}
+.transactions-table tbody tr:hover {
+  background: #1e293b;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+}
+.transactions-table tbody tr:nth-child(even) {
+  background: #0f172a;
+}
+.transactions-table tbody tr:nth-child(odd) {
+  background: #1e293b;
+}
+.transactions-table tbody tr:nth-child(even):hover,
+.transactions-table tbody tr:nth-child(odd):hover {
+  background: #334155;
+}
+.transactions-table tbody tr:hover td {
+  background: transparent;
+  cursor: pointer;
+}
+.transactions-table td {
+  color: #e2e8f0;
+  font-size: 14px;
+  font-weight: 500;
+  background: transparent;
+}
+.amount-cell { 
+  font-family: 'Courier New', Courier, monospace; 
+  font-weight: 700; 
+  color: #60a5fa;
+  font-size: 16px;
+  direction: ltr;
+  text-align: left;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
 
 .tree-node-actions { display: flex; gap: 0.5rem; }
 

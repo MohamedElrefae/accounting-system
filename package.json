@@ -37,9 +37,10 @@
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.10",
     "dotenv": "^16.4.5",
+    "framer-motion": "^12.23.24",
     "html2canvas": "^1.4.1",
-    "jspdf": "^2.5.2",
-    "jspdf-autotable": "^3.8.2",
+    "jspdf": "^3.0.3",
+    "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.365.0",
     "pdfjs-dist": "^5.4.149",
     "prop-types": "^15.8.1",
@@ -84,7 +85,7 @@
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.39.1",
     "vite": "^7.1.2",
-    "vitest": "^1.6.0",
+    "vitest": "^4.0.5",
     "webpack-bundle-analyzer": "^4.10.1"
   }
 }
