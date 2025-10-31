@@ -3134,9 +3134,73 @@ const TransactionsPage: React.FC = () => {
         open={wizardOpen}
         onClose={() => setWizardOpen(false)}
         onSubmit={async (data) => {
-          console.log('New transaction data:', data)
-          // TODO: Implement transaction creation logic
-          await reload()
+          try {
+            console.log('Saving transaction:', data)
+            
+            // Save transaction header to Supabase
+            const { data: transaction, error: txError } = await supabase
+              .from('transactions')
+              .insert({
+                entry_date: data.entry_date,
+                description: data.description,
+                description_ar: data.description_ar,
+                org_id: data.org_id,
+                project_id: data.project_id,
+                classification_id: data.classification_id,
+                reference_number: data.reference_number,
+                notes: data.notes,
+                notes_ar: data.notes_ar,
+                created_by: (await supabase.auth.getUser()).data.user?.id
+              })
+              .select()
+              .single()
+            
+            if (txError) {
+              console.error('Error saving transaction:', txError)
+              throw new Error(txError.message || 'فشل حفظ المعاملة')
+            }
+            
+            console.log('Transaction saved:', transaction)
+            
+            // Save transaction lines
+            if (data.lines && data.lines.length > 0) {
+              const linesData = data.lines.map((line: any) => ({
+                transaction_id: transaction.id,
+                line_no: line.line_no,
+                account_id: line.account_id,
+                debit_amount: line.debit_amount || 0,
+                credit_amount: line.credit_amount || 0,
+                description: line.description,
+                org_id: line.org_id || data.org_id,
+                project_id: line.project_id || data.project_id,
+                cost_center_id: line.cost_center_id,
+                work_item_id: line.work_item_id,
+                analysis_work_item_id: line.analysis_work_item_id,
+                classification_id: line.classification_id,
+                sub_tree_id: line.sub_tree_id
+              }))
+              
+              const { error: linesError } = await supabase
+                .from('transaction_lines')
+                .insert(linesData)
+              
+              if (linesError) {
+                console.error('Error saving transaction lines:', linesError)
+                throw new Error(linesError.message || 'فشل حفظ بنود المعاملة')
+              }
+              
+              console.log('Transaction lines saved successfully')
+            }
+            
+            // Reload transactions
+            await reload()
+            
+            // Success - the wizard will show success message
+            console.log('Transaction created successfully!')
+          } catch (error: any) {
+            console.error('Transaction creation failed:', error)
+            throw error // Re-throw to let the wizard handle the error
+          }
         }}
         accounts={accounts}
         projects={projects}

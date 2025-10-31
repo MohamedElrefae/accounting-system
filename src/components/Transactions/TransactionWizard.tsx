@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import DraggableResizablePanel from '../Common/DraggableResizablePanel'
+import AttachDocumentsPanel from '../documents/AttachDocumentsPanel'
 import type { Account, Project } from '../../services/transactions'
 import type { Organization } from '../../types'
 import type { TransactionClassification } from '../../services/transaction-classification'
@@ -16,13 +17,17 @@ import {
   Paper,
   Chip,
   Alert,
-  StepButton
+  StepButton,
+  TextField,
+  FormControl,
+  Select,
+  MenuItem
 } from '@mui/material'
+import Grid from '@mui/material/Unstable_Grid2'
 import {
   NavigateNext,
   NavigateBefore,
   Save,
-  Add,
   AttachFile,
   DeleteOutline,
   CheckCircle,
@@ -314,32 +319,42 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
           lines: Object.fromEntries(Object.entries(lineAttachments).map(([idx, files]) => [Number(idx), files]))
         }
       }
+      
+      // Call onSubmit which should save to Supabase
       await onSubmit(finalData)
-      // Reset form and close
-      setTransactionAttachments([])
-      setLineAttachments({})
-      setCompletedSteps(new Set())
-      setHeaderData({
-        entry_date: new Date().toISOString().split('T')[0],
-        description: '',
-        description_ar: '',
-        org_id: localStorage.getItem('default_org_id') || (organizations[0]?.id || ''),
-        project_id: localStorage.getItem('default_project_id') || '',
-        // reset defaults
-        default_cost_center_id: '',
-        default_work_item_id: '',
-        default_sub_tree_id: '',
-        classification_id: '',
-        reference_number: '',
-        notes: '',
-        notes_ar: ''
-      })
-      setLines([
-        { line_no: 1, account_id: '', debit_amount: 0, credit_amount: 0, description: '' },
-        { line_no: 2, account_id: '', debit_amount: 0, credit_amount: 0, description: '' }
-      ])
-      setCurrentStep('basic')
-      onClose()
+      
+      // Show success message
+      setErrors({ success: '✅ تم حفظ المعاملة بنجاح!' })
+      
+      // Wait 2 seconds to show success message, then close
+      setTimeout(() => {
+        // Reset form and close
+        setTransactionAttachments([])
+        setLineAttachments({})
+        setCompletedSteps(new Set())
+        setHeaderData({
+          entry_date: new Date().toISOString().split('T')[0],
+          description: '',
+          description_ar: '',
+          org_id: localStorage.getItem('default_org_id') || (organizations[0]?.id || ''),
+          project_id: localStorage.getItem('default_project_id') || '',
+          // reset defaults
+          default_cost_center_id: '',
+          default_work_item_id: '',
+          default_sub_tree_id: '',
+          classification_id: '',
+          reference_number: '',
+          notes: '',
+          notes_ar: ''
+        })
+        setLines([
+          { line_no: 1, account_id: '', debit_amount: 0, credit_amount: 0, description: '' },
+          { line_no: 2, account_id: '', debit_amount: 0, credit_amount: 0, description: '' }
+        ])
+        setCurrentStep('basic')
+        setErrors({})
+        onClose()
+      }, 2000)
     } catch (err: any) {
       setErrors({ submit: err.message || 'فشل حفظ المعاملة' })
       // Scroll to top to show error
@@ -401,8 +416,8 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     >
       <div className="tx-wizard" dir="rtl">
         {/* Material-UI Stepper */}
-        <Box sx={{ width: '100%', padding: '20px 20px 0 20px' }}>
-          <Stepper activeStep={currentStepIndex} alternativeLabel>
+        <Box sx={{ width: '100%', padding: '20px 20px 0 20px', background: '#0f172a' }}>
+          <Stepper activeStep={currentStepIndex} alternativeLabel sx={{ background: 'transparent' }}>
             {steps.map((step, idx) => (
               <Step key={step.id} completed={completedSteps.has(step.id)}>
                 <StepButton onClick={() => {
@@ -433,130 +448,185 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         <div className="tx-wizard-content">
           {/* STEP 1: Basic Information */}
           {currentStep === 'basic' && (
-            <div className="step-basic" style={{ padding: '20px' }}>
-              <h3 style={{ marginBottom: '20px', color: 'var(--primary)' }}>المعلومات الأساسية للمعاملة</h3>
+            <div className="step-basic" style={{ padding: '20px', background: '#0f172a', pointerEvents: 'auto' }}>
+              <h3 style={{ marginBottom: '20px', color: '#3b82f6', fontSize: '24px', fontWeight: 600 }}>المعلومات الأساسية للمعاملة</h3>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', maxWidth: '900px' }}>
-                {/* Entry Date */}
-                <div className="form-field">
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '14px' }}>
-                    تاريخ القيد <span style={{ color: 'var(--danger)' }}>*</span>
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={headerData.entry_date}
-                    onChange={(e) => setHeaderData(prev => ({ ...prev, entry_date: e.target.value }))}
-                    style={{ 
-                      width: '100%', 
-                      padding: '10px 12px', 
-                      borderRadius: '6px', 
-                      border: `2px solid ${errors.entry_date ? 'var(--danger)' : 'var(--border)'}`,
-                      fontSize: '14px'
-                    }}
-                  />
-                  {errors.entry_date && <div style={{ color: 'var(--danger)', fontSize: '12px', marginTop: '6px' }}>{errors.entry_date}</div>}
-                </div>
+              <Box sx={{ 
+                maxWidth: '1000px', 
+                margin: '0 auto',
+                background: '#1e293b',
+                borderRadius: '12px',
+                padding: '32px',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+                pointerEvents: 'auto',
+                position: 'relative',
+                zIndex: 1
+              }}>
+                <Grid container spacing={3} sx={{ pointerEvents: 'auto' }}>
+                  {/* Entry Date */}
+                  <Grid xs={12} md={6}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600, color: '#f1f5f9' }}>
+                        تاريخ القيد <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={headerData.entry_date}
+                        onChange={(e) => setHeaderData(prev => ({ ...prev, entry_date: e.target.value }))}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          borderRadius: '8px',
+                          border: `2px solid ${errors.entry_date ? '#ef4444' : '#475569'}`,
+                          fontSize: '14px',
+                          backgroundColor: '#334155',
+                          color: '#f1f5f9',
+                          fontFamily: 'inherit'
+                        }}
+                      />
+                      {errors.entry_date && (
+                        <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{errors.entry_date}</div>
+                      )}
+                      {!errors.entry_date && (
+                        <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '4px' }}>حدد تاريخ إجراء المعاملة</div>
+                      )}
+                    </div>
+                  </Grid>
 
-                {/* Organization */}
-                <div className="form-field">
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '14px' }}>
-                    المؤسسة <span style={{ color: 'var(--danger)' }}>*</span>
-                  </label>
-                  <select
-                    required
-                    value={headerData.org_id}
-                    onChange={(e) => setHeaderData(prev => ({ ...prev, org_id: e.target.value, project_id: '' }))}
-                    style={{ 
-                      width: '100%', 
-                      padding: '10px 12px', 
-                      borderRadius: '6px', 
-                      border: `2px solid ${errors.org_id ? 'var(--danger)' : 'var(--border)'}`,
-                      fontSize: '14px'
-                    }}
-                  >
-                    <option value="">اختر المؤسسة...</option>
-                    {organizations.map(org => (
-                      <option key={org.id} value={org.id}>{org.name}</option>
-                    ))}
-                  </select>
-                  {errors.org_id && <div style={{ color: 'var(--danger)', fontSize: '12px', marginTop: '6px' }}>{errors.org_id}</div>}
-                </div>
+                  {/* Organization */}
+                  <Grid xs={12} md={6}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600, color: '#f1f5f9' }}>
+                        المؤسسة <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <select
+                        value={headerData.org_id}
+                        onChange={(e) => setHeaderData(prev => ({ ...prev, org_id: e.target.value, project_id: '' }))}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          borderRadius: '8px',
+                          border: `2px solid ${errors.org_id ? '#ef4444' : '#475569'}`,
+                          fontSize: '14px',
+                          backgroundColor: '#334155',
+                          color: '#f1f5f9',
+                          fontFamily: 'inherit'
+                        }}
+                      >
+                        <option value="" disabled>اختر المؤسسة...</option>
+                        {organizations.map(org => (
+                          <option key={org.id} value={org.id}>{org.code} - {org.name}</option>
+                        ))}
+                      </select>
+                      {errors.org_id && (
+                        <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{errors.org_id}</div>
+                      )}
+                      {!errors.org_id && (
+                        <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '4px' }}>اختر المؤسسة المسؤولة عن هذه المعاملة</div>
+                      )}
+                    </div>
+                  </Grid>
 
-                {/* Description */}
-                <div className="form-field" style={{ gridColumn: '1 / -1' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '14px' }}>
-                    وصف المعاملة <span style={{ color: 'var(--danger)' }}>*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={headerData.description}
-                    onChange={(e) => setHeaderData(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="اكتب وصفاً واضحاً للمعاملة..."
-                    style={{ 
-                      width: '100%', 
-                      padding: '10px 12px', 
-                      borderRadius: '6px', 
-                      border: `2px solid ${errors.description ? 'var(--danger)' : 'var(--border)'}`,
-                      fontSize: '14px'
-                    }}
-                  />
-                  {errors.description && <div style={{ color: 'var(--danger)', fontSize: '12px', marginTop: '6px' }}>{errors.description}</div>}
-                </div>
+                  {/* Description */}
+                  <Grid xs={12} md={6}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600, color: '#f1f5f9' }}>
+                        وصف المعاملة <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={headerData.description}
+                        onChange={(e) => setHeaderData(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="مثال: شراء أثاث مكتبي ولوازم"
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          borderRadius: '8px',
+                          border: `2px solid ${errors.description ? '#ef4444' : '#475569'}`,
+                          fontSize: '14px',
+                          backgroundColor: '#334155',
+                          color: '#f1f5f9',
+                          fontFamily: 'inherit'
+                        }}
+                      />
+                      {errors.description && (
+                        <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{errors.description}</div>
+                      )}
+                      {!errors.description && (
+                        <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '4px' }}>أدخل وصفاً واضحاً وموجزاً للمعاملة (3 أحرف على الأقل)</div>
+                      )}
+                    </div>
+                  </Grid>
 
-                {/* Project */}
-                <div className="form-field">
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '14px' }}>
-                    المشروع
-                  </label>
-                  <select
-                    value={headerData.project_id}
-                    onChange={(e) => setHeaderData(prev => ({ ...prev, project_id: e.target.value }))}
-                    style={{ 
-                      width: '100%', 
-                      padding: '10px 12px', 
-                      borderRadius: '6px', 
-                      border: '2px solid var(--border)',
-                      fontSize: '14px'
-                    }}
-                    disabled={!headerData.org_id}
-                  >
-                    <option value="">بدون مشروع</option>
-                    {filteredProjects.map(proj => (
-                      <option key={proj.id} value={proj.id}>{proj.name}</option>
-                    ))}
-                  </select>
-                </div>
+                  {/* Project */}
+                  <Grid xs={12} md={6}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600, color: '#f1f5f9' }}>
+                        المشروع
+                      </label>
+                      <select
+                        value={headerData.project_id}
+                        onChange={(e) => setHeaderData(prev => ({ ...prev, project_id: e.target.value }))}
+                        disabled={!headerData.org_id}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          borderRadius: '8px',
+                          border: '2px solid #475569',
+                          fontSize: '14px',
+                          backgroundColor: !headerData.org_id ? '#1e293b' : '#334155',
+                          color: '#f1f5f9',
+                          fontFamily: 'inherit',
+                          cursor: !headerData.org_id ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        <option value="">بدون مشروع</option>
+                        {filteredProjects.map(proj => (
+                          <option key={proj.id} value={proj.id}>{proj.code} - {proj.name}</option>
+                        ))}
+                      </select>
+                      <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '4px' }}>
+                        {!headerData.org_id ? '⚠️ اختر المؤسسة أولاً' : 'اختياري - حدد المشروع المرتبط'}
+                      </div>
+                    </div>
+                  </Grid>
 
-                {/* Notes */}
-                <div className="form-field" style={{ gridColumn: '1 / -1' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '14px' }}>
-                    ملاحظات
-                  </label>
-                  <textarea
-                    value={headerData.notes}
-                    onChange={(e) => setHeaderData(prev => ({ ...prev, notes: e.target.value }))}
-                    placeholder="ملاحظات إضافية (اختياري)..."
-                    rows={3}
-                    style={{ 
-                      width: '100%', 
-                      padding: '10px 12px', 
-                      borderRadius: '6px', 
-                      border: '2px solid var(--border)',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-              </div>
+                  {/* Notes */}
+                  <Grid xs={12}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600, color: '#f1f5f9' }}>
+                        ملاحظات
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={headerData.notes}
+                        onChange={(e) => setHeaderData(prev => ({ ...prev, notes: e.target.value }))}
+                        placeholder="ملاحظات داخلية (اختياري)..."
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          borderRadius: '8px',
+                          border: '2px solid #475569',
+                          fontSize: '14px',
+                          backgroundColor: '#334155',
+                          color: '#f1f5f9',
+                          fontFamily: 'inherit',
+                          resize: 'vertical'
+                        }}
+                      />
+                      <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '4px' }}>ملاحظات داخلية اختيارية</div>
+                    </div>
+                  </Grid>
+                </Grid>
+              </Box>
             </div>
           )}
 
           {/* STEP 2: Transaction Lines */}
           {currentStep === 'lines' && (
-            <div className="step-lines" style={{ padding: '20px' }}>
+            <div className="step-lines" style={{ padding: '20px', background: '#0f172a' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h3 style={{ margin: 0, color: 'var(--primary)', fontSize: '20px' }}>بنود المعاملة</h3>
+                <h3 style={{ margin: 0, color: '#3b82f6', fontSize: '24px', fontWeight: 600 }}>بنود المعاملة</h3>
               </div>
 
               <div style={{ background: 'var(--info-bg)', borderRadius: '6px', marginBottom: '16px', border: '1px solid var(--info)' }}>
@@ -588,17 +658,16 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
               </div>
 
               {/* Lines Table */}
-              <div style={{ overflowX: 'auto', marginBottom: '16px' }}>
+              <div style={{ overflowX: 'auto', marginBottom: '16px', background: '#1e293b', borderRadius: '12px', padding: '16px' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                   <thead>
-                    <tr style={{ background: 'var(--surface)', borderBottom: '2px solid var(--border)' }}>
-                      <th style={{ padding: '12px 8px', textAlign: 'center', width: '40px' }}>#</th>
-                      <th style={{ padding: '12px 8px', textAlign: 'right', minWidth: '250px' }}>الحساب *</th>
-                      <th style={{ padding: '12px 8px', textAlign: 'right', width: '110px' }}>مدين</th>
-                      <th style={{ padding: '12px 8px', textAlign: 'right', width: '110px' }}>دائن</th>
-                      <th style={{ padding: '12px 8px', textAlign: 'right', minWidth: '180px' }}>البيان</th>
-                      <th style={{ padding: '12px 8px', textAlign: 'right', width: '150px' }}>المشروع</th>
-                      <th style={{ padding: '12px 8px', textAlign: 'center', width: '100px' }}>إجراءات</th>
+                    <tr style={{ background: '#334155', borderBottom: '2px solid #475569' }}>
+                      <th style={{ padding: '12px 8px', textAlign: 'center', width: '40px', color: '#f1f5f9', fontWeight: 600 }}>#</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'right', minWidth: '250px', color: '#f1f5f9', fontWeight: 600 }}>الحساب *</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'right', width: '110px', color: '#f1f5f9', fontWeight: 600 }}>مدين</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'right', width: '110px', color: '#f1f5f9', fontWeight: 600 }}>دائن</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'right', minWidth: '300px', color: '#f1f5f9', fontWeight: 600 }}>البيان</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'center', width: '100px', color: '#f1f5f9', fontWeight: 600 }}>إجراءات</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -606,8 +675,8 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                       const isExpanded = expandedLines.has(idx)
                       return (
                         <React.Fragment key={idx}>
-                          <tr style={{ borderBottom: '1px solid var(--border-subtle)', background: isExpanded ? 'var(--surface-light)' : 'transparent' }}>
-                            <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 600 }}>{idx + 1}</td>
+                          <tr style={{ borderBottom: '1px solid #475569', background: isExpanded ? '#334155' : 'transparent' }}>
+                            <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 600, color: '#f1f5f9' }}>{idx + 1}</td>
                             <td style={{ padding: '10px 8px' }}>
                               <select
                                 value={line.account_id}
@@ -616,8 +685,10 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                                   width: '100%', 
                                   padding: '8px', 
                                   borderRadius: '4px', 
-                                  border: `2px solid ${errors[`line_${idx}_account`] ? 'var(--danger)' : 'var(--border)'}`,
-                                  fontSize: '13px'
+                                  border: `2px solid ${errors[`line_${idx}_account`] ? '#ef4444' : '#475569'}`,
+                                  fontSize: '13px',
+                                  backgroundColor: '#334155',
+                                  color: '#f1f5f9'
                                 }}
                               >
                                 <option value="">اختر الحساب...</option>
@@ -645,10 +716,12 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                                   width: '100%', 
                                   padding: '8px', 
                                   borderRadius: '4px', 
-                                  border: '2px solid var(--border)', 
+                                  border: '2px solid #475569', 
                                   textAlign: 'right',
                                   fontSize: '13px',
-                                  fontWeight: line.debit_amount > 0 ? 600 : 'normal'
+                                  fontWeight: line.debit_amount > 0 ? 600 : 'normal',
+                                  backgroundColor: '#334155',
+                                  color: '#f1f5f9'
                                 }}
                                 placeholder="0.00"
                               />
@@ -667,47 +740,34 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                                   width: '100%', 
                                   padding: '8px', 
                                   borderRadius: '4px', 
-                                  border: '2px solid var(--border)', 
+                                  border: '2px solid #475569', 
                                   textAlign: 'right',
                                   fontSize: '13px',
-                                  fontWeight: line.credit_amount > 0 ? 600 : 'normal'
+                                  fontWeight: line.credit_amount > 0 ? 600 : 'normal',
+                                  backgroundColor: '#334155',
+                                  color: '#f1f5f9'
                                 }}
                                 placeholder="0.00"
                               />
                             </td>
                             <td style={{ padding: '10px 8px' }}>
-                              <input
-                                type="text"
+                              <textarea
                                 value={line.description || ''}
                                 onChange={(e) => updateLine(idx, { description: e.target.value })}
                                 placeholder="أدخل البيان..."
+                                rows={2}
                                 style={{ 
                                   width: '100%', 
                                   padding: '8px', 
                                   borderRadius: '4px', 
-                                  border: '2px solid var(--border)',
-                                  fontSize: '13px'
+                                  border: '2px solid #475569',
+                                  fontSize: '13px',
+                                  backgroundColor: '#334155',
+                                  color: '#f1f5f9',
+                                  resize: 'vertical',
+                                  fontFamily: 'inherit'
                                 }}
                               />
-                            </td>
-                            <td style={{ padding: '10px 8px' }}>
-                              <select
-                                value={line.project_id || ''}
-                                onChange={(e) => updateLine(idx, { project_id: e.target.value || undefined })}
-                                style={{ 
-                                  width: '100%', 
-                                  padding: '8px', 
-                                  borderRadius: '4px', 
-                                  border: '2px solid var(--border)',
-                                  fontSize: '13px'
-                                }}
-                                disabled={!headerData.org_id}
-                              >
-                                <option value="">-</option>
-                                {filteredProjects.map(proj => (
-                                  <option key={proj.id} value={proj.id}>{proj.name}</option>
-                                ))}
-                              </select>
                             </td>
                             <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                               <IconButton
@@ -737,16 +797,16 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                           </tr>
                           {/* Expanded row with additional fields */}
                           {isExpanded && (
-                            <tr style={{ background: 'var(--surface)' }}>
-                              <td colSpan={7} style={{ padding: '16px 20px' }}>
+                            <tr style={{ background: '#1e293b' }}>
+                              <td colSpan={6} style={{ padding: '16px 20px' }}>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
                               {/* Project */}
                               <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: 600 }}>المشروع</label>
+                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: 600, color: '#f1f5f9' }}>المشروع</label>
                                 <select
                                   value={line.project_id || ''}
                                   onChange={(e) => updateLine(idx, { project_id: e.target.value || undefined })}
-                                  style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '13px' }}
+                                  style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #475569', fontSize: '13px', backgroundColor: '#334155', color: '#f1f5f9' }}
                                   disabled={!headerData.org_id}
                                 >
                                   <option value="">بدون مشروع</option>
@@ -757,11 +817,11 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                               </div>
                               {/* Cost Center */}
                               <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: 600 }}>مركز التكلفة</label>
+                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: 600, color: '#f1f5f9' }}>مركز التكلفة</label>
                                 <select
                                   value={line.cost_center_id || ''}
                                   onChange={(e) => updateLine(idx, { cost_center_id: e.target.value || undefined })}
-                                  style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '13px' }}
+                                  style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #475569', fontSize: '13px', backgroundColor: '#334155', color: '#f1f5f9' }}
                                 >
                                   <option value="">بدون مركز تكلفة</option>
                                   {costCenters.map(cc => (
@@ -771,11 +831,11 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                               </div>
                               {/* Classification */}
                               <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: 600 }}>تصنيف المعاملة</label>
+                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: 600, color: '#f1f5f9' }}>تصنيف المعاملة</label>
                                 <select
                                   value={line.classification_id || ''}
                                   onChange={(e) => updateLine(idx, { classification_id: e.target.value || undefined })}
-                                  style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '13px' }}
+                                  style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #475569', fontSize: '13px', backgroundColor: '#334155', color: '#f1f5f9' }}
                                 >
                                   <option value="">بدون تصنيف</option>
                                   {classifications.map(cls => (
@@ -785,11 +845,11 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                               </div>
                               {/* Work Item */}
                               <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: 600 }}>عنصر العمل</label>
+                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: 600, color: '#f1f5f9' }}>عنصر العمل</label>
                                 <select
                                   value={line.work_item_id || ''}
                                   onChange={(e) => updateLine(idx, { work_item_id: e.target.value || undefined })}
-                                  style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '13px' }}
+                                  style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #475569', fontSize: '13px', backgroundColor: '#334155', color: '#f1f5f9' }}
                                 >
                                   <option value="">بدون عنصر</option>
                                   {workItems.map(wi => (
@@ -799,11 +859,11 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                               </div>
                               {/* Sub Tree */}
                               <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: 600 }}>الشجرة الفرعية</label>
+                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: 600, color: '#f1f5f9' }}>الشجرة الفرعية</label>
                                 <select
                                   value={line.sub_tree_id || ''}
                                   onChange={(e) => updateLine(idx, { sub_tree_id: e.target.value || undefined })}
-                                  style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '13px' }}
+                                  style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #475569', fontSize: '13px', backgroundColor: '#334155', color: '#f1f5f9' }}
                                 >
                                   <option value="">بدون شجرة فرعية</option>
                                   {categories.filter(c => c.org_id === (line.org_id || headerData.org_id)).map(cat => (
@@ -818,23 +878,28 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                               </div>
                             )}
                             
-                            {/* Per-line attachments */}
-                            <Box sx={{ marginTop: '12px', padding: '10px', background: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                <Typography variant="body2" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <AttachFile sx={{ fontSize: 16 }} />
-                                  مرفقات السطر
-                                  {lineAttachments[idx]?.length > 0 && (
-                                    <Chip label={lineAttachments[idx].length} size="small" color="primary" />
-                                  )}
-                                </Typography>
+                            {/* Per-line attachments - Using AttachDocumentsPanel style */}
+                            <div style={{ marginTop: '16px', background: '#0f172a', borderRadius: '8px', padding: '16px', border: '1px solid #334155' }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px', color: '#f1f5f9', fontSize: '15px' }}>
+                                المستندات المرفقة
+                              </Typography>
+                              <Box sx={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
                                 <Button
                                   variant="outlined"
                                   component="label"
                                   size="small"
-                                  startIcon={<Add />}
+                                  sx={{
+                                    borderColor: '#3b82f6',
+                                    color: '#3b82f6',
+                                    fontSize: '12px',
+                                    padding: '6px 12px',
+                                    '&:hover': {
+                                      borderColor: '#60a5fa',
+                                      backgroundColor: 'rgba(59, 130, 246, 0.1)'
+                                    }
+                                  }}
                                 >
-                                  إضافة
+                                  Select
                                   <input
                                     type="file"
                                     hidden
@@ -850,30 +915,123 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                                     }}
                                   />
                                 </Button>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  disabled
+                                  sx={{
+                                    borderColor: '#475569',
+                                    color: '#94a3b8',
+                                    fontSize: '12px',
+                                    padding: '6px 12px'
+                                  }}
+                                >
+                                  Generate from Template
+                                </Button>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  disabled
+                                  sx={{
+                                    borderColor: '#475569',
+                                    color: '#94a3b8',
+                                    fontSize: '12px',
+                                    padding: '6px 12px'
+                                  }}
+                                >
+                                  Link existing
+                                </Button>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  disabled
+                                  sx={{
+                                    borderColor: '#475569',
+                                    color: '#94a3b8',
+                                    fontSize: '12px',
+                                    padding: '6px 12px'
+                                  }}
+                                >
+                                  Refresh
+                                </Button>
+                                <Button
+                                  variant="contained"
+                                  size="small"
+                                  component="label"
+                                  sx={{
+                                    backgroundColor: '#3b82f6',
+                                    color: '#fff',
+                                    fontSize: '12px',
+                                    padding: '6px 12px',
+                                    '&:hover': {
+                                      backgroundColor: '#2563eb'
+                                    }
+                                  }}
+                                >
+                                  Upload & Link
+                                  <input
+                                    type="file"
+                                    hidden
+                                    multiple
+                                    accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"
+                                    onChange={(e) => {
+                                      if (e.target.files) {
+                                        setLineAttachments(prev => ({
+                                          ...prev,
+                                          [idx]: [...(prev[idx] || []), ...Array.from(e.target.files!)]
+                                        }))
+                                      }
+                                    }}
+                                  />
+                                </Button>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  disabled
+                                  sx={{
+                                    borderColor: '#475569',
+                                    color: '#94a3b8',
+                                    fontSize: '12px',
+                                    padding: '6px 12px'
+                                  }}
+                                >
+                                  Documents
+                                </Button>
                               </Box>
-                              {lineAttachments[idx]?.length > 0 ? (
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                  {lineAttachments[idx].map((file, fIdx) => (
-                                    <Chip
-                                      key={fIdx}
-                                      label={file.name}
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+                                {lineAttachments[idx]?.map((file, fIdx) => (
+                                  <Paper key={fIdx} sx={{ padding: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#1e293b', border: '1px solid #334155' }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                      <AttachFile sx={{ color: '#3b82f6', fontSize: 20 }} />
+                                      <Box>
+                                        <Typography variant="body2" sx={{ color: '#f1f5f9', fontSize: '13px', fontWeight: 500 }}>{file.name}</Typography>
+                                        <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                                          {(file.size / 1024).toFixed(2)} KB
+                                        </Typography>
+                                      </Box>
+                                    </Box>
+                                    <IconButton
                                       size="small"
-                                      onDelete={() => {
+                                      onClick={() => {
                                         setLineAttachments(prev => ({
                                           ...prev,
                                           [idx]: prev[idx].filter((_, i) => i !== fIdx)
                                         }))
                                       }}
-                                      sx={{ fontSize: '11px' }}
-                                    />
-                                  ))}
-                                </Box>
-                              ) : (
-                                <Typography variant="caption" color="text.secondary">
-                                  لا توجد مرفقات لهذا السطر
-                                </Typography>
-                              )}
-                            </Box>
+                                      sx={{ color: '#ef4444' }}
+                                    >
+                                      <DeleteOutline fontSize="small" />
+                                    </IconButton>
+                                  </Paper>
+                                ))}
+                                {(!lineAttachments[idx] || lineAttachments[idx].length === 0) && (
+                                  <Box sx={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
+                                    <AttachFile sx={{ fontSize: 40, opacity: 0.3, marginBottom: '8px' }} />
+                                    <Typography variant="body2">لم يتم إرفاق مستندات</Typography>
+                                  </Box>
+                                )}
+                              </Box>
+                            </div>
                               </td>
                             </tr>
                           )}
@@ -1044,6 +1202,18 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
           {/* STEP 4: Review */}
           {currentStep === 'review' && (
             <div className="step-review" style={{ padding: '20px' }}>
+              {/* Success/Error Messages */}
+              {errors.success && (
+                <Alert severity="success" sx={{ marginBottom: '20px' }}>
+                  {errors.success}
+                </Alert>
+              )}
+              {errors.submit && (
+                <Alert severity="error" sx={{ marginBottom: '20px' }}>
+                  {errors.submit}
+                </Alert>
+              )}
+              
               <h3 style={{ marginBottom: '20px', color: 'var(--primary)' }}>مراجعة المعاملة قبل الحفظ</h3>
 
               {/* Header Info */}
