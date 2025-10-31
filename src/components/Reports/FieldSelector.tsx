@@ -134,7 +134,7 @@ const FieldSelector: React.FC<FieldSelectorProps> = ({
               primary={field.label}
               secondary={
                 <Box display="flex" alignItems="center" gap={1}>
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography component="span" variant="caption" color="text.secondary">
                     {field.name}
                   </Typography>
                   <Chip
@@ -163,6 +163,7 @@ const FieldSelector: React.FC<FieldSelectorProps> = ({
                   )}
                 </Box>
               }
+              secondaryTypographyProps={{ component: 'div' }}
             />
           </ListItemButton>
         </ListItem>

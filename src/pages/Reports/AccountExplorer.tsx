@@ -213,7 +213,7 @@ const AccountExplorerReport: React.FC = () => {
       }>
 
       // 2) Fetch GL summary for current filters
-      const { data: summaryData, error: sumErr } = await supabase.rpc('get_gl_account_summary', {
+      const { data: summaryData, error: sumErr } = await supabase.rpc('get_gl_account_summary_filtered', {
         p_date_from: mode === 'range' ? (dateFrom || null) : null,
         p_date_to: dateTo || null,
         p_org_id: orgIdRef.current || null,
@@ -222,13 +222,9 @@ const AccountExplorerReport: React.FC = () => {
         p_limit: null,
         p_offset: null,
         p_classification_id: classificationId || null,
-        p_cost_center_id: costCenterId || null,
-        p_work_item_id: workItemId || null,
+        p_analysis_work_item_id: workItemId || null,
         p_expenses_category_id: expensesCategoryId || null,
-        p_debit_account_id: debitAccountId || null,
-        p_credit_account_id: creditAccountId || null,
-        p_amount_min: amountMin ? Number(amountMin) : null,
-        p_amount_max: amountMax ? Number(amountMax) : null,
+        p_sub_tree_id: expensesCategoryId || null,
       })
       if (sumErr) throw sumErr
       const summaryRows = (summaryData || []) as Array<{

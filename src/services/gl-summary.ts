@@ -50,7 +50,7 @@ export async function fetchGLSummary(filters: GLFilters): Promise<GLAccountSumma
     const dateTo = filters.dateTo && filters.dateTo.trim() !== '' ? filters.dateTo : null;
     
     // Use parameter structure from working gl-account-summary service
-    const { data, error } = await supabase.rpc('get_gl_account_summary_filtered', {
+const { data, error } = await supabase.rpc('get_gl_account_summary_filtered', {
       p_date_from: dateFrom,
       p_date_to: dateTo,
       p_org_id: filters.orgId ?? null,
@@ -60,6 +60,7 @@ export async function fetchGLSummary(filters: GLFilters): Promise<GLAccountSumma
       p_offset: null,
       p_classification_id: null,
       p_analysis_work_item_id: null,
+      p_expenses_category_id: null,
       p_sub_tree_id: null
     });
 

@@ -252,7 +252,7 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
         left: 0,
         width: '100vw',
         height: '100vh',
-        zIndex: 1000
+        zIndex: 10000
       };
     }
 
@@ -266,7 +266,7 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
       return {
         position: 'fixed',
         ...dockStyles[dockPosition],
-        zIndex: 1000
+        zIndex: 10000
       };
     }
 
@@ -276,7 +276,7 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
       top: position.y,
       width: size.width,
       height: size.height,
-      zIndex: 1000
+      zIndex: 10000
     } as React.CSSProperties;
   };
 

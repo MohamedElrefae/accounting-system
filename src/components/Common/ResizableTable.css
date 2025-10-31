@@ -93,7 +93,8 @@
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal; /* allow wrap for readability */
+  line-height: 1.2;
   font-size: 0.875rem;
 }
 

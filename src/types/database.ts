@@ -213,6 +213,7 @@ export interface Organization extends BaseEntity {
   registration_number?: string | null;
   logo_url?: string | null;
   is_active: boolean;
+  status?: 'active' | 'inactive' | 'suspended' | 'archived'; // Added by migration 001
   parent_org_id?: DatabaseId | null;
   settings?: unknown; // json
 }

@@ -21,13 +21,14 @@ export type TransactionClassificationUpdate = Partial<Omit<TransactionClassifica
 export async function getTransactionClassifications(orgId: string): Promise<TransactionClassification[]> {
   const { data, error } = await supabase
     .from('transaction_classification')
-    .select('*')
+    .select('id, code, name, post_to_costs, org_id, created_at, updated_at')
     .eq('org_id', orgId)
-    .order('code', { ascending: true });
+    .order('code', { ascending: true })
+    .limit(1000);
 
   if (error) {
     console.error('Error fetching transaction classifications:', error);
-    throw error;
+    return []; // Return empty array instead of throwing
   }
   
   return (data as TransactionClassification[]) || [];
@@ -40,12 +41,13 @@ export async function getTransactionClassifications(orgId: string): Promise<Tran
 export async function getAllTransactionClassifications(): Promise<TransactionClassification[]> {
   const { data, error } = await supabase
     .from('transaction_classification')
-    .select('*')
-    .order('code', { ascending: true });
+    .select('id, code, name, post_to_costs, org_id, created_at, updated_at')
+    .order('code', { ascending: true })
+    .limit(1000);
 
   if (error) {
     console.error('Error fetching all transaction classifications:', error);
-    throw error;
+    return []; // Return empty array instead of throwing
   }
   
   return (data as TransactionClassification[]) || [];

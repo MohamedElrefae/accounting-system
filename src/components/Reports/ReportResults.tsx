@@ -3,12 +3,6 @@ import {
   Box,
   Typography,
   Paper,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-  TablePagination,
   Alert,
   CircularProgress,
   Button,
@@ -18,6 +12,11 @@ import {
   ListItemIcon,
   ListItemText,
 } from '@mui/material';
+import ResizableTable from '../Common/ResizableTable';
+import type { ColumnConfig as GridCol } from '../Common/ResizableTable';
+import ColumnConfiguration from '../Common/ColumnConfiguration';
+import { useColumnPreferences } from '../../hooks/useColumnPreferences';
+import { useAuth } from '../../contexts/AuthContext';
 import ExportIcon from '@mui/icons-material/GetApp';
 import SaveIcon from '@mui/icons-material/Save';
 import TableIcon from '@mui/icons-material/TableChart';
@@ -41,10 +40,35 @@ const ReportResults: React.FC<ReportResultsProps> = ({
   error = null,
   onExport,
   onSave,
+  dataset,
+  tableKey,
 }) => {
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [exportMenuAnchor, setExportMenuAnchor] = useState<null | HTMLElement>(null);
+  const [configOpen, setConfigOpen] = useState(false);
+  const { user } = useAuth();
+  
+  // Build default columns from result metadata (memoized to avoid infinite loops)
+  const defaults: GridCol[] = React.useMemo(() => (
+    (data?.columns || []).map((c) => ({
+      key: c.field,
+      label: c.label || c.field,
+      visible: true,
+      width: 140,
+      minWidth: 100,
+      maxWidth: 420,
+      resizable: true,
+      sortable: true,
+      type: (c.type as any) || 'text',
+      frozen: ['entry_date','entry_number'].includes(c.field),
+      pinPriority: ['entry_date','entry_number'].includes(c.field) ? (c.field === 'entry_date' ? 2 : 1) : 0,
+    }))
+  ), [data?.columns]);
+  const prefKey = tableKey || `reports/custom/${dataset?.key || dataset?.id || 'unknown'}`;
+  const { columns, handleColumnResize, handleColumnConfigChange, resetToDefaults } = useColumnPreferences({
+    storageKey: prefKey,
+    defaultColumns: defaults,
+    userId: user?.id,
+  });
 
   const formatCellValue = (value: any): string => {
     if (value === null || value === undefined) {
@@ -169,11 +193,6 @@ const ReportResults: React.FC<ReportResultsProps> = ({
     );
   }
 
-  const paginatedData = data.data.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
-
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -242,86 +261,41 @@ const ReportResults: React.FC<ReportResultsProps> = ({
 
       {/* Summary Info */}
       <Box display="flex" gap={2} mb={3}>
-        <Chip
-          size="medium"
-          label={`${data.total_count.toLocaleString('ar-SA')} صف`}
-          color="primary"
-        />
-        <Chip
-          size="medium"
-          label={`${data.columns.length} عمود`}
-          color="secondary"
-        />
-        <Chip
-          size="medium"
-          label={`${data.execution_time_ms} مللي ثانية`}
-          color="info"
-        />
+        <Chip size="medium" label={`${data.total_count.toLocaleString('ar-SA')} صف`} color="primary" />
+        <Chip size="medium" label={`${data.columns.length} عمود`} color="secondary" />
+        <Chip size="medium" label={`${data.execution_time_ms} مللي ثانية`} color="info" />
+        <Button variant="outlined" onClick={() => setConfigOpen(true)}>إعداد الأعمدة</Button>
       </Box>
 
       {data.data.length === 0 ? (
-        <Alert severity="warning">
-          لا توجد نتائج تطابق الشروط المحددة
-        </Alert>
+        <Alert severity="warning">لا توجد نتائج تطابق الشروط المحددة</Alert>
       ) : (
-        <Paper elevation={1}>
-          <Box sx={{ overflow: 'auto', maxHeight: 600 }}>
-            <Table stickyHeader>
-              <TableHead>
-                <TableRow>
-                  {data.columns.map((column) => (
-                    <TableCell 
-                      key={column.field} 
-                      sx={{ 
-                        fontWeight: 'bold',
-                        bgcolor: 'grey.50',
-                        minWidth: 120,
-                      }}
-                    >
-                      {column.label}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {paginatedData.map((row, rowIndex) => (
-                  <TableRow key={page * rowsPerPage + rowIndex} hover>
-                    {data.columns.map((column) => (
-                      <TableCell key={column.field}>
-                        {formatCellValue(row[column.field])}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+        <Paper elevation={1} sx={{ p: 0 }}>
+          {/* Make the grid area tall for full-page feel */}
+          <Box sx={{ height: '70vh' }}>
+            <ResizableTable
+              columns={columns as GridCol[]}
+              data={data.data}
+              onColumnResize={handleColumnResize}
+              className="wrap"
+              headerHeight={48}
+              rowHeight={44}
+            />
           </Box>
-
-          <TablePagination
-            rowsPerPageOptions={[10, 25, 50, 100]}
-            component="div"
-            count={data.total_count}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={handleChangePage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-            labelRowsPerPage="عدد الصفوف في الصفحة:"
-            labelDisplayedRows={({ from, to, count }) => 
-              `${from}-${to} من ${count !== -1 ? count : `أكثر من ${to}`}`
-            }
-            getItemAriaLabel={(type) => {
-              if (type === 'first') return 'الصفحة الأولى';
-              if (type === 'last') return 'الصفحة الأخيرة';
-              if (type === 'next') return 'الصفحة التالية';
-              return 'الصفحة السابقة';
-            }}
-          />
         </Paper>
       )}
 
+      <ColumnConfiguration
+        columns={columns as GridCol[]}
+        isOpen={configOpen}
+        onClose={() => setConfigOpen(false)}
+        onConfigChange={handleColumnConfigChange as any}
+        onReset={resetToDefaults}
+      />
+
       {data.total_count > 1000 && (
         <Alert severity="info" sx={{ mt: 2 }}>
-          <strong>تلميح:</strong> يحتوي التقرير على عدد كبير من النتائج. يمكنك استخدام المرشحات لتقليل النتائج أو تصدير البيانات لتحليلها في برنامج خارجي.
+          <strong>تلميح:</strong> يحتوي التقرير على عدد كبير من النتائج. استخدم المرشحات لتقليل النتائج أو قم بالتصدير.
         </Alert>
       )}
     </Box>

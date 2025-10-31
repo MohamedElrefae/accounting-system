@@ -32,7 +32,7 @@ export interface GLAccountSummaryRow {
 }
 
 export async function fetchGLAccountSummary(filters: GLAccountSummaryFilters): Promise<GLAccountSummaryRow[]> {
-  const { data, error } = await supabase.rpc('get_gl_account_summary_filtered', {
+const { data, error } = await supabase.rpc('get_gl_account_summary_filtered', {
     p_date_from: filters.dateFrom ?? null,
     p_date_to: filters.dateTo ?? null,
     p_org_id: filters.orgId ?? null,
@@ -42,6 +42,7 @@ export async function fetchGLAccountSummary(filters: GLAccountSummaryFilters): P
     p_offset: filters.offset ?? null,
     p_classification_id: filters.classificationId ?? null,
     p_analysis_work_item_id: filters.analysisWorkItemId ?? null,
+    p_expenses_category_id: filters.expensesCategoryId ?? null,
     p_sub_tree_id: filters.expensesCategoryId ?? null,
   })
   if (error) throw error

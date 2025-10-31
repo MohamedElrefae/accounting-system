@@ -4,12 +4,12 @@ import {
   Card,
   CardContent,
   Typography,
-  Grid,
   Skeleton,
   Alert,
   Chip,
   IconButton,
 } from '@mui/material';
+import Grid from '@mui/material/Unstable_Grid2';
 import DatasetIcon from '@mui/icons-material/Dataset';
 import InfoIcon from '@mui/icons-material/Info';
 import type { DatasetSelectorProps } from '../../types/reports';
@@ -70,8 +70,8 @@ const DatasetSelector: React.FC<DatasetSelectorProps> = ({
       </Typography>
 
       <Grid container spacing={2}>
-        {datasets.map((dataset) => (
-          <Grid xs={12} md={6} key={dataset.id}>
+{datasets.map((dataset) => (
+          <Grid xs={12} md={6} key={dataset.id || (dataset as any).key || dataset.name}>
             <Card
               sx={{
                 cursor: 'pointer',
