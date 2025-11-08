@@ -10,40 +10,21 @@ import { DRAWER_WIDTH, DRAWER_COLLAPSED_WIDTH } from './Sidebar';
 
 const DashboardLayout: React.FC = () => {
   const { sidebarCollapsed, toggleSidebar, language } = useAppStore();
-  const [mounted, setMounted] = React.useState(true);
   const isRtl = language === 'ar';
   
-  // Force complete remount when language changes
+  // Simple direction update - no remounting needed
   React.useEffect(() => {
-    // Force unmount and remount
-    setMounted(false);
-    
-    // Update document direction
     document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
     document.documentElement.lang = language;
-    
-    // Remount after a brief delay
-    const timer = setTimeout(() => {
-      setMounted(true);
-    }, 50);
-    
-    return () => clearTimeout(timer);
-  }, [language]);
-
+  }, [language, isRtl]);
 
   const handleMenuClick = () => {
     toggleSidebar?.();
   };
 
-  // Don't render during remount transition
-  if (!mounted) {
-    return null;
-  }
-
   // Render the sidebar out-of-flow via a portal so it can freely sit on the left/right
   return (
     <Box 
-      key={isRtl ? 'rtl-layout' : 'ltr-layout'}
       sx={{
         display: 'flex', 
         flexDirection: 'column',

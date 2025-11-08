@@ -4,14 +4,18 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-console.log('🔍 Supabase URL:', supabaseUrl ? 'SET' : 'MISSING')
-console.log('🔍 Supabase Key:', supabaseAnonKey ? 'SET' : 'MISSING')
+if (import.meta.env.DEV) {
+  console.log('🔍 Supabase URL:', supabaseUrl ? 'SET' : 'MISSING')
+  console.log('🔍 Supabase Key:', supabaseAnonKey ? 'SET' : 'MISSING')
+}
 
 // Check if environment variables are properly loaded
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ Supabase environment variables are missing!')
-  console.error('Expected: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY')
-  console.error('Available env vars:', Object.keys(import.meta.env).filter(k => k.startsWith('VITE_')))
+  if (import.meta.env.DEV) {
+    console.error('❌ Supabase environment variables are missing!')
+    console.error('Expected: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY')
+    console.error('Available env vars:', Object.keys(import.meta.env).filter(k => k.startsWith('VITE_')))
+  }
   
   // Show a user-friendly error instead of white screen
   document.addEventListener('DOMContentLoaded', () => {

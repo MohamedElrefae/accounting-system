@@ -21,11 +21,11 @@ const queryClient = new QueryClient({
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
-      staleTime: 10 * 60 * 1000, // 10 minutes - longer cache
-      cacheTime: 15 * 60 * 1000, // 15 minutes
+      staleTime: 30 * 1000, // 30 seconds - fresh data
+      cacheTime: 5 * 60 * 1000, // 5 minutes
       suspense: false, // Disable suspense for better performance
       useErrorBoundary: false, // Handle errors locally
-      refetchOnMount: false, // Don't refetch on component mount
+      refetchOnMount: true, // Always get fresh data on mount
     },
   },
 })
