@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Box, Button, Divider, Stack, TextField, Typography, styled } from '@mui/material';
-import OrgSelector from '../../../components/organizations/OrgSelector';
+import OrgSelector from '../../../components/Organizations/OrgSelector';
 import { useToast } from '../../../contexts/ToastContext';
 import { getActiveOrgId } from '../../../utils/org';
 import * as svc from '../../../services/templates';

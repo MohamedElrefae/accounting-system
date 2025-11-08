@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Box, Button, Divider, Stack, TextField, Typography, styled, FormControlLabel, Checkbox } from '@mui/material';
-import OrgSelector from '../../../components/organizations/OrgSelector';
+import OrgSelector from '../../../components/Organizations/OrgSelector';
 import { useParams } from 'react-router-dom';
 import { useToast } from '../../../contexts/ToastContext';
 import * as tpl from '../../../services/templates';
