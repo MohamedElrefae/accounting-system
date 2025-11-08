@@ -1,7 +1,7 @@
 import { useParams } from 'react-router-dom';
 import { Box, TextField, Typography, Stack, Button } from '@mui/material';
 import { useEffect, useState } from 'react';
-import ProjectAttachmentsPanel from '../../components/projects/ProjectAttachmentsPanel';
+import ProjectAttachmentsPanel from '../../components/Projects/ProjectAttachmentsPanel';
 import { getActiveOrgId, setActiveOrgId } from '../../utils/org';
 import { supabase } from '../../utils/supabase';
 import { getOrganizations, type Organization } from '../../services/organization';
