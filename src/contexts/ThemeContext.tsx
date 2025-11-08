@@ -56,9 +56,13 @@ export const CustomThemeProvider: React.FC<ThemeProviderProps> = ({ children }) 
   // Create the Material-UI theme using our unified theme system
   // Include forceRender in dependencies to ensure recreation
   const theme = React.useMemo(() => {
-    console.log('[ThemeContext] Creating theme with mode:', themeMode, 'language:', language, 'forceRender:', forceRender);
+    if (import.meta.env.DEV) {
+      console.log('[ThemeContext] Creating theme with mode:', themeMode, 'language:', language, 'forceRender:', forceRender);
+    }
     const newTheme = createAppTheme(themeMode, language);
-    console.log('[ThemeContext] Created theme direction:', newTheme.direction);
+    if (import.meta.env.DEV) {
+      console.log('[ThemeContext] Created theme direction:', newTheme.direction);
+    }
     return newTheme;
   }, [themeMode, language, forceRender]);
 

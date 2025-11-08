@@ -3,14 +3,18 @@ export class PerformanceMonitor {
 
   static startMeasure(name: string) {
     this.measurements[name] = performance.now();
-    console.log(`⏱️ Started measuring: ${name}`);
+    if (import.meta.env.DEV) {
+      console.log(`⏱️ Started measuring: ${name}`);
+    }
   }
 
   static endMeasure(name: string) {
     const start = this.measurements[name];
     if (start) {
       const duration = performance.now() - start;
-      console.log(`⚡ ${name}: ${duration.toFixed(2)}ms`);
+      if (import.meta.env.DEV) {
+        console.log(`⚡ ${name}: ${duration.toFixed(2)}ms`);
+      }
       delete this.measurements[name];
       return duration;
     }
@@ -23,8 +27,8 @@ export class PerformanceMonitor {
   }
 
   static logPageLoad() {
-    // Log Core Web Vitals
-    if ('performance' in window) {
+    // Log Core Web Vitals (dev only)
+    if (import.meta.env.DEV && 'performance' in window) {
       const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
       
       console.log('📊 Performance Metrics:');
@@ -35,8 +39,8 @@ export class PerformanceMonitor {
   }
 }
 
-// Auto-log page performance when DOM is ready
-if (typeof window !== 'undefined') {
+// Auto-log page performance when DOM is ready (dev only)
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
   window.addEventListener('load', () => {
     setTimeout(() => PerformanceMonitor.logPageLoad(), 100);
   });

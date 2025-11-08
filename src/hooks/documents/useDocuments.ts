@@ -1,11 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as svc from '../../services/documents';
+import { stableListQueryOptions } from '../../services/queryOptions';
 
 export function useDocuments(params?: Parameters<typeof svc.getDocuments>[0]) {
   return useQuery({
     queryKey: ['documents', params ?? 'disabled'],
     queryFn: () => svc.getDocuments(params as any),
     enabled: !!params && !!(params as any).orgId,
+    ...stableListQueryOptions,
   });
 }
 
@@ -25,6 +27,7 @@ export function useDocument(documentId?: string) {
     queryKey: ['document', documentId],
     queryFn: () => svc.getDocumentById(documentId as string),
     enabled: !!documentId,
+    ...stableListQueryOptions,
   });
 }
 
@@ -33,6 +36,7 @@ export function useDocumentVersions(documentId?: string) {
     queryKey: ['document-versions', documentId],
     queryFn: () => svc.getDocumentVersions(documentId as string),
     enabled: !!documentId,
+    ...stableListQueryOptions,
   });
 }
 
