@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { CostAnalysisModal } from '../CostAnalysisModal'
 import { TransactionLineItemsEditor } from '../TransactionLineItemsEditor'
-import type { EditableTxLineItem } from '../../../services/transaction-line-items'
+import type { EditableTxLineItem } from '../../../services/transaction-line-items-enhanced'
 
 /**
  * 🧪 COST ANALYSIS MODAL INTEGRATION TESTS

@@ -74,44 +74,27 @@ const TransactionsHeaderTable: React.FC<TransactionsHeaderTableProps> = ({
   
   // Prepare table data
   const tableData = useMemo(() => {
-    const accLabel = (id?: string | null) => {
-      if (!id) return ''
-      const a = accounts.find(x => x.id === id)
-      return a ? `${a.code} - ${a.name}` : id
-    }
-
-    const catMap: Record<string, string> = {}
-    for (const c of categories) { catMap[c.id] = `${c.code} - ${c.description}` }
-
     return transactions.map((t: any) => ({
       entry_number: t.entry_number,
       entry_date: t.entry_date,
       description: t.description,
-      debit_account_label: accLabel(t.debit_account_id),
-      credit_account_label: accLabel(t.credit_account_id),
-      amount: t.amount,
-      sub_tree_label: t.sub_tree_id ? (catMap[t.sub_tree_id] || '—') : '—',
-      work_item_label: (() => { const wi = workItems.find(w => w.id === (t.work_item_id || '')); return wi ? `${wi.code} - ${wi.name}` : '—' })(),
-      analysis_work_item_label: (() => {
-        const id = (t as any).analysis_work_item_id || ''
-        if (!id) return '—'
-        const a = analysisItemsMap[id]
-        return a ? `${a.code} - ${a.name}` : id
-      })(),
-      classification_name: t.transaction_classification?.name || '—',
+      line_items_count: Number((t as any).line_items_count ?? 0),
+      line_items_total: Number((t as any).line_items_total ?? (Math.max(Number((t as any).total_debits ?? 0), Number((t as any).total_credits ?? 0)))),
+      total_debits: Number((t as any).total_debits ?? 0),
+      total_credits: Number((t as any).total_credits ?? 0),
       organization_name: organizations.find(o => o.id === (t.org_id || ''))?.name || '—',
       project_name: projects.find(p => p.id === (t.project_id || ''))?.name || '—',
-      cost_center_label: t.cost_center_code && t.cost_center_name ? `${t.cost_center_code} - ${t.cost_center_name}` : '—',
       reference_number: t.reference_number || '—',
       notes: t.notes || '—',
       created_by_name: t.created_by ? (userNames[t.created_by] || t.created_by.substring(0, 8)) : '—',
       posted_by_name: t.posted_by ? (userNames[t.posted_by] || t.posted_by.substring(0, 8)) : '—',
+      posted_at: (t as any).posted_at || null,
       approval_status: t.is_posted ? 'posted' : ((t as any).approval_status || 'draft'),
       documents_count: (t as any).documents_count || 0,
       actions: null,
       original: t
     }))
-  }, [transactions, accounts, userNames, categories, workItems, analysisItemsMap, organizations, projects])
+  }, [transactions, userNames, organizations, projects])
 
   return (
     <ResizableTable

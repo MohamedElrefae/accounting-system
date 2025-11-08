@@ -19,6 +19,10 @@ export interface TransactionLineRecord {
   created_at: string
   updated_at: string
   documents_count?: number
+  // New aggregated fields from transaction_line_items
+  line_items_count?: number
+  line_items_total?: number
+  // Existing cost fields
   discount_amount?: number
   tax_amount?: number
   total_cost?: number | null
@@ -86,6 +90,10 @@ const TransactionLinesTable: React.FC<TransactionLinesTableProps> = ({
       work_item_label: line.work_item_id ? (workItems.find(w => w.id === line.work_item_id)?.name || line.work_item_id) : '—',
       classification_label: line.classification_id ? (classifications.find(c => c.id === line.classification_id)?.name || line.classification_id) : '—',
       sub_tree_label: line.sub_tree_id ? (catMap[line.sub_tree_id] || line.sub_tree_id) : '—',
+      // Aggregated line items fields
+      line_items_count: Number(line.line_items_count || 0),
+      line_items_total: Number(line.line_items_total || 0),
+      // Cost fields
       discount_amount: line.discount_amount || 0,
       tax_amount: line.tax_amount || 0,
       total_cost: line.total_cost || 0,
@@ -106,8 +114,8 @@ const TransactionLinesTable: React.FC<TransactionLinesTableProps> = ({
       highlightRowId={selectedLineId}
       getRowId={(row) => (row as any).original?.id ?? (row as any).id}
       renderCell={(_value, column, row, _rowIndex) => {
-        // Handle cost columns - display currency format
-        if (column.key === 'discount_amount' || column.key === 'tax_amount' || column.key === 'total_cost' || column.key === 'standard_cost') {
+        // Handle currency columns
+        if (column.key === 'discount_amount' || column.key === 'tax_amount' || column.key === 'total_cost' || column.key === 'standard_cost' || column.key === 'line_items_total') {
           const value = _value || 0
           return (
             <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>

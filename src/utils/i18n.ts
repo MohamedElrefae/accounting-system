@@ -1,6 +1,18 @@
 import useAppStore from '@/store/useAppStore'
 
 const en = {
+  welcomeTitle: 'Welcome',
+  quickActions: 'Quick Actions',
+  recentActivity: 'Recent Activity',
+  createTransaction: 'Create Transaction',
+  accountsTree: 'Accounts Tree',
+  generalLedger: 'General Ledger',
+  noRecentActivity: 'No recent activity',
+  posted: 'Posted',
+  draft: 'Draft',
+  makeWelcomeDefault: 'Make Welcome my default',
+  makeDashboardDefault: 'Make Dashboard my default',
+  goToDashboard: 'Go to Dashboard',
   openingBalanceImport: 'Opening Balance Import',
   uploadExcel: 'Upload Excel, track import, and validate results',
   template: 'Template',
@@ -36,6 +48,18 @@ const en = {
 }
 
 const ar = {
+  welcomeTitle: 'مرحباً',
+  quickActions: 'إجراءات سريعة',
+  recentActivity: 'النشاط الأخير',
+  createTransaction: 'إنشاء معاملة',
+  accountsTree: 'شجرة الحسابات',
+  generalLedger: 'دفتر الأستاذ',
+  noRecentActivity: 'لا يوجد نشاط حديث',
+  posted: 'مرحّلة',
+  draft: 'مسودة',
+  makeWelcomeDefault: 'اجعل صفحة الترحيب هي الافتراضية',
+  makeDashboardDefault: 'اجعل لوحة التحكم هي الافتراضية',
+  goToDashboard: 'الانتقال إلى لوحة التحكم',
   openingBalanceImport: 'استيراد الأرصدة الافتتاحية',
   uploadExcel: 'ارفع ملف إكسل، تتبع الاستيراد وتحقق من النتائج',
   template: 'القالب',

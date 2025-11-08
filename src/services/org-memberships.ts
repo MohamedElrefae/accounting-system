@@ -35,17 +35,24 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberWithUser[]
   if (USE_MOCK) {
     return mockStore.memberships.filter(m => m.org_id === orgId);
   }
-  const { data, error } = await supabase
-    .from("org_memberships")
-    .select(
-      `org_id, user_id, created_at,
-       user:user_profiles ( id, email, first_name, last_name, full_name_ar, department, job_title, is_active, avatar_url )`
-    )
-    .eq("org_id", orgId)
-    .order("created_at", { ascending: true });
-
+  const { data, error } = await supabase.rpc('org_members_list', { p_org_id: orgId });
   if (error) throw error;
-  return (data || []) as unknown as OrgMemberWithUser[];
+  return (data || []).map((r: any) => ({
+    org_id: r.org_id,
+    user_id: r.user_id,
+    created_at: r.created_at,
+    user: {
+      id: r.user_id,
+      email: r.email,
+      first_name: r.first_name,
+      last_name: r.last_name,
+      full_name_ar: r.full_name_ar,
+      department: r.department,
+      job_title: r.job_title,
+      is_active: r.is_active,
+      avatar_url: r.avatar_url,
+    }
+  })) as OrgMemberWithUser[];
 }
 
 export async function addOrgMember(orgId: string, userId: string): Promise<void> {
@@ -61,9 +68,7 @@ export async function addOrgMember(orgId: string, userId: string): Promise<void>
     }
     return;
   }
-  const { error } = await supabase
-    .from("org_memberships")
-    .insert({ org_id: orgId, user_id: userId });
+  const { error } = await supabase.rpc('org_member_add', { p_org_id: orgId, p_user_id: userId, p_is_default: false });
   if (error) throw error;
 }
 
@@ -74,18 +79,13 @@ export async function removeOrgMember(orgId: string, userId: string): Promise<vo
     if (idx >= 0) mockStore.memberships.splice(idx, 1);
     return;
   }
-  const { error } = await supabase
-    .from("org_memberships")
-    .delete()
-    .eq("org_id", orgId)
-    .eq("user_id", userId);
+  const { error } = await supabase.rpc('org_member_remove', { p_org_id: orgId, p_user_id: userId });
   if (error) throw error;
 }
 
 export async function searchUsersNotInOrg(orgId: string, query: string, limit = 20) {
   if (USE_MOCK) {
-    // Return a few fake users filtered by query
-    const pool = Array.from({ length: 10 }).map((_, i) => ({
+    const pool = Array.from({ length: 20 }).map((_, i) => ({
       id: `mock-user-${i+1}`,
       email: `mock${i+1}@example.com`,
       first_name: 'Mock',
@@ -98,24 +98,7 @@ export async function searchUsersNotInOrg(orgId: string, query: string, limit = 
     return pool.filter(u => !existing.has(u.id) && (!query || u.email.includes(query))).slice(0, limit);
   }
 
-  let q = supabase.from('user_profiles')
-    .select('id, email, first_name, last_name, full_name_ar, department, job_title, is_active')
-    .order('email')
-    .limit(limit);
-
-  if (query) {
-    q = q.ilike('email', `%${query}%`);
-  }
-
-  const { data: users, error } = await q;
+  const { data, error } = await supabase.rpc('org_users_not_in', { p_org_id: orgId, p_query: query || '', p_limit: limit });
   if (error) throw error;
-
-  const { data: members, error: memErr } = await supabase
-    .from('org_memberships')
-    .select('user_id')
-    .eq('org_id', orgId);
-  if (memErr) throw memErr;
-  const memberIds = new Set((members || []).map((m: { user_id: string }) => m.user_id));
-
-  return (users || []).filter((u: { id: string }) => !memberIds.has(u.id));
+  return data as any[];
 }

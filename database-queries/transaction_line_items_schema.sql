@@ -78,13 +78,13 @@ LIMIT 10;
 
 -- 7. Count records by organization
 SELECT 
-    organization_id,
+    org_id,
     COUNT(*) as total_items,
     COUNT(CASE WHEN transaction_id IS NULL THEN 1 END) as template_items,
     COUNT(CASE WHEN transaction_id IS NOT NULL THEN 1 END) as actual_transaction_items
 FROM transaction_line_items
-GROUP BY organization_id
-ORDER BY organization_id;
+GROUP BY org_id
+ORDER BY org_id;
 
 -- 8. Hierarchical structure analysis
 WITH RECURSIVE item_hierarchy AS (
@@ -94,7 +94,7 @@ WITH RECURSIVE item_hierarchy AS (
         item_code,
         item_name,
         parent_id,
-        organization_id,
+        org_id,
         1 as level,
         item_code::text as path
     FROM transaction_line_items
@@ -109,7 +109,7 @@ WITH RECURSIVE item_hierarchy AS (
         t.item_code,
         t.item_name,
         t.parent_id,
-        t.organization_id,
+        t.org_id,
         h.level + 1,
         h.path || ' -> ' || t.item_code
     FROM transaction_line_items t
@@ -117,17 +117,17 @@ WITH RECURSIVE item_hierarchy AS (
     WHERE t.transaction_id IS NULL  -- Templates only
 )
 SELECT 
-    organization_id,
+    org_id,
     level,
     COUNT(*) as items_count,
     MAX(length(path)) as max_path_length
 FROM item_hierarchy
-GROUP BY organization_id, level
-ORDER BY organization_id, level;
+GROUP BY org_id, level
+ORDER BY org_id, level;
 
 -- 9. Code pattern analysis
 SELECT 
-    organization_id,
+    org_id,
     CASE 
         WHEN item_code ~ '^[0-9]{4}$' AND item_code::integer % 1000 = 0 THEN 'Level 1 (x000)'
         WHEN item_code ~ '^[0-9]{4}$' AND item_code::integer % 100 = 0 THEN 'Level 2 (x100)'
@@ -141,34 +141,34 @@ SELECT
 FROM transaction_line_items
 WHERE transaction_id IS NULL  -- Templates only
     AND item_code IS NOT NULL
-GROUP BY organization_id, code_pattern
-ORDER BY organization_id, code_pattern;
+GROUP BY org_id, code_pattern
+ORDER BY org_id, code_pattern;
 
 -- 10. Find the next available codes for each organization
 SELECT 
-    organization_id,
+    org_id,
     'Level 1' as level_type,
     COALESCE(MAX(item_code::integer), 0) + 1000 as next_code
 FROM transaction_line_items
 WHERE transaction_id IS NULL
     AND item_code ~ '^[0-9]{4}$'
     AND item_code::integer % 1000 = 0
-GROUP BY organization_id
+GROUP BY org_id
 
 UNION ALL
 
 SELECT 
-    organization_id,
+    org_id,
     'Level 2' as level_type,
-    COALESCE(MAX(item_code::integer), 0) + 100 as next_code
+    COALES(MAX(item_code::integer), 0) + 100 as next_code
 FROM transaction_line_items
 WHERE transaction_id IS NULL
     AND item_code ~ '^[0-9]{4}$'
     AND item_code::integer % 100 = 0
     AND item_code::integer % 1000 != 0
-GROUP BY organization_id
+GROUP BY org_id
 
-ORDER BY organization_id, level_type;
+ORDER BY org_id, level_type;
 
 -- =========================================================
 -- Verification Queries (run after operations)
@@ -198,18 +198,18 @@ SELECT
     'Duplicate Codes' as check_type,
     COUNT(*) as count
 FROM (
-    SELECT organization_id, item_code, COUNT(*) as duplicates
+    SELECT org_id, item_code, COUNT(*) as duplicates
     FROM transaction_line_items
     WHERE transaction_id IS NULL
         AND item_code IS NOT NULL
-    GROUP BY organization_id, item_code
+    GROUP BY org_id, item_code
     HAVING COUNT(*) > 1
 ) duplicates;
 
 -- Performance check: Index usage
 EXPLAIN (ANALYZE, BUFFERS) 
 SELECT * FROM transaction_line_items 
-WHERE organization_id = 'sample-org-id' 
+WHERE org_id = 'sample-org-id' 
     AND transaction_id IS NULL 
     AND is_active = true
 ORDER BY item_code;

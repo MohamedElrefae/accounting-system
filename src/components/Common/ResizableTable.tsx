@@ -126,7 +126,7 @@ function ResizableTable<T extends RowRecord>({
 
     const { column, startX, startWidth } = resizeRef.current
     const deltaX = e.clientX - startX
-    const newWidth = Math.max(80, Math.min(500, startWidth + deltaX))
+    const newWidth = Math.max(20, Math.round(startWidth + delta))
 
     onColumnResize(column, newWidth)
   }, [onColumnResize])
@@ -211,8 +211,8 @@ function ResizableTable<T extends RowRecord>({
                 className={`resizable-th ${column.type || 'text'}-cell ${frozenByFlag[idx] ? 'frozen' : ''} ${isRTL ? 'rtl' : 'ltr'}`}
                 style={{ 
                   width: `${column.width}px`,
-                  minWidth: `${column.minWidth || 80}px`,
-                  maxWidth: `${column.maxWidth || 500}px`,
+                  minWidth: `${(column.minWidth ?? 20)}px`,
+                  ...(typeof column.maxWidth === 'number' ? { maxWidth: `${column.maxWidth}px` } : { maxWidth: 'none' as any }),
                   ...(frozenByFlag[idx] && !isRTL ? { left: `${stickyLeftOffsets[idx]}px` } : {}),
                   ...(frozenByFlag[idx] && isRTL ? { right: `${stickyRightOffsets[idx]}px` } : {}),
                 }}
@@ -257,8 +257,8 @@ function ResizableTable<T extends RowRecord>({
                       className={`resizable-td ${column.type || 'text'}-cell ${frozenByFlag[cidx] ? 'frozen' : ''} ${isRTL ? 'rtl' : 'ltr'}`}
                       style={{ 
                         width: `${column.width}px`,
-                        minWidth: `${column.minWidth || 80}px`,
-                        maxWidth: `${column.maxWidth || 500}px`,
+                        minWidth: `${(column.minWidth ?? 20)}px`,
+                        ...(typeof column.maxWidth === 'number' ? { maxWidth: `${column.maxWidth}px` } : { maxWidth: 'none' as any }),
                         ...(frozenByFlag[cidx] && !isRTL ? { left: `${stickyLeftOffsets[cidx]}px` } : {}),
                         ...(frozenByFlag[cidx] && isRTL ? { right: `${stickyRightOffsets[cidx]}px` } : {}),
                       }}

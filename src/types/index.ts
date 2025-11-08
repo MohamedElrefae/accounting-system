@@ -87,12 +87,17 @@ export interface Organization {
   id: string;
   code: string;
   name: string;
+  name_ar?: string;
   description?: string;
-  status: "active" | "inactive" | "suspended" | "archived";
   address?: string;
   phone?: string;
   email?: string;
+  website?: string;
   tax_number?: string;
+  registration_number?: string;
+  logo_url?: string | null;
+  is_active: boolean; // maps to DB boolean (replaces legacy "status")
+  parent_org_id?: string | null;
   created_at: string;
   updated_at: string;
 }

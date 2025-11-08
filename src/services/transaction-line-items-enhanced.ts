@@ -1,9 +1,48 @@
 import { supabase } from '../utils/supabase'
-import { transactionLineItemsService } from './transaction-line-items'
-import type { DbTxLineItem, EditableTxLineItem } from './transaction-line-items'
+// Core data shapes shared with UI
+export interface DbTxLineItem {
+  id: string
+  transaction_line_id: string
+  org_id: string | null
+  line_number: number
+  quantity: number
+  percentage: number
+  unit_price: number
+  unit_of_measure: string | null
+  total_amount: number | null
+  is_active?: boolean | null
+  parent_id?: string | null
+  level?: number | null
+  analysis_work_item_id: string | null
+  sub_tree_id: string | null
+  work_item_id: string | null
+  line_item_catalog_id: string | null
+  item_code: string | null
+  item_name: string | null
+  item_name_ar: string | null
+  created_at: string
+  updated_at: string
+}
 
-// Re-export types for convenience
-export type { DbTxLineItem, EditableTxLineItem } from './transaction-line-items'
+export interface EditableTxLineItem {
+  id?: string
+  transaction_line_id?: string | null
+  line_number: number
+  quantity: number
+  percentage?: number
+  unit_price: number
+  unit_of_measure?: string | null
+  analysis_work_item_id?: string | null
+  sub_tree_id?: string | null
+  work_item_id?: string | null
+  line_item_catalog_id?: string | null
+  item_code?: string | null
+  item_name?: string | null
+  item_name_ar?: string | null
+  /** UI-only cost fields retained for editor compatibility */
+  discount_amount?: number
+  tax_amount?: number
+}
 
 // Extended interface for tree functionality
 export interface LineItemTreeNode extends DbTxLineItem {
@@ -171,6 +210,19 @@ export interface ChildLineItemRequest {
   unit_of_measure?: string;
 }
 
+export interface CatalogSelectorItem {
+  id: string
+  item_code: string
+  item_name: string
+  item_name_ar?: string | null
+  unit_of_measure?: string | null
+  unit_price?: number | null
+  level: number
+  is_active?: boolean | null
+  parent_id?: string | null
+  parent_code?: string | null
+}
+
 /**
  * Enhanced service that extends the basic TransactionLineItemsService
  * with tree functionality and child creation capabilities
@@ -191,7 +243,7 @@ export class TransactionLineItemsEnhancedService {
     console.log('🌳 Loading line items tree for transaction line:', transactionLineId)
     try {
       // Load flat data from basic service
-      const items = await transactionLineItemsService.listByTransactionLine(transactionLineId)
+      const items = await this.fetchLineItems(transactionLineId)
       
       // Build tree structure
       const tree = buildLineItemTree(items)
@@ -223,6 +275,209 @@ export class TransactionLineItemsEnhancedService {
     // Load and cache via tree method (which also caches the list)
     await this.getLineItemsTree(transactionLineId, force)
     return cache.list.get(transactionLineId) || []
+  }
+
+  /**
+   * Persist a full set of items and refresh in-memory cache.
+   */
+  async saveLineItems(transactionLineId: string, items: EditableTxLineItem[]): Promise<void> {
+    try {
+      const normalized = items.map(item => ({
+        ...item,
+        percentage: item.percentage == null ? 100 : item.percentage,
+      }))
+
+      const { data: existingRows, error: loadError } = await supabase
+        .from('transaction_line_items')
+        .select('id')
+        .eq('transaction_line_id', transactionLineId)
+
+      if (loadError) throw loadError
+
+      const existingIds = new Set((existingRows || []).map(row => row.id as string))
+      const incomingIds = new Set(normalized.filter(row => row.id).map(row => row.id as string))
+
+      const toInsert = normalized
+        .filter(row => !row.id)
+        .map(row => ({
+          transaction_line_id: transactionLineId,
+          line_number: row.line_number,
+          quantity: row.quantity,
+          percentage: row.percentage,
+          unit_price: row.unit_price,
+          unit_of_measure: row.unit_of_measure ?? null,
+          analysis_work_item_id: row.analysis_work_item_id ?? null,
+          sub_tree_id: row.sub_tree_id ?? null,
+          work_item_id: row.work_item_id ?? null,
+          line_item_catalog_id: row.line_item_catalog_id ?? null,
+          item_code: row.item_code ?? null,
+          item_name: row.item_name ?? null,
+          item_name_ar: row.item_name_ar ?? null,
+        }))
+
+      const toUpdate = normalized
+        .filter(row => row.id)
+        .map(row => ({
+          id: row.id!,
+          line_number: row.line_number,
+          quantity: row.quantity,
+          percentage: row.percentage,
+          unit_price: row.unit_price,
+          unit_of_measure: row.unit_of_measure ?? null,
+          analysis_work_item_id: row.analysis_work_item_id ?? null,
+          sub_tree_id: row.sub_tree_id ?? null,
+          work_item_id: row.work_item_id ?? null,
+          line_item_catalog_id: row.line_item_catalog_id ?? null,
+          item_code: row.item_code ?? null,
+          item_name: row.item_name ?? null,
+          item_name_ar: row.item_name_ar ?? null,
+          updated_at: new Date().toISOString(),
+        }))
+
+      const toDelete = Array.from(existingIds).filter(id => !incomingIds.has(id))
+
+      if (toInsert.length > 0) {
+        const { error } = await supabase
+          .from('transaction_line_items')
+          .insert(toInsert)
+        if (error) throw error
+      }
+
+      if (toUpdate.length > 0) {
+        const { error } = await supabase
+          .from('transaction_line_items')
+          .upsert(toUpdate, { onConflict: 'id' })
+        if (error) throw error
+      }
+
+      if (toDelete.length > 0) {
+        const { error } = await supabase
+          .from('transaction_line_items')
+          .delete()
+          .in('id', toDelete)
+          .eq('transaction_line_id', transactionLineId)
+        if (error) throw error
+      }
+
+      this.clearCache(transactionLineId)
+    } catch (error) {
+      console.error('❌ Error saving line items set:', error)
+      throw new Error('Failed to save line items')
+    }
+  }
+
+  private async fetchLineItems(transactionLineId: string): Promise<DbTxLineItem[]> {
+    const { data, error } = await supabase
+      .from('transaction_line_items')
+      .select(`
+        id,
+        transaction_line_id,
+        org_id,
+        line_number,
+        quantity,
+        percentage,
+        unit_price,
+        unit_of_measure,
+        total_amount,
+        analysis_work_item_id,
+        sub_tree_id,
+        work_item_id,
+        line_item_catalog_id,
+        item_code,
+        item_name,
+        item_name_ar,
+        created_at,
+        updated_at,
+        is_active,
+        parent_id,
+        level
+      `)
+      .eq('transaction_line_id', transactionLineId)
+      .order('line_number', { ascending: true })
+      .order('id', { ascending: true })
+
+    if (error) throw error
+    return (data || []) as DbTxLineItem[]
+  }
+
+  private async persistLineItems(transactionLineId: string, items: EditableTxLineItem[]): Promise<void> {
+    const normalized = items.map(item => ({
+      ...item,
+      percentage: item.percentage == null ? 100 : item.percentage,
+    }))
+
+    const { data: existing, error: readError } = await supabase
+      .from('transaction_line_items')
+      .select('id')
+      .eq('transaction_line_id', transactionLineId)
+
+    if (readError) throw readError
+
+    const existingIds = new Set((existing || []).map(row => row.id as string))
+    const incomingIds = new Set(normalized.filter(row => row.id).map(row => row.id as string))
+
+    const toInsert = normalized
+      .filter(row => !row.id)
+      .map(row => ({
+        transaction_line_id: transactionLineId,
+        line_number: row.line_number,
+        quantity: row.quantity,
+        percentage: row.percentage,
+        unit_price: row.unit_price,
+        unit_of_measure: row.unit_of_measure ?? null,
+        analysis_work_item_id: row.analysis_work_item_id ?? null,
+        sub_tree_id: row.sub_tree_id ?? null,
+        work_item_id: row.work_item_id ?? null,
+        line_item_catalog_id: row.line_item_catalog_id ?? null,
+        item_code: row.item_code ?? null,
+        item_name: row.item_name ?? null,
+        item_name_ar: row.item_name_ar ?? null,
+        org_id: undefined,
+      }))
+
+    const toUpdate = normalized
+      .filter(row => row.id)
+      .map(row => ({
+        id: row.id!,
+        line_number: row.line_number,
+        quantity: row.quantity,
+        percentage: row.percentage,
+        unit_price: row.unit_price,
+        unit_of_measure: row.unit_of_measure ?? null,
+        analysis_work_item_id: row.analysis_work_item_id ?? null,
+        sub_tree_id: row.sub_tree_id ?? null,
+        work_item_id: row.work_item_id ?? null,
+        line_item_catalog_id: row.line_item_catalog_id ?? null,
+        item_code: row.item_code ?? null,
+        item_name: row.item_name ?? null,
+        item_name_ar: row.item_name_ar ?? null,
+        updated_at: new Date().toISOString(),
+      }))
+
+    const toDelete = Array.from(existingIds).filter(id => !incomingIds.has(id))
+
+    if (toInsert.length > 0) {
+      const { error } = await supabase
+        .from('transaction_line_items')
+        .insert(toInsert)
+      if (error) throw error
+    }
+
+    if (toUpdate.length > 0) {
+      const { error } = await supabase
+        .from('transaction_line_items')
+        .upsert(toUpdate, { onConflict: 'id' })
+      if (error) throw error
+    }
+
+    if (toDelete.length > 0) {
+      const { error } = await supabase
+        .from('transaction_line_items')
+        .delete()
+        .in('id', toDelete)
+        .eq('transaction_line_id', transactionLineId)
+      if (error) throw error
+    }
   }
 
   /**
@@ -274,7 +529,7 @@ export class TransactionLineItemsEnhancedService {
     try {
       // For now, we'll implement the logic here
       // In production, you'd call: fn_get_next_line_item_code(transactionLineId, parentItemCode)
-      const items = await transactionLineItemsService.listByTransactionLine(transactionLineId);
+      const items = await this.fetchLineItems(transactionLineId);
       
       if (!parentItemCode) {
         // Root level suggestion
@@ -356,13 +611,9 @@ export class TransactionLineItemsEnhancedService {
         sub_tree_id: item.sub_tree_id,
         unit_of_measure: item.unit_of_measure
       })), itemData]
-      
-      // Update via basic service
-      await transactionLineItemsService.upsertMany(transactionLineId, updatedItems)
-      
-      // Invalidate cache
-      this.clearCache(transactionLineId)
-      
+
+      await this.saveLineItems(transactionLineId, updatedItems)
+
       return itemData
     } catch (error) {
       console.error('Error creating line item:', error)
@@ -388,8 +639,8 @@ export class TransactionLineItemsEnhancedService {
       
       // Update the item
       const updatedItem = { ...items[itemIndex], ...updates }
-      const updatedItems = items.map((item, index) => 
-        index === itemIndex 
+      const updatedItems = items.map((item, index) =>
+        index === itemIndex
           ? {
               id: updatedItem.id,
               line_number: updatedItem.line_number,
@@ -415,13 +666,9 @@ export class TransactionLineItemsEnhancedService {
               unit_of_measure: item.unit_of_measure
             }
       )
-      
-      // Update via basic service
-      await transactionLineItemsService.upsertMany(transactionLineId, updatedItems)
-      
-      // Invalidate cache
-      this.clearCache(transactionLineId)
-      
+
+      await this.saveLineItems(transactionLineId, updatedItems)
+
       return updatedItem as EditableTxLineItem
     } catch (error) {
       console.error('Error updating line item:', error)
@@ -452,12 +699,9 @@ export class TransactionLineItemsEnhancedService {
           sub_tree_id: item.sub_tree_id,
           unit_of_measure: item.unit_of_measure
         }))
-      
-      await transactionLineItemsService.upsertMany(transactionLineId, updatedItems)
-      
-      // Invalidate cache
-      this.clearCache(transactionLineId)
-      
+
+      await this.saveLineItems(transactionLineId, updatedItems)
+
       return true
     } catch (error) {
       console.error('Error deleting line item:', error)
@@ -503,16 +747,18 @@ export class TransactionLineItemsEnhancedService {
 
       // Create the new item
       const newItem: EditableTxLineItem = {
-        line_number: Math.max(...items.map(i => i.line_number), 0) + 1,
+        line_number: Math.max(0, ...items.map(i => i.line_number)) + 1,
         item_code: itemCode,
         item_name: itemName,
+        item_name_ar: itemNameAr,
         quantity: childData.quantity ?? 1,
         percentage: childData.percentage ?? 100,
         unit_price: childData.unit_price ?? 0,
         unit_of_measure: childData.unit_of_measure ?? 'piece',
-        // Inherit from parent if available
-        analysis_work_item_id: parentItem?.analysis_work_item_id,
-        sub_tree_id: parentItem?.sub_tree_id
+        analysis_work_item_id: parentItem?.analysis_work_item_id ?? null,
+        sub_tree_id: parentItem?.sub_tree_id ?? null,
+        work_item_id: parentItem?.work_item_id ?? null,
+        line_item_catalog_id: parentItem?.line_item_catalog_id ?? null,
       };
 
       // Save the new item using the enhanced create method
@@ -530,67 +776,13 @@ export class TransactionLineItemsEnhancedService {
    */
   async getTreeStructure(transactionLineId: string): Promise<LineItemTreeNode[]> {
     try {
-      const items = await transactionLineItemsService.listByTransactionLine(transactionLineId);
-      
-      // Transform to tree nodes
-      const treeNodes: LineItemTreeNode[] = items.map(item => ({
-        ...item,
-        depth: this.calculateDepth(item.item_code || ''),
-        has_children: this.hasChildren(item.item_code || '', items),
-        sort_path: [item.line_number],
-        calculated_total: item.total_amount || 0,
-        children: []
-      }));
+      const items = await this.getLineItemsList(transactionLineId)
 
-      // Build hierarchical structure
-      const rootNodes = treeNodes.filter(node => node.depth === 0);
-      const nodeMap = new Map(treeNodes.map(node => [node.id, node]));
-
-      // For each node, find its children
-      treeNodes.forEach(node => {
-        if (node.item_code) {
-          const children = treeNodes.filter(child => 
-            child.item_code && 
-            child.item_code !== node.item_code && 
-            this.isDirectChild(node.item_code!, child.item_code)
-          );
-          node.children = children;
-        }
-      });
-
-      return rootNodes;
+      return buildLineItemTree(items)
     } catch (error) {
       console.error('Error getting tree structure:', error);
       throw new Error('Failed to get tree structure');
     }
-  }
-
-  /**
-   * Calculate depth from item code
-   */
-  private calculateDepth(code: string): number {
-    if (!code) return 0;
-    if (code.includes('-')) {
-      return code.split('-').length - 1;
-    }
-    // Numeric pattern depth detection
-    const baseMatch = code.match(/^(\d+)/);
-    if (baseMatch) {
-      const base = baseMatch[1];
-      return Math.max(0, Math.floor((code.length - base.length) / base.length));
-    }
-    return 0;
-  }
-
-  /**
-   * Check if item has children
-   */
-  private hasChildren(code: string, items: DbTxLineItem[]): boolean {
-    return items.some(item => 
-      item.item_code && 
-      item.item_code !== code && 
-      this.isDirectChild(code, item.item_code)
-    );
   }
 
   /**
@@ -620,7 +812,7 @@ export class TransactionLineItemsEnhancedService {
    */
   async deleteLineItemWithChildren(transactionLineId: string, itemCode: string): Promise<void> {
     try {
-      const items = await transactionLineItemsService.listByTransactionLine(transactionLineId);
+      const items = await this.getLineItemsList(transactionLineId)
       
       // Find item and all its descendants
       const toDelete = new Set<string>();
@@ -646,17 +838,17 @@ export class TransactionLineItemsEnhancedService {
           quantity: item.quantity,
           percentage: item.percentage,
           unit_price: item.unit_price,
-          discount_amount: item.discount_amount,
-          tax_amount: item.tax_amount,
           item_code: item.item_code,
           item_name: item.item_name,
+          item_name_ar: item.item_name_ar,
           analysis_work_item_id: item.analysis_work_item_id,
           sub_tree_id: item.sub_tree_id,
-          line_item_id: item.line_item_id,
+          work_item_id: item.work_item_id,
+          line_item_catalog_id: item.line_item_catalog_id,
           unit_of_measure: item.unit_of_measure
         }));
 
-      await transactionLineItemsService.upsertMany(transactionLineId, remainingItems);
+      await this.saveLineItems(transactionLineId, remainingItems);
     } catch (error) {
       console.error('Error deleting line item with children:', error);
       throw new Error('Failed to delete line item with children');
@@ -854,41 +1046,29 @@ export class TransactionLineItemsEnhancedService {
    */
   async getLineItemPath(transactionLineId: string, itemCode: string): Promise<LineItemTreeNode[]> {
     try {
-      const items = await this.getLineItemsList(transactionLineId);
-      const path: LineItemTreeNode[] = [];
-      
-      // Build path from root to current item
-      let currentCode = itemCode;
+      const items = await this.getLineItemsList(transactionLineId)
+      const path: LineItemTreeNode[] = []
+
+      let currentCode: string | null = itemCode
       while (currentCode) {
-        const item = items.find(i => i.item_code === currentCode);
+        const item = items.find(i => i.item_code === currentCode)
         if (item) {
-          const treeNode: LineItemTreeNode = {
+          path.unshift({
             ...item,
-            depth: this.calculateDepth(item.item_code || ''),
-            has_children: this.hasChildren(item.item_code || '', items),
+            depth: calculateDepthFromCode(item.item_code || ''),
+            has_children: this.isDirectChild(currentCode, currentCode) ? false : items.some(candidate => this.isDirectChild(currentCode!, candidate.item_code || '')),
             sort_path: [item.line_number],
-            calculated_total: item.total_amount || 0
-          };
-          path.unshift(treeNode); // Add to beginning
+            calculated_total: item.total_amount || 0,
+            parent_code: extractParentCode(item.item_code || '') || undefined,
+            path: buildHierarchyPath(item.item_code || ''),
+          })
         }
-        
-        // Find parent code
-        if (currentCode.includes('-')) {
-          const parts = currentCode.split('-');
-          parts.pop();
-          currentCode = parts.join('-');
-        } else {
-          // For numeric patterns, find the base
-          const match = currentCode.match(/^(\d+)/);
-          if (match && currentCode.length > match[1].length) {
-            currentCode = match[1];
-          } else {
-            break;
-          }
-        }
+
+        const parentCode = extractParentCode(currentCode)
+        currentCode = parentCode ?? null
       }
-      
-      return path;
+
+      return path
     } catch (error) {
       console.error('Error getting line item path:', error);
       throw new Error('Failed to get line item path');
@@ -1005,6 +1185,34 @@ class TransactionLineItemsCatalogService {
       console.error('❌ Error getting catalog tree:', error)
       throw new Error('Failed to get catalog tree')
     }
+  }
+
+  async getCatalogSelectorItems(orgId: string, includeInactive = false): Promise<CatalogSelectorItem[]> {
+    const items = await this.getCatalogItems(orgId, includeInactive)
+    const codeToId = new Map<string, string>()
+    items.forEach(item => {
+      if (item.item_code) {
+        codeToId.set(item.item_code, item.id)
+      }
+    })
+
+    return items.map(item => {
+      const parentCode = extractParentCode(item.item_code || '') || null
+      const parentId = item.parent_id ?? (parentCode ? codeToId.get(parentCode) ?? null : null)
+
+      return {
+        id: item.id,
+        item_code: item.item_code || '',
+        item_name: item.item_name || '',
+        item_name_ar: item.item_name_ar,
+        unit_of_measure: item.unit_of_measure,
+        unit_price: item.unit_price,
+        level: Math.max(1, calculateDepthFromCode(item.item_code || '')),
+        is_active: item.is_active,
+        parent_id: parentId,
+        parent_code: parentCode,
+      }
+    })
   }
 
   /**

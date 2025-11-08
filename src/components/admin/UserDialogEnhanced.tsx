@@ -1,18 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useRef } from 'react';
 import { supabase } from '../../utils/supabase';
 import { audit } from '../../utils/audit';
 import { useAuth } from '../../contexts/AuthContext';
 import UnifiedCRUDForm, { type UnifiedCRUDFormHandle } from '../Common/UnifiedCRUDForm';
-import DraggableResizablePanel from '../Common/DraggableResizablePanel';
+import DraggablePanelContainer from '../Common/DraggablePanelContainer';
 import { createUserFormConfig, type UserRecord, type Role } from './UserFormConfig';
-
-interface PanelState {
-  position: { x: number; y: number };
-  size: { width: number; height: number };
-  isMaximized: boolean;
-  isDocked: boolean;
-  dockPosition?: 'left' | 'right' | 'top' | 'bottom';
-}
 
 type ExistingUserFromDb = {
   id: string;
@@ -46,13 +38,13 @@ export const UserDialogEnhanced: React.FC<UserDialogProps> = ({
   const { user: currentUser } = useAuth();
   const formRef = useRef<UnifiedCRUDFormHandle>(null);
   
-  // Panel state for DraggableResizablePanel
-  const [panelState, setPanelState] = useState<PanelState>({
+  // Panel defaults for DraggablePanelContainer
+  const panelDefaults = {
     position: { x: window.innerWidth * 0.1, y: window.innerHeight * 0.1 },
     size: { width: Math.min(900, window.innerWidth * 0.8), height: Math.min(700, window.innerHeight * 0.8) },
     isMaximized: false,
     isDocked: false
-  });
+  };
 
   // Convert user data to UserRecord format
   const existingUserRecord: UserRecord | null = user ? {
@@ -188,20 +180,18 @@ export const UserDialogEnhanced: React.FC<UserDialogProps> = ({
   if (!open) return null;
 
   return (
-    <DraggableResizablePanel
+    <DraggablePanelContainer
+      storageKey="userDialogEnhanced"
       isOpen={open}
       onClose={onClose}
       title={formConfig.title}
-      position={panelState.position}
-      size={panelState.size}
-      isMaximized={panelState.isMaximized}
-      isDocked={panelState.isDocked}
-      dockPosition={panelState.dockPosition || 'right'}
-      onMove={(position) => setPanelState(prev => ({ ...prev, position }))}
-      onResize={(size) => setPanelState(prev => ({ ...prev, size }))}
-      onMaximize={() => setPanelState(prev => ({ ...prev, isMaximized: !prev.isMaximized }))}
-      onDock={(dockPosition) => setPanelState(prev => ({ ...prev, isDocked: true, dockPosition }))}
-      onResetPosition={() => setPanelState(prev => ({ ...prev, position: { x: 100, y: 100 }, isMaximized: false, isDocked: false }))}
+      defaults={{
+        position: () => panelDefaults.position,
+        size: () => panelDefaults.size,
+        isMaximized: panelDefaults.isMaximized,
+        isDocked: panelDefaults.isDocked,
+        dockPosition: panelDefaults.dockPosition || 'right',
+      }}
     >
       <UnifiedCRUDForm
         ref={formRef}
@@ -209,7 +199,7 @@ export const UserDialogEnhanced: React.FC<UserDialogProps> = ({
         onSubmit={handleFormSubmit}
         onCancel={handleFormCancel}
       />
-    </DraggableResizablePanel>
+    </DraggablePanelContainer>
   );
 };
 

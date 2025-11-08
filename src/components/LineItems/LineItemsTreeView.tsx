@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { lineItemsUIService } from '../../services/line-items-ui'
 import type { 
   LineItemUINode, 
-  CreateLineItemPayload, 
-  UpdateLineItemPayload 
+  CreateLineItemPayload
 } from '../../services/line-items-ui'
 import { useToast } from '../../contexts/ToastContext'
 
@@ -20,7 +19,7 @@ interface LineItemsTreeViewProps {
  */
 export const LineItemsTreeView: React.FC<LineItemsTreeViewProps> = ({
   transactionId,
-  orgId,
+  orgId: _orgId,
   disabled = false,
   onLineItemsChange
 }) => {
@@ -29,9 +28,9 @@ export const LineItemsTreeView: React.FC<LineItemsTreeViewProps> = ({
   const [saving, setSaving] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
-  const [selectedItem, setSelectedItem] = useState<LineItemUINode | null>(null)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [addDialogType, setAddDialogType] = useState<'parent' | 'child'>('parent')
+  const [addDialogParentCode, setAddDialogParentCode] = useState<string | null>(null)
   const [stats, setStats] = useState({
     totalItems: 0,
     rootItems: 0,
@@ -42,17 +41,10 @@ export const LineItemsTreeView: React.FC<LineItemsTreeViewProps> = ({
 
   const { showToast } = useToast()
 
-  // Load line items on mount and when transaction changes
-  useEffect(() => {
-    if (transactionId) {
-      loadLineItems()
-    }
-  }, [transactionId])
-
   /**
    * Load line items data
    */
-  const loadLineItems = async () => {
+  const loadLineItems = useCallback(async () => {
     try {
       setLoading(true)
       
@@ -75,7 +67,14 @@ export const LineItemsTreeView: React.FC<LineItemsTreeViewProps> = ({
     } finally {
       setLoading(false)
     }
-  }
+  }, [transactionId, onLineItemsChange, showToast])
+
+  // Load line items on mount and when transaction changes
+  useEffect(() => {
+    if (transactionId) {
+      loadLineItems()
+    }
+  }, [transactionId, loadLineItems])
 
   /**
    * Handle Add Parent Item (إضافة أصل - Orange button)
@@ -86,14 +85,13 @@ export const LineItemsTreeView: React.FC<LineItemsTreeViewProps> = ({
       
       const payload: CreateLineItemPayload = {
         transaction_id: transactionId,
+        line_number: lineItems.length + 1,
         item_name: formData.item_name,
         item_name_ar: formData.item_name_ar || formData.item_name,
         quantity: formData.quantity || 1,
         unit_price: formData.unit_price || 0,
         unit_of_measure: formData.unit_of_measure || 'piece',
         percentage: formData.percentage || 100,
-        discount_amount: formData.discount_amount || 0,
-        tax_amount: formData.tax_amount || 0
       }
       
       // Validate before creating
@@ -112,7 +110,8 @@ export const LineItemsTreeView: React.FC<LineItemsTreeViewProps> = ({
       setShowAddDialog(false)
     } catch (error) {
       console.error('❌ Error creating parent item:', error)
-      showToast(`خطأ في إضافة العنصر: ${error.message}`, { severity: 'error' })
+      const message = error instanceof Error ? error.message : String(error)
+      showToast(`خطأ في إضافة العنصر: ${message}`, { severity: 'error' })
     } finally {
       setSaving(false)
     }
@@ -128,14 +127,13 @@ export const LineItemsTreeView: React.FC<LineItemsTreeViewProps> = ({
       const payload: CreateLineItemPayload = {
         transaction_id: transactionId,
         parent_code: parentCode,
+        line_number: lineItems.length + 1,
         item_name: formData.item_name,
         item_name_ar: formData.item_name_ar || formData.item_name,
         quantity: formData.quantity || 1,
         unit_price: formData.unit_price || 0,
         unit_of_measure: formData.unit_of_measure || 'piece',
         percentage: formData.percentage || 100,
-        discount_amount: formData.discount_amount || 0,
-        tax_amount: formData.tax_amount || 0
       }
       
       const validation = await lineItemsUIService.validateLineItem(transactionId, payload)
@@ -152,44 +150,8 @@ export const LineItemsTreeView: React.FC<LineItemsTreeViewProps> = ({
       setShowAddDialog(false)
     } catch (error) {
       console.error('❌ Error creating child item:', error)
-      showToast(`خطأ في إضافة العنصر: ${error.message}`, { severity: 'error' })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  /**
-   * Handle Edit Item (تعديل - Blue button)
-   */
-  const handleEditItem = async (item: LineItemUINode, updates: any) => {
-    try {
-      setSaving(true)
-      
-      const payload: UpdateLineItemPayload = {
-        id: item.id,
-        item_name: updates.item_name,
-        item_name_ar: updates.item_name_ar,
-        quantity: updates.quantity,
-        unit_price: updates.unit_price,
-        unit_of_measure: updates.unit_of_measure,
-        percentage: updates.percentage,
-        discount_amount: updates.discount_amount,
-        tax_amount: updates.tax_amount
-      }
-      
-      const validation = await lineItemsUIService.validateLineItem(transactionId, payload)
-      if (!validation.valid) {
-        showToast(`خطأ في البيانات: ${validation.errors.join(', ')}`, { severity: 'error' })
-        return
-      }
-      
-      await lineItemsUIService.updateLineItem(transactionId, payload)
-      await loadLineItems()
-      
-      showToast('تم تحديث العنصر بنجاح', { severity: 'success' })
-    } catch (error) {
-      console.error('❌ Error updating item:', error)
-      showToast(`خطأ في التحديث: ${error.message}`, { severity: 'error' })
+      const message = error instanceof Error ? error.message : String(error)
+      showToast(`خطأ في إضافة العنصر: ${message}`, { severity: 'error' })
     } finally {
       setSaving(false)
     }
@@ -209,7 +171,8 @@ export const LineItemsTreeView: React.FC<LineItemsTreeViewProps> = ({
       showToast(`تم ${statusText} العنصر بنجاح`, { severity: 'success' })
     } catch (error) {
       console.error('❌ Error toggling status:', error)
-      showToast(`خطأ في تغيير الحالة: ${error.message}`, { severity: 'error' })
+      const message = error instanceof Error ? error.message : String(error)
+      showToast(`خطأ في تغيير الحالة: ${message}`, { severity: 'error' })
     } finally {
       setSaving(false)
     }
@@ -232,7 +195,8 @@ export const LineItemsTreeView: React.FC<LineItemsTreeViewProps> = ({
       showToast('تم حذف العنصر بنجاح', { severity: 'success' })
     } catch (error) {
       console.error('❌ Error deleting item:', error)
-      showToast(`خطأ في الحذف: ${error.message}`, { severity: 'error' })
+      const message = error instanceof Error ? error.message : String(error)
+      showToast(`خطأ في الحذف: ${message}`, { severity: 'error' })
     } finally {
       setSaving(false)
     }
@@ -254,7 +218,8 @@ export const LineItemsTreeView: React.FC<LineItemsTreeViewProps> = ({
       setLineItems(searchResults)
     } catch (error) {
       console.error('❌ Error searching:', error)
-      showToast(`خطأ في البحث: ${error.message}`, { severity: 'error' })
+      const message = error instanceof Error ? error.message : String(error)
+      showToast(`خطأ في البحث: ${message}`, { severity: 'error' })
     }
   }
 
@@ -311,6 +276,7 @@ export const LineItemsTreeView: React.FC<LineItemsTreeViewProps> = ({
             className="btn bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded"
             onClick={() => {
               setAddDialogType('parent')
+              setAddDialogParentCode(null)
               setShowAddDialog(true)
             }}
             disabled={disabled || saving}
@@ -362,6 +328,7 @@ export const LineItemsTreeView: React.FC<LineItemsTreeViewProps> = ({
                 className="btn bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg"
                 onClick={() => {
                   setAddDialogType('parent')
+                  setAddDialogParentCode(null)
                   setShowAddDialog(true)
                 }}
                 disabled={disabled}
@@ -377,8 +344,11 @@ export const LineItemsTreeView: React.FC<LineItemsTreeViewProps> = ({
                   item={item}
                   expanded={expandedNodes.has(item.id)}
                   onToggleExpand={() => toggleNodeExpansion(item)}
-                  onEdit={(updates) => handleEditItem(item, updates)}
-                  onAddChild={(formData) => handleAddChildItem(item.code, formData)}
+                  onAddChild={() => {
+                    setAddDialogType('child')
+                    setAddDialogParentCode(item.code)
+                    setShowAddDialog(true)
+                  }}
                   onToggleStatus={() => handleToggleStatus(item)}
                   onDelete={() => handleDeleteItem(item)}
                   disabled={disabled || saving}
@@ -393,8 +363,18 @@ export const LineItemsTreeView: React.FC<LineItemsTreeViewProps> = ({
       {showAddDialog && (
         <AddItemDialog
           type={addDialogType}
-          transactionId={transactionId}
-          onSubmit={addDialogType === 'parent' ? handleAddParentItem : () => {}}
+          parentCode={addDialogParentCode ?? undefined}
+          onSubmit={(formData, parentCode) => {
+            if (addDialogType === 'parent') {
+              return handleAddParentItem(formData)
+            }
+            const effectiveParent = parentCode ?? addDialogParentCode
+            if (!effectiveParent) {
+              showToast('يجب اختيار عنصر أساسي لإضافة بند فرعي', { severity: 'warning' })
+              return
+            }
+            return handleAddChildItem(effectiveParent, formData)
+          }}
           onCancel={() => setShowAddDialog(false)}
           saving={saving}
         />
@@ -410,8 +390,7 @@ interface TreeNodeProps {
   item: LineItemUINode
   expanded: boolean
   onToggleExpand: () => void
-  onEdit: (updates: any) => void
-  onAddChild: (formData: any) => void
+  onAddChild: () => void
   onToggleStatus: () => void
   onDelete: () => void
   disabled: boolean
@@ -421,14 +400,11 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = ({
   item,
   expanded,
   onToggleExpand,
-  onEdit,
   onAddChild,
   onToggleStatus,
   onDelete,
   disabled
 }) => {
-  const [editing, setEditing] = useState(false)
-
   return (
     <div className={`tree-node ${item.status === 'inactive' ? 'inactive' : ''}`}>
       <div className="node-content flex-row items-center justify-between p-3 border rounded-lg mb-2 hover:bg-gray-50">
@@ -465,21 +441,11 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = ({
           {/* إضافة فرعي - Add Child (Green button from your UI) */}
           <button
             className="btn bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm"
-            onClick={() => onAddChild({})}
+            onClick={onAddChild}
             disabled={disabled}
             title="إضافة عنصر فرعي"
           >
             ➕ إضافة فرعي
-          </button>
-          
-          {/* تعديل - Edit (Blue button from your UI) */}
-          <button
-            className="btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"
-            onClick={() => setEditing(true)}
-            disabled={disabled}
-            title="تعديل"
-          >
-            ✏️ تعديل
           </button>
           
           {/* تفعيل/تعطيل - Toggle Status */}
@@ -516,15 +482,15 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = ({
  */
 interface AddItemDialogProps {
   type: 'parent' | 'child'
-  transactionId: string
-  onSubmit: (formData: any) => void
+  parentCode?: string
+  onSubmit: (formData: any, parentCode?: string) => void
   onCancel: () => void
   saving: boolean
 }
 
 const AddItemDialog: React.FC<AddItemDialogProps> = ({
   type,
-  transactionId,
+  parentCode,
   onSubmit,
   onCancel,
   saving
@@ -536,6 +502,11 @@ const AddItemDialog: React.FC<AddItemDialogProps> = ({
     unit_price: 0,
     unit_of_measure: 'piece'
   })
+  const [localParentCode, setLocalParentCode] = useState(parentCode ?? '')
+
+  useEffect(() => {
+    setLocalParentCode(parentCode ?? '')
+  }, [parentCode])
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -544,7 +515,25 @@ const AddItemDialog: React.FC<AddItemDialogProps> = ({
           {type === 'parent' ? 'إضافة عنصر أساسي جديد' : 'إضافة عنصر فرعي جديد'}
         </h3>
         
-        <form onSubmit={(e) => { e.preventDefault(); onSubmit(formData) }} className="space-y-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            const effectiveParent = type === 'child' ? (localParentCode || parentCode || undefined) : undefined
+            onSubmit(formData, effectiveParent)
+          }}
+          className="space-y-4"
+        >
+          {type === 'child' && (
+            <input
+              type="text"
+              placeholder="كود العنصر الأساسي"
+              value={localParentCode}
+              onChange={(e) => setLocalParentCode(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md"
+              required
+              disabled={Boolean(parentCode)}
+            />
+          )}
           <input
             type="text"
             placeholder="اسم البند"

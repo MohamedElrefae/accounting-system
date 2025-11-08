@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { getAccounts, getTransactionAudit, getCurrentUserId, getProjects, getUserDisplayMap, type Account, type TransactionRecord, type Project } from '../../services/transactions'
 import { listWorkItemsAll } from '../../services/work-items'
 import type { WorkItemRow } from '../../types/work-items'
@@ -65,6 +65,7 @@ const TransactionsEnrichedPage: React.FC = () => {
   const [classificationFilterId, setClassificationFilterId] = useState<string>('')
   const [expensesCategoryFilterId, setExpensesCategoryFilterId] = useState<string>('')
   const [workItemFilterId, setWorkItemFilterId] = useState<string>('')
+  const [analysisWorkItemFilterId, setAnalysisWorkItemFilterId] = useState<string>('')
   const [costCenterFilterId, setCostCenterFilterId] = useState<string>('')
   const [approvalFilter, setApprovalFilter] = useState<'all' | 'draft' | 'submitted' | 'revision_requested' | 'approved' | 'rejected' | 'cancelled' | 'posted'>(() => { try { return (localStorage.getItem('transactions_enriched_approval_filter') as any) || 'all' } catch { return 'all' } })
   const [wrapMode, setWrapMode] = useState<boolean>(() => { try { return localStorage.getItem('transactions_enriched_table_wrap') === '1' } catch { return false } })
@@ -75,6 +76,7 @@ const TransactionsEnrichedPage: React.FC = () => {
 
 
   const location = useLocation()
+  const navigate = useNavigate()
   const hasPerm = useHasPermission()
   const { showToast } = useToast()
 
@@ -116,7 +118,14 @@ const TransactionsEnrichedPage: React.FC = () => {
   }, [location.pathname])
 
   // Refetch when filters/pagination change
-  useEffect(() => { reload().catch(() => {}) }, [searchTerm, filters.dateFrom, filters.dateTo, filters.amountFrom, filters.amountTo, debitFilterId, creditFilterId, orgFilterId, projectFilterId, classificationFilterId, expensesCategoryFilterId, workItemFilterId, costCenterFilterId, approvalFilter, page, pageSize])
+  useEffect(() => { reload().catch(() => {}) }, [searchTerm, filters.dateFrom, filters.dateTo, filters.amountFrom, filters.amountTo, debitFilterId, creditFilterId, orgFilterId, projectFilterId, classificationFilterId, expensesCategoryFilterId, workItemFilterId, analysisWorkItemFilterId, costCenterFilterId, approvalFilter, page, pageSize])
+
+  // Global refresh via CustomEvent (from details panel)
+  useEffect(() => {
+    const handler = (_e: Event) => { reload().catch(() => {}) }
+    window.addEventListener('transactions:refresh', handler)
+    return () => window.removeEventListener('transactions:refresh', handler)
+  }, [])
 
   async function reload() {
     // Determine mode from route: /transactions/my-enriched vs /transactions/all-enriched
@@ -136,6 +145,7 @@ const TransactionsEnrichedPage: React.FC = () => {
       classificationId: classificationFilterId || undefined,
       expensesCategoryId: expensesCategoryFilterId || undefined,
       workItemId: workItemFilterId || undefined,
+      analysisWorkItemId: analysisWorkItemFilterId || undefined,
       costCenterId: costCenterFilterId || undefined,
       approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any) : undefined,
       createdBy: currentUserId || undefined,
@@ -179,47 +189,63 @@ const TransactionsEnrichedPage: React.FC = () => {
       }
     } catch {}
 
-    // Load supporting maps (categories/work items) for current orgs in page
+    // Load supporting maps (categories/work items) for relevant orgs
     try {
-      const orgIds = Array.from(new Set((rows || []).map(r => r.org_id).filter(Boolean))) as string[]
+      const orgIds = (() => {
+        if (orgFilterId) return [orgFilterId]
+        if (organizations && organizations.length) return organizations.map(o => o.id)
+        return Array.from(new Set((rows || []).map(r => r.org_id).filter(Boolean))) as string[]
+      })()
       if (orgIds.length > 0) {
         const lists = await Promise.all(orgIds.map(id => getExpensesCategoriesList(id).catch(() => [])))
         const merged: Record<string, ExpensesCategoryRow> = {}
         for (const list of lists) for (const r of list) merged[r.id] = r
-        setCategories(Object.values(merged))
-      } else setCategories([])
+        if (Object.keys(merged).length) setCategories(Object.values(merged))
+      }
     } catch {}
 
     try {
-      const orgIds = Array.from(new Set((rows || []).map(r => r.org_id).filter(Boolean))) as string[]
+      const orgIds = (() => {
+        if (orgFilterId) return [orgFilterId]
+        if (organizations && organizations.length) return organizations.map(o => o.id)
+        return Array.from(new Set((rows || []).map(r => r.org_id).filter(Boolean))) as string[]
+      })()
       if (orgIds.length > 0) {
         const lists = await Promise.all(orgIds.map(id => listWorkItemsAll(id).catch(() => [])))
         const merged: Record<string, WorkItemRow> = {}
         for (const list of lists) for (const r of list) merged[r.id] = r as any
-        setWorkItems(Object.values(merged))
-      } else setWorkItems([])
+        if (Object.keys(merged).length) setWorkItems(Object.values(merged))
+      }
     } catch {}
 
     // Load cost centers for orgs
     try {
-      const orgIds = Array.from(new Set((rows || []).map(r => r.org_id).filter(Boolean))) as string[]
+      const orgIds = (() => {
+        if (orgFilterId) return [orgFilterId]
+        if (organizations && organizations.length) return organizations.map(o => o.id)
+        return Array.from(new Set((rows || []).map(r => r.org_id).filter(Boolean))) as string[]
+      })()
       const merged: Record<string, { id: string; code: string; name: string }> = {}
       for (const id of orgIds) {
         const list = await getCostCentersForSelector(id).catch(() => [])
         for (const cc of list as any[]) merged[cc.id] = { id: cc.id, code: cc.code, name: cc.name }
       }
-      setCostCenters(Object.values(merged))
+      if (Object.keys(merged).length) setCostCenters(Object.values(merged))
     } catch {}
 
     // Analysis Work Items map for labels
     try {
-      const orgIds = Array.from(new Set((rows || []).map(r => r.org_id).filter(Boolean))) as string[]
+      const orgIds = (() => {
+        if (orgFilterId) return [orgFilterId]
+        if (organizations && organizations.length) return organizations.map(o => o.id)
+        return Array.from(new Set((rows || []).map(r => r.org_id).filter(Boolean))) as string[]
+      })()
       const merged: Record<string, { code: string; name: string }> = {}
       for (const orgId of orgIds) {
         const list = await listAnalysisWorkItems({ orgId, projectId: projectFilterId || null, onlyWithTx: false, includeInactive: true }).catch(() => [])
         for (const a of list as any[]) merged[a.id] = { code: a.code, name: a.name }
       }
-      setAnalysisItemsMap(merged)
+      if (Object.keys(merged).length) setAnalysisItemsMap(merged)
     } catch {}
 
     // resolve creator/poster names
@@ -244,10 +270,14 @@ const TransactionsEnrichedPage: React.FC = () => {
     { key: 'organization_label', label: 'المؤسسة', visible: true, width: 200, minWidth: 160, maxWidth: 300, type: 'text', resizable: true },
     { key: 'project_label', label: 'المشروع', visible: true, width: 200, minWidth: 160, maxWidth: 300, type: 'text', resizable: true },
     { key: 'cost_center_label', label: 'مركز التكلفة', visible: true, width: 200, minWidth: 160, maxWidth: 300, type: 'text', resizable: true },
+    { key: 'reference_number', label: 'المرجع', visible: false, width: 120, minWidth: 100, maxWidth: 180, type: 'text', resizable: true },
+    { key: 'notes', label: 'الملاحظات', visible: false, width: 200, minWidth: 150, maxWidth: 300, type: 'text', resizable: true },
+    { key: 'created_by_name', label: 'أنشئت بواسطة', visible: false, width: 140, minWidth: 120, maxWidth: 200, type: 'text', resizable: true },
+    { key: 'posted_by_name', label: 'مرحلة بواسطة', visible: false, width: 140, minWidth: 120, maxWidth: 200, type: 'text', resizable: true },
     { key: 'approval_status', label: 'حالة الاعتماد', visible: true, width: 140, minWidth: 120, maxWidth: 200, type: 'badge', resizable: false },
   ], [])
 
-  const { columns, handleColumnResize, handleColumnConfigChange } = useColumnPreferences({
+  const { columns, handleColumnResize, handleColumnConfigChange, resetToDefaults } = useColumnPreferences({
     storageKey: 'transactions_enriched_table',
     defaultColumns,
     userId: currentUserId || undefined,
@@ -272,6 +302,9 @@ const TransactionsEnrichedPage: React.FC = () => {
     userId: currentUserId || undefined,
   })
 
+  // Column configuration modal state
+  const [columnsConfigOpen, setColumnsConfigOpen] = useState(false)
+
   // Helpers for label mapping
   const accountLabel = (id?: string | null) => {
     if (!id) return ''
@@ -287,6 +320,10 @@ const TransactionsEnrichedPage: React.FC = () => {
     const classMap: Record<string, string> = {}
     for (const c of classifications) { classMap[c.id] = `${c.code} - ${c.name}` }
     return paged.map((t: any) => {
+      // Resolve aggregated dimension sets for this tx (from transaction_lines)
+      const txId = (t.transaction_id || t.id) as string | undefined
+      const agg = (txId && dimLists[txId]) ? dimLists[txId]! : { projects: [], subTrees: [], workItems: [], analysis: [], costCenters: [] }
+
       // Accounts lists (for tooltip)
       const dCodes: string[] = Array.isArray(t.debit_accounts_codes) ? t.debit_accounts_codes : []
       const dNames: string[] = Array.isArray(t.debit_accounts_names) ? t.debit_accounts_names : []
@@ -296,7 +333,7 @@ const TransactionsEnrichedPage: React.FC = () => {
       const creditList = cCodes.map((code, i) => `${code} - ${cNames[i] || ''}`.trim())
 
       // Project list (from aggregated lines if present, else from view array)
-      const aggProjIds: string[] = Array.isArray(agg.projects) && agg.projects.length ? agg.projects : []
+      const aggProjIds: string[] = Array.isArray(agg.projects) && agg.projects.length ? (agg.projects as string[]) : []
       const pids: string[] = aggProjIds.length ? aggProjIds : (Array.isArray(t.project_ids) ? t.project_ids : [])
       const projectList = pids
         .map((id: string) => {
@@ -327,8 +364,6 @@ const TransactionsEnrichedPage: React.FC = () => {
       })()
 
       // Build lists from transaction_lines aggregation (preferred)
-      const txId = t.transaction_id || t.id
-      const agg = dimLists[txId] || {}
 
       // Sub-tree list (compute code-name from ids if present)
       const subTreeIds: string[] = Array.isArray(agg.subTrees) && agg.subTrees.length ? agg.subTrees : []
@@ -415,6 +450,24 @@ const TransactionsEnrichedPage: React.FC = () => {
     })
   }, [paged, accounts, userNames, categories, workItems, analysisItemsMap, organizations, projects, classifications])
 
+  // Build export data from current columns and table rows (include all configured columns)
+  const exportData = useMemo(() => {
+    const visibleCols = (columns || []).filter(c => c.visible)
+    const defs = visibleCols.map(col => ({
+      key: col.key,
+      header: col.label,
+      type: (col.type === 'currency' ? 'currency' : col.type === 'date' ? 'date' : col.type === 'number' ? 'number' : col.type === 'boolean' ? 'boolean' : 'text') as any,
+    }))
+    const rows = (tableData || []).map((row: any) => {
+      const out: any = {}
+      for (const col of visibleCols) {
+        out[col.key] = row[col.key]
+      }
+      return out
+    })
+    return prepareTableData(createStandardColumns(defs as any), rows)
+  }, [columns, tableData])
+
   if (loading) return <div className="loading-container"><div className="loading-spinner" />جاري التحميل...</div>
   if (error) return <div className="error-container">خطأ: {error}</div>
 
@@ -424,29 +477,15 @@ const TransactionsEnrichedPage: React.FC = () => {
         <h1 className="transactions-title">المعاملات (من العرض المحسّن)</h1>
         <div className="transactions-actions">
           <WithPermission perm="transactions.create">
-            <button className="ultimate-btn ultimate-btn-add" onClick={() => {/* reuse standard create via forms if needed */}}>
+<button className="ultimate-btn ultimate-btn-add" onClick={() => navigate('/transactions/my')}>
               <div className="btn-content"><span className="btn-text">+ معاملة جديدة</span></div>
             </button>
           </WithPermission>
-          <button className="ultimate-btn ultimate-btn-edit" onClick={() => {/* open column config handled on table */}}>
+<button className="ultimate-btn ultimate-btn-edit" onClick={() => setColumnsConfigOpen(true)}>
             <div className="btn-content"><span className="btn-text">⚙️ إعدادات الأعمدة</span></div>
           </button>
           <ExportButtons
-            data={prepareTableData(createStandardColumns([
-              { key: 'entry_number', header: 'رقم القيد', type: 'text' },
-              { key: 'entry_date', header: 'التاريخ', type: 'date' },
-              { key: 'description', header: 'البيان', type: 'text' },
-              { key: 'debit_account', header: 'الحساب المدين', type: 'text' },
-              { key: 'credit_account', header: 'الحساب الدائن', type: 'text' },
-              { key: 'amount', header: 'المبلغ', type: 'currency' },
-            ]), paged.map((t: any) => ({
-              entry_number: t.entry_number,
-              entry_date: t.entry_date,
-              description: t.description,
-              debit_account: accountLabel(t.debit_account_id),
-              credit_account: accountLabel(t.credit_account_id),
-              amount: t.amount,
-            })))}
+            data={exportData}
             config={{ title: 'تقرير المعاملات (محسّن)', rtlLayout: true, useArabicNumerals: true }}
             size="small"
             layout="horizontal"
@@ -480,9 +519,19 @@ const TransactionsEnrichedPage: React.FC = () => {
         {/* Work item */}
         <select value={workItemFilterId} onChange={e => { setWorkItemFilterId(e.target.value); setPage(1) }} className="filter-select filter-select--workitem"><option value="">جميع عناصر العمل</option>{workItems.slice().sort((a,b)=>`${a.code} - ${a.name}`.localeCompare(`${b.code} - ${b.name}`)).map(w => (<option key={w.id} value={w.id}>{`${w.code} - ${w.name}`.substring(0, 52)}</option>))}</select>
         {/* Analysis work item */}
-        <select value={(filters as any).analysis_work_item_id || ''} onChange={e => { (setFilters as any)({ ...filters, analysis_work_item_id: e.target.value }); setPage(1) }} className="filter-select filter-select--analysisworkitem"><option value="">جميع بنود التحليل</option>{Object.entries({}).map(([id,a]) => (<option key={id} value={id}>{id}</option>))}</select>
+        <select value={analysisWorkItemFilterId} onChange={e => { setAnalysisWorkItemFilterId(e.target.value); setPage(1) }} className="filter-select filter-select--analysisworkitem">
+          <option value="">جميع بنود التحليل</option>
+          {Object.entries(analysisItemsMap).sort((a,b)=>`${a[1].code} - ${a[1].name}`.localeCompare(`${b[1].code} - ${b[1].name}`)).map(([id, a]) => (
+            <option key={id} value={id}>{`${a.code} - ${a.name}`.substring(0, 52)}</option>
+          ))}
+        </select>
         {/* Cost center */}
-        <select value={costCenterFilterId} onChange={e => { setCostCenterFilterId(e.target.value); setPage(1) }} className="filter-select filter-select--costcenter"><option value="">جميع مراكز التكلفة</option></select>
+        <select value={costCenterFilterId} onChange={e => { setCostCenterFilterId(e.target.value); setPage(1) }} className="filter-select filter-select--costcenter">
+          <option value="">جميع مراكز التكلفة</option>
+          {costCenters.slice().sort((a,b)=>`${a.code} - ${a.name}`.localeCompare(`${b.code} - ${b.name}`)).map(cc => (
+            <option key={cc.id} value={cc.id}>{`${cc.code} - ${cc.name}`.substring(0, 52)}</option>
+          ))}
+        </select>
         {/* Amount range */}
         <input type="number" placeholder="من مبلغ" value={filters.amountFrom} onChange={e => { setFilters({ ...filters, amountFrom: e.target.value }); setPage(1) }} className="filter-input filter-input--amount" />
         <input type="number" placeholder="إلى مبلغ" value={filters.amountTo} onChange={e => { setFilters({ ...filters, amountTo: e.target.value }); setPage(1) }} className="filter-input filter-input--amount" />
@@ -494,7 +543,8 @@ const TransactionsEnrichedPage: React.FC = () => {
             <span className="transactions-count">عدد السجلات: {totalCount}</span>
             <label className="wrap-toggle"><input type="checkbox" checked={wrapMode} onChange={(e) => setWrapMode(e.target.checked)} /><span>التفاف النص</span></label>
             <button className="ultimate-btn" onClick={() => reload().catch(() => {})}><div className="btn-content"><span className="btn-text">تحديث</span></div></button>
-            <button className="ultimate-btn ultimate-btn-warning" onClick={() => { setWrapMode(false); try { localStorage.setItem('transactions_enriched_table_wrap', '0') } catch {}; handleColumnConfigChange(defaultColumns) }} title="استعادة الإعدادات الافتراضية"><div className="btn-content"><span className="btn-text">استعادة الافتراضي</span></div></button>
+            <button className="ultimate-btn" onClick={() => window.dispatchEvent(new CustomEvent('transactions:refresh'))} title="تحديث سريع"><div className="btn-content"><span className="btn-text">تحديث 🔁</span></div></button>
+<button className="ultimate-btn ultimate-btn-warning" onClick={() => { setWrapMode(false); try { localStorage.setItem('transactions_enriched_table_wrap', '0') } catch {}; resetToDefaults() }} title="استعادة الإعدادات الافتراضية"><div className="btn-content"><span className="btn-text">استعادة الافتراضي</span></div></button>
           </div>
           <div className="transactions-pagination">
             <button className="ultimate-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}><div className="btn-content"><span className="btn-text">السابق</span></div></button>
@@ -549,6 +599,16 @@ const TransactionsEnrichedPage: React.FC = () => {
       </div>
 
 
+
+      {/* Column Configuration Modal - Enriched Headers Table */}
+      <ColumnConfiguration
+        columns={columns}
+        onConfigChange={handleColumnConfigChange}
+        isOpen={columnsConfigOpen}
+        onClose={() => setColumnsConfigOpen(false)}
+        onReset={resetToDefaults}
+        sampleData={tableData as any}
+      />
 
       {/* Permissions diagnostic (optional) */}
       <div className="diag-panel" style={{ display: 'none' }}>

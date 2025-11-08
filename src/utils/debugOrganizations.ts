@@ -68,10 +68,10 @@ export async function debugOrganizations() {
   }
 }
 
-// Auto-run in development
-if (import.meta.env.DEV) {
-  setTimeout(() => {
-    debugOrganizations()
-  }, 2000) // Wait 2 seconds after app loads
-}
+// Auto-run disabled for performance - call manually when needed
+// if (import.meta.env.DEV) {
+//   setTimeout(() => {
+//     debugOrganizations()
+//   }, 2000) // Wait 2 seconds after app loads
+// }
 

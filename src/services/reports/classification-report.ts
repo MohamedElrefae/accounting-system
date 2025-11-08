@@ -64,7 +64,7 @@ export async function fetchTransactionClassificationSummary(filters: Classificat
       entry_date, 
       project_id, 
       is_posted,
-      projects(organization_id)
+      projects(org_id)
     `)
 
   if (filters.dateFrom) q = q.gte('entry_date', filters.dateFrom)
@@ -93,7 +93,7 @@ export async function fetchTransactionClassificationSummary(filters: Classificat
   // Filter by org if specified (via project relationship)
   let filteredTxs = txs || []
   if (filters.orgId) {
-    filteredTxs = filteredTxs.filter(tx => (tx as any).projects?.organization_id === filters.orgId)
+    filteredTxs = filteredTxs.filter(tx => (tx as any).projects?.org_id === filters.orgId)
   }
 
   // Load classification names
@@ -167,7 +167,7 @@ export async function fetchClassificationAccountBreakdown(classificationId: stri
       project_id,
       is_posted,
       classification_id,
-      projects(organization_id)
+      projects(org_id)
     `)
 
   if (filters.dateFrom) q = q.gte('entry_date', filters.dateFrom)
@@ -188,7 +188,7 @@ export async function fetchClassificationAccountBreakdown(classificationId: stri
   // Filter by org if specified
   let filteredTxs = txs || []
   if (filters.orgId) {
-    filteredTxs = filteredTxs.filter(tx => (tx as any).projects?.organization_id === filters.orgId)
+    filteredTxs = filteredTxs.filter(tx => (tx as any).projects?.org_id === filters.orgId)
   }
 
   // Load account details
@@ -248,7 +248,7 @@ export async function fetchClassificationAccountBreakdown(classificationId: stri
 export async function fetchClassificationTimeline(classificationId: string | null, filters: ClassificationReportFilters): Promise<ClassificationTimelinePoint[]> {
   let q = supabase
     .from('transactions')
-    .select('amount, entry_date, is_posted, project_id, classification_id, projects(organization_id)')
+    .select('amount, entry_date, is_posted, project_id, classification_id, projects(org_id)')
 
   if (filters.dateFrom) q = q.gte('entry_date', filters.dateFrom)
   if (filters.dateTo) q = q.lte('entry_date', filters.dateTo)
@@ -268,7 +268,7 @@ export async function fetchClassificationTimeline(classificationId: string | nul
   // Filter by org if specified
   let filteredTxs = txs || []
   if (filters.orgId) {
-    filteredTxs = filteredTxs.filter(tx => (tx as any).projects?.organization_id === filters.orgId)
+    filteredTxs = filteredTxs.filter(tx => (tx as any).projects?.org_id === filters.orgId)
   }
 
   // Group by month

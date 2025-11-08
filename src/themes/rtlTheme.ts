@@ -107,19 +107,6 @@ const arabicTypography = {
   }
 }
 
-// RTL-aware spacing and layout
-const getRTLSpacing = (isRTL: boolean) => ({
-  marginLeft: isRTL ? 'marginRight' : 'marginLeft',
-  marginRight: isRTL ? 'marginLeft' : 'marginRight',
-  paddingLeft: isRTL ? 'paddingRight' : 'paddingLeft',
-  paddingRight: isRTL ? 'paddingLeft' : 'paddingRight',
-  left: isRTL ? 'right' : 'left',
-  right: isRTL ? 'left' : 'right',
-  borderLeft: isRTL ? 'borderRight' : 'borderLeft',
-  borderRight: isRTL ? 'borderLeft' : 'borderRight',
-  textAlign: isRTL ? 'right' : 'left'
-})
-
 // Enhanced theme for construction fiscal management
 const getConstructionTheme = (isRTL: boolean): ThemeOptions => ({
   direction: isRTL ? 'rtl' : 'ltr',

@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { TransactionLineItemsEditor } from './TransactionLineItemsEditor'
-import { transactionLineItemsService, type EditableTxLineItem } from '../../services/transaction-line-items'
+import {
+  transactionLineItemsEnhancedService,
+  type EditableTxLineItem,
+} from '../../services/transaction-line-items-enhanced'
 
 export interface TransactionLineItemsSectionProps {
   transactionLineId: string
@@ -43,7 +46,7 @@ export const TransactionLineItemsSection: React.FC<TransactionLineItemsSectionPr
       setError(null)
       setSuccess(null)
       try {
-        const rows = await transactionLineItemsService.listByTransactionLine(transactionLineId)
+        const rows = await transactionLineItemsEnhancedService.getLineItemsList(transactionLineId)
         if (!mounted) return
         const mapped: EditableTxLineItem[] = rows.map(r => ({
           id: r.id,
@@ -51,14 +54,14 @@ export const TransactionLineItemsSection: React.FC<TransactionLineItemsSectionPr
           quantity: r.quantity,
           percentage: r.percentage ?? 100,
           unit_price: r.unit_price,
-          discount_amount: r.discount_amount ?? 0,
-          tax_amount: r.tax_amount ?? 0,
           unit_of_measure: r.unit_of_measure,
           item_code: r.item_code,
           item_name: r.item_name,
           analysis_work_item_id: r.analysis_work_item_id,
           sub_tree_id: r.sub_tree_id,
-          line_item_id: (r as any).line_item_id ?? null,
+          line_item_catalog_id: r.line_item_catalog_id,
+          work_item_id: r.work_item_id,
+          item_name_ar: r.item_name_ar,
         }))
         setItems(mapped)
       } catch (e: any) {
@@ -76,7 +79,7 @@ export const TransactionLineItemsSection: React.FC<TransactionLineItemsSectionPr
     setError(null)
     setSuccess(null)
     try {
-      await transactionLineItemsService.upsertMany(transactionLineId, items)
+      await transactionLineItemsEnhancedService.saveLineItems(transactionLineId, items)
       setSuccess('Saved')
     } catch (e: any) {
       setError(e?.message || 'Save failed')

@@ -50,7 +50,7 @@ const visibleFields = localStorage.getItem('unifiedForm:➕ معاملة جدي�
 console.log('Visible fields:', JSON.parse(visibleFields || '[]'));
 
 // Force include sub_tree_id
-const defaultFields = ['entry_number','entry_date','description','debit_account_id','credit_account_id','amount','reference_number','organization_id','project_id','classification_id','cost_center_id','work_item_id','analysis_work_item_id','sub_tree_id','notes'];
+const defaultFields = ['entry_number','entry_date','description','debit_account_id','credit_account_id','amount','reference_number','org_id','project_id','classification_id','cost_center_id','work_item_id','analysis_work_item_id','sub_tree_id','notes'];
 localStorage.setItem('unifiedForm:➕ معاملة جديدة:visibleFields', JSON.stringify(defaultFields));
 localStorage.setItem('unifiedForm:➕ معاملة جديدة:fieldOrder', JSON.stringify(defaultFields));
 

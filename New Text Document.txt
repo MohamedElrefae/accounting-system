@@ -1,0 +1,91 @@
+# Windsurf AI Agent Enforcement Plan for Legacy SPA Modernization
+
+**Date:** Thursday, November 06, 2025  
+**For:** Legacy SPA Unified Modernization — Centralized Auth, UI Consistency, and Performance Optimization  
+**Purpose:** Clear step-by-step instructions for Windsurf AI to enforce exact design, security, and speed standards across all current and future pages/components of the legacy SPA.
+
+---
+
+## Phase Summary Table
+
+| Phase                      | Goal                                            | Key Components                                            | Acceptance Criteria                                                             |
+|----------------------------|------------------------------------------------|-----------------------------------------------------------|---------------------------------------------------------------------------------|
+| Unified CRUD & Theme       | Replicate Tree of Accounts (ToA) UI & feel globally: CRUD form, theme token, ultimate button | CRUD forms, theme tokens, ultimate buttons, RTL support   | Visual regression: all pages indistinguishable from ToA page; no style exceptions |
+| Centralized Auth           | Role-based routing and permissions centralized ensuring security and maintainability | Middleware, permission matrix, ProtectedRoute wrapper    | All roles tested against all routes; no per-page auth code; consistent redirects |
+| Speed Optimization         | Fast load and navigation below 1 second, high Lighthouse scores | Code splitting, React Query caching, optimized DB queries | Page loads <1s; Lighthouse >90/100 on key pages; navigation instant after cache  |
+
+---
+
+## Phase 1: Enforce Unified CRUD & Theme Across Entire App
+
+### What to Do
+- Replace ALL forms (Add/Edit/View/Delete) with the exact **Unified CRUD Form** component used on Tree of Accounts page.
+- Replace all buttons with the **Ultimate Button** component from ToA page.
+- Use the centralized **theme token system** exclusively for colors, fonts, spacing, and RTL-aware layout in every component and page.
+- Remove all old inline styles, redundant CSS classes, or conflicting UI frameworks.
+- For any new page/component developed moving forward, scaffold only using ToA’s unified CRUD + theme setup.
+
+### Deliverables
+- All existing pages updated to use unified CRUD/forms/buttons/theme.
+- Screenshots of each modified page confirming visual/UX parity.
+- Automated visual regression suite configured for future prevention of deviations.
+  
+### Acceptance Criteria
+- No visual or functional difference between ToA and other key pages.
+- Common UI elements behave identically, RTL supported everywhere.
+- Theme tokens govern all styling, no inline or third-party conflicts remain.
+
+---
+
+## Phase 2: Centralized Role-Based Auth and Routing
+
+### What to Do
+- Create a **central permission matrix** mapping every user role (e.g., admin, accountant, manager) to authorized page routes and actions.
+- Implement a single middleware that runs BEFORE any page/component loads to verify the user’s role and permissions.
+- Remove all per-page and per-component authorization code.
+- Wrap every route with a `<ProtectedRoute>` component to enforce these centralized permissions.
+- Provide robust redirects to `/login` or `/unauthorized` for unauthorized access attempts.
+- Implement caching of permissions for efficient checks.
+
+### Deliverables
+- `src/lib/permissions.ts` with permission matrix and utility functions.
+- `src/middleware.ts` central middleware controlling access.
+- `src/components/ProtectedRoute.tsx` wrapper component.
+- All pages refactored to use ProtectedRoute; no per-page auth code.
+- Automated testing scripts for all route-role combinations.
+
+### Acceptance Criteria
+- All roles tested against all pages successfully (allowed/denied flow).
+- No page contains individual auth checks; permission logic fully centralized.
+- Unauthorized access redirects without page rendering errors.
+
+---
+
+## Phase 3: Performance Optimization for 10x Speed
+
+### What to Do
+- Implement **code splitting** with dynamic imports per page/route so that initial bundles are less than 100KB.
+- Integrate **React Query** for all data fetching with at least 5 minutes stale-time caching.
+- Optimize all database queries with pagination and appropriate indexes to reduce backend response times.
+- Add memoization (`React.memo`, `useMemo`) and callbacks (`useCallback`) to reduce unnecessary re-renders.
+- Compress and lazy-load images/assets in all pages.
+- Perform before/after Lighthouse audits targeting scores >90 and first contentful paint under 1 second.
+
+### Deliverables
+- Updated `next.config.js` or build configuration files enforcing code splitting.
+- React Query setup with proper cache keys and invalidation.
+- Database query improvements documented and tested.
+- Memoization implemented in key components.
+- Compressed and lazy-loaded assets.
+- Performance benchmark reports demonstrating target metrics met.
+
+### Acceptance Criteria
+- Dashboard, Reports, and Transaction entry pages load in under 1 second.
+- Navigation between pages is near-instant on cached data.
+- Lighthouse performance >90/100 on all critical routes.
+- Bundle sizes per route are under 100KB.
+
+---
+
+## Instructions for Windsurf AI Agent
+

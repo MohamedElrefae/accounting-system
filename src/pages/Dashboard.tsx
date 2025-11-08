@@ -25,6 +25,9 @@ import {
   IconButton,
 } from '@mui/material';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { dashboardQueryKeys, fetchCategoryTotals, fetchRecentActivity, prefetchDashboardQueries } from '../services/dashboard-queries';
+import { getActiveOrgId, getActiveProjectId } from '../utils/org';
 import useAppStore from '../store/useAppStore';
 import { useNavigate } from 'react-router-dom';
 import StatCard from '../components/ui/StatCard';
@@ -43,7 +46,6 @@ import { supabase } from '../utils/supabase';
 import { getActiveProjects } from '../services/projects';
 import { getOrganizations } from '../services/organization';
 import { getCompanyConfig } from '../services/company-config';
-import { getCategoryTotals, type AccountBalanceFilter } from '../services/account-balances';
 import type { StatCard as StatCardType } from '../types';
 
 // Minimal shape for dashboard recent transactions
@@ -89,6 +91,50 @@ const Dashboard: React.FC = () => {
   const [numbersOnlyDashboard, setNumbersOnlyDashboard] = React.useState<boolean>(false);
   const [showFilters, setShowFilters] = React.useState<boolean>(false);
   const [postedOnly, setPostedOnly] = React.useState<boolean>(false); // Default: show all transactions
+  // Query-driven, hydrated by prefetch
+  const orgIdForQuery = selectedOrgId || getActiveOrgId() || undefined;
+  const projectIdForQuery = selectedProjectId || getActiveProjectId() || undefined;
+  const { data: categoryTotalsQ } = useQuery({
+    queryKey: dashboardQueryKeys.categoryTotals({ orgId: orgIdForQuery, projectId: projectIdForQuery, dateFrom, dateTo, postedOnly }),
+    queryFn: () => fetchCategoryTotals({ orgId: orgIdForQuery, projectId: projectIdForQuery, dateFrom, dateTo, postedOnly }),
+    staleTime: 5 * 60 * 1000,
+  });
+  const { data: recentQData } = useQuery({
+    queryKey: dashboardQueryKeys.recentActivity({ orgId: orgIdForQuery, projectId: projectIdForQuery, postedOnly }),
+    queryFn: () => fetchRecentActivity({ orgId: orgIdForQuery, projectId: projectIdForQuery, postedOnly }),
+    staleTime: 60 * 1000,
+  });
+  React.useEffect(() => { if (Array.isArray(recentQData)) setRecent(recentQData as any); }, [recentQData]);
+  const qc = useQueryClient();
+  React.useEffect(() => {
+    const prefetch = () => { prefetchDashboardQueries(qc, { orgId: orgIdForQuery, projectId: projectIdForQuery, dateFrom, dateTo, postedOnly }); };
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(prefetch, { timeout: 1000 });
+    } else {
+      setTimeout(prefetch, 0);
+    }
+  }, [qc, orgIdForQuery, projectIdForQuery, dateFrom, dateTo, postedOnly]);
+  React.useEffect(() => {
+    if (categoryTotalsQ) {
+      const totals = categoryTotalsQ as Record<string, number>;
+      const totalAssets = Math.abs(totals['asset'] || 0);
+      const totalLiabilities = Math.abs(totals['liability'] || 0);
+      const totalEquity = Math.abs(totals['equity'] || 0);
+      const totalRevenue = Math.abs(totals['revenue'] || 0);
+      const totalExpenses = Math.abs(totals['expense'] || 0);
+      const netProfit = totalRevenue - totalExpenses;
+      const liveStats: StatCardType[] = [
+        { id: 'assets', title: '', titleEn: language === 'ar' ? 'الأصول' : 'Assets', titleAr: 'الأصول', value: formatAmount(totalAssets), change: 0, icon: 'AccountBalance', color: 'primary' },
+        { id: 'liabilities', title: '', titleEn: language === 'ar' ? 'الالتزامات' : 'Liabilities', titleAr: 'الالتزامات', value: formatAmount(totalLiabilities), change: 0, icon: 'AccountBalance', color: 'warning' },
+        { id: 'equity', title: '', titleEn: language === 'ar' ? 'حقوق الملكية' : 'Equity', titleAr: 'حقوق الملكية', value: formatAmount(totalEquity), change: 0, icon: 'AccountBalance', color: 'success' },
+        { id: 'revenue', title: '', titleEn: t.totalRevenue, titleAr: t.totalRevenue, value: formatAmount(totalRevenue), change: 0, icon: 'TrendingUp', color: 'success' },
+        { id: 'expenses', title: '', titleEn: t.totalExpenses, titleAr: t.totalExpenses, value: formatAmount(totalExpenses), change: 0, icon: 'TrendingDown', color: 'error' },
+        { id: 'profit', title: '', titleEn: language === 'ar' ? 'صافي الدخل' : 'Net Income', titleAr: 'صافي الدخل', value: formatAmount(netProfit), change: 0, icon: 'AccountBalance', color: netProfit >= 0 ? 'primary' : 'error' },
+      ];
+      setStats(liveStats);
+      setLastUpdated(new Date());
+    }
+  }, [categoryTotalsQ, language, numberFormat, numbersOnlyDashboard]);
   const axisNumberFormatter = React.useMemo(() => new Intl.NumberFormat(numberFormat || 'en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), [numberFormat]);
   const compactNumberFormatter = React.useMemo(() => new Intl.NumberFormat(numberFormat || 'en-US', { notation: 'compact', maximumFractionDigits: 1 }), [numberFormat]);
   const formatAxisTick = (v: number) => {
@@ -334,16 +380,6 @@ const Dashboard: React.FC = () => {
       setCustomShortcuts(Array.isArray((cfg as any).shortcuts) ? ((cfg as any).shortcuts as any) : []);
 
       // Use unified balance service for consistency with all reports
-      const balanceFilters: AccountBalanceFilter = {
-        dateFrom,
-        dateTo,
-        postedOnly,
-        orgId: orgId || undefined,
-        projectId: projectId || undefined
-      };
-      
-      const categoryTotals = await getCategoryTotals(balanceFilters);
-      
       // Get accounts for transaction categorization (support id and code lookups)
       const { data: accts, error: acctErr } = await supabase
         .from('accounts')
@@ -361,6 +397,7 @@ const Dashboard: React.FC = () => {
       const { getReadMode } = await import('../config/featureFlags');
       const readMode = getReadMode();
 
+      if (false) {
       let rows: any[] = [];
       if (readMode !== 'legacy') {
         // Use enriched multi-line journals view
@@ -375,26 +412,16 @@ const Dashboard: React.FC = () => {
         if (txErr) throw txErr;
         rows = txRecent || [];
 
-        const recentDerived: RecentRow[] = rows.map(r => {
-          const debitCat = r.debit_account_code ? acctByCode[r.debit_account_code]?.category || null : null;
-          const creditCat = r.credit_account_code ? acctByCode[r.credit_account_code]?.category || null : null;
-          let type: 'income' | 'expense' = 'income';
-          if (debitCat === 'expense') type = 'expense';
-          else if (creditCat === 'revenue') type = 'income';
-          let category: string | null = null;
-          if (type === 'expense') category = (r.debit_account_code && (acctByCode[r.debit_account_code]?.name ?? debitCat)) ?? null;
-          else category = (r.credit_account_code && (acctByCode[r.credit_account_code]?.name ?? creditCat)) ?? null;
-          return {
-            id: r.journal_id,
-            entry_date: r.doc_date || r.posting_date,
-            description: '',
-            amount: Number(r.amount ?? 0),
-            debit_account_id: r.debit_account_code, // code when in GL2 mode
-            credit_account_id: r.credit_account_code, // code when in GL2 mode
-            type,
-            category,
-          } as RecentRow;
-        });
+        const recentDerived: RecentRow[] = rows.map(r => ({
+          id: r.journal_id,
+          entry_date: r.doc_date || r.posting_date,
+          description: '',
+          amount: Number(r.amount ?? 0),
+          debit_account_id: r.debit_account_code,
+          credit_account_id: r.credit_account_code,
+          type: 'income',
+          category: null,
+        }));
         setRecent(recentDerived);
       } else {
         // Legacy single-line transactions table
@@ -410,18 +437,18 @@ const Dashboard: React.FC = () => {
         if (txErr) throw txErr;
         rows = txRecent || [];
 
-        const recentDerived: RecentRow[] = rows.map(r => {
-          const debitCat = acctById[r.debit_account_id]?.category || null;
-          const creditCat = acctById[r.credit_account_id]?.category || null;
-          let type: 'income' | 'expense' = 'income';
-          if (debitCat === 'expense') type = 'expense';
-          else if (creditCat === 'revenue') type = 'income';
-          let category: string | null = null;
-          if (type === 'expense') category = acctById[r.debit_account_id]?.name ?? debitCat ?? null;
-          else category = acctById[r.credit_account_id]?.name ?? creditCat ?? null;
-          return { id: r.id, entry_date: r.entry_date, description: r.description, amount: r.amount, debit_account_id: r.debit_account_id, credit_account_id: r.credit_account_id, type, category } as RecentRow;
-        });
+        const recentDerived: RecentRow[] = rows.map(r => ({
+          id: r.id,
+          entry_date: r.entry_date,
+          description: r.description,
+          amount: r.amount,
+          debit_account_id: r.debit_account_id,
+          credit_account_id: r.credit_account_id,
+          type: 'income',
+          category: null,
+        }));
         setRecent(recentDerived);
+      }
       }
 
       // 2) Window for charts: last 6 months
@@ -472,12 +499,6 @@ const Dashboard: React.FC = () => {
       const revenueByMonth: number[] = Array(6).fill(0);
       const expensesByMonth: number[] = Array(6).fill(0);
 
-      // Initialize totals using unified category totals
-      const totalAssets = Math.abs(categoryTotals['asset'] || 0);
-      const totalLiabilities = Math.abs(categoryTotals['liability'] || 0);
-      const totalEquity = Math.abs(categoryTotals['equity'] || 0);
-      const totalRevenue = Math.abs(categoryTotals['revenue'] || 0);
-      const totalExpenses = Math.abs(categoryTotals['expense'] || 0);
 
       // Build revenue/expenses by month from transactions (informational)
       for (const r of txs) {
@@ -494,18 +515,7 @@ const Dashboard: React.FC = () => {
           if (debitCat === 'expense') expensesByMonth[idx] += amt;
         }
       }
-      const netProfit = totalRevenue - totalExpenses;
-
-      // Compose stat cards (fallback to mock colors/icons semantics)
-      const liveStats: StatCardType[] = [
-        { id: 'assets', title: '', titleEn: language === 'ar' ? 'الأصول' : 'Assets', titleAr: 'الأصول', value: formatAmount(totalAssets), change: 0, icon: 'AccountBalance', color: 'primary' },
-        { id: 'liabilities', title: '', titleEn: language === 'ar' ? 'الالتزامات' : 'Liabilities', titleAr: 'الالتزامات', value: formatAmount(totalLiabilities), change: 0, icon: 'AccountBalance', color: 'warning' },
-        { id: 'equity', title: '', titleEn: language === 'ar' ? 'حقوق الملكية' : 'Equity', titleAr: 'حقوق الملكية', value: formatAmount(totalEquity), change: 0, icon: 'AccountBalance', color: 'success' },
-        { id: 'revenue', title: '', titleEn: t.totalRevenue, titleAr: t.totalRevenue, value: formatAmount(totalRevenue), change: 0, icon: 'TrendingUp', color: 'success' },
-        { id: 'expenses', title: '', titleEn: t.totalExpenses, titleAr: t.totalExpenses, value: formatAmount(totalExpenses), change: 0, icon: 'TrendingDown', color: 'error' },
-        { id: 'profit', title: '', titleEn: language === 'ar' ? 'صافي الدخل' : 'Net Income', titleAr: 'صافي الدخل', value: formatAmount(netProfit), change: 0, icon: 'AccountBalance', color: netProfit >= 0 ? 'primary' : 'error' },
-      ];
-      setStats(liveStats);
+      // last updated after chart load
       setLastUpdated(new Date());
 
       // Compose chart data rows
@@ -521,6 +531,21 @@ const Dashboard: React.FC = () => {
   React.useEffect(() => {
     void load();
   }, [load, selectedOrgId, selectedProjectId, dateFrom, dateTo]);
+
+  // Global refresh from other parts of app (e.g., after deletion)
+  React.useEffect(() => {
+    const handler = (_e: Event) => {
+      void (async () => {
+        await Promise.allSettled([
+          qc.invalidateQueries({ queryKey: dashboardQueryKeys.categoryTotals({ orgId: orgIdForQuery, projectId: projectIdForQuery, dateFrom, dateTo, postedOnly }) }),
+          qc.invalidateQueries({ queryKey: dashboardQueryKeys.recentActivity({ orgId: orgIdForQuery, projectId: projectIdForQuery, postedOnly }) }),
+        ]);
+        await load();
+      })();
+    };
+    window.addEventListener('transactions:refresh', handler)
+    return () => window.removeEventListener('transactions:refresh', handler)
+  }, [qc, load, orgIdForQuery, projectIdForQuery, dateFrom, dateTo, postedOnly])
   
 
   return (
@@ -572,7 +597,15 @@ const Dashboard: React.FC = () => {
               {(language === 'ar' ? 'آخر تحديث: ' : 'Last updated: ') + formatDate(lastUpdated.toISOString().slice(0, 10)) + ' ' + lastUpdated.toLocaleTimeString(numberFormat || (language === 'ar' ? 'ar-SA' : 'en-US'), { hour12: false })}
             </Typography>
           )}
-          <Button variant="outlined" size="small" onClick={async () => { setRefreshing(true); await load(); setRefreshing(false); }} startIcon={refreshing ? <CircularProgress size={14} /> : undefined} disabled={refreshing}>
+          <Button variant="outlined" size="small" onClick={async () => { 
+            setRefreshing(true);
+            await Promise.allSettled([
+              qc.invalidateQueries({ queryKey: dashboardQueryKeys.categoryTotals({ orgId: orgIdForQuery, projectId: projectIdForQuery, dateFrom, dateTo, postedOnly }) }),
+              qc.invalidateQueries({ queryKey: dashboardQueryKeys.recentActivity({ orgId: orgIdForQuery, projectId: projectIdForQuery, postedOnly }) }),
+            ]);
+            await load();
+            setRefreshing(false);
+          }} startIcon={refreshing ? <CircularProgress size={14} /> : undefined} disabled={refreshing}>
             {language === 'ar' ? (refreshing ? 'جارِ التحديث...' : 'تحديث') : (refreshing ? 'Refreshing...' : 'Refresh')}
           </Button>
         </Box>
@@ -789,9 +822,14 @@ const Dashboard: React.FC = () => {
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
               {t.recentTransactions}
             </Typography>
-            <Button variant="outlined" size="small">
-              {t.viewAll}
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button variant="outlined" size="small" onClick={() => window.dispatchEvent(new CustomEvent('transactions:refresh'))}>
+                {language === 'ar' ? 'تحديث' : 'Refresh'}
+              </Button>
+              <Button variant="outlined" size="small" onClick={() => navigate('/transactions/all')}>
+                {t.viewAll}
+              </Button>
+            </Box>
           </Box>
           
           <TableContainer component={Paper} variant="outlined">

@@ -1,9 +1,7 @@
-import { supabase } from '../utils/supabase'
 import { transactionLineItemsEnhancedService } from './transaction-line-items-enhanced'
 import type { 
   LineItemTreeNode, 
-  EditableTxLineItem,
-  ChildLineItemRequest 
+  EditableTxLineItem
 } from './transaction-line-items-enhanced'
 
 export interface LineItemUINode {
@@ -16,7 +14,6 @@ export interface LineItemUINode {
   parent_id: string | null
   has_children?: boolean
   has_active_children?: boolean
-  transaction_id: string
   line_number: number
   quantity: number
   unit_price: number
@@ -28,17 +25,18 @@ export interface LineItemUINode {
 export interface CreateLineItemPayload {
   transaction_id: string
   parent_code?: string
+  line_number?: number
   item_code?: string
   item_name: string
   item_name_ar?: string
   quantity?: number
   percentage?: number
   unit_price?: number
-  discount_amount?: number
-  tax_amount?: number
   unit_of_measure?: string
   analysis_work_item_id?: string
   sub_tree_id?: string
+  work_item_id?: string
+  line_item_catalog_id?: string
 }
 
 export interface UpdateLineItemPayload {
@@ -49,8 +47,6 @@ export interface UpdateLineItemPayload {
   quantity?: number
   percentage?: number
   unit_price?: number
-  discount_amount?: number
-  tax_amount?: number
   unit_of_measure?: string
   is_active?: boolean
 }
@@ -73,7 +69,7 @@ export class LineItemsUIService {
       const flatItems = await transactionLineItemsEnhancedService.getLineItemsList(transactionId)
       
       // Convert tree nodes to UI nodes
-      const rootNodes = tree.map(node => this.convertToUINode(node, flatItems))
+      const rootNodes = tree.filter(node => node.depth === 0).map(node => this.convertToUINode(node, flatItems))
       
       console.log('✅ Loaded', rootNodes.length, 'root line items')
       return rootNodes
@@ -115,36 +111,26 @@ export class LineItemsUIService {
   async createParentLineItem(payload: CreateLineItemPayload): Promise<string> {
     try {
       console.log('➕ Creating parent line item:', payload.item_name)
-      
-      // Get suggested code for root level
-      const suggestedCode = await transactionLineItemsEnhancedService.fetchNextLineItemCode(
-        payload.transaction_id
-      )
-      
-      // Get current items to determine line number
-      const existingItems = await transactionLineItemsEnhancedService.getLineItemsList(payload.transaction_id)
-      const maxLineNumber = Math.max(0, ...existingItems.map(item => item.line_number))
-      
+
       const newItem: EditableTxLineItem = {
-        line_number: maxLineNumber + 1,
-        item_code: payload.item_code || suggestedCode,
+        line_number: payload.line_number ?? 1,
+        item_code: payload.item_code ?? null,
         item_name: payload.item_name,
-        item_name_ar: payload.item_name_ar,
+        item_name_ar: payload.item_name_ar ?? null,
         quantity: payload.quantity ?? 1,
         percentage: payload.percentage ?? 100,
         unit_price: payload.unit_price ?? 0,
-        discount_amount: payload.discount_amount ?? 0,
-        tax_amount: payload.tax_amount ?? 0,
         unit_of_measure: payload.unit_of_measure ?? 'piece',
-        analysis_work_item_id: payload.analysis_work_item_id || null,
-        sub_tree_id: payload.sub_tree_id || null,
-        line_item_id: null
+        analysis_work_item_id: payload.analysis_work_item_id ?? null,
+        sub_tree_id: payload.sub_tree_id ?? null,
+        work_item_id: payload.work_item_id ?? null,
+        line_item_catalog_id: payload.line_item_catalog_id ?? null,
       }
-      
+
       await transactionLineItemsEnhancedService.createLineItem(payload.transaction_id, newItem)
-      
+
       console.log('✅ Created parent line item with code:', newItem.item_code)
-      return newItem.item_code || suggestedCode
+      return newItem.item_code || ''
     } catch (error) {
       console.error('❌ Error creating parent line item:', error)
       throw new Error('Failed to create parent line item')
@@ -162,25 +148,35 @@ export class LineItemsUIService {
         throw new Error('Parent code is required for child line items')
       }
       
-      // Use the enhanced service's child creation method
-      const childRequest: ChildLineItemRequest = {
-        parent_item_code: payload.parent_code,
-        suggested_code: payload.item_code,
+      const newItem: EditableTxLineItem = {
+        line_number: payload.line_number ?? 1,
+        item_code: payload.item_code ?? null,
         item_name: payload.item_name,
-        item_name_ar: payload.item_name_ar,
-        quantity: payload.quantity,
-        percentage: payload.percentage,
-        unit_price: payload.unit_price,
-        discount_amount: payload.discount_amount,
-        tax_amount: payload.tax_amount,
-        unit_of_measure: payload.unit_of_measure
+        item_name_ar: payload.item_name_ar ?? null,
+        quantity: payload.quantity ?? 1,
+        percentage: payload.percentage ?? 100,
+        unit_price: payload.unit_price ?? 0,
+        unit_of_measure: payload.unit_of_measure ?? 'piece',
+        analysis_work_item_id: payload.analysis_work_item_id ?? null,
+        sub_tree_id: payload.sub_tree_id ?? null,
+        work_item_id: payload.work_item_id ?? null,
+        line_item_catalog_id: payload.line_item_catalog_id ?? null,
       }
-      
+
       const createdItem = await transactionLineItemsEnhancedService.createChildLineItem(
         payload.transaction_id,
-        childRequest
+        {
+          parent_item_code: payload.parent_code,
+          suggested_code: newItem.item_code ?? undefined,
+          item_name: newItem.item_name ?? undefined,
+          item_name_ar: newItem.item_name_ar ?? undefined,
+          quantity: newItem.quantity ?? undefined,
+          percentage: newItem.percentage ?? undefined,
+          unit_price: newItem.unit_price ?? undefined,
+          unit_of_measure: newItem.unit_of_measure ?? undefined,
+        }
       )
-      
+
       console.log('✅ Created child line item with code:', createdItem.item_code)
       return createdItem.item_code || ''
     } catch (error) {
@@ -203,8 +199,6 @@ export class LineItemsUIService {
         quantity: payload.quantity,
         percentage: payload.percentage,
         unit_price: payload.unit_price,
-        discount_amount: payload.discount_amount,
-        tax_amount: payload.tax_amount,
         unit_of_measure: payload.unit_of_measure
       }
       
@@ -369,50 +363,80 @@ export class LineItemsUIService {
 
   // Helper methods
 
-  private convertToUINode(treeNode: LineItemTreeNode, allItems: any[]): LineItemUINode {
-    const isActive = !(treeNode.item_name_ar?.includes('(معطل)') || treeNode.item_name?.includes('(معطل)'))
-    
+  private convertToUINode(node: LineItemTreeNode | EditableTxLineItem, allItems: EditableTxLineItem[]): LineItemUINode {
+    const depth = 'depth' in node ? node.depth ?? 0 : this.calculateDepth(node.item_code || '')
+    const hasChildren = 'has_children' in node
+      ? Boolean(node.has_children)
+      : this.hasChildren(node.item_code || '', allItems)
+    const isActive = !(node.item_name_ar?.includes('(معطل)') || node.item_name?.includes('(معطل)'))
+    const totalAmount = 'total_amount' in node && typeof (node as LineItemTreeNode).total_amount === 'number'
+      ? (node as LineItemTreeNode).total_amount ?? this.calculateAmount(node)
+      : this.calculateAmount(node)
+
     return {
-      id: treeNode.id,
-      code: treeNode.item_code || '',
-      name: treeNode.item_name || '',
-      name_ar: treeNode.item_name_ar || treeNode.item_name || '',
-      level: treeNode.depth || 1,
+      id: node.id!,
+      code: node.item_code || '',
+      name: node.item_name || '',
+      name_ar: node.item_name_ar || node.item_name || '',
+      level: depth + 1,
       status: isActive ? 'active' : 'inactive',
-      parent_id: treeNode.parent_code || null,
-      has_children: treeNode.has_children || false,
-      has_active_children: treeNode.has_children || false, // Simplified
-      transaction_id: treeNode.transaction_id || '',
-      line_number: treeNode.line_number,
-      quantity: treeNode.quantity,
-      unit_price: treeNode.unit_price,
-      total_amount: treeNode.total_amount || 0,
-      item_type: 'line_item', // Default type
-      unit_of_measure: treeNode.unit_of_measure || 'piece'
+      parent_id: this.extractParentCode(node.item_code || ''),
+      has_children: hasChildren,
+      has_active_children: hasChildren,
+      line_number: node.line_number,
+      quantity: node.quantity,
+      unit_price: node.unit_price,
+      total_amount: Number(totalAmount),
+      item_type: 'line_item',
+      unit_of_measure: node.unit_of_measure || 'piece'
     }
   }
 
-  private extractParentCode(itemCode: string): string | null {
+  private calculateAmount(item: EditableTxLineItem): number {
+    const qty = Number(item.quantity ?? 0)
+    const pct = Number(item.percentage == null ? 100 : item.percentage)
+    const price = Number(item.unit_price ?? 0)
+    return qty * price * (pct / 100)
+  }
+
+  private extractParentCode(itemCode: string | null | undefined): string | null {
     if (!itemCode) return null
-    
-    // Dash pattern: "1-2-3" -> "1-2"
+
     if (itemCode.includes('-')) {
       const parts = itemCode.split('-')
       if (parts.length > 1) {
         parts.pop()
         return parts.join('-')
       }
+      return null
     }
-    
-    // Numeric pattern: "123" -> "12" (if meaningful)
-    if (/^\d+$/.test(itemCode) && itemCode.length > 1) {
-      const parentCode = itemCode.substring(0, itemCode.length - 1)
-      if (parentCode.length > 0) {
-        return parentCode
-      }
+
+    if (/^\d+$/.test(itemCode)) {
+      if (itemCode.length <= 1) return null
+      return itemCode.slice(0, -1)
     }
-    
+
     return null
+  }
+
+  private hasChildren(parentCode: string, items: EditableTxLineItem[]): boolean {
+    if (!parentCode) return false
+    return items.some(item => {
+      if (!item.item_code) return false
+      const candidateParent = this.extractParentCode(item.item_code)
+      return candidateParent === parentCode
+    })
+  }
+
+  private calculateDepth(itemCode: string): number {
+    if (!itemCode) return 0
+    if (itemCode.includes('-')) {
+      return itemCode.split('-').length
+    }
+    if (/^\d+$/.test(itemCode)) {
+      return Math.min(itemCode.length, 4)
+    }
+    return 1
   }
 
   /**
@@ -468,10 +492,3 @@ export class LineItemsUIService {
 
 // Export singleton instance
 export const lineItemsUIService = new LineItemsUIService()
-
-// Export types for use in components
-export type {
-  LineItemUINode,
-  CreateLineItemPayload,
-  UpdateLineItemPayload
-}

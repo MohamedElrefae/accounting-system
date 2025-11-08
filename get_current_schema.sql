@@ -21,13 +21,13 @@ SELECT EXISTS (
 ) as table_exists;
 
 -- Sample accounts data to understand structure
-SELECT id, code, name, account_type, parent_id, organization_id 
+SELECT id, code, name, account_type, parent_id, org_id 
 FROM accounts 
-WHERE organization_id IS NOT NULL 
+WHERE org_id IS NOT NULL 
 LIMIT 5;
 
 -- Sample transactions to understand structure  
-SELECT id, account_id, description, amount, transaction_date, organization_id
+SELECT id, account_id, description, amount, transaction_date, org_id
 FROM transactions 
-WHERE organization_id IS NOT NULL 
+WHERE org_id IS NOT NULL 
 LIMIT 5;

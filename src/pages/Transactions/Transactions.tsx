@@ -3150,7 +3150,7 @@ const TransactionsPage: React.FC = () => {
                 reference_number: data.reference_number,
                 notes: data.notes,
                 notes_ar: data.notes_ar,
-                created_by: (await supabase.auth.getUser()).data.user?.id
+                created_by: await (await import('../../services/authService')).AuthService.getCurrentUserId()
               })
               .select()
               .single()

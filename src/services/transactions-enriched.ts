@@ -76,39 +76,44 @@ export interface EnrichedViewFilters {
 }
 
 export async function getTransactionsEnrichedView(filters: EnrichedViewFilters, page = 1, pageSize = 20): Promise<PagedResult<any>> {
-  const from = (page - 1) * pageSize
-  const to = from + pageSize - 1
+  const f = filters || {}
 
+  // Ask server to compute eligible transaction ids with full filters and exact pagination
+  const { data: idRows, error: idErr } = await supabase.rpc('list_transactions_enriched_rows', {
+    p_scope: f.scope ?? 'all',
+    p_pending_only: false,
+    p_search: f.search || null,
+    p_date_from: f.dateFrom || null,
+    p_date_to: f.dateTo || null,
+    p_amount_from: f.amountFrom ?? null,
+    p_amount_to: f.amountTo ?? null,
+    p_debit_account_id: f.debitAccountId || null,
+    p_credit_account_id: f.creditAccountId || null,
+    p_project_id: f.projectId || null,
+    p_org_id: f.orgId || null,
+    p_classification_id: f.classificationId || null,
+    p_sub_tree_id: f.expensesCategoryId || null,
+    p_work_item_id: f.workItemId || null,
+    p_analysis_work_item_id: f.analysisWorkItemId || null,
+    p_cost_center_id: f.costCenterId || null,
+    p_approval_status: f.approvalStatus || null,
+    p_created_by: f.createdBy || null,
+    p_page: page,
+    p_page_size: pageSize,
+  } as any)
+  if (idErr) throw idErr
+  const ids = (idRows || []).map((r: any) => r.id)
+  const total = (idRows && idRows.length > 0 && typeof (idRows[0] as any).total_count === 'number') ? Number((idRows[0] as any).total_count) : 0
+  if (ids.length === 0) return { rows: [], total }
+
+  // Fetch the enriched rows by ids, ordered by entry_date desc for stable display
   let q = supabase
     .from('transactions_enriched_v2')
-    .select('*', { count: 'exact' })
+    .select('*')
+    .in('transaction_id', ids)
     .order('entry_date', { ascending: false })
 
-  const f = filters || {}
-  if (f.search && f.search.trim()) {
-    const s = f.search.trim()
-    q = (q as any).or(`entry_number.ilike.%${s}%,description.ilike.%${s}%,reference_number.ilike.%${s}%,notes.ilike.%${s}%`)
-  }
-  if (f.dateFrom) q = q.gte('entry_date', f.dateFrom)
-  if (f.dateTo) q = q.lte('entry_date', f.dateTo)
-  if (f.amountFrom != null) q = q.gte('amount', f.amountFrom)
-  if (f.amountTo != null) q = q.lte('amount', f.amountTo)
-  if (f.debitAccountId) q = q.eq('debit_account_id', f.debitAccountId)
-  if (f.creditAccountId) q = q.eq('credit_account_id', f.creditAccountId)
-  if (f.projectId) q = q.eq('project_id', f.projectId)
-  if (f.orgId) q = q.eq('org_id', f.orgId)
-  if (f.classificationId) q = q.eq('classification_id', f.classificationId)
-  if (f.expensesCategoryId) q = q.eq('sub_tree_id', f.expensesCategoryId)
-  if (f.workItemId) q = q.eq('work_item_id', f.workItemId)
-  if (f.analysisWorkItemId) q = q.eq('analysis_work_item_id', f.analysisWorkItemId)
-  if (f.costCenterId) q = q.eq('cost_center_id', f.costCenterId)
-  if (f.approvalStatus === 'posted') q = q.eq('is_posted', true)
-  else if (f.approvalStatus) q = q.eq('approval_status', f.approvalStatus)
-
-  // Scope: restrict to current user's rows if required
-  if (f.scope === 'my' && f.createdBy) q = q.eq('created_by', f.createdBy)
-
-  const { data, error, count } = await q.range(from, to)
+  const { data, error } = await q
   if (error) throw error
-  return { rows: (data || []) as any[], total: count ?? 0 }
+  return { rows: (data || []) as any[], total }
 }

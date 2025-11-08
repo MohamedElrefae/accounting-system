@@ -3,7 +3,8 @@ import styles from './TransactionLineItems.module.css'
 import { useHasPermission } from '../../hooks/useHasPermission'
 import { useToast } from '../../contexts/ToastContext'
 import { getOrganizations, type Organization } from '../../services/organization'
-import { lineItemsCatalogService, type CatalogItem } from '../../services/line-items-catalog'
+import { transactionLineItemsCatalogService, type DbTxLineItem } from '../../services/transaction-line-items-enhanced'
+
 import ExportButtons from '../../components/Common/ExportButtons'
 import TreeView from '../../components/TreeView/TreeView'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
@@ -69,6 +70,7 @@ const TransactionLineItemsPage: React.FC = () => {
   const [orgId, setOrgId] = useState<string>('')
 
   const [list, setList] = useState<TransactionLineItemRow[]>([])
+
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
@@ -85,7 +87,7 @@ const TransactionLineItemsPage: React.FC = () => {
   // Form dialog
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState<{ 
+  const [form, setForm] = useState<{
     item_code: string
     item_name: string
     item_name_ar: string
@@ -97,15 +99,15 @@ const TransactionLineItemsPage: React.FC = () => {
     is_active: boolean
     position: number
   }>({
-    item_code: '', 
-    item_name: '', 
-    item_name_ar: '', 
-    description: '', 
-    parent_id: '', 
+    item_code: '',
+    item_name: '',
+    item_name_ar: '',
+    description: '',
+    parent_id: '',
     quantity: 1,
     unit_price: 0,
     unit_of_measure: 'piece',
-    is_active: true, 
+    is_active: true,
     position: 0
   })
 
@@ -130,25 +132,25 @@ const TransactionLineItemsPage: React.FC = () => {
         setLoading(false)
       }
     })()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canView])
 
-const reload = async (chosen: string) => {
+  const reload = async (chosen: string) => {
     if (!chosen) return
     setLoading(true)
     try {
-      const catalogItems: CatalogItem[] = await lineItemsCatalogService.list(chosen, true)
+      const catalogItems: DbTxLineItem[] = await transactionLineItemsCatalogService.getCatalogItems(chosen, true)
 
-      const itemsWithMeta: TransactionLineItemRow[] = catalogItems.map(i => ({
-        id: i.id,
-        item_code: i.code || null,
-        item_name: i.name || null,
-        item_name_ar: i.name_ar || null,
-        parent_id: i.parent_id || null,
-        unit_price: i.standard_cost ?? 0,
-        unit_of_measure: i.base_unit_of_measure ?? null,
-        is_active: i.is_active,
-        level: i.level || calculateLevelFromCode(i.code || ''),
+      const itemsWithMeta: TransactionLineItemRow[] = catalogItems.map(item => ({
+        id: item.id,
+        item_code: item.item_code || null,
+        item_name: item.item_name || null,
+        item_name_ar: item.item_name_ar || null,
+        parent_id: item.parent_id || null,
+        unit_price: item.unit_price ?? 0,
+        unit_of_measure: item.unit_of_measure ?? null,
+        is_active: item.is_active !== false,
+        level: calculateLevelFromCode(item.item_code || ''),
         child_count: 0,
         has_usage: false,
         usage_count: 0,
@@ -183,8 +185,8 @@ const reload = async (chosen: string) => {
   const filteredList = useMemo(() => {
     if (!search) return list
     const q = search.toLowerCase()
-    return list.filter(r => 
-      (r.item_code && r.item_code.toLowerCase().includes(q)) || 
+    return list.filter(r =>
+      (r.item_code && r.item_code.toLowerCase().includes(q)) ||
       (r.item_name && r.item_name.toLowerCase().includes(q)) ||
       (r.item_name_ar && r.item_name_ar.toLowerCase().includes(q))
     )
@@ -215,7 +217,7 @@ const reload = async (chosen: string) => {
       item_name: r.item_name || '',
       item_name_ar: r.item_name_ar || '',
       level: r.level,
-quantity: 1,
+      quantity: 1,
       unit_price: r.unit_price,
       unit_of_measure: r.unit_of_measure || '',
       is_active: r.is_active !== false,
@@ -228,7 +230,7 @@ quantity: 1,
   const getNextCode = async (parentId?: string | null) => {
     if (!orgId) return '1000'
     try {
-return await lineItemsCatalogService.getNextCode(orgId, parentId ?? undefined)
+      return await transactionLineItemsCatalogService.getNextCatalogItemCode(orgId, parentId ?? undefined)
     } catch (e: unknown) {
       const error = e as Error
       showToast(
@@ -242,24 +244,24 @@ return await lineItemsCatalogService.getNextCode(orgId, parentId ?? undefined)
   const openCreate = async () => {
     setEditingId(null)
     const code = await getNextCode(null)
-    setForm({ 
-      item_code: code, 
-      item_name: '', 
-      item_name_ar: '', 
-      description: '', 
-      parent_id: '', 
+    setForm({
+      item_code: code,
+      item_name: '',
+      item_name_ar: '',
+      description: '',
+      parent_id: '',
       quantity: 1,
       unit_price: 0,
       unit_of_measure: 'piece',
-      is_active: true, 
-      position: 0 
+      is_active: true,
+      position: 0
     })
     setOpen(true)
   }
 
   const openEdit = (row: TransactionLineItemRow) => {
     setEditingId(row.id)
-setForm({
+    setForm({
       item_code: row.item_code || '',
       item_name: row.item_name || '',
       item_name_ar: row.item_name_ar || '',
@@ -278,27 +280,32 @@ setForm({
     if (!orgId) { showToast('Select organization', { severity: 'warning' }); return }
     try {
       if (editingId) {
-await lineItemsCatalogService.update(editingId, orgId, {
-          code: form.item_code,
-          name: form.item_name,
-          name_ar: form.item_name_ar || undefined,
-          base_unit_of_measure: form.unit_of_measure,
-          standard_cost: form.unit_price,
+        await transactionLineItemsCatalogService.updateCatalogItem(editingId, orgId, {
+          item_code: form.item_code,
+          item_name: form.item_name,
+          item_name_ar: form.item_name_ar || undefined,
+          parent_id: form.parent_id ? form.parent_id : undefined,
+          unit_of_measure: form.unit_of_measure || undefined,
+          unit_price: form.unit_price,
+          quantity: form.quantity,
           is_active: form.is_active,
+          position: form.position,
         })
         showToast('تم التحديث بنجاح', { severity: 'success' })
       } else {
-await lineItemsCatalogService.create(orgId, {
-          code: form.item_code,
-          name: form.item_name,
-          name_ar: form.item_name_ar || undefined,
+        await transactionLineItemsCatalogService.createCatalogItem(orgId, {
+          item_code: form.item_code,
+          item_name: form.item_name,
+          item_name_ar: form.item_name_ar || undefined,
           parent_id: form.parent_id || undefined,
-          base_unit_of_measure: form.unit_of_measure,
-          standard_cost: form.unit_price,
-          is_active: true,
+          unit_of_measure: form.unit_of_measure,
+          unit_price: form.unit_price,
+          quantity: form.quantity,
+          position: form.position,
         })
         showToast('تم الإنشاء بنجاح', { severity: 'success' })
       }
+
       setOpen(false)
       await reload(orgId)
     } catch (e: unknown) {
@@ -328,8 +335,8 @@ await lineItemsCatalogService.create(orgId, {
 
   const handleToggleActive = async (row: TransactionLineItemRow) => {
     try {
-await lineItemsCatalogService.update(row.id, orgId, { 
-        is_active: !row.is_active 
+      await transactionLineItemsCatalogService.updateCatalogItem(row.id, orgId, {
+        is_active: !row.is_active,
       })
       showToast(row.is_active ? 'تم التعطيل' : 'تم التفعيل', { severity: 'success' })
       await reload(orgId)
@@ -342,7 +349,7 @@ await lineItemsCatalogService.update(row.id, orgId, {
     if (!orgId) return
     if (!confirm(`حذف بند التكلفة ${row.item_code}؟`)) return
     try {
-await lineItemsCatalogService.remove(row.id, orgId)
+      await transactionLineItemsCatalogService.deleteCatalogItem(row.id, orgId)
       showToast('تم الحذف بنجاح', { severity: 'success' })
       await reload(orgId)
     } catch (e: unknown) {

@@ -1,10 +1,10 @@
-import React, { useMemo, useRef, useState, useEffect } from 'react'
-import DraggableResizablePanel from '@/components/Common/DraggableResizablePanel'
+import React, { useMemo, useState, useEffect } from 'react'
+import DraggablePanelContainer from '@/components/Common/DraggablePanelContainer'
 import UnifiedCRUDForm, { type FormConfig } from '@/components/Common/UnifiedCRUDForm'
 import { Box, Button, Stack, Typography, Table, TableBody, TableCell, TableHead, TableRow, Menu, MenuItem } from '@mui/material'
 import { useArabicLanguage } from '@/services/ArabicLanguageService'
 import { useToast } from '@/contexts/ToastContext'
-import SearchableSelect, { type SearchableSelectOption } from '@/components/Common/SearchableSelect'
+import type { SearchableSelectOption } from '@/components/Common/SearchableSelect'
 import { OpeningBalanceImportService } from '@/services/OpeningBalanceImportService'
 import { getActiveOrgId, getActiveProjectId } from '@/utils/org'
 import { getProject } from '@/services/projects'
@@ -45,20 +45,6 @@ const OpeningBalanceManualCrud: React.FC<OpeningBalanceManualCrudProps> = ({ ope
   const openPresets = (e: React.MouseEvent)=> setPresetAnchor(e.currentTarget as HTMLElement)
   const closePresets = ()=> setPresetAnchor(null)
 
-  // Persisted layout state (position/size/dock)
-  const [position, setPosition] = useState<{ x: number; y: number}>(()=>{ try { return JSON.parse(localStorage.getItem('obi.manual.crud:position')||'')||{x:120,y:90} } catch { return {x:120,y:90} } })
-  const [size, setSize] = useState<{ width: number; height: number }>(()=>{ try { return JSON.parse(localStorage.getItem('obi.manual.crud:size')||'')||{width:980,height:760} } catch { return {width:980,height:760} } })
-  const [isMaximized, setIsMaximized] = useState<boolean>(()=>{ try { return localStorage.getItem('obi.manual.crud:maximized')==='true' } catch { return false } })
-  const [isDocked, setIsDocked] = useState<boolean>(()=>{ try { return localStorage.getItem('obi.manual.crud:docked')==='true' } catch { return false } })
-  const [dockPosition, setDockPosition] = useState<'left'|'right'|'top'|'bottom'>(()=>{ try { return (localStorage.getItem('obi.manual.crud:dockPosition') as any)||'right' } catch { return 'right' } })
-
-  // Persist on change
-  React.useEffect(()=>{ try { localStorage.setItem('obi.manual.crud:position', JSON.stringify(position)) } catch {} }, [position])
-  React.useEffect(()=>{ try { localStorage.setItem('obi.manual.crud:size', JSON.stringify(size)) } catch {} }, [size])
-  React.useEffect(()=>{ try { localStorage.setItem('obi.manual.crud:maximized', String(isMaximized)) } catch {} }, [isMaximized])
-  React.useEffect(()=>{ try { localStorage.setItem('obi.manual.crud:docked', String(isDocked)) } catch {} }, [isDocked])
-  React.useEffect(()=>{ try { localStorage.setItem('obi.manual.crud:dockPosition', dockPosition) } catch {} }, [dockPosition])
-
   // Load defaults and options when opened
   useEffect(() => {
     if (!open) return
@@ -92,7 +78,7 @@ const OpeningBalanceManualCrud: React.FC<OpeningBalanceManualCrudProps> = ({ ope
       } catch {}
     }
     load()
-  }, [open])
+  }, [open, orgId])
 
   const formConfig: FormConfig = useMemo(() => ({
     title: isRTL ? 'إضافة سطر رصيد افتتاحي' : 'Add Opening Balance Row',
@@ -124,20 +110,16 @@ const OpeningBalanceManualCrud: React.FC<OpeningBalanceManualCrudProps> = ({ ope
   }
 
   return (
-    <DraggableResizablePanel
-      title={isRTL ? 'إدخال الأرصدة الافتتاحية (CRUD موحد)' : 'Manual Opening Balances (Unified CRUD)'}
+    <DraggablePanelContainer
+      storageKey="obi.manual.crud"
       isOpen={open}
       onClose={onClose}
-      position={position}
-      size={size}
-      onMove={(p)=> setPosition(p)}
-      onResize={(s)=> setSize(s)}
-      isMaximized={isMaximized}
-      onMaximize={()=> setIsMaximized(v=>!v)}
-      isDocked={isDocked}
-      dockPosition={dockPosition}
-      onDock={(dock)=> { setIsDocked(true); setDockPosition(dock) }}
-      onResetPosition={()=>{ setPosition({x:120,y:90}); setSize({width:980,height:760}); setIsDocked(false); setIsMaximized(false) }}
+      title={isRTL ? 'إدخال الأرصدة الافتتاحية (CRUD موحد)' : 'Manual Opening Balances (Unified CRUD)'}
+      defaults={{
+        position: () => ({ x: 120, y: 90 }),
+        size: () => ({ width: 980, height: 760 }),
+        dockPosition: 'right',
+      }}
     >
       <Stack spacing={2} sx={{ p: 2 }}>
         {/* Header-like action row to match unified CRUD look */}
@@ -157,7 +139,7 @@ const OpeningBalanceManualCrud: React.FC<OpeningBalanceManualCrudProps> = ({ ope
               '&:hover':{ transform:'scale(1.05)'},
               transition:'all 0.2s ease'
             }} onClick={()=>{ 
-              try { localStorage.setItem('obi.manual.crud.pref', JSON.stringify({ savedAt: Date.now(), position, size, isDocked, dockPosition })) } catch {}
+              try { localStorage.setItem('obi.manual.crud.pref', JSON.stringify({ savedAt: Date.now() })) } catch {}
               try { showToast(isRTL?'تم حفظ التخطيط':'Layout saved', { severity:'success' }) } catch {}
             }}>💾</Button>
             <Button size="small" onClick={openPresets} title={isRTL?'تخطيطات سريعة':'Layout presets'} sx={{
@@ -166,10 +148,10 @@ const OpeningBalanceManualCrud: React.FC<OpeningBalanceManualCrudProps> = ({ ope
               transition:'all 0.2s ease'
             }}>▾</Button>
             <Menu anchorEl={presetAnchor} open={!!presetAnchor} onClose={closePresets} anchorOrigin={{ horizontal:'right', vertical:'bottom' }} transformOrigin={{ horizontal:'right', vertical:'top' }}>
-              <MenuItem onClick={()=>{ setPosition({x:20,y:90}); setSize({width:520,height:760}); setIsDocked(true); setDockPosition('left'); closePresets() }}>{isRTL?'تثبيت يسار (ضيق)':'Dock left (narrow)'}</MenuItem>
-              <MenuItem onClick={()=>{ setPosition({x:window.innerWidth-700,y:90}); setSize({width:680,height:760}); setIsDocked(true); setDockPosition('right'); closePresets() }}>{isRTL?'تثبيت يمين (عريض)':'Dock right (wide)'}</MenuItem>
-              <MenuItem onClick={()=>{ setIsMaximized(true); setIsDocked(false); closePresets() }}>{isRTL?'تكبير':'Maximize'}</MenuItem>
-              <MenuItem onClick={()=>{ setPosition({x:120,y:90}); setSize({width:980,height:760}); setIsDocked(false); setIsMaximized(false); closePresets() }}>{isRTL?'استعادة الافتراضي':'Restore default'}</MenuItem>
+              <MenuItem onClick={()=>{ try { localStorage.setItem('obi.manual.crud.pref', JSON.stringify({ preset: 'left_narrow', savedAt: Date.now() })) } catch {} closePresets() }}>{isRTL?'تثبيت يسار (ضيق)':'Dock left (narrow)'}</MenuItem>
+              <MenuItem onClick={()=>{ try { localStorage.setItem('obi.manual.crud.pref', JSON.stringify({ preset: 'right_wide', savedAt: Date.now() })) } catch {} closePresets() }}>{isRTL?'تثبيت يمين (عريض)':'Dock right (wide)'}</MenuItem>
+              <MenuItem onClick={()=>{ try { localStorage.setItem('obi.manual.crud.pref', JSON.stringify({ preset: 'maximize', savedAt: Date.now() })) } catch {} closePresets() }}>{isRTL?'تكبير':'Maximize'}</MenuItem>
+              <MenuItem onClick={()=>{ try { localStorage.setItem('obi.manual.crud.pref', JSON.stringify({ preset: 'default', savedAt: Date.now() })) } catch {} closePresets() }}>{isRTL?'استعادة الافتراضي':'Restore default'}</MenuItem>
             </Menu>
             <Button size="small" title={isRTL?'إعادة تعيين':'Reset'} sx={{
               borderRadius:'12px',
@@ -225,7 +207,7 @@ const OpeningBalanceManualCrud: React.FC<OpeningBalanceManualCrudProps> = ({ ope
           <Button onClick={onClose}>{isRTL ? 'إغلاق' : 'Close'}</Button>
         </Stack>
       </Stack>
-    </DraggableResizablePanel>
+    </DraggablePanelContainer>
   )
 }
 

@@ -1,36 +1,46 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type PluginOption } from 'vite'
 import react from '@vitejs/plugin-react'
 import { visualizer } from 'rollup-plugin-visualizer'
 import path from 'path'
 
+const patchPostgrestWrapperPlugin: PluginOption = {
+  name: 'patch-postgrest-wrapper',
+  enforce: 'pre',
+  transform(code: string, id: string) {
+    if (id.includes('@supabase/postgrest-js/dist/esm/wrapper.mjs')) {
+      const patched = code.replace(
+        "import index from '../cjs/index.js'",
+        "import * as index from '../cjs/index.js'",
+      )
+      return { code: patched, map: null }
+    }
+
+    return null
+  },
+}
+
 // Minimal, clean baseline config
-export default defineConfig(({ mode }) => ({
-  plugins: [
+export default defineConfig(({ mode }) => {
+  const plugins: PluginOption[] = [
     react({
-      // Enable React Fast Refresh
-      fastRefresh: true,
-      // Include .tsx files
-      include: "**/*.{jsx,tsx}",
+      include: ['**/*.jsx', '**/*.tsx'],
     }),
-    // Patch Supabase postgrest wrapper to avoid default import from CJS
-    {
-      name: 'patch-postgrest-wrapper',
-      enforce: 'pre',
-      transform(code, id) {
-        if (id.includes('@supabase/postgrest-js/dist/esm/wrapper.mjs')) {
-          const patched = code.replace("import index from '../cjs/index.js'", "import * as index from '../cjs/index.js'")
-          return { code: patched, map: null }
-        }
-        return null
-      }
-    },
-    mode === 'analyze' && visualizer({
-      filename: 'dist/stats.html',
-      open: true,
-      gzipSize: true,
-      brotliSize: true,
-    })
-  ].filter(Boolean),
+    patchPostgrestWrapperPlugin,
+  ]
+
+  if (mode === 'analyze') {
+    plugins.push(
+      visualizer({
+        filename: 'dist/stats.html',
+        open: true,
+        gzipSize: true,
+        brotliSize: true,
+      }) as PluginOption,
+    )
+  }
+
+  return {
+    plugins,
   define: {
     // Fix for some CommonJS modules
     global: 'globalThis',
@@ -61,15 +71,17 @@ export default defineConfig(({ mode }) => ({
       '@mui/utils',
       'zustand',
       '@tanstack/react-query',
-      'pdfjs-dist'
+      'pdfjs-dist',
+      'react-router-dom',
+      '@supabase/supabase-js'
     ],
     exclude: ['@mui/private-theming'],
-    force: true
+    force: false // Changed to false for better caching
   },
   server: {
     host: true, // allow LAN access and avoids "use --host to expose" message
-    port: 3001,
-    strictPort: false, // allow fallback if 3001 is taken
+    port: 3000,
+    strictPort: true, // force port 3000, fail if taken
     open: true,
     cors: true,
     watch: {
@@ -82,8 +94,6 @@ export default defineConfig(({ mode }) => ({
       // Explicit HMR config tends to be more stable on some Windows setups
       protocol: 'ws',
       host: 'localhost',
-      // Let Vite choose a free port automatically
-      port: undefined
     }
   },
   preview: {
@@ -95,9 +105,12 @@ export default defineConfig(({ mode }) => ({
   build: {
     target: 'esnext',
     minify: 'esbuild',
-    sourcemap: true,
+    // Avoid large sourcemaps in normal production builds to reduce memory footprint
+    sourcemap: mode === 'analyze',
+    cssCodeSplit: true,
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
+      treeshake: { moduleSideEffects: false },
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
@@ -108,6 +121,7 @@ export default defineConfig(({ mode }) => ({
         }
       }
     },
-    assetsInclude: ['**/*.worker.js']
-  }
-}))
+  },
+  assetsInclude: ['**/*.worker.js'],
+}
+})

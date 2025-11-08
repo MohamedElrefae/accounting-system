@@ -26,37 +26,48 @@ CREATE TRIGGER trigger_calculate_line_item_total
     FOR EACH ROW
     EXECUTE FUNCTION calculate_line_item_total();
 
--- 4. Test the trigger with a sample insert
+-- 4. Test the trigger with a sample insert using an existing transaction_line_id
 BEGIN;
 
+-- Insert a test line item linked to an existing transaction_line (if any exist)
 INSERT INTO transaction_line_items (
-    transaction_id, 
-    line_number, 
-    item_name_ar, 
-    quantity, 
-    percentage, 
-    unit_price, 
-    unit_of_measure,
-    org_id
-) VALUES (
-    gen_random_uuid(), 
-    1, 
-    'Test Trigger Item', 
-    3, 
-    100, 
-    20.50, 
-    'piece',
-    gen_random_uuid()
-) RETURNING 
-    id,
-    transaction_id,
+    transaction_line_id,
+    line_number,
     item_name_ar,
     quantity,
     percentage,
     unit_price,
-    total_amount, -- Should show 3 * (100/100) * 20.50 = 61.50
+    unit_of_measure,
+    org_id
+)
+SELECT 
+    tl.id,
+    COALESCE((SELECT MAX(line_number) + 1 FROM transaction_line_items tli WHERE tli.transaction_line_id = tl.id), 1) AS next_line_number,
+    'Test Trigger Item',
+    3,
+    100,
+    20.50,
+    'piece',
+    tl.org_id
+FROM public.transaction_lines tl
+ORDER BY tl.created_at DESC
+LIMIT 1;
+
+-- Show the inserted test row (if any)
+SELECT 
+    id,
+    transaction_line_id,
+    item_name_ar,
+    quantity,
+    percentage,
+    unit_price,
+    total_amount,
     created_at,
-    updated_at;
+    updated_at
+FROM transaction_line_items
+WHERE item_name_ar = 'Test Trigger Item'
+ORDER BY created_at DESC
+LIMIT 1;
 
 -- 5. Clean up test data
 DELETE FROM transaction_line_items WHERE item_name_ar = 'Test Trigger Item';

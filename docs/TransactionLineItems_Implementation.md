@@ -178,7 +178,7 @@ WHERE transaction_id IS NULL;
 
 -- Check hierarchical structure
 SELECT 
-    organization_id,
+    org_id,
     CASE 
         WHEN item_code::integer % 1000 = 0 THEN 'Level 1'
         WHEN item_code::integer % 100 = 0 THEN 'Level 2' 
@@ -188,8 +188,8 @@ SELECT
     COUNT(*) as count
 FROM transaction_line_items
 WHERE transaction_id IS NULL
-GROUP BY organization_id, level
-ORDER BY organization_id, level;
+GROUP BY org_id, level
+ORDER BY org_id, level;
 ```
 
 ## Integration Benefits

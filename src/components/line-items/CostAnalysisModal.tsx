@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import type { EditableTxLineItem } from '../../services/transaction-line-items'
+import type { EditableTxLineItem } from '../../services/transaction-line-items-enhanced'
 
 export interface CostAnalysisModalProps {
   item: EditableTxLineItem | null
@@ -69,19 +69,19 @@ export const CostAnalysisModal: React.FC<CostAnalysisModalProps> = ({
     onClose()
   }
 
-  const getWorkItemLabel = (id: string | null) => {
+  const getWorkItemLabel = (id: string | null | undefined) => {
     if (!id) return '—'
     const item = workItems.find(w => w.id === id)
     return item ? `${item.code} - ${item.name}` : id
   }
 
-  const getAnalysisItemLabel = (id: string | null) => {
+  const getAnalysisItemLabel = (id: string | null | undefined) => {
     if (!id) return '—'
     const item = analysisItems[id]
     return item ? `${item.code} - ${item.name}` : id
   }
 
-  const getCostCenterLabel = (id: string | null) => {
+  const getCostCenterLabel = (id: string | null | undefined) => {
     if (!id) return '—'
     const cc = costCenters.find(c => c.id === id)
     return cc ? `${cc.code} - ${cc.name}` : id
@@ -114,7 +114,7 @@ export const CostAnalysisModal: React.FC<CostAnalysisModalProps> = ({
               {item.item_code || `#${item.line_number}`} - {item.item_name || 'Untitled'}
             </div>
             <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
-              Qty: {item.quantity} × ${item.unit_price} = ${((item.quantity ?? 0) * (item.unit_price ?? 0)).toFixed(2)}
+              Qty: {item.quantity} × {item.percentage ?? 100}% × {item.unit_price} = {(Number(item.quantity || 0) * Number(item.unit_price || 0) * (Number(item.percentage ?? 100) / 100)).toFixed(2)}
             </div>
           </div>
 

@@ -1,0 +1,297 @@
+/* Transaction Entry Form - Professional Dark Theme Styles */
+
+.tx-entry-form {
+  direction: rtl;
+  font-family: inherit;
+}
+
+/* Form Container */
+.tx-form-container {
+  background: var(--surface);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+/* Header Section */
+.tx-form-header {
+  background: var(--primary);
+  color: var(--text-on-primary, #ffffff);
+  padding: 20px 24px;
+  border-radius: 8px 8px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid var(--primary);
+}
+
+.tx-form-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+/* Section Headers */
+.tx-section-header {
+  background: var(--surface);
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tx-section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--primary);
+  margin: 0;
+}
+
+/* Transaction Lines Grid - Compact Layout */
+.tx-lines-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tx-line-row {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.tx-line-row:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.tx-line-row.has-error {
+  border-color: var(--danger);
+  background: rgba(var(--danger-rgb, 220, 53, 69), 0.05);
+}
+
+/* Main Line Row (always visible) */
+.tx-line-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.tx-line-number {
+  min-width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary);
+  color: var(--text-on-primary, #ffffff);
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.tx-line-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.tx-line-field.account {
+  flex: 2;
+  min-width: 200px;
+}
+
+.tx-line-field.description {
+  flex: 2;
+  min-width: 150px;
+}
+
+.tx-line-field.amount {
+  flex: 1;
+  min-width: 110px;
+  max-width: 140px;
+}
+
+.tx-line-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* Expandable Details Row */
+.tx-line-details {
+  padding: 0 16px 12px 16px;
+  background: var(--surface-light, rgba(255, 255, 255, 0.02));
+}
+
+.tx-line-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Expand/Collapse Button */
+.tx-expand-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  min-width: unset;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.tx-expand-btn:hover {
+  background: rgba(var(--primary-rgb, 25, 118, 210), 0.1);
+}
+
+.tx-expand-btn.expanded {
+  background: var(--primary);
+  color: var(--text-on-primary, #ffffff);
+}
+
+/* Form Fields - Consistent Styling */
+.tx-field-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tx-field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted_text);
+  margin-bottom: 4px;
+}
+
+.tx-field-input {
+  background: var(--input-bg, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 12px;
+  color: var(--text);
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.tx-field-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 25, 118, 210), 0.1);
+}
+
+.tx-field-input.error {
+  border-color: var(--danger);
+}
+
+.tx-field-error {
+  font-size: 0.75rem;
+  color: var(--danger);
+  margin-top: 4px;
+}
+
+/* Totals Footer Overrides */
+.totals-footer {
+  background: var(--surface) !important;
+  border-top: 3px solid var(--primary) !important;
+}
+
+.balance-status.balanced {
+  color: var(--success) !important;
+}
+
+.balance-status.unbalanced {
+  color: var(--danger) !important;
+}
+
+/* Loading Overlay */
+.tx-loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.tx-loading-content {
+  background: var(--surface);
+  padding: 32px;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 1200px) {
+  .tx-line-main {
+    flex-wrap: wrap;
+  }
+  
+  .tx-line-field.account,
+  .tx-line-field.description {
+    flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .tx-line-main {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .tx-line-field {
+    width: 100%;
+  }
+  
+  .tx-line-details-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Accessibility */
+.tx-field-input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Animations */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tx-line-details {
+  animation: slideDown 0.2s ease-out;
+}
+
+/* Print Styles */
+@media print {
+  .tx-form-header,
+  .tx-line-actions,
+  .totals-footer {
+    display: none !important;
+  }
+  
+  .tx-line-row {
+    break-inside: avoid;
+  }
+}

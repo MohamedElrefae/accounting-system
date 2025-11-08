@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import type { EditableTxLineItem } from '../../services/transaction-line-items'
+import React, { useState } from 'react'
+import type { EditableTxLineItem } from '../../services/transaction-line-items-enhanced'
 import CostAnalysisModal from './CostAnalysisModal'
 
 export interface TransactionLineItemsEditorProps {
@@ -36,6 +36,10 @@ export const TransactionLineItemsEditor: React.FC<TransactionLineItemsEditorProp
   items,
   onChange,
   disabled = false,
+  workItems,
+  analysisItems,
+  costCenters,
+  transactionLineDefaults,
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [costModalOpen, setCostModalOpen] = useState(false)
@@ -46,9 +50,7 @@ export const TransactionLineItemsEditor: React.FC<TransactionLineItemsEditorProp
     const qty = Number(item.quantity || 0)
     const pct = Number(item.percentage == null ? 100 : item.percentage)
     const price = Number(item.unit_price || 0)
-    const discount = Number(item.discount_amount || 0)
-    const tax = Number(item.tax_amount || 0)
-    return qty * (pct / 100) * price - discount + tax
+    return qty * (pct / 100) * price
   }
 
   const grandTotal = items.reduce((sum, item) => sum + calculateLineTotal(item), 0)
@@ -61,14 +63,11 @@ export const TransactionLineItemsEditor: React.FC<TransactionLineItemsEditorProp
       quantity: 1,
       percentage: 100,
       unit_price: 0,
-      discount_amount: 0,
-      tax_amount: 0,
       unit_of_measure: 'piece',
       item_code: '',
       item_name: '',
       analysis_work_item_id: null,
       sub_tree_id: null,
-      line_item_id: null,
     }
     onChange([...items, newItem])
   }
@@ -160,11 +159,7 @@ export const TransactionLineItemsEditor: React.FC<TransactionLineItemsEditorProp
                 <th className="p-3 text-right text-sm font-semibold text-gray-700">النسبة%</th>
                 <th className="p-3 text-right text-sm font-semibold text-gray-700">سعر الوحدة</th>
                 {showAdvanced && (
-                  <>
-                    <th className="p-3 text-right text-sm font-semibold text-gray-700">الخصم</th>
-                    <th className="p-3 text-right text-sm font-semibold text-gray-700">الضريبة</th>
-                    <th className="p-3 text-right text-sm font-semibold text-gray-700">وحدة القياس</th>
-                  </>
+                  <th className="p-3 text-right text-sm font-semibold text-gray-700">وحدة القياس</th>
                 )}
                 <th className="p-3 text-right text-sm font-semibold text-gray-700">الإجمالي</th>
                 <th className="p-3 text-center text-sm font-semibold text-gray-700">العمليات</th>
@@ -243,52 +238,23 @@ export const TransactionLineItemsEditor: React.FC<TransactionLineItemsEditorProp
                     
                     {/* Advanced fields */}
                     {showAdvanced && (
-                      <>
-                        {/* Discount */}
-                        <td className="p-3">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={item.discount_amount || 0}
-                            onChange={(e) => updateItem(index, { discount_amount: Number(e.target.value) || 0 })}
-                            className="field w-20"
-                            disabled={disabled}
-                          />
-                        </td>
-                        
-                        {/* Tax */}
-                        <td className="p-3">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={item.tax_amount || 0}
-                            onChange={(e) => updateItem(index, { tax_amount: Number(e.target.value) || 0 })}
-                            className="field w-20"
-                            disabled={disabled}
-                          />
-                        </td>
-                        
-                        {/* Unit of Measure */}
-                        <td className="p-3">
-                          <select
-                            value={item.unit_of_measure || 'piece'}
-                            onChange={(e) => updateItem(index, { unit_of_measure: e.target.value })}
-                            className="field w-24"
-                            disabled={disabled}
-                          >
-                            <option value="piece">قطعة</option>
-                            <option value="meter">متر</option>
-                            <option value="kg">كيلو</option>
-                            <option value="liter">لتر</option>
-                            <option value="hour">ساعة</option>
-                            <option value="day">يوم</option>
-                            <option value="set">طقم</option>
-                            <option value="box">صندوق</option>
-                          </select>
-                        </td>
-                      </>
+                      <td className="p-3">
+                        <select
+                          value={item.unit_of_measure || 'piece'}
+                          onChange={(e) => updateItem(index, { unit_of_measure: e.target.value })}
+                          className="field w-24"
+                          disabled={disabled}
+                        >
+                          <option value="piece">قطعة</option>
+                          <option value="meter">متر</option>
+                          <option value="kg">كيلو</option>
+                          <option value="liter">لتر</option>
+                          <option value="hour">ساعة</option>
+                          <option value="day">يوم</option>
+                          <option value="set">طقم</option>
+                          <option value="box">صندوق</option>
+                        </select>
+                      </td>
                     )}
                     
                     {/* Total */}

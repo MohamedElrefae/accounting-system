@@ -26,7 +26,8 @@ const CompanySettings: React.FC = () => {
     date_format: 'YYYY-MM-DD',
     number_format: 'ar-SA',
     default_org_id: '',
-    default_project_id: ''
+    default_project_id: '',
+    renumber_transactions_after_delete: false
   })
 
   const { showToast } = useToast()
@@ -59,7 +60,8 @@ const CompanySettings: React.FC = () => {
         date_format: currentConfig.date_format,
         number_format: currentConfig.number_format,
         default_org_id: currentConfig.default_org_id || '',
-        default_project_id: currentConfig.default_project_id || ''
+        default_project_id: currentConfig.default_project_id || '',
+        renumber_transactions_after_delete: !!currentConfig.renumber_transactions_after_delete
       })
     } catch (error) {
       console.error('Error loading config:', error)
@@ -213,6 +215,28 @@ const CompanySettings: React.FC = () => {
           <div className="sample-number">
             <strong>مثال على الرقم المولد: </strong>
             <code>{generateSampleNumber()}</code>
+          </div>
+        </div>
+
+        {/* Deletion policy */}
+        <div className="settings-section">
+          <div className="section-header">
+            <Settings size={20} />
+            <h2>سياسة الحذف وإعادة الترقيم</h2>
+          </div>
+          <div className="form-grid">
+            <div className="form-field checkbox-field" style={{ gridColumn: '1 / -1' }}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={!!formData.renumber_transactions_after_delete}
+                  onChange={(e) => setFormData(prev => ({ ...prev, renumber_transactions_after_delete: e.target.checked }))}
+                />
+                <span className="checkmark"></span>
+                إعادة ترقيم أرقام القيود تلقائياً بعد الحذف (للاختبار قبل التشغيل الفعلي)
+              </label>
+              <small>عند التفعيل، سيتم إعادة توليد أرقام المعاملات المتأثرة بعد حذف معاملة وفق نمط الرقم الحالي.</small>
+            </div>
           </div>
         </div>
 

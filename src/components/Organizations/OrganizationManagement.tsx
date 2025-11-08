@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit, Trash2, MapPin, Phone, Mail, FileText } from 'lucide-react';
-import { getOrganizations, createOrganization, updateOrganization, deleteOrganization, type Organization } from '../../services/organization';
+import { Building2, Plus, Edit, Trash2, MapPin, Phone, Mail, FileText, Eraser } from 'lucide-react';
+import { getOrganizations, createOrganization, updateOrganization, deleteOrganizationCascade, purgeOrganizationData, type Organization } from '../../services/organization';
 import { useToast } from '../../contexts/ToastContext';
 import styles from './OrganizationManagement.module.css';
 
@@ -12,7 +12,7 @@ interface OrganizationFormData {
   phone: string;
   email: string;
   tax_number: string;
-  status: 'active' | 'inactive';
+  is_active: boolean;
 }
 
 const OrganizationManagement: React.FC = () => {
@@ -29,7 +29,7 @@ const OrganizationManagement: React.FC = () => {
     phone: '',
     email: '',
     tax_number: '',
-    status: 'active'
+    is_active: true
   });
 
   const { showToast } = useToast();
@@ -61,7 +61,7 @@ const OrganizationManagement: React.FC = () => {
       phone: '',
       email: '',
       tax_number: '',
-      status: 'active'
+      is_active: true
     });
     setDialogOpen(true);
   };
@@ -76,7 +76,7 @@ const OrganizationManagement: React.FC = () => {
       phone: org.phone || '',
       email: org.email || '',
       tax_number: org.tax_number || '',
-      status: org.status
+      is_active: !!org.is_active
     });
     setDialogOpen(true);
   };
@@ -108,16 +108,35 @@ const OrganizationManagement: React.FC = () => {
     }
   };
 
+  const handlePurge = async (org: Organization) => {
+    const warning = `تنبيه مهم:\nسيتم حذف جميع البيانات المرتبطة بالمؤسسة \"${org.code} — ${org.name}\" (مشاريع، إعدادات، المخزون، التقارير ...)، مع الإبقاء على سجل المؤسسة.\nلا يمكن التراجع عن هذه العملية. هل تريد المتابعة؟`;
+    if (!window.confirm(warning)) return;
+    setSaving(true);
+    try {
+      await purgeOrganizationData(org.id);
+      await loadOrganizations();
+      showToast('تم تفريغ بيانات المؤسسة بنجاح (مع بقاء المؤسسة)', { severity: 'success' });
+    } catch (error: any) {
+      console.error('Error purging organization data:', error);
+      const msg = error?.message || 'فشل تفريغ بيانات المؤسسة';
+      showToast(msg, { severity: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDelete = async (org: Organization) => {
-    if (!window.confirm(`هل أنت متأكد من حذف المؤسسة "${org.name}"؟`)) return;
+    const warning = `تنبيه مهم:\nسيتم حذف المؤسسة \"${org.code} — ${org.name}\" وجميع البيانات المرتبطة بها نهائيًا (مشاريع، إعدادات، المخزون، التقارير ...).\nلا يمكن التراجع عن هذه العملية. هل تريد المتابعة؟`;
+    if (!window.confirm(warning)) return;
 
     try {
-      await deleteOrganization(org.id);
+      await deleteOrganizationCascade(org.id);
       setOrganizations(prev => prev.filter(o => o.id !== org.id));
-      showToast('تم حذف المؤسسة بنجاح', { severity: 'success' });
-    } catch (error) {
+      showToast('تم حذف المؤسسة وكافة بياناتها المرتبطة', { severity: 'success' });
+    } catch (error: any) {
       console.error('Error deleting organization:', error);
-      showToast('فشل حذف المؤسسة', { severity: 'error' });
+      const msg = error?.message || 'فشل حذف المؤسسة بسبب ارتباطات في الجداول';
+      showToast(msg, { severity: 'error' });
     }
   };
 
@@ -171,8 +190,8 @@ const OrganizationManagement: React.FC = () => {
                       <h3>{org.code}</h3>
                       <h4>{org.name}</h4>
                     </div>
-                    <div className={`${styles.statusBadge} ${org.status === 'active' ? styles.statusActive : styles.statusInactive}`}>
-                      {org.status === 'active' ? 'نشطة' : 'غير نشطة'}
+                    <div className={`${styles.statusBadge} ${org.is_active ? styles.statusActive : styles.statusInactive}`}>
+                      {org.is_active ? 'نشطة' : 'غير نشطة'}
                     </div>
                   </div>
                   
@@ -211,6 +230,10 @@ const OrganizationManagement: React.FC = () => {
                     <button className={`${styles.actionButton} ${styles.editButton}`} onClick={() => handleEdit(org)}>
                       <Edit size={16} />
                       تعديل
+                    </button>
+                    <button className={`${styles.actionButton} ${styles.deleteButton}`} onClick={() => handlePurge(org)}>
+                      <Eraser size={16} />
+                      تفريغ البيانات
                     </button>
                     <button className={`${styles.actionButton} ${styles.deleteButton}`} onClick={() => handleDelete(org)}>
                       <Trash2 size={16} />
@@ -261,16 +284,15 @@ const OrganizationManagement: React.FC = () => {
                     />
                   </div>
 
-                  <div className={styles.formField}>
-                    <label htmlFor="status">الحالة</label>
-                    <select
-                      id="status"
-                      value={formData.status}
-                      onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as 'active' | 'inactive' }))}
-                    >
-                      <option value="active">نشطة</option>
-                      <option value="inactive">غير نشطة</option>
-                    </select>
+                  <div className={`${styles.formField} ${styles.checkboxField}`}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={formData.is_active}
+                        onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                      />
+                      المؤسسة نشطة
+                    </label>
                   </div>
 
                   <div className={styles.formField}>

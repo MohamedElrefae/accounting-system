@@ -255,7 +255,7 @@ export const createTransactionFormConfig = (
   }
   // Helper to build union options for selected debit/credit accounts and organization
   const getCategoryOptionsForSelection = (form: Record<string, unknown>) => {
-    const orgId = (form as { organization_id?: string })?.organization_id || '';
+    const orgId = (form as { org_id?: string })?.org_id || '';
     const debitId = (form as { debit_account_id?: string })?.debit_account_id || '';
     const creditId = (form as { credit_account_id?: string })?.credit_account_id || '';
     
@@ -360,7 +360,7 @@ export const createTransactionFormConfig = (
       defaultValue: getCurrentDate(DATE_FORMATS.ISO), // Default to today in ISO format for HTML date input
       icon: <Calendar size={16} />,
       validation: (value: unknown) => validateDate(String(value ?? '')),
-      helpText: 'تاريخ إجراء المعاملة',
+      helpText: 'تاريخ إجراء المعاملة — سيتم التحقق من توافقه مع الفترات المحاسبية عند الحفظ',
       colSpan: 1,
       position: { row: 1, col: 2 }
     },
@@ -372,9 +372,20 @@ export const createTransactionFormConfig = (
       required: true,
       icon: <FileText size={16} />,
       validation: (value: unknown) => validateDescription(String(value ?? '')),
-      helpText: 'وصف مفصل يوضح طبيعة المعاملة',
+      helpText: 'حقل إلزامي — اكتب وصفاً واضحاً وموجزاً لطبيعة المعاملة',
       colSpan: 1,
       position: { row: 2, col: 1 }
+    },
+    {
+      id: 'description_ar',
+      type: 'text',
+      label: 'وصف المعاملة بالعربي',
+      placeholder: 'اكتب الوصف بالعربية...',
+      required: false,
+      icon: <FileText size={16} />,
+      helpText: 'اختياري — وصف عربي للمعاملة',
+      colSpan: 1,
+      position: { row: 2, col: 2 }
     },
     {
       id: 'debit_account_id',
@@ -452,18 +463,18 @@ export const createTransactionFormConfig = (
       placeholder: 'رقم المرجع (اختياري)',
       required: false,
       icon: <Receipt size={16} />,
-      helpText: 'رقم الإشارة أو الفاتورة (اختياري)',
+      helpText: 'اختياري — رقم الإشارة/الفاتورة أو مرجع خارجي',
       colSpan: 1,
       position: { row: 4, col: 2 }
     },
     {
-      id: 'organization_id',
+      id: 'org_id',
       type: 'searchable-select',
       label: 'المؤسسة',
       required: false,
       options: [{ value: '', label: 'بدون مؤسسة', searchText: '' }, ...organizationOptions],
       icon: <Building2 size={16} />,
-      helpText: 'المؤسسة المرتبطة بهذه المعاملة (اختياري)',
+      helpText: 'تحدد نطاق المشاريع وبنود التحليل والشجرة الفرعية',
       searchable: true,
       clearable: true,
       placeholder: 'ابحث عن المؤسسة...',
@@ -477,7 +488,7 @@ export const createTransactionFormConfig = (
       required: false,
       options: [{ value: '', label: 'بدون مشروع', searchText: '' }, ...projectOptions],
       icon: <FolderOpen size={16} />,
-      helpText: 'المشروع المرتبط بهذه المعاملة (اختياري)',
+      helpText: 'اختياري — لتتبع وتحليل التكلفة على مستوى المشروع',
       searchable: true,
       clearable: true,
       placeholder: 'ابحث عن المشروع...',
@@ -491,10 +502,11 @@ export const createTransactionFormConfig = (
       required: false,
       options: [{ value: '', label: 'بدون تصنيف', searchText: '' }, ...classificationOptions],
       icon: <Tag size={16} />,
-      helpText: 'تصنيف نوع المعاملة (اختياري)',
+      helpText: 'للتقارير والتحليلات — لا يغيّر القيد المحاسبي',
       searchable: true,
       clearable: true,
       placeholder: 'ابحث عن تصنيف المعاملة...',
+      conditionalLogic: () => false,
       colSpan: 1,
       position: { row: 6, col: 1 }
     },
@@ -507,10 +519,11 @@ export const createTransactionFormConfig = (
         ? [{ value: '', label: 'بدون مركز تكلفة', searchText: '' }, ...costCenterOptions]
         : [{ value: '', label: 'لا يوجد مراكز تكلفة متاحة', searchText: '' }],
       icon: <Layers size={16} />,
-      helpText: 'مركز التكلفة (مطلوب عند تصنيفات معينة)',
+      helpText: 'قد يكون إلزامياً لبعض التصنيفات وفق سياسات الشركة',
       searchable: true,
       clearable: true,
       placeholder: costCenterOptions.length > 0 ? 'اختر مركز التكلفة...' : 'لا يوجد مراكز تكلفة',
+      conditionalLogic: () => false,
       colSpan: 1,
       position: { row: 6, col: 2 }
     },
@@ -521,10 +534,11 @@ export const createTransactionFormConfig = (
       required: false,
       options: [{ value: '', label: 'بدون عنصر', searchText: '' }, ...workItemOptions],
       icon: <Tag size={16} />,
-      helpText: 'اختياري — اختر عنصر عمل (كتالوج المؤسسة أو مشروع)',
+      helpText: 'اختياري — عنصر من كتالوج المؤسسة أو مشروع محدد',
       searchable: true,
       clearable: true,
       placeholder: 'اختر عنصر العمل...',
+      conditionalLogic: () => false,
       colSpan: 1,
       position: { row: 7, col: 1 }
     },
@@ -535,7 +549,7 @@ export const createTransactionFormConfig = (
       required: false,
       options: [],
       optionsProvider: async (form) => {
-        const orgId = String((form as any)?.organization_id || '')
+        const orgId = String((form as any)?.org_id || '')
         const projectId = String((form as any)?.project_id || '') || null
         if (!orgId) return [{ value: '', label: 'اختر المؤسسة أولاً', searchText: '' }]
         const list = await listAnalysisWorkItems({ orgId, projectId, onlyWithTx: false, includeInactive: true })
@@ -543,11 +557,12 @@ export const createTransactionFormConfig = (
         return [{ value: '', label: 'بدون بند', searchText: '' }, ...opts]
       },
       icon: <Tag size={16} />,
-      helpText: 'اختياري — بند تحليل مرتبط بالمعاملة (يتم تصفيته حسب المشروع) ',
+      helpText: 'اختياري — يتم ترشيحه تلقائياً حسب المؤسسة والمشروع',
       searchable: true,
       clearable: true,
       placeholder: 'اختر بند التحليل...',
-      dependsOnAny: ['organization_id', 'project_id'],
+      dependsOnAny: ['org_id', 'project_id'],
+      conditionalLogic: () => false,
       colSpan: 1,
       position: { row: 8, col: 1 }
     },
@@ -558,17 +573,18 @@ export const createTransactionFormConfig = (
       required: false,
       options: [{ value: '', label: 'تحميل عقد الشجرة الفرعية...', searchText: '' }],
       optionsProvider: (form) => {
-        console.log('🌳 sub_tree_id optionsProvider called with form data:', { orgId: (form as any)?.organization_id, hasCategories: expensesCategories.length });
+        console.log('🌳 sub_tree_id optionsProvider called with form data:', { orgId: (form as any)?.org_id, hasCategories: expensesCategories.length });
         const result = getCategoryOptionsForSelection(form);
         console.log('🌳 sub_tree_id optionsProvider returning:', result.length, 'options');
         return result;
       },
       icon: <Tag size={16} />,
-      helpText: 'يتم تصفية عقد الشجرة حسب المؤسسة والحساب المدين/الدائن المحدد',
+      helpText: 'للتحليل حسب الشجرة الفرعية — تتغير الخيارات حسب المؤسسة والحسابات المختارة',
       searchable: true,
       clearable: true,
       placeholder: 'اختر عقدة الشجرة الفرعية...',
-      dependsOnAny: ['organization_id', 'debit_account_id', 'credit_account_id'],
+      dependsOnAny: ['org_id', 'debit_account_id', 'credit_account_id'],
+      conditionalLogic: () => false,
       colSpan: 1,
       position: { row: 7, col: 2 }
     },
@@ -579,15 +595,26 @@ export const createTransactionFormConfig = (
       placeholder: 'ملاحظات إضافية (اختياري)',
       required: false,
       icon: <MessageSquare size={16} />,
-      helpText: 'أي ملاحظات إضافية حول المعاملة',
+      helpText: 'ملاحظات داخلية (لن تظهر في التقارير الرسمية)',
+      colSpan: 1,
+      position: { row: 8, col: 1 }
+    },
+    {
+      id: 'notes_ar',
+      type: 'text',
+      label: 'ملاحظات بالعربي',
+      placeholder: 'ملاحظات باللغة العربية (اختياري)',
+      required: false,
+      icon: <MessageSquare size={16} />,
+      helpText: 'اختياري — ملاحظات عربية',
       colSpan: 1,
       position: { row: 8, col: 2 }
     }
   ];
 
-  // Header-only mode: keep only entry_date, description, reference_number, organization_id
+  // Header-only mode: keep only entry_date, description, description_ar, reference_number, org_id, project_id, notes, notes_ar
   if (options?.headerOnly) {
-    fields = fields.filter(f => ['entry_date','description','reference_number','organization_id'].includes(f.id))
+    fields = fields.filter(f => ['entry_date','description','description_ar','reference_number','org_id','project_id','notes','notes_ar'].includes(f.id))
   }
 
   // Default values for the form
@@ -643,14 +670,11 @@ export const createTransactionFormConfig = (
         { field: 'credit_account_id' },
         { field: 'amount' },
         { field: 'reference_number' },
-        { field: 'organization_id' },
+        { field: 'org_id' },
         { field: 'project_id' },
-        { field: 'classification_id' },
-        { field: 'cost_center_id' },
-        { field: 'work_item_id' },
-        { field: 'analysis_work_item_id' },
-        { field: 'sub_tree_id' },
-        { field: 'notes' }
+        { field: 'description_ar' },
+        { field: 'notes' },
+        { field: 'notes_ar' }
       ]
     }
   };

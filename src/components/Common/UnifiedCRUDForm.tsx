@@ -105,6 +105,8 @@ export interface UnifiedCRUDFormProps {
   onSubmit: (data: Record<string, unknown>) => Promise<void>;
   onCancel: () => void;
   showAutoFillNotification?: boolean;
+  /** Hide the default Save/Cancel action row (caller will render custom actions) */
+  hideDefaultActions?: boolean;
 }
 
 // Exposed handle for external controls (e.g., panel header Save)
@@ -120,6 +122,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     onSubmit,
     onCancel,
     showAutoFillNotification = false,
+    hideDefaultActions = false,
   } = props;
   const { showToast } = useToast();
   // State Management
@@ -1167,38 +1170,40 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
         )}
         
         {/* Action Buttons */}
-        <div className={styles.actionsRow}>
-          <button 
-            type="submit" 
-            disabled={isLoading || isSubmitting}
-            className={`ultimate-btn ultimate-btn-add ${styles.btnGrow}`}
-          >
-            <div className="btn-content">
-              <div className={`btn-icon ${isSubmitting ? 'spinning' : ''}`}>
-                {isSubmitting ? (
-                  <Loader2 size={16} />
-                ) : (
-                  <Save size={16} />
-                )}
+        {!hideDefaultActions && (
+          <div className={styles.actionsRow}>
+            <button 
+              type="submit" 
+              disabled={isLoading || isSubmitting}
+              className={`ultimate-btn ultimate-btn-add ${styles.btnGrow}`}
+            >
+              <div className="btn-content">
+                <div className={`btn-icon ${isSubmitting ? 'spinning' : ''}`}>
+                  {isSubmitting ? (
+                    <Loader2 size={16} />
+                  ) : (
+                    <Save size={16} />
+                  )}
+                </div>
+                <span className="btn-text">
+                  {config.submitLabel || (isSubmitting ? 'جاري الحفظ...' : '💾 حفظ البيانات')}
+                </span>
               </div>
-              <span className="btn-text">
-                {config.submitLabel || (isSubmitting ? 'جاري الحفظ...' : '💾 حفظ البيانات')}
-              </span>
-            </div>
-          </button>
-          
-          <button 
-            type="button" 
-            onClick={onCancel}
-            disabled={isLoading || isSubmitting}
-            className={`ultimate-btn ultimate-btn-delete ${styles.btnGrow}`}
-          >
-            <div className="btn-content">
-              <X size={16} />
-              <span className="btn-text">{config.cancelLabel || '❌ إلغاء'}</span>
-            </div>
-          </button>
-        </div>
+            </button>
+            
+            <button 
+              type="button" 
+              onClick={onCancel}
+              disabled={isLoading || isSubmitting}
+              className={`ultimate-btn ultimate-btn-delete ${styles.btnGrow}`}
+            >
+              <div className="btn-content">
+                <X size={16} />
+                <span className="btn-text">{config.cancelLabel || '❌ إلغاء'}</span>
+              </div>
+            </button>
+          </div>
+        )}
       </form>
       
     </div>

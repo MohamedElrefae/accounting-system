@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react'
-import DraggableResizablePanel from '../Common/DraggableResizablePanel'
-import AttachDocumentsPanel from '../documents/AttachDocumentsPanel'
+import DraggablePanelContainer from '../Common/DraggablePanelContainer'
 import type { Account, Project } from '../../services/transactions'
 import type { Organization } from '../../types'
 import type { TransactionClassification } from '../../services/transaction-classification'
@@ -17,11 +16,7 @@ import {
   Paper,
   Chip,
   Alert,
-  StepButton,
-  TextField,
-  FormControl,
-  Select,
-  MenuItem
+  StepButton
 } from '@mui/material'
 import Grid from '@mui/material/Unstable_Grid2'
 import {
@@ -124,29 +119,6 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   const [transactionAttachments, setTransactionAttachments] = useState<File[]>([])
   // Step completion tracking
   const [completedSteps, setCompletedSteps] = useState<Set<StepType>>(new Set())
-
-  // Panel state persistence
-  const [panelPosition, setPanelPosition] = useState<{ x: number; y: number }>(() => {
-    try {
-      const saved = localStorage.getItem('txWizard:position')
-      return saved ? JSON.parse(saved) : { x: 60, y: 40 }
-    } catch { return { x: 60, y: 40 } }
-  })
-  const [panelSize, setPanelSize] = useState<{ width: number; height: number }>(() => {
-    try {
-      const saved = localStorage.getItem('txWizard:size')
-      return saved ? JSON.parse(saved) : { width: 1000, height: 700 }
-    } catch { return { width: 1000, height: 700 } }
-  })
-  const [panelMaximized, setPanelMaximized] = useState<boolean>(false)
-
-  // Persist state
-  useEffect(() => {
-    try { localStorage.setItem('txWizard:position', JSON.stringify(panelPosition)) } catch {}
-  }, [panelPosition])
-  useEffect(() => {
-    try { localStorage.setItem('txWizard:size', JSON.stringify(panelSize)) } catch {}
-  }, [panelSize])
 
   const currentStepIndex = steps.findIndex(s => s.id === currentStep)
 
@@ -394,24 +366,16 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   if (!open) return null
 
   return (
-    <DraggableResizablePanel
+    <DraggablePanelContainer
+      storageKey="txWizard"
       isOpen={open}
       onClose={onClose}
       title="معاملة جديدة - خطوة بخطوة"
       subtitle={`الخطوة ${currentStepIndex + 1} من ${steps.length}: ${steps[currentStepIndex].label}`}
-      position={panelPosition}
-      size={panelSize}
-      onMove={setPanelPosition}
-      onResize={setPanelSize}
-      isMaximized={panelMaximized}
-      onMaximize={() => setPanelMaximized(!panelMaximized)}
-      isDocked={false}
-      dockPosition="right"
-      onDock={() => {}}
-      onResetPosition={() => {
-        setPanelPosition({ x: 60, y: 40 })
-        setPanelSize({ width: 1000, height: 700 })
-        setPanelMaximized(false)
+      defaults={{
+        position: () => ({ x: 60, y: 40 }),
+        size: () => ({ width: 1000, height: 700 }),
+        dockPosition: 'right',
       }}
     >
       <div className="tx-wizard" dir="rtl">
@@ -1386,7 +1350,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
           )}
         </Box>
       </div>
-    </DraggableResizablePanel>
+    </DraggablePanelContainer>
   )
 }
 

@@ -6,6 +6,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { clearDateFormatCache } from '../../utils/dateHelpers';
 import { getActiveProjects, type Project } from '../../services/projects';
 import { getOrganizations, type Organization } from '../../services/organization';
+import { setActiveOrgId, setActiveProjectId } from '../../utils/org';
 
 const OrganizationSettings: React.FC = () => {
   const [config, setConfig] = useState<CompanyConfig | null>(null);
@@ -70,19 +71,13 @@ const OrganizationSettings: React.FC = () => {
     if (!config) return;
     setSaving(true);
     try {
-      // Parse shortcuts JSON (optional)
-      let parsedShortcuts: any = [];
-      try {
-        parsedShortcuts = JSON.parse(formData.shortcutsJSON || '[]');
-        if (!Array.isArray(parsedShortcuts)) throw new Error('Shortcuts must be an array');
-      } catch {
-        showToast('صيغة الاختصارات غير صحيحة. يجب إدخال مصفوفة JSON.', { severity: 'error' });
-        setSaving(false);
-        return;
-      }
-
-      await updateCompanyConfig({ ...formData, shortcuts: parsedShortcuts } as any);
+      await updateCompanyConfig({ ...formData } as any);
       clearDateFormatCache();
+      // Apply defaults to local storage immediately
+      try {
+        setActiveOrgId(formData.default_org_id || null);
+        setActiveProjectId(formData.default_project_id || null);
+      } catch {}
       showToast('تم حفظ الإعدادات بنجاح', { severity: 'success' });
       await loadConfig();
     } catch {

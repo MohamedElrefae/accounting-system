@@ -112,8 +112,7 @@ const OpeningBalanceImportWizard: React.FC<OpeningBalanceImportWizardProps> = ({
               setLoading(false)
               try {
                 if (submitForApproval) {
-                  const { data: { session } } = await (await import('@/utils/supabase')).supabase.auth.getSession()
-                  const submittedBy = session?.user?.id
+                  const submittedBy = await (await import('../../services/authService')).AuthService.getCurrentUserId()
                   await OpeningBalanceImportService.requestApproval({ orgId, importId: result.importId, submittedBy })
                   showToast(isRTL ? 'تم إرسال طلب الموافقة' : 'Approval request submitted', { severity:'success' })
                 }
@@ -129,8 +128,7 @@ const OpeningBalanceImportWizard: React.FC<OpeningBalanceImportWizardProps> = ({
         setStep(4)
         try {
           if (submitForApproval) {
-            const { data: { session } } = await (await import('@/utils/supabase')).supabase.auth.getSession()
-            const submittedBy = session?.user?.id
+            const submittedBy = await (await import('../../services/authService')).AuthService.getCurrentUserId()
             await OpeningBalanceImportService.requestApproval({ orgId, importId: result.importId, submittedBy })
             showToast(isRTL ? 'تم إرسال طلب الموافقة' : 'Approval request submitted', { severity:'success' })
           }
@@ -275,8 +273,7 @@ const OpeningBalanceImportWizard: React.FC<OpeningBalanceImportWizardProps> = ({
             transition:'all 0.2s ease'
           }} onClick={async ()=>{
             try {
-              const { data: { session } } = await (await import('@/utils/supabase')).supabase.auth.getSession()
-              const submittedBy = session?.user?.id
+              const submittedBy = await (await import('../../services/authService')).AuthService.getCurrentUserId()
               await OpeningBalanceImportService.requestApproval({ orgId, importId: currentImportId, submittedBy })
               showToast(isRTL ? 'تم إرسال طلب الموافقة' : 'Approval request submitted', { severity:'success' })
             } catch (e:any) {
@@ -335,14 +332,14 @@ const OpeningBalanceImportWizard: React.FC<OpeningBalanceImportWizardProps> = ({
               const poll = async()=>{
                 if (done) return
                 try { const s = await OpeningBalanceImportService.getImportStatus(result.importId); setImportStatus(s); if (['completed','failed','partially_completed'].includes(s.status)) { done=true; setShowResultsModal(true); setStep(4); setLoading(false);
-                  try { if (submitForApproval) { const { data:{ session } } = await (await import('@/utils/supabase')).supabase.auth.getSession(); const submittedBy=session?.user?.id; await OpeningBalanceImportService.requestApproval({ orgId, importId: result.importId, submittedBy }); showToast(isRTL?'تم إرسال طلب الموافقة':'Approval request submitted',{severity:'success'}) } } catch {}
+                  try { if (submitForApproval) { const submittedBy = await (await import('../../services/authService')).AuthService.getCurrentUserId(); await OpeningBalanceImportService.requestApproval({ orgId, importId: result.importId, submittedBy }); showToast(isRTL?'تم إرسال طلب الموافقة':'Approval request submitted',{severity:'success'}) } } catch {}
                   return } } catch {}
                 setTimeout(poll, 2000)
               }
               poll()
             } else {
               setShowResults(true); setStep(4)
-              try { if (submitForApproval) { const { data:{ session } } = await (await import('@/utils/supabase')).supabase.auth.getSession(); const submittedBy=session?.user?.id; await OpeningBalanceImportService.requestApproval({ orgId, importId: result.importId, submittedBy }); showToast(isRTL?'تم إرسال طلب الموافقة':'Approval request submitted',{severity:'success'}) } } catch {}
+              try { if (submitForApproval) { const submittedBy = await (await import('../../services/authService')).AuthService.getCurrentUserId(); await OpeningBalanceImportService.requestApproval({ orgId, importId: result.importId, submittedBy }); showToast(isRTL?'تم إرسال طلب الموافقة':'Approval request submitted',{severity:'success'}) } } catch {}
             }
           } catch (e) {
             setImportStatus({ status:'failed', error: String((e as any)?.message || e) })

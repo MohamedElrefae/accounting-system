@@ -1452,8 +1452,7 @@ export default function EnhancedOpeningBalanceImport() {
                           }}>{isRTL ? 'تنزيل النتائج' : 'Download Results'}</Button>
                           <Button variant="contained" color="primary" onClick={async () => {
                             try {
-                              const { data: { session } } = await (await import('@/utils/supabase')).supabase.auth.getSession()
-                              const submittedBy = session?.user?.id
+                              const submittedBy = await (await import('../../services/authService')).AuthService.getCurrentUserId()
                               const req = await OpeningBalanceImportService.requestApproval({ orgId, importId: (currentImportId || importStatus?.importId), submittedBy })
                               setApprovalRequestId(req.id)
                               try { (window as any)?.toast?.success?.(isRTL ? 'تم إرسال الطلب للموافقة' : 'Approval request submitted') } catch {}
@@ -2292,8 +2291,7 @@ export default function EnhancedOpeningBalanceImport() {
               // Optional immediate submit for approval
               if (submitForApproval) {
                 try {
-                  const { data: { session } } = await (await import('@/utils/supabase')).supabase.auth.getSession()
-                  const submittedBy = session?.user?.id
+                  const submittedBy = await (await import('../../services/authService')).AuthService.getCurrentUserId()
                   await OpeningBalanceImportService.requestApproval({ orgId, importId: result.importId, submittedBy })
                 } catch {}
               }

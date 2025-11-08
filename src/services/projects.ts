@@ -152,7 +152,7 @@ export async function createProject(input: Omit<Project, 'id' | 'created_at' | '
     status: input.status ?? 'active',
     start_date: normalizeDate((input as any).start_date),
     end_date: normalizeDate((input as any).end_date),
-    org_id: normalize((input as any).org_id ?? (input as any).organization_id ?? null),
+    org_id: normalize((input as any).org_id ?? null),
     budget_amount: normalize((input as any).budget_amount ?? (input as any).budget ?? null),
     created_by: uid ?? null,
   }
@@ -187,8 +187,8 @@ export async function updateProject(id: string, updates: Partial<Omit<Project, '
   if (updates.status !== undefined) payload.status = updates.status
   if ((updates as any).start_date !== undefined) payload.start_date = normalizeDate((updates as any).start_date)
   if ((updates as any).end_date !== undefined) payload.end_date = normalizeDate((updates as any).end_date)
-  if ((updates as any).org_id !== undefined || (updates as any).organization_id !== undefined) {
-    payload.org_id = normalize((updates as any).org_id ?? (updates as any).organization_id)
+  if ((updates as any).org_id !== undefined) {
+    payload.org_id = normalize((updates as any).org_id)
   }
   if ((updates as any).budget_amount !== undefined || (updates as any).budget !== undefined) {
     payload.budget_amount = normalize((updates as any).budget_amount ?? (updates as any).budget)

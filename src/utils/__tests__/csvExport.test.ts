@@ -9,7 +9,8 @@ describe('toCsv', () => {
     ]
     const csv = toCsv(rows)
     // Header contains a,b,c in some order; check it includes them and has 3 columns
-    const [header, ...rest] = csv.split('\n')
+    const [header] = csv.split('\n')
+
     expect(header.split(',').sort()).toEqual(['a','b','c'])
     // Contains properly quoted comma field and newline field
     expect(csv).toContain('"y, z"')

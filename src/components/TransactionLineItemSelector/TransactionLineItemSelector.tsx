@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   Dialog,
   DialogTitle,
@@ -28,7 +28,7 @@ import {
   Add as AddIcon
 } from '@mui/icons-material'
 import { useToast } from '../../contexts/ToastContext'
-import { lineItemsCatalogService } from '../../services/line-items-catalog'
+import { transactionLineItemsEnhancedService } from '../../services/transaction-line-items-enhanced'
 
 // Minimal catalog item shape used by this selector
 interface SelectorRow {
@@ -37,9 +37,11 @@ interface SelectorRow {
   item_name: string | null
   item_name_ar: string | null
   parent_id?: string | null
+  parent_code?: string | null
   unit_of_measure?: string | null
   unit_price?: number | null
   is_active?: boolean
+  level: number
 }
 
 export interface SelectedLineItem {
@@ -47,11 +49,6 @@ export interface SelectedLineItem {
   item_code: string | null
   item_name: string | null
   item_name_ar: string | null
-  level: number
-  quantity_selected: number
-  unit_price_override: number
-  total_amount: number
-}
   level: number
   quantity_selected: number
   unit_price_override: number
@@ -84,7 +81,7 @@ const TransactionLineItemSelector: React.FC<TransactionLineItemSelectorProps> = 
   const { showToast } = useToast()
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
-const [items, setItems] = useState<SelectorRow[]>([])
+  const [items, setItems] = useState<SelectorRow[]>([])
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [tempSelections, setTempSelections] = useState<Map<string, SelectedLineItem>>(new Map())
   const [filterLevel, setFilterLevel] = useState<number | 'all'>('all')
@@ -96,7 +93,8 @@ const [items, setItems] = useState<SelectorRow[]>([])
     const loadItems = async () => {
       setLoading(true)
       try {
-const catalogItems = await lineItemsCatalogService.toSelectorItems(orgId)
+        const catalogItems = await transactionLineItemsEnhancedService.getCatalogSelectorItems(orgId)
+
         // Map to local shape
         setItems(catalogItems.map(ci => ({
           id: ci.id,
@@ -104,9 +102,11 @@ const catalogItems = await lineItemsCatalogService.toSelectorItems(orgId)
           item_name: ci.item_name,
           item_name_ar: ci.item_name_ar || null,
           parent_id: ci.parent_id ?? null,
+          parent_code: ci.parent_code ?? null,
           unit_of_measure: ci.unit_of_measure ?? null,
           unit_price: ci.unit_price ?? 0,
-          is_active: ci.is_active,
+          is_active: ci.is_active ?? true,
+          level: ci.level,
         })))
         
         // Initialize temp selections from existing selected items
@@ -125,28 +125,15 @@ const catalogItems = await lineItemsCatalogService.toSelectorItems(orgId)
     loadItems()
   }, [open, orgId, selectedItems, showToast])
 
-  // Calculate level from item code
-  const calculateLevelFromCode = useCallback((code: string): number => {
-    if (!code || !/^\d+$/.test(code)) return 1
-    const codeNum = parseInt(code, 10)
-    if (codeNum >= 1000 && codeNum < 10000) {
-      if (codeNum % 1000 === 0) return 1
-      if (codeNum % 100 === 0) return 2
-      if (codeNum % 10 === 0) return 3
-      return 4
-    }
-    return 1
-  }, [])
-
   // Enhanced items with level and selection info
   const enhancedItems = useMemo(() => {
     return items.map(item => ({
       ...item,
-      level: calculateLevelFromCode(item.item_code || ''),
+      level: item.level,
       isSelected: tempSelections.has(item.id),
-      hasChildren: items.some(i => i.parent_id === item.id),
+      hasChildren: items.some(i => i.parent_id === item.id || i.parent_code === item.item_code),
     }))
-  }, [items, tempSelections, calculateLevelFromCode])
+  }, [items, tempSelections])
 
   // Filter items
   const filteredItems = useMemo(() => {
@@ -199,12 +186,12 @@ const catalogItems = await lineItemsCatalogService.toSelectorItems(orgId)
     })
   }
 
-const handleItemSelect = (item: SelectorRow & { level: number }, checked: boolean) => {
+  const handleItemSelect = (item: SelectorRow & { level: number }, checked: boolean) => {
     setTempSelections(prev => {
       const newMap = new Map(prev)
       
       if (checked) {
-const selectedItem: SelectedLineItem = {
+        const selectedItem: SelectedLineItem = {
           id: item.id,
           item_code: item.item_code || null,
           item_name: item.item_name || null,
@@ -212,29 +199,18 @@ const selectedItem: SelectedLineItem = {
           level: item.level,
           quantity_selected: 1,
           unit_price_override: item.unit_price || 0,
-          total_amount: 1 * (item.unit_price || 0)
+          total_amount: 1 * (item.unit_price || 0),
         }
+
+        if (!multiSelect) {
+          newMap.clear()
+        }
+
         newMap.set(item.id, selectedItem)
       } else {
         newMap.delete(item.id)
       }
 
-      // If not multiSelect, clear other selections
-      if (!multiSelect && checked) {
-        newMap.clear()
-const selectedItem: SelectedLineItem = {
-          id: item.id,
-          item_code: item.item_code || null,
-          item_name: item.item_name || null,
-          item_name_ar: item.item_name_ar || null,
-          level: item.level,
-          quantity_selected: 1,
-          unit_price_override: item.unit_price || 0,
-          total_amount: 1 * (item.unit_price || 0)
-        }
-        newMap.set(item.id, selectedItem)
-      }
-      
       return newMap
     })
   }

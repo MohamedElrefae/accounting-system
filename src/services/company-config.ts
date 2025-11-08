@@ -1,4 +1,5 @@
 import { supabase } from '../utils/supabase'
+import { getActiveOrgId } from '../utils/org'
 
 export interface CompanyConfig {
   id: string
@@ -14,6 +15,8 @@ export interface CompanyConfig {
   number_format: string
   default_org_id?: string | null
   default_project_id?: string | null
+  // Optional toggle: resequence numbers after delete (for pre-go-live/testing)
+  renumber_transactions_after_delete?: boolean | null
   // Optional company-wide dashboard shortcuts
   // Stored as JSONB in DB: [{ label, path, icon?, accessKey? }]
   shortcuts?: Array<{ label: string; path: string; icon?: string; accessKey?: string }>
@@ -35,6 +38,7 @@ const DEFAULT_COMPANY_CONFIG: Partial<CompanyConfig> = {
   number_format: 'ar-SA',
   default_org_id: null,
   default_project_id: null,
+  renumber_transactions_after_delete: false,
   shortcuts: []
 }
 
@@ -55,19 +59,23 @@ export async function getCompanyConfig(): Promise<CompanyConfig> {
   }
 
   try {
-    const { data, error } = await supabase
+    const orgId = getActiveOrgId() || null
+    let query = supabase
       .from('company_config')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(1)
-      .maybeSingle()
 
-    if (error) {
-      throw error
+    if (orgId) {
+      query = query.eq('org_id', orgId)
     }
 
-    // If no row exists, return in-memory defaults without writing to DB
-    if (!data) {
+    const { data, error } = await query
+    if (error) throw error
+
+    const row = Array.isArray(data) ? (data[0] as CompanyConfig | undefined) : (data as unknown as CompanyConfig | undefined)
+
+    if (!row) {
       const fallback = {
         ...DEFAULT_COMPANY_CONFIG,
         id: 'default',
@@ -79,7 +87,7 @@ export async function getCompanyConfig(): Promise<CompanyConfig> {
       return fallback
     }
 
-    configCache = data as CompanyConfig
+    configCache = row
     configCacheTime = now
     return configCache
   } catch (error) {
@@ -115,29 +123,82 @@ async function createDefaultConfig(): Promise<CompanyConfig> {
  * Update company configuration
  */
 export async function updateCompanyConfig(updates: Partial<CompanyConfig>): Promise<CompanyConfig> {
+  // Only send columns that certainly exist in the DB to avoid PostgREST 400 (unknown column)
+  const ALLOWED_COLUMNS: (keyof CompanyConfig)[] = [
+    'company_name',
+    'transaction_number_prefix',
+    'transaction_number_use_year_month',
+    'transaction_number_length',
+    'transaction_number_separator',
+    'fiscal_year_start_month',
+    'currency_code',
+    'currency_symbol',
+    'date_format',
+    'number_format',
+    'default_org_id',
+    'default_project_id',
+    'auto_post_on_approve',
+    'renumber_transactions_after_delete',
+  ] as any;
+
+  const payload: Record<string, any> = {};
+  for (const k of ALLOWED_COLUMNS as string[]) {
+    if ((updates as any)[k] !== undefined) payload[k] = (updates as any)[k];
+  }
+
   try {
-    const currentConfig = await getCompanyConfig()
-    
+    const currentConfig = await getCompanyConfig();
+
+    // Include optional columns only if they exist in current config shape
+    const OPTIONAL_KEYS = [
+      'default_org_id',
+      'default_project_id',
+      'renumber_transactions_after_delete',
+      'auto_post_on_approve',
+    ];
+    for (const k of OPTIONAL_KEYS) {
+      if ((currentConfig as any)[k] !== undefined && (updates as any)[k] !== undefined) {
+        (payload as any)[k] = (updates as any)[k];
+      }
+    }
+
+    // If no persistent row exists yet (cache fallback id), insert a new row
+    if (!currentConfig || currentConfig.id === 'default') {
+      const orgId = getActiveOrgId() || null
+      const insertPayload = { ...payload, updated_at: new Date().toISOString(), org_id: orgId }
+      const { data, error } = await supabase
+        .from('company_config')
+        .insert(insertPayload)
+        .select('*')
+        .single();
+      if (error) throw error;
+
+      // Clear cache
+      configCache = null;
+      configCacheTime = 0;
+      return data as CompanyConfig;
+    }
+
     const { data, error } = await supabase
       .from('company_config')
       .update({
-        ...updates,
-        updated_at: new Date().toISOString()
+        ...payload,
+        updated_at: new Date().toISOString(),
       })
       .eq('id', currentConfig.id)
       .select('*')
-      .single()
+      .single();
 
-    if (error) throw error
+    if (error) throw error;
 
     // Clear cache
-    configCache = null
-    configCacheTime = 0
+    configCache = null;
+    configCacheTime = 0;
 
-    return data as CompanyConfig
+    return data as CompanyConfig;
   } catch (error) {
-    console.error('Error updating company config:', error)
-    throw error
+    console.error('Error updating company config:', error);
+    throw error;
   }
 }
 

@@ -14,6 +14,7 @@ import { TransactionLineItemsSection } from '../line-items/TransactionLineItemsS
 import AttachDocumentsPanel from '../documents/AttachDocumentsPanel'
 import { getTransactionLines } from '../../services/transaction-lines'
 import { WithPermission } from '../Common/withPermission'
+import { useToast } from '../../contexts/ToastContext'
 
 export interface UnifiedTransactionDetailsPanelProps {
   transaction: TransactionRecord
@@ -124,12 +125,21 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
     } catch { return 'right'; }
   })
   
+  const { showToast } = useToast()
+  
   // Action modals
   const [reviewModalOpen, setReviewModalOpen] = useState(false)
   const [reviewAction, setReviewAction] = useState<'approve' | 'reject' | 'revise' | null>(null)
   const [reviewReason, setReviewReason] = useState('')
   const [submitModalOpen, setSubmitModalOpen] = useState(false)
   const [submitNote, setSubmitNote] = useState('')
+  
+  // Delete confirm modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [deleteDefaultRenumber, setDeleteDefaultRenumber] = useState<boolean>(false)
+  const [deleteOverrideEnabled, setDeleteOverrideEnabled] = useState<boolean>(false)
+  const [deleteOverrideRenumber, setDeleteOverrideRenumber] = useState<boolean>(false)
+  const [deleteForce, setDeleteForce] = useState<boolean>(false)
   
   // Config modal state
   const [configModalOpen, setConfigModalOpen] = useState(false)
@@ -435,6 +445,26 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
     })()
   }, [transaction.id])
 
+  // Load company config (renumber flag) for delete confirmation UI
+  useEffect(() => {
+    (async () => {
+      try {
+        const { getCompanyConfig } = await import('../../services/company-config')
+        const cfg = await getCompanyConfig()
+        const flag = !!(cfg as any).renumber_transactions_after_delete
+        setDeleteDefaultRenumber(flag)
+        setDeleteOverrideEnabled(false)
+        setDeleteOverrideRenumber(flag)
+        setDeleteForce(false)
+      } catch {
+        setDeleteDefaultRenumber(false)
+        setDeleteOverrideEnabled(false)
+        setDeleteOverrideRenumber(false)
+        setDeleteForce(false)
+      }
+    })()
+  }, [])
+
   // Form configuration
   const transactionFormConfig = useMemo(() => {
     return createTransactionFormConfig(
@@ -455,17 +485,19 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
     entry_number: transaction.entry_number,
     entry_date: transaction.entry_date,
     description: transaction.description,
+    description_ar: (transaction as any).description_ar || '',
     debit_account_id: transaction.debit_account_id,
     credit_account_id: transaction.credit_account_id,
     amount: transaction.amount,
     reference_number: transaction.reference_number || '',
     notes: transaction.notes || '',
+    notes_ar: (transaction as any).notes_ar || '',
     classification_id: transaction.classification_id || '',
     sub_tree_id: (transaction as any).sub_tree_id || '',
     work_item_id: (transaction as any).work_item_id || '',
     analysis_work_item_id: (transaction as any).analysis_work_item_id || '',
     cost_center_id: transaction.cost_center_id || '',
-    organization_id: transaction.org_id || '',
+    org_id: transaction.org_id || '',
     project_id: transaction.project_id || ''
   }), [transaction])
 
@@ -479,17 +511,19 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
       const updateData = {
         entry_date: data.entry_date,
         description: data.description,
+        description_ar: data.description_ar || null,
         reference_number: data.reference_number || null,
         debit_account_id: data.debit_account_id,
         credit_account_id: data.credit_account_id,
         amount: parseFloat(data.amount),
         notes: data.notes || null,
+        notes_ar: data.notes_ar || null,
         classification_id: data.classification_id || null,
         sub_tree_id: data.sub_tree_id || null,
         work_item_id: data.work_item_id || null,
         analysis_work_item_id: data.analysis_work_item_id || null,
         cost_center_id: data.cost_center_id || null,
-        org_id: data.organization_id || null,
+        org_id: data.org_id || null,
         project_id: data.project_id || null,
       }
       
@@ -551,15 +585,21 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
 
   // Handle delete
   const handleDelete = async () => {
-    if (!onDelete) return
-    
-    const confirmed = window.confirm('هل أنت متأكد من حذف هذه المعاملة؟')
-    if (!confirmed) return
-    
+    // Open confirm modal instead of immediate delete
+    setDeleteModalOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
     setIsLoading(true)
     try {
-      await onDelete(transaction.id)
-      onClose() // Close panel after successful delete
+      const renumberOpt = deleteOverrideEnabled ? deleteOverrideRenumber : undefined
+      const forceOpt = !!canManage && deleteForce
+      const { deleteTransaction } = await import('../../services/transactions')
+      const res = await deleteTransaction(transaction.id, { force: forceOpt, renumber: renumberOpt })
+      setDeleteModalOpen(false)
+      showToast(res.renumber_applied ? 'تم حذف المعاملة وتمت إعادة الترقيم' : 'تم حذف المعاملة بدون إعادة ترقيم', { severity: 'success' })
+      try { window.dispatchEvent(new CustomEvent('transactions:refresh', { detail: { deleted_id: transaction.id, renumber_applied: res.renumber_applied } })) } catch {}
+      onClose()
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -1096,6 +1136,58 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
           )}
         </div>
       </DraggableResizablePanel>
+
+      {/* Delete Confirm Modal */}
+      {deleteModalOpen && (
+        <div className="modal-overlay" onClick={() => !isLoading && setDeleteModalOpen(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">تأكيد حذف المعاملة</h3>
+              <button className="ultimate-btn ultimate-btn-delete" onClick={() => !isLoading && setDeleteModalOpen(false)}>
+                <div className="btn-content"><span className="btn-text">إغلاق</span></div>
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{ marginBottom: 12 }}>
+                سيتم حذف المعاملة رقم <strong>{transaction.entry_number}</strong> وجميع القيود التفصيلية المرتبطة بها نهائياً.
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                حالة إعادة الترقيم الافتراضية من الإعدادات: <strong>{deleteDefaultRenumber ? 'مفعّل' : 'معطّل'}</strong>
+              </div>
+              <div className="checkbox-field" style={{ marginBottom: 8 }}>
+                <label>
+                  <input type="checkbox" checked={deleteOverrideEnabled} onChange={e => setDeleteOverrideEnabled(e.target.checked)} />
+                  تجاهل الإعداد الافتراضي لهذه العملية فقط
+                </label>
+              </div>
+              {deleteOverrideEnabled && (
+                <div className="checkbox-field" style={{ marginInlineStart: 16, marginBottom: 8 }}>
+                  <label>
+                    <input type="checkbox" checked={deleteOverrideRenumber} onChange={e => setDeleteOverrideRenumber(e.target.checked)} />
+                    إعادة ترقيم الأرقام بعد الحذف في هذه العملية
+                  </label>
+                </div>
+              )}
+              {canManage && (
+                <div className="checkbox-field" style={{ marginTop: 8 }}>
+                  <label>
+                    <input type="checkbox" checked={deleteForce} onChange={e => setDeleteForce(e.target.checked)} />
+                    فرض الحذف (للمدراء/المشرفين فقط)
+                  </label>
+                </div>
+              )}
+              <div className="modal-actions" style={{ marginTop: 16 }}>
+                <button className="ultimate-btn ultimate-btn-success" onClick={handleDeleteConfirm} disabled={isLoading}>
+                  <div className="btn-content"><span className="btn-text">تأكيد الحذف</span></div>
+                </button>
+                <button className="ultimate-btn ultimate-btn-warning" onClick={() => !isLoading && setDeleteModalOpen(false)} disabled={isLoading}>
+                  <div className="btn-content"><span className="btn-text">إلغاء</span></div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Review Modal */}
       {reviewModalOpen && (

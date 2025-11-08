@@ -34,40 +34,46 @@ FROM information_schema.triggers
 WHERE event_object_table = 'transaction_line_items'
     AND event_object_schema = 'public';
 
--- Test insert to ensure ID generation works (will be rolled back)
+-- Test insert to ensure ID generation and total_amount trigger work (rolled back)
 BEGIN;
+
+-- Insert a test record linked to an existing transaction_line (required by NOT NULL FK)
 INSERT INTO transaction_line_items (
-    transaction_id, 
-    line_number, 
-    item_name_ar, 
-    quantity, 
-    percentage, 
-    unit_price, 
+    transaction_line_id,
+    line_number,
+    item_name_ar,
+    quantity,
+    percentage,
+    unit_price,
     unit_of_measure,
     org_id
-) VALUES (
-    'test-transaction-id', 
-    1, 
-    'Test Item', 
-    1, 
-    100, 
-    10.50, 
+)
+SELECT 
+    tl.id,
+    COALESCE((SELECT MAX(line_number) + 1 FROM transaction_line_items tli WHERE tli.transaction_line_id = tl.id), 1) AS next_line_number,
+    'Test Item',
+    1,
+    100,
+    10.50,
     'piece',
-    'test-org-id'
-);
+    tl.org_id
+FROM public.transaction_lines tl
+ORDER BY tl.created_at DESC
+LIMIT 1;
 
 -- Check if the insert worked and ID was generated
 SELECT 
     id,
-    transaction_id,
-    line_number,
+    transaction_line_id,
     item_name_ar,
     quantity,
     percentage,
     unit_price,
     total_amount
 FROM transaction_line_items 
-WHERE transaction_id = 'test-transaction-id';
+WHERE item_name_ar = 'Test Item'
+ORDER BY created_at DESC
+LIMIT 1;
 
 ROLLBACK; -- Rollback the test insert
 

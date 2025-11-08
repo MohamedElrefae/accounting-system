@@ -45,7 +45,7 @@ specificKeys.forEach(key => {
 // Set explicit visible fields including sub_tree_id
 const defaultVisibleFields = [
     'entry_number', 'entry_date', 'description', 'debit_account_id', 'credit_account_id',
-    'amount', 'reference_number', 'organization_id', 'project_id', 'classification_id',
+    'amount', 'reference_number', 'org_id', 'project_id', 'classification_id',
     'cost_center_id', 'work_item_id', 'analysis_work_item_id', 'sub_tree_id', 'notes'
 ];
 

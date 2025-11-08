@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react'
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import './ColumnConfiguration.css'
 
 // Column configuration interface - defined inline to avoid import issues
@@ -22,6 +22,7 @@ interface ColumnConfigurationProps {
   isOpen: boolean
   onClose: () => void
   onReset?: () => void
+  sampleData?: Array<Record<string, any>>
 }
 
 const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
@@ -29,7 +30,8 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
   onConfigChange,
   isOpen,
   onClose,
-  onReset
+  onReset,
+  sampleData = []
 }) => {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null)
@@ -38,6 +40,37 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
   // Working copy for edits (apply on Save)
   const [working, setWorking] = useState<ColumnConfig[]>(columns)
   const [query, setQuery] = useState('')
+
+  // Heuristic auto-fit width calculator (label-based)
+  const computeAutoWidth = useCallback((c: ColumnConfig) => {
+    const label = (c.label || c.key || '')
+    const base = 9.5 // px per char (approx)
+    const padding = 32 // paddings + buffer
+    const typeBias = (() => {
+      switch (c.type) {
+        case 'number': return 80
+        case 'date': return 120
+        case 'currency': return 130
+        case 'badge': return 110
+        default: return 0
+      }
+    })()
+    let maxLen = label.length
+    if (Array.isArray(sampleData) && sampleData.length > 0) {
+      // check up to first 200 rows for performance
+      const limit = Math.min(sampleData.length, 200)
+      for (let i = 0; i < limit; i++) {
+        const row = sampleData[i]
+        const v = row?.[c.key]
+        const s = (v === null || v === undefined) ? '' : String(v)
+        if (s.length > maxLen) maxLen = s.length
+      }
+    }
+    const approx = Math.max(60, Math.round(maxLen * base + padding))
+    return Math.max(typeBias, approx)
+  }, [sampleData])
+
+  const widthDragRef = useRef<{ globalIndex: number; startX: number; startWidth: number } | null>(null)
 
   useEffect(() => {
     if (isOpen) {
@@ -67,11 +100,8 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
     const idx = working.findIndex(c => c.key === filteredWorking[index].key)
     if (idx < 0) return
     const next = [...working]
-    const column = next[idx]
-    const minWidth = column.minWidth || 80
-    const maxWidth = column.maxWidth || 500
-    const constrainedWidth = Math.max(minWidth, Math.min(maxWidth, width))
-    next[idx] = { ...next[idx], width: constrainedWidth }
+    const w = Number.isFinite(width) ? Math.max(20, Math.round(width)) : 100
+    next[idx] = { ...next[idx], width: w }
     setWorking(next)
   }
 
@@ -140,9 +170,89 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
     dragCounter.current = 0
   }
 
+  // Begin width drag on handle (index is filteredWorking index)
+  const startWidthDrag = useCallback((e: React.MouseEvent, index: number) => {
+    e.preventDefault()
+    const key = filteredWorking[index]?.key
+    const globalIndex = working.findIndex(c => c.key === key)
+    if (globalIndex < 0) return
+    widthDragRef.current = {
+      globalIndex,
+      startX: e.clientX,
+      startWidth: working[globalIndex]?.width || 100,
+    }
+    document.addEventListener('mousemove', onWidthDragMove)
+    document.addEventListener('mouseup', onWidthDragEnd)
+  }, [filteredWorking, working])
+
+  const onWidthDragMove = useCallback((e: MouseEvent) => {
+    if (!widthDragRef.current) return
+    const { globalIndex, startX, startWidth } = widthDragRef.current
+    const delta = e.clientX - startX
+    const nextWidth = Math.max(20, Math.round(startWidth + delta))
+    setWorking(prev => {
+      if (globalIndex < 0 || globalIndex >= prev.length) return prev
+      const next = [...prev]
+      next[globalIndex] = { ...next[globalIndex], width: nextWidth }
+      return next
+    })
+  }, [])
+
+  const onWidthDragEnd = useCallback(() => {
+    document.removeEventListener('mousemove', onWidthDragMove)
+    document.removeEventListener('mouseup', onWidthDragEnd)
+    widthDragRef.current = null
+  }, [onWidthDragMove])
+
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', onWidthDragMove)
+      document.removeEventListener('mouseup', onWidthDragEnd)
+    }
+  }, [onWidthDragMove, onWidthDragEnd])
+
   const toggleAll = (visible: boolean) => {
     const next = working.map(col => ({ ...col, visible }))
     setWorking(next)
+  }
+
+  // Preset sizing
+  const applyPreset = (preset: 'compact' | 'comfortable' | 'wide') => {
+    const pick = (c: ColumnConfig) => {
+      switch (c.type) {
+        case 'number': return preset === 'compact' ? 80 : preset === 'comfortable' ? 100 : 120
+        case 'date': return preset === 'compact' ? 120 : preset === 'comfortable' ? 140 : 170
+        case 'currency': return preset === 'compact' ? 120 : preset === 'comfortable' ? 150 : 190
+        case 'badge': return preset === 'compact' ? 110 : preset === 'comfortable' ? 130 : 150
+        case 'actions': return preset === 'compact' ? 140 : preset === 'comfortable' ? 180 : 220
+        default: return preset === 'compact' ? 160 : preset === 'comfortable' ? 220 : 300
+      }
+    }
+    setWorking(prev => prev.map(c => ({ ...c, width: pick(c) })))
+  }
+
+  const equalizeWidths = () => {
+    const vis = working.filter(c => c.visible)
+    if (!vis.length) return
+    const avg = Math.round(vis.reduce((s, c) => s + (c.width || 120), 0) / vis.length)
+    setWorking(prev => prev.map(c => ({ ...c, width: avg })))
+  }
+
+  const exportConfig = async () => {
+    try {
+      const json = JSON.stringify({ columns: working }, null, 2)
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(json)
+      else window.prompt('انسخ الإعدادات:', json)
+    } catch {}
+  }
+
+  const importConfig = async () => {
+    try {
+      const input = window.prompt('ألصق الإعدادات (JSON):')
+      if (!input) return
+      const parsed = JSON.parse(input)
+      if (parsed && Array.isArray(parsed.columns)) setWorking(parsed.columns)
+    } catch { alert('تنسيق غير صالح') }
   }
 
   const resetToDefaults = () => {
@@ -206,6 +316,15 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
                 استعادة الافتراضي
               </button>
             )}
+            <div className="sizing-presets" style={{ display: 'inline-flex', gap: 6, marginInlineStart: 10 }}>
+              <button className="config-btn" onClick={() => applyPreset('compact')}>مضغوط</button>
+              <button className="config-btn" onClick={() => applyPreset('comfortable')}>مريح</button>
+              <button className="config-btn" onClick={() => applyPreset('wide')}>واسع</button>
+              <button className="config-btn" onClick={equalizeWidths}>تساوي العرض</button>
+              <button className="config-btn" onClick={() => setWorking(prev => prev.map(c => ({ ...c, width: computeAutoWidth(c) })))}>ملاءمة تلقائية</button>
+              <button className="config-btn" onClick={exportConfig}>نسخ الإعدادات</button>
+              <button className="config-btn" onClick={importConfig}>لصق الإعدادات</button>
+            </div>
           </div>
           <div className="search-box">
             <input
@@ -225,6 +344,7 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
             <div className="header-label">اسم العمود</div>
             <div className="header-width">العرض (px)</div>
             <div className="header-priority">أولوية التثبيت</div>
+            <div className="header-minwidth">الحد الأدنى (px)</div>
           </div>
 
           <div className="column-config-list">
@@ -276,17 +396,23 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
                   <div className="column-key">{column.key}</div>
                 </div>
 
-                <div className="width-control">
+                <div className="width-control" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input
                     type="number"
                     value={column.width}
                     onChange={(e) => handleWidthChange(index, parseInt(e.target.value) || 100)}
-                    min={column.minWidth || 80}
-                    max={column.maxWidth || 500}
                     step="10"
-                    disabled={!column.resizable}
                     className="width-input"
+                    style={{ width: 90 }}
                   />
+                  <div
+                    className="width-drag-handle"
+                    title="اسحب لتغيير العرض"
+                    onMouseDown={(e) => startWidthDrag(e, index)}
+                    style={{ cursor: 'ew-resize', width: 18, height: 18, borderRadius: 3, background: '#ddd', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' }}
+                  >
+                    ⋮
+                  </div>
                 </div>
 
                 <div className="priority-control">
@@ -304,6 +430,40 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
                     <option value={4}>عالي جداً (4)</option>
                   </select>
                 </div>
+
+                <div className="minwidth-control" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    type="number"
+                    value={column.minWidth ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? undefined : (parseInt(e.target.value) || undefined)
+                      const idx = working.findIndex(c => c.key === filteredWorking[index].key)
+                      if (idx >= 0) {
+                        const next = [...working]
+                        next[idx] = { ...next[idx], minWidth: val }
+                        setWorking(next)
+                      }
+                    }}
+                    placeholder="—"
+                    className="minwidth-input"
+                    style={{ width: 80 }}
+                  />
+                  <button
+                    className="config-btn"
+                    title="إلغاء الحد الأدنى"
+                    onClick={() => {
+                      const idx = working.findIndex(c => c.key === filteredWorking[index].key)
+                      if (idx >= 0) {
+                        const next = [...working]
+                        next[idx] = { ...next[idx], minWidth: undefined }
+                        setWorking(next)
+                      }
+                    }}
+                  >
+                    لا حد
+                  </button>
+                </div>
+
               </div>
             ))}
           </div>

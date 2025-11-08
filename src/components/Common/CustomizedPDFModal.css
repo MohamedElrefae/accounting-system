@@ -5,30 +5,34 @@
 
 .customized-pdf-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 20000;
   backdrop-filter: blur(4px);
 }
 
 .customized-pdf-modal {
   background: var(--modal_bg);
   border-radius: var(--radius-lg);
-  width: 90vw;
-  max-width: 900px;
-  max-height: 85vh;
+  width: 92vw;
+  max-width: 1200px;
+  max-height: 88vh;
   display: flex;
   flex-direction: column;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
   direction: rtl;
   font-family: inherit;
   border: 1px solid var(--border);
+}
+
+.customized-pdf-modal.fullscreen {
+  width: 98vw;
+  max-width: 98vw;
+  height: 94vh;
+  max-height: 94vh;
 }
 
 /* Header */
@@ -76,6 +80,62 @@
   padding: 20px 24px;
 }
 
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.toolbar-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.toolbar-actions .btn {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  background: var(--field_bg);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.toolbar-actions .btn:hover {
+  background: var(--hover-bg);
+}
+
+.search-input {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  width: 260px;
+  background: var(--field_bg);
+  color: var(--text);
+}
+
+.preview-panel {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--field_bg);
+  max-height: 220px;
+  overflow: auto;
+}
+
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.preview-table th,
+.preview-table td {
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
 .settings-section {
   margin-bottom: 28px;
 }
@@ -105,9 +165,9 @@
 
 .columns-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 8px;
-  max-height: 200px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  max-height: 360px;
   overflow-y: auto;
 }
 

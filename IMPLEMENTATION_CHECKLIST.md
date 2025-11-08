@@ -1,240 +1,245 @@
-# Implementation Checklist - Dual-Table Transactions Page
+# Transaction Entry Form - Implementation Checklist
 
-## ✅ COMPLETED
-- [x] Created `TransactionsHeaderTable.tsx` component (T1 - headers table)
-- [x] Created `TransactionLinesTable.tsx` component (T2 - lines table)  
-- [x] Created `DUAL_TABLE_ARCHITECTURE.md` (comprehensive guide)
-- [x] Designed state management structure
-- [x] Designed column configuration strategy
-- [x] Designed layout and CSS structure
-- [x] Created data flow documentation
+## ✅ Quick Status Check
 
-## 🔄 IN PROGRESS / TODO
+- [ ] **Step 1:** Supabase RPC Function Deployed
+- [ ] **Step 2:** Database Schema Verified  
+- [ ] **Step 3:** Parent Component Updated
+- [ ] **Step 4:** Form Tested & Working
 
-### Phase 1: State & Data Management
-- [ ] Add new state variables to Transactions.tsx:
-  - `selectedTransactionId`
-  - `selectedLineId`
-  - `lineColumnsConfigOpen`
-  - Rename `columnConfigOpen` → `headersColumnConfigOpen`
+---
 
-- [ ] Create default line columns configuration:
-  ```typescript
-  const defaultLineColumns: ColumnConfig[] = useMemo(() => [
-    // 10 columns defined in DUAL_TABLE_ARCHITECTURE.md Step 3
-  ], [])
-  ```
+## 📋 STEP 1: Deploy Supabase RPC Function ⚠️ CRITICAL
 
-- [ ] Setup useColumnPreferences hook for lines table:
-  ```typescript
-  const {
-    columns: lineColumns,
-    handleColumnResize: handleLineColumnResize,
-    handleColumnConfigChange: handleLineColumnConfigChange,
-    resetToDefaults: resetLineColumnsToDefaults
-  } = useColumnPreferences({
-    storageKey: 'transactions_lines_table',
-    defaultColumns: defaultLineColumns,
-    userId: currentUserId || undefined
-  })
-  ```
+### What to Do:
+1. Open your Supabase Dashboard
+2. Go to **SQL Editor** (left sidebar)
+3. Open file `supabase-create-transaction-function.sql`
+4. Copy **all** content (Ctrl+A, Ctrl+C)
+5. Paste into Supabase SQL Editor
+6. Click **"RUN"**
+7. Verify: "Success. No rows returned"
 
-### Phase 2: Line Fetching & Selection
-- [ ] Add useEffect to fetch lines when selectedTransactionId changes:
-  ```typescript
-  useEffect(() => {
-    // Fetch from transaction_lines table
-    // Filter by transaction_id
-    // Order by line_no
-  }, [selectedTransactionId])
-  ```
+**Checklist:**
+- [ ] Opened Supabase SQL Editor
+- [ ] Copied SQL from `supabase-create-transaction-function.sql`
+- [ ] Ran SQL successfully
+- [ ] No errors appeared
 
-- [ ] Import new components at top of Transactions.tsx:
-  ```typescript
-  import TransactionsHeaderTable from './TransactionsHeaderTable'
-  import TransactionLinesTable, { type TransactionLineRecord } from './TransactionLinesTable'
-  ```
+**If you see errors:**
+- "function already exists" → ✅ Good! Already deployed, skip to Step 2
+- "permission denied" → You need admin access
+- Other errors → Check SQL syntax or contact support
 
-### Phase 3: Layout Restructuring
-- [ ] Replace single ResizableTable in render with:
-  - `<div className="transactions-content">`
-    - `<div className="transactions-section headers-section">`
-      - Section header with "المعاملات (رؤوس القيود)"
-      - Toolbar (existing code)
-      - `<TransactionsHeaderTable ... />`
-    - `<div className="transactions-section-divider">`
-    - `<div className="transactions-section lines-section">`
-      - Section header with "القيود التفصيلية"
-      - `<TransactionLinesTable ... />`
+---
 
-- [ ] Move existing ResizableTable renderCell logic into TransactionsHeaderTable component
+## 📋 STEP 2: Verify Database Schema
 
-- [ ] Add all callback handlers to TransactionsHeaderTable props:
-  - onSelectTransaction
-  - onEdit
-  - onDelete
-  - onOpenDetails
-  - onOpenDocuments
-  - onOpenCostAnalysis
-  - onSubmit
-  - onApprove
-  - onRevise
-  - onReject
-  - onResubmit
-  - onPost
-  - onCancelSubmission
+### What to Do:
+1. Open file `STEP_2_VERIFY_SCHEMA.sql`
+2. Copy **Query 1** and run in Supabase
+3. Verify you see columns: `id`, `entry_date`, `description`, `org_id`
+4. Copy **Query 2** and run in Supabase
+5. Verify you see columns: `id`, `transaction_id`, `line_no`, `account_id`, `debit_amount`, `credit_amount`
+6. Copy **Query 3** and run in Supabase
+7. Verify it returns 1 row showing the function name
 
-### Phase 4: Line Operations
-- [ ] Implement onEditLine handler in TransactionLinesTable:
-  ```typescript
-  onEditLine={(line) => {
-    // Set lineForm state with line data
-    // Set editingLine = true
-    // Show line editor form
-  }}
-  ```
+**Checklist:**
+- [ ] Query 1 passed (transactions table exists)
+- [ ] Query 2 passed (transaction_lines table exists)
+- [ ] Query 3 passed (RPC function exists)
+- [ ] Schema matches expected structure
 
-- [ ] Implement onDeleteLine handler:
-  ```typescript
-  onDeleteLine={async (id) => {
-    // Confirm deletion
-    // Delete from transaction_lines table
-    // Refresh lines for selected transaction
-    // Show toast
-  }}
-  ```
+**If Query 3 returns NO ROWS:**
+→ Go back to Step 1! The function isn't deployed.
 
-- [ ] Implement onSelectLine handler:
-  ```typescript
-  onSelectLine={(line) => setSelectedLineId(line.id)}
-  ```
+---
 
-### Phase 5: CSS Updates
-- [ ] Add to `Transactions.css`:
-  - `.transactions-content` (flex container)
-  - `.transactions-section` (styling)
-  - `.headers-section` (sizing)
-  - `.lines-section` (sizing with max-height)
-  - `.transactions-section-divider` (visual separator)
-  - `.section-header` (flex layout)
-  - `.section-controls` (buttons layout)
-  - `.section-controls button:disabled` (disabled state)
+## 📋 STEP 3: Update Parent Component ✅ DONE
 
-### Phase 6: Column Configuration Modals
-- [ ] Add two ColumnConfiguration modals in render:
-  - One for headers table (columnConfigOpen)
-  - One for lines table (lineColumnsConfigOpen)
+### Status: **COMPLETED AUTOMATICALLY**
 
-- [ ] Wire up modal callbacks to call appropriate handlers:
-  - `handleColumnConfigChange` for headers
-  - `handleLineColumnConfigChange` for lines
-  - `resetToDefaults` for headers
-  - `resetLineColumnsToDefaults` for lines
+The file `src/pages/Transactions/Transactions.tsx` has been updated:
+- ✅ Import changed: `TransactionWizard` → `TransactionEntryForm`
+- ✅ Component usage updated
+- ✅ Props simplified: `onSubmit` → `onSuccess`
 
-### Phase 7: Testing
-- [ ] Test header table:
-  - [ ] Filters work (date, account, classification, etc.)
-  - [ ] Pagination works
-  - [ ] Export works
-  - [ ] Row selection highlights correctly
-  - [ ] All action buttons work (edit, delete, submit, approve, etc.)
-  - [ ] Column resizing works
-  - [ ] Wrap mode toggle works
-  - [ ] Column config modal works
-
-- [ ] Test lines table:
-  - [ ] Shows empty message when no transaction selected
-  - [ ] Fetches and displays lines when transaction selected
-  - [ ] Edit button opens line editor form
-  - [ ] Delete button removes line and refreshes table
-  - [ ] Column resizing works
-  - [ ] Wrap mode toggle works
-  - [ ] Column config modal works
-  - [ ] Row selection highlights correctly
-
-- [ ] Test integration:
-  - [ ] Selecting transaction in T1 loads lines in T2
-  - [ ] Clearing selection clears T2
-  - [ ] Creating new line updates T2
-  - [ ] Editing existing line updates T2
-  - [ ] Deleting line updates T2
-  - [ ] Line form persists when interacting with T1
-  - [ ] Both tables maintain separate column preferences
-
-- [ ] Test responsiveness:
-  - [ ] Resize browser window
-  - [ ] Check mobile view
-  - [ ] Verify scrolling works for both tables
-
-### Phase 8: Performance Verification
-- [ ] Check React DevTools Profiler:
-  - [ ] No unnecessary re-renders
-  - [ ] Column preference updates are efficient
-  - [ ] Line fetching doesn't block UI
-
-- [ ] Monitor localStorage:
-  - [ ] Headers columns save to 'transactions_table'
-  - [ ] Lines columns save to 'transactions_lines_table'
-  - [ ] Both persist and restore correctly
-
-### Phase 9: Bug Fixes & Polish
-- [ ] Fix any lint errors
-- [ ] Fix any TypeScript errors
-- [ ] Verify all aria labels and titles are in Arabic
-- [ ] Add loading indicators where needed
-- [ ] Add error messages for failed operations
-- [ ] Test keyboard navigation (Tab, Enter, Escape)
-
-### Phase 10: Documentation
-- [ ] Update README if needed
-- [ ] Add inline code comments for complex logic
-- [ ] Document new props and component exports
-- [ ] Create migration guide if needed
-
-## Key Files to Modify
-
-```
-src/pages/Transactions/
-├── Transactions.tsx              ← MAIN REFACTORING (Steps 1-6)
-├── TransactionsHeaderTable.tsx   ← NEW (already created)
-├── TransactionLinesTable.tsx     ← NEW (already created)
-└── Transactions.css              ← UPDATE (Step 5)
-
-Reference Files:
-├── DUAL_TABLE_ARCHITECTURE.md    ← Implementation guide
-└── IMPLEMENTATION_CHECKLIST.md   ← This file
+### Verify No Errors:
+```bash
+npm run build
 ```
 
-## Critical Implementation Notes
+**Checklist:**
+- [ ] Build completes with 0 errors
+- [ ] No TypeScript errors in console
+- [ ] All dependencies are installed
 
-1. **State Selection**: selectedTransactionId must trigger line fetch
-2. **Column Preferences**: Use different storage keys to avoid conflicts
-3. **Empty State**: Lines table should show message when no tx selected
-4. **Row Highlighting**: Use selectedTransactionId/selectedLineId for highlighting
-5. **Form Integration**: Line form should remain open when switching between tables
-6. **Permissions**: All existing permission checks must still apply
-7. **Callbacks**: Handler functions must maintain existing error handling/toasts
+### Check Dependencies:
+```bash
+npm list react-hook-form @hookform/resolvers zod
+```
 
-## Estimated Time
+**If any missing, install:**
+```bash
+npm install react-hook-form @hookform/resolvers zod
+```
 
-- Phase 1-2: 30 minutes (state setup)
-- Phase 3-4: 60 minutes (layout + callbacks)
-- Phase 5-6: 30 minutes (CSS + modals)
-- Phase 7-8: 60 minutes (testing + perf)
-- Phase 9-10: 30 minutes (polish + docs)
-- **Total: ~3.5 hours**
+---
 
-## Rollback Strategy
+## 📋 STEP 4: Test the Form
 
-If issues arise, revert changes to:
-1. Keep original Transactions.tsx as backup
-2. Remove the two new component files
-3. The old single-table layout will work unchanged
-4. No database changes required (just UI restructuring)
+### 4.1 Start Server
+```bash
+npm run dev
+```
+- [ ] Server starts successfully
+- [ ] Navigate to transactions page
+- [ ] Page loads without errors
 
-## Support Resources
+### 4.2 Open Form
+- [ ] Click "+ معاملة جديدة" button
+- [ ] Form modal opens
+- [ ] Header shows "معاملة جديدة"
+- [ ] Settings icon (⚙️) is visible
 
-- `DUAL_TABLE_ARCHITECTURE.md` - Detailed step-by-step guide
-- `TransactionsHeaderTable.tsx` - T1 component template
-- `TransactionLinesTable.tsx` - T2 component template
-- Existing `Transactions.tsx` - Reference for patterns/handlers
+### 4.3 Test Basic Fields
+- [ ] Entry date is pre-filled with today
+- [ ] Organization dropdown works
+- [ ] Description field accepts text
+- [ ] Project dropdown works (optional)
+
+### 4.4 Test Layout Settings
+- [ ] Click ⚙️ Settings icon
+- [ ] Modal opens with 3 tabs
+- [ ] Can change column count (1, 2, or 3)
+- [ ] Can drag fields to reorder
+- [ ] Can toggle visibility
+- [ ] Can toggle full-width
+- [ ] Click "حفظ" (Save)
+- [ ] Changes are applied
+
+### 4.5 Test Transaction Lines
+- [ ] See 2 default lines
+- [ ] Click "+ إضافة سطر" → Line 3 appears
+- [ ] Select account in line 1
+- [ ] Enter debit: 1000
+- [ ] Credit auto-clears to 0
+- [ ] Enter credit: 1000 in line 2  
+- [ ] Debit auto-clears to 0
+- [ ] Can delete line (trash icon)
+- [ ] Cannot delete last line
+
+### 4.6 Test Sticky Footer
+- [ ] Footer visible at bottom (fixed)
+- [ ] Shows total debits
+- [ ] Shows total credits
+- [ ] Shows difference
+- [ ] Shows status (✅/❌)
+
+**Test Live Updates:**
+- [ ] Enter amounts → Totals update instantly
+- [ ] Unbalanced → Shows ❌ غير متوازن
+- [ ] Save button DISABLED when unbalanced
+- [ ] Balanced → Shows ✅ متوازن
+- [ ] Save button ENABLED when balanced
+
+### 4.7 Test Validation
+- [ ] Clear required field → Error appears
+- [ ] Error message in Arabic
+- [ ] Fill field → Error disappears
+- [ ] Cannot save with validation errors
+
+### 4.8 Test Submission
+**Create valid transaction:**
+- [ ] Fill all required fields
+- [ ] Line 1: Account, Debit = 1000
+- [ ] Line 2: Account, Credit = 1000
+- [ ] Footer shows ✅ balanced
+- [ ] Click "حفظ المعاملة"
+- [ ] Button shows "جارٍ الحفظ..."
+- [ ] Success message appears
+- [ ] Form closes automatically
+- [ ] Transaction appears in list
+
+### 4.9 Test Keyboard Shortcut
+- [ ] Fill form completely
+- [ ] Balance transaction
+- [ ] Press **Cmd+S** (Mac) or **Ctrl+S** (Windows)
+- [ ] Form submits successfully
+
+### 4.10 Test Persistence
+- [ ] Open form
+- [ ] Change layout (e.g., 3 columns)
+- [ ] Save and close
+- [ ] **Refresh page** (F5)
+- [ ] Open form again
+- [ ] Layout is preserved
+
+---
+
+## 🎯 Final Checks
+
+### All Working?
+- [ ] Form opens and closes smoothly
+- [ ] All fields are editable
+- [ ] Validation works correctly
+- [ ] Totals calculate in real-time
+- [ ] Can save balanced transactions
+- [ ] Transactions appear in list after save
+- [ ] No console errors
+- [ ] No network errors
+
+### Browser Test
+- [ ] Chrome/Edge
+- [ ] Firefox
+- [ ] Safari (if applicable)
+
+---
+
+## ✅ SUCCESS CRITERIA
+
+**Implementation is complete when:**
+
+1. ✅ Form opens as single-page (no wizard steps)
+2. ✅ Can customize layout via settings
+3. ✅ Can add/remove lines dynamically
+4. ✅ Real-time validation works
+5. ✅ Footer shows live totals
+6. ✅ Can save transactions successfully
+7. ✅ Transactions appear in list
+8. ✅ Layout persists across refreshes
+9. ✅ Keyboard shortcut works
+10. ✅ Zero console errors
+
+---
+
+## 🐛 Troubleshooting
+
+**"Function does not exist"**
+→ Go to Step 1, run the SQL
+
+**Form doesn't open**
+→ Check browser console for errors
+
+**Totals don't update**
+→ Check console, might be rendering issue
+
+**Can't save**
+→ Check validation errors (red text under fields)
+
+**Layout doesn't persist**
+→ Check localStorage is enabled in browser
+
+---
+
+## 📞 Need Help?
+
+- `TRANSACTION_FORM_IMPLEMENTATION_GUIDE.md` - Full details
+- `TRANSACTION_FORM_QUICK_START.md` - Quick reference
+- Browser DevTools → Console tab - Check for errors
+- Browser DevTools → Network tab - Check API calls
+
+---
+
+**Status:** 🎉 Ready to go!  
+**Last Updated:** 2025-10-29

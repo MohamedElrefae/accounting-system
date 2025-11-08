@@ -35,7 +35,6 @@ select
   t.credit_account_name,
   t.project_id,
   t.org_id,
-  t.organization_id,
   t.created_at,
   t.updated_at,
   t.created_by,

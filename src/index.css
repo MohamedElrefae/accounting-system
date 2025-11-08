@@ -82,6 +82,11 @@ button:focus-visible {
   --primary-blue: var(--accent);
   --info-bg: rgba(32, 118, 255, 0.08);
   --on-accent: var(--button_text);
+  --on-success: #FFFFFF;
+  --on-warning: #111111;
+  --on-error: #FFFFFF;
+  --on-neutral: #FFFFFF;
+  --on-info: #FFFFFF;
   --success-strong: #16A085;
   --warning-strong: #F6A000;
   --error-strong: #C53030;
@@ -149,6 +154,11 @@ html[data-theme='dark'] {
   --primary-blue: var(--accent);
   --info-bg: rgba(32, 118, 255, 0.08);
   --on-accent: var(--button_text);
+  --on-success: #FFFFFF;
+  --on-warning: #111111;
+  --on-error: #FFFFFF;
+  --on-neutral: #FFFFFF;
+  --on-info: #FFFFFF;
   --success-strong: #16A085;
   --warning-strong: #F6A000;
   --error-strong: #C53030;
@@ -216,6 +226,11 @@ html[data-theme='light'] {
   --accent-primary: var(--accent);
   --accent-primary-hover: #1A5FE6;
   --on-accent: var(--button_text);
+  --on-success: #FFFFFF;
+  --on-warning: #111111;
+  --on-error: #FFFFFF;
+  --on-neutral: #FFFFFF;
+  --on-info: #FFFFFF;
   --success-strong: #16A085;
   --warning-strong: #F6A000;
   --error-strong: #C53030;

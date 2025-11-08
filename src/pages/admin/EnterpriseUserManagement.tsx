@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from 'react';
 import {
   Box,
@@ -69,8 +70,10 @@ import DeactivateIcon from '@mui/icons-material/PersonOff';
 import InviteIcon from '@mui/icons-material/PersonAddAlt';
 import ShieldIcon from '@mui/icons-material/Shield';
 import PermissionIcon from '@mui/icons-material/Key';
+import Refresh from '@mui/icons-material/Refresh';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { testUserManagementConnection } from '../../utils/testUserManagement';
 
 interface User {
   id: string;
@@ -117,7 +120,7 @@ export default function EnterpriseUserManagement() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('active');
   const [filterRole, setFilterRole] = useState<FilterRole>('all');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  
+
   // Dialog states
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -140,6 +143,7 @@ export default function EnterpriseUserManagement() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    // Load data on component mount
     loadData();
   }, []);
 
@@ -147,6 +151,9 @@ export default function EnterpriseUserManagement() {
     try {
       setLoading(true);
       await Promise.all([loadUsers(), loadRoles()]);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      alert('فشل تحميل البيانات. يرجى المحاولة مرة أخرى.');
     } finally {
       setLoading(false);
     }
@@ -154,14 +161,17 @@ export default function EnterpriseUserManagement() {
 
   const loadUsers = async () => {
     try {
-      // First, load users
+      // Skip table check and try direct query with minimal data
       const { data: usersData, error: usersError } = await supabase
         .from('user_profiles')
-        .select('*')
-        .order('email');
+        .select('id, email')
+        .order('email')
+        .limit(20); // Very small limit to prevent stack issues
 
       if (usersError) {
         console.error('Error loading users:', usersError);
+        // If user_profiles fails, show message and return empty
+        setUsers([]);
         return;
       }
 
@@ -170,31 +180,47 @@ export default function EnterpriseUserManagement() {
         return;
       }
 
-      // Then load user roles separately
+      // Load user roles with correct schema (user_roles -> roles join)
       const userIds = usersData.map(u => u.id);
-      const { data: userRolesData, error: userRolesError } = await supabase
-        .from('user_roles')
-        .select(`
-          user_id,
-          roles (
-            id,
-            name,
-            name_ar,
-            description,
-            description_ar,
-            is_system
-          )
-        `)
-        .in('user_id', userIds);
+      let userRolesData: any[] = [];
 
-      if (userRolesError) {
-        console.warn('Warning loading user roles:', userRolesError);
+      try {
+        const { data: rolesData, error: userRolesError } = await supabase
+          .from('user_roles')
+          .select(`
+            user_id,
+            role_id,
+            roles!inner (
+              id,
+              name,
+              name_ar
+            )
+          `)
+          .in('user_id', userIds)
+          .eq('is_active', true)
+          .limit(200); // Prevent large queries
+
+        if (!userRolesError && rolesData) {
+          userRolesData = rolesData;
+        }
+      } catch (error) {
+        console.warn('Could not load user roles, continuing without them:', error);
       }
 
-      // Create a map of user roles
-      const roleMap: { [userId: string]: any } = {};
+      // Create a map of user roles using correct schema
+      const roleMap: { [userId: string]: any[] } = {};
       userRolesData?.forEach(ur => {
-        roleMap[ur.user_id] = ur.roles;
+        if (!roleMap[ur.user_id]) {
+          roleMap[ur.user_id] = [];
+        }
+        const role = (ur as any).roles;
+        if (role) {
+          roleMap[ur.user_id].push({
+            id: role.id,
+            name: role.name,
+            name_ar: role.name_ar
+          });
+        }
       });
 
       // Combine users with their roles
@@ -216,7 +242,7 @@ export default function EnterpriseUserManagement() {
         .from('roles')
         .select('*')
         .order('name');
-      
+
       if (error) {
         console.error('Error loading roles:', error);
         return;
@@ -230,28 +256,28 @@ export default function EnterpriseUserManagement() {
   // Filtered and sorted users
   const processedUsers = useMemo(() => {
     const filtered = users.filter(user => {
-      const matchesSearch = searchTerm === '' || 
+      const matchesSearch = searchTerm === '' ||
         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.full_name_ar?.includes(searchTerm) ||
         user.department?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.job_title?.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesStatus = filterStatus === 'all' || 
+
+      const matchesStatus = filterStatus === 'all' ||
         (filterStatus === 'active' && user.is_active) ||
         (filterStatus === 'inactive' && !user.is_active);
-      
-      const matchesRole = filterRole === 'all' || 
+
+      const matchesRole = filterRole === 'all' ||
         user.role?.id.toString() === filterRole;
-      
+
       return matchesSearch && matchesStatus && matchesRole;
     });
 
     // Sort users
     filtered.sort((a, b) => {
       let comparison = 0;
-      
+
       switch (sortField) {
         case 'name': {
           const nameA = a.full_name_ar || `${a.first_name} ${a.last_name}` || a.email;
@@ -280,7 +306,7 @@ export default function EnterpriseUserManagement() {
           break;
         }
       }
-      
+
       return sortDirection === 'desc' ? -comparison : comparison;
     });
 
@@ -386,7 +412,7 @@ export default function EnterpriseUserManagement() {
           role_id: roleId,
           assigned_by: currentUser?.id
         });
-        
+
         if (error) throw error;
       }
     } catch (error) {
@@ -401,7 +427,7 @@ export default function EnterpriseUserManagement() {
         .from('user_profiles')
         .update({ is_active: !currentStatus })
         .eq('id', userId);
-      
+
       if (error) throw error;
       await loadUsers();
       alert(currentStatus ? 'تم إلغاء تفعيل المستخدم' : 'تم تفعيل المستخدم');
@@ -417,15 +443,15 @@ export default function EnterpriseUserManagement() {
     try {
       // Remove user roles first
       await supabase.from('user_roles').delete().eq('user_id', userId);
-      
+
       // Delete user profile
       const { error } = await supabase
         .from('user_profiles')
         .delete()
         .eq('id', userId);
-      
+
       if (error) throw error;
-      
+
       await loadUsers();
       alert('تم حذف المستخدم بنجاح');
     } catch (error: any) {
@@ -467,7 +493,7 @@ export default function EnterpriseUserManagement() {
       'آخر دخول': user.last_login ? new Date(user.last_login).toLocaleDateString('ar-SA') : 'لم يدخل',
       'تاريخ الإنشاء': new Date(user.created_at).toLocaleDateString('ar-SA')
     }));
-    
+
     console.log('Exporting users:', data);
     alert('تم التصدير بنجاح');
   };
@@ -479,7 +505,7 @@ export default function EnterpriseUserManagement() {
     const inactive = total - active;
     const withRoles = users.filter(u => u.role).length;
     const admins = users.filter(u => u.role?.name.includes('admin')).length;
-    
+
     return { total, active, inactive, withRoles, admins };
   }, [users]);
 
@@ -496,7 +522,7 @@ export default function EnterpriseUserManagement() {
               نظام شامل لإدارة حسابات المستخدمين وأدوارهم وصلاحياتهم
             </Typography>
           </Box>
-          
+
           {/* Quick Stats */}
           <Stack direction="row" spacing={2}>
             <Card elevation={1} sx={{ minWidth: 120, textAlign: 'center' }}>
@@ -532,6 +558,16 @@ export default function EnterpriseUserManagement() {
           </Stack>
 
           <Stack direction="row" spacing={1}>
+            <Tooltip title="تحديث البيانات">
+              <IconButton onClick={loadData} disabled={loading}>
+                <Refresh />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="اختبار الاتصال">
+              <IconButton onClick={testUserManagementConnection}>
+                <SecurityIcon />
+              </IconButton>
+            </Tooltip>
             <Tooltip title="تصدير البيانات">
               <IconButton onClick={exportUsers}>
                 <ExportIcon />
@@ -571,7 +607,7 @@ export default function EnterpriseUserManagement() {
             }}
             sx={{ minWidth: 300 }}
           />
-          
+
           <FormControl sx={{ minWidth: 150 }}>
             <InputLabel>ترتيب حسب</InputLabel>
             <Select
@@ -639,6 +675,11 @@ export default function EnterpriseUserManagement() {
         )}
       </Paper>
 
+      {/* Loading Progress */}
+      {loading && (
+        <LinearProgress sx={{ mb: 2 }} />
+      )}
+
       {/* Content Area */}
       <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
         {viewMode === 'cards' && (
@@ -649,6 +690,30 @@ export default function EnterpriseUserManagement() {
                   <Skeleton variant="rectangular" height={280} />
                 </Grid>
               ))
+            ) : processedUsers.length === 0 ? (
+              <Grid item xs={12}>
+                <Paper sx={{ p: 4, textAlign: 'center' }}>
+                  <GroupIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    لا توجد مستخدمين
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    {searchTerm || filterStatus !== 'all' || filterRole !== 'all'
+                      ? 'لا توجد نتائج تطابق معايير البحث المحددة'
+                      : 'لم يتم العثور على أي مستخدمين في النظام'
+                    }
+                  </Typography>
+                  {(!searchTerm && filterStatus === 'all' && filterRole === 'all') && (
+                    <Button
+                      variant="contained"
+                      startIcon={<AddUserIcon />}
+                      onClick={() => handleEditUser(null)}
+                    >
+                      إضافة أول مستخدم
+                    </Button>
+                  )}
+                </Paper>
+              </Grid>
             ) : (
               processedUsers.map((user) => (
                 <Grid item xs={12} md={6} lg={4} key={user.id}>
@@ -658,8 +723,8 @@ export default function EnterpriseUserManagement() {
                       height: '100%',
                       transition: 'all 0.3s ease',
                       border: selectedUsers.includes(user.id) ? 2 : 1,
-                      borderColor: selectedUsers.includes(user.id) 
-                        ? 'primary.main' 
+                      borderColor: selectedUsers.includes(user.id)
+                        ? 'primary.main'
                         : alpha(theme.palette.divider, 0.2),
                       '&:hover': {
                         elevation: 8,
@@ -678,7 +743,7 @@ export default function EnterpriseUserManagement() {
                               height: 50
                             }}
                           >
-                            {user.full_name_ar 
+                            {user.full_name_ar
                               ? user.full_name_ar.charAt(0)
                               : user.first_name?.charAt(0) || user.email.charAt(0).toUpperCase()
                             }
@@ -704,7 +769,7 @@ export default function EnterpriseUserManagement() {
                               }
                             }}
                           />
-                          <IconButton 
+                          <IconButton
                             size="small"
                             onClick={(e) => {
                               setMenuAnchor(e.currentTarget);
@@ -744,14 +809,14 @@ export default function EnterpriseUserManagement() {
                       </Stack>
 
                       <Stack direction="row" spacing={1} flexWrap="wrap" gap={1} mb={2}>
-                        <Chip 
+                        <Chip
                           icon={getUserStatusIcon(user.is_active)}
                           label={user.is_active ? 'نشط' : 'غير نشط'}
                           size="small"
                           color={getUserStatusColor(user.is_active)}
                         />
                         {user.role && (
-                          <Chip 
+                          <Chip
                             icon={getRoleIcon(user.role)}
                             label={user.role.name_ar}
                             size="small"
@@ -760,7 +825,7 @@ export default function EnterpriseUserManagement() {
                           />
                         )}
                         {user.permission_count && user.permission_count > 0 && (
-                          <Chip 
+                          <Chip
                             icon={<PermissionIcon />}
                             label={`${user.permission_count} صلاحية`}
                             size="small"
@@ -866,7 +931,7 @@ export default function EnterpriseUserManagement() {
                             height: 40
                           }}
                         >
-                          {user.full_name_ar 
+                          {user.full_name_ar
                             ? user.full_name_ar.charAt(0)
                             : user.first_name?.charAt(0) || user.email.charAt(0).toUpperCase()
                           }
@@ -897,7 +962,7 @@ export default function EnterpriseUserManagement() {
                     </TableCell>
                     <TableCell>
                       {user.role ? (
-                        <Chip 
+                        <Chip
                           icon={getRoleIcon(user.role)}
                           label={user.role.name_ar}
                           size="small"
@@ -910,7 +975,7 @@ export default function EnterpriseUserManagement() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Chip 
+                      <Chip
                         icon={getUserStatusIcon(user.is_active)}
                         label={user.is_active ? 'نشط' : 'غير نشط'}
                         size="small"
@@ -919,7 +984,7 @@ export default function EnterpriseUserManagement() {
                     </TableCell>
                     <TableCell>
                       <Typography variant="caption">
-                        {user.last_login 
+                        {user.last_login
                           ? new Date(user.last_login).toLocaleDateString('ar-SA')
                           : 'لم يدخل'
                         }
@@ -937,15 +1002,15 @@ export default function EnterpriseUserManagement() {
                         }}>
                           <SecurityIcon />
                         </IconButton>
-                        <IconButton 
-                          size="small" 
+                        <IconButton
+                          size="small"
                           color={user.is_active ? 'error' : 'success'}
                           onClick={() => handleToggleUserStatus(user.id, user.is_active)}
                         >
                           {user.is_active ? <DeactivateIcon /> : <ActiveIcon />}
                         </IconButton>
-                        <IconButton 
-                          size="small" 
+                        <IconButton
+                          size="small"
                           color="error"
                           onClick={() => handleDeleteUser(user.id, user.email)}
                         >
@@ -971,9 +1036,9 @@ export default function EnterpriseUserManagement() {
                       <Typography variant="body2">المستخدمون النشطون</Typography>
                       <Typography variant="body2" fontWeight="bold">{analytics.active}</Typography>
                     </Stack>
-                    <LinearProgress 
-                      variant="determinate" 
-                      value={(analytics.active / analytics.total) * 100} 
+                    <LinearProgress
+                      variant="determinate"
+                      value={(analytics.active / analytics.total) * 100}
                       color="success"
                       sx={{ height: 8, borderRadius: 4 }}
                     />
@@ -983,9 +1048,9 @@ export default function EnterpriseUserManagement() {
                       <Typography variant="body2">لديهم أدوار</Typography>
                       <Typography variant="body2" fontWeight="bold">{analytics.withRoles}</Typography>
                     </Stack>
-                    <LinearProgress 
-                      variant="determinate" 
-                      value={(analytics.withRoles / analytics.total) * 100} 
+                    <LinearProgress
+                      variant="determinate"
+                      value={(analytics.withRoles / analytics.total) * 100}
                       color="primary"
                       sx={{ height: 8, borderRadius: 4 }}
                     />
@@ -995,9 +1060,9 @@ export default function EnterpriseUserManagement() {
                       <Typography variant="body2">المديرون</Typography>
                       <Typography variant="body2" fontWeight="bold">{analytics.admins}</Typography>
                     </Stack>
-                    <LinearProgress 
-                      variant="determinate" 
-                      value={(analytics.admins / analytics.total) * 100} 
+                    <LinearProgress
+                      variant="determinate"
+                      value={(analytics.admins / analytics.total) * 100}
                       color="warning"
                       sx={{ height: 8, borderRadius: 4 }}
                     />
@@ -1048,7 +1113,7 @@ export default function EnterpriseUserManagement() {
             <ListItemText>سجل النشاط</ListItemText>
           </MenuItem>
           <Divider />
-          <MenuItem 
+          <MenuItem
             onClick={() => {
               handleToggleUserStatus(selectedUserForMenu!.id, selectedUserForMenu!.is_active);
               setMenuAnchor(null);
@@ -1061,7 +1126,7 @@ export default function EnterpriseUserManagement() {
               {selectedUserForMenu?.is_active ? 'إلغاء التفعيل' : 'تفعيل'}
             </ListItemText>
           </MenuItem>
-          <MenuItem 
+          <MenuItem
             onClick={() => {
               handleDeleteUser(selectedUserForMenu!.id, selectedUserForMenu!.email);
               setMenuAnchor(null);
@@ -1089,7 +1154,7 @@ export default function EnterpriseUserManagement() {
             </Typography>
           </Stack>
         </DialogTitle>
-        
+
         <DialogContent>
           <Stack spacing={3} sx={{ mt: 2 }}>
             <Grid container spacing={2}>

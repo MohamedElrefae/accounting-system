@@ -8,7 +8,8 @@
  * - Arabic RTL support
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { UniversalTableData } from '../../utils/UniversalExportManager';
 import { exportToPDF } from '../../utils/UniversalExportManager';
 import './CustomizedPDFModal.css';
@@ -74,6 +75,19 @@ const CustomizedPDFModal: React.FC<CustomizedPDFModalProps> = ({
   });
 
   const [isExporting, setIsExporting] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(true);
+  const [columnsQuery, setColumnsQuery] = useState('');
+
+  // Default selected columns: only those marked visible !== false (fallback to all)
+  useEffect(() => {
+    if (!isOpen) return
+    const visibleKeys = (data.columns || []).filter(c => (c as any).visible !== false).map(c => c.key)
+    if (visibleKeys.length > 0) {
+      setSettings(prev => ({ ...prev, selectedColumns: visibleKeys }))
+    } else {
+      setSettings(prev => ({ ...prev, selectedColumns: (data.columns || []).map(c => c.key) }))
+    }
+  }, [isOpen, data.columns])
 
   const handleSettingChange = useCallback((key: keyof PDFSettings, value: unknown) => {
     setSettings(prev => ({
@@ -91,6 +105,12 @@ const CustomizedPDFModal: React.FC<CustomizedPDFModalProps> = ({
       }
     }));
   }, []);
+
+  const filteredColumns = useMemo(() => {
+    const q = columnsQuery.trim().toLowerCase();
+    if (!q) return data.columns;
+    return data.columns.filter(c => (c.header || c.key).toLowerCase().includes(q));
+  }, [columnsQuery, data.columns]);
 
   const handleColumnToggle = useCallback((columnKey: string, checked: boolean) => {
     setSettings(prev => ({
@@ -148,17 +168,27 @@ const CustomizedPDFModal: React.FC<CustomizedPDFModalProps> = ({
     }
   }, [settings, data, onClose]);
 
+  useEffect(() => {
+    if (!isOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [isOpen])
+
   if (!isOpen) return null;
 
   const allColumnsSelected = settings.selectedColumns.length === data.columns.length;
   const someColumnsSelected = settings.selectedColumns.length > 0 && !allColumnsSelected;
 
-  return (
+  return createPortal(
     <div className="customized-pdf-modal-overlay" onClick={onClose}>
-      <div className="customized-pdf-modal" onClick={e => e.stopPropagation()}>
+      <div className={`customized-pdf-modal ${isFullscreen ? 'fullscreen' : ''}`} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2 className="modal-title">تخصيص تصدير PDF</h2>
-          <button className="close-button" onClick={onClose}>×</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="close-button" title={isFullscreen ? 'تصغير' : 'تكبير'} onClick={() => setIsFullscreen(v => !v)}>⛶</button>
+            <button className="close-button" onClick={onClose}>×</button>
+          </div>
         </div>
 
         <div className="modal-content">
@@ -166,6 +196,22 @@ const CustomizedPDFModal: React.FC<CustomizedPDFModalProps> = ({
           <div className="settings-section">
             <h3 className="section-title">الأعمدة للتصدير</h3>
             <div className="column-selection">
+              <div className="toolbar-row">
+                <div className="toolbar-actions">
+                  <button className="btn" onClick={() => handleSelectAllColumns(true)}>اختيار الكل</button>
+                  <button className="btn" onClick={() => handleSelectAllColumns(false)}>إلغاء الكل</button>
+                  <button className="btn" onClick={() => {
+                    const current = new Set(settings.selectedColumns)
+                    const next: string[] = []
+                    for (const c of data.columns) {
+                      if (!current.has(c.key)) next.push(c.key)
+                    }
+                    // invert selection
+                    setSettings(prev => ({ ...prev, selectedColumns: next }))
+                  }}>عكس الاختيار</button>
+                </div>
+                <input className="search-input" placeholder="بحث عن عمود..." value={columnsQuery} onChange={e => setColumnsQuery(e.target.value)} />
+              </div>
               <div className="select-all-checkbox">
                 <label className="checkbox-label">
                   <input
@@ -180,7 +226,7 @@ const CustomizedPDFModal: React.FC<CustomizedPDFModalProps> = ({
                 </label>
               </div>
               <div className="columns-grid">
-                {data.columns.map(col => (
+                {filteredColumns.map(col => (
                   <label key={col.key} className="checkbox-label">
                     <input
                       type="checkbox"
@@ -190,6 +236,27 @@ const CustomizedPDFModal: React.FC<CustomizedPDFModalProps> = ({
                     {col.header}
                   </label>
                 ))}
+              </div>
+
+              <div className="preview-panel">
+                <table className="preview-table">
+                  <thead>
+                    <tr>
+                      {data.columns.filter(c => settings.selectedColumns.includes(c.key)).map(c => (
+                        <th key={c.key}>{c.header}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data.rows || []).slice(0, 8).map((r, idx) => (
+                      <tr key={idx}>
+                        {data.columns.filter(c => settings.selectedColumns.includes(c.key)).map(c => (
+                          <td key={c.key}>{r[c.key] as any}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -402,7 +469,8 @@ const CustomizedPDFModal: React.FC<CustomizedPDFModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

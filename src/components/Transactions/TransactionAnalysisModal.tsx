@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import './TransactionAnalysisModal.css'
 import ExportButtons from '../../components/Common/ExportButtons'
+import DraggableResizablePanel from '../Common/DraggableResizablePanel'
 import { createStandardColumns } from '../../hooks/useUniversalExport'
 import type { UniversalTableData } from '../../utils/UniversalExportManager'
-import { listLineItems, upsertLineItems, bulkReplaceLineItems, computeLineTotal, validateItems, deleteLineItem, type TransactionLineItem } from '../../services/cost-analysis'
+import { listLineItems, upsertLineItems, computeLineTotal, validateItems, deleteLineItem, type TransactionLineItem } from '../../services/cost-analysis'
 import { supabase } from '../../utils/supabase'
 import { listAnalysisWorkItems } from '../../services/analysis-work-items'
 import { getCompanyConfig } from '../../services/company-config'
-import { lineItemsCatalogService, type CatalogSelectorItem } from '../../services/line-items-catalog'
+import { transactionLineItemsEnhancedService } from '../../services/transaction-line-items-enhanced'
 import { getExpensesCategoriesList } from '../../services/sub-tree'
 import { listWorkItemsUnion } from '../../services/work-items'
 import { SearchableDropdown } from '../Common/SearchableDropdown'
@@ -146,10 +147,8 @@ const TransactionAnalysisModal: React.FC<Props> = ({
   transactionAmount,
   orgId,
   workItems = [],
-  costCenters = []
 }) => {
   const [loading, setLoading] = useState(false)
-  const contentRef = React.useRef<HTMLDivElement | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>('')
   const [data, setData] = useState<TransactionAnalysisDetail | null>(null)
@@ -170,43 +169,15 @@ const TransactionAnalysisModal: React.FC<Props> = ({
     return { w: 1100, h: 850 }
   }
   const [customSize, setCustomSize] = useState<{ w: number; h: number }>(loadCustomSize())
-  const [isResizing, setIsResizing] = useState(false)
-  const [resizeStart, setResizeStart] = useState<{ x: number; y: number; w: number; h: number; axis: 'both' | 'x' | 'y' } | null>(null)
-  const [showSizeBadge, setShowSizeBadge] = useState(false)
-  const [preResizeSize, setPreResizeSize] = useState<{ w: number; h: number } | null>(null)
-  // Drag state for moving the window
-  const [position, setPosition] = useState<{ x: number; y: number }>(() => {
-    const { w, h } = loadCustomSize()
-    const cx = Math.max(0, Math.floor((window.innerWidth - w) / 2))
-    const cy = Math.max(0, Math.floor((window.innerHeight - h) / 2))
-    return { x: cx, y: cy }
-  })
-  const [isDragging, setIsDragging] = useState(false)
-  const [dragStart, setDragStart] = useState<{ x: number; y: number; origX: number; origY: number }>({ x: 0, y: 0, origX: 0, origY: 0 })
 
   const [tab, setTab] = useState<'header' | 'line_items' | 'by_item' | 'by_cost_center' | 'by_category'>(loadConfig().defaultTab)
   const [lineItems, setLineItems] = useState<TransactionLineItem[]>([])
   const [analysisWorkItems, setAnalysisWorkItems] = useState<AnalysisWorkItem[]>([])
-  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([])
   const [loadedWorkItems, setLoadedWorkItems] = useState<WorkItem[]>([])
   const [loadedSubTree, setLoadedSubTree] = useState<any[]>([])
   const [currency, setCurrency] = useState<string>('SAR')
   const [selectedForDelete, setSelectedForDelete] = useState<Set<number>>(new Set())
-  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
-  const [rowsByItem, setRowsByItem] = useState<Array<{ analysis_work_item_id: string; analysis_work_item_code: string; analysis_work_item_name: string; amount: number }>>([])
-  const [rowsByCC, setRowsByCC] = useState<Array<{ cost_center_id: string; cost_center_code: string; cost_center_name: string; amount: number }>>([])
-  const [rowsByCat, setRowsByCat] = useState<Array<{ expenses_category_id: string; expenses_category_code: string; expenses_category_name: string; amount: number }>>([])
-  const [selectedItemIndex, setSelectedItemIndex] = useState<number | null>(null)
-  
   // State for cost dimension editing
-  const [editingItemId, setEditingItemId] = useState<string | null>(null)
-  const [editingDimensions, setEditingDimensions] = useState<{
-    work_item_id: string | null
-    analysis_work_item_id: string | null
-    sub_tree_id: string | null
-  } | null>(null)
-
-
   const lastLoadKeyRef = useRef<string>('')
   useEffect(() => {
     let cancelled = false
@@ -233,13 +204,12 @@ const TransactionAnalysisModal: React.FC<Props> = ({
         }
 
         // Load all data (skip org-scoped lists if we still lack org)
-        const [analysisDetail, lineItemsData, analysisItemsList, workItemsList, subTreeData, categories, companyConfig] = await Promise.all([
+        const [analysisDetail, lineItemsData, analysisItemsList, workItemsList, subTreeData, companyConfig] = await Promise.all([
           getTransactionAnalysisDetail(transactionId),
           listLineItems(transactionId, transactionLineId || undefined).catch(() => []),
           effectiveOrg ? listAnalysisWorkItems({ orgId: effectiveOrg, includeInactive: false }).catch(() => []) : Promise.resolve([]),
           effectiveOrg ? listWorkItemsUnion(effectiveOrg, null, true).catch(() => []) : Promise.resolve([]),
           effectiveOrg ? getExpensesCategoriesList(effectiveOrg, false).catch(() => []) : Promise.resolve([]),
-          Promise.resolve([]),
           getCompanyConfig().catch(() => ({ currency_code: 'SAR' }))
         ])
         
@@ -249,13 +219,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({
           setAnalysisWorkItems(analysisItemsList.map(w => ({ id: w.id, code: w.code, name: w.name })))
           setLoadedWorkItems(workItemsList || [])
           setLoadedSubTree(subTreeData || [])
-          setExpenseCategories(categories.map(c => ({ id: c.id, code: c.code, description: c.description })))
           setCurrency(companyConfig.currency_code || 'SAR')
-          
-          // Process breakdown data
-          setRowsByItem([])
-          setRowsByCC([])
-          setRowsByCat([])
         }
       } catch (e: unknown) {
         const error = e as { message?: string };
@@ -275,37 +239,13 @@ const TransactionAnalysisModal: React.FC<Props> = ({
     }
     window.addEventListener('keydown', onKey)
     return () => { cancelled = true; window.removeEventListener('keydown', onKey) }
-  }, [open, transactionId, transactionLineId, orgId])
-
-  // Recenter the modal when opening or when switching size preset
-  useEffect(() => {
-    if (!open) return
-    const dims = (() => {
-      if (config.size === 'custom') return { w: customSize.w, h: customSize.h }
-      const w = config.size === 'sm' ? 640 : config.size === 'md' ? 860 : config.size === 'lg' ? 1060 : config.size === 'xl' ? 1300 : Math.round(window.innerWidth * 0.98)
-      const h = config.size === 'fullscreen' ? Math.round(window.innerHeight * 0.96) : Math.round(window.innerHeight * 0.90)
-      return { w, h }
-    })()
-    const cx = Math.max(0, Math.floor((window.innerWidth - dims.w) / 2))
-    const cy = Math.max(0, Math.floor((window.innerHeight - dims.h) / 2))
-    setPosition({ x: cx, y: cy })
-  }, [open, config.size, customSize.w, customSize.h])
+  }, [open, transactionId, transactionLineId, orgId, onClose])
 
   // Keyboard shortcuts for size presets
   useEffect(() => {
     const presets: ModalSize[] = ['sm','md','lg','xl','fullscreen']
     const onKey = (ev: KeyboardEvent) => {
       if (!open) return
-      // Cancel in-progress resize
-      if (ev.key === 'Escape' && isResizing) {
-        if (preResizeSize) setCustomSize(preResizeSize)
-        setIsResizing(false)
-        setResizeStart(null)
-        setShowSizeBadge(false)
-        document.body.style.userSelect = ''
-        document.body.style.cursor = ''
-        return
-      }
       const ctrlAlt = ev.ctrlKey && ev.altKey
       if (ctrlAlt) {
         if (ev.key === '1') setConfig(p => ({ ...p, size: 'sm' }))
@@ -336,89 +276,15 @@ const TransactionAnalysisModal: React.FC<Props> = ({
     try { localStorage.setItem(storageKey + ':customSize', JSON.stringify(customSize)) } catch {}
   }, [customSize])
 
-  // Drag handlers for moving the modal freely
-  useEffect(() => {
-    if (!isDragging) return
-    const onMove = (ev: MouseEvent) => {
-      let nextX = ev.clientX - dragStart.x
-      let nextY = ev.clientY - dragStart.y
-      if (ev.shiftKey) {
-        const dx = nextX - dragStart.origX
-        const dy = nextY - dragStart.origY
-        if (Math.abs(dx) > Math.abs(dy)) nextY = dragStart.origY
-        else nextX = dragStart.origX
-      }
-      const maxX = Math.max(0, window.innerWidth - (config.size === 'custom' ? customSize.w : Math.min(window.innerWidth * 0.98, customSize.w)))
-      const maxY = Math.max(0, window.innerHeight - (config.size === 'custom' ? customSize.h : Math.min(window.innerHeight * 0.96, customSize.h)))
-      setPosition({ x: Math.min(Math.max(0, nextX), maxX), y: Math.min(Math.max(0, nextY), maxY) })
-    }
-    const onUp = () => setIsDragging(false)
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-    return () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
-  }, [isDragging, dragStart, customSize.w, customSize.h, config.size])
+  const onPanelResize = useCallback((size: { width: number; height: number }) => {
+    setPanelSize(size)
+    setCustomSize({ w: size.width, h: size.height })
+    setConfig(prev => (prev.size === 'custom' ? prev : { ...prev, size: 'custom' }))
+  }, [])
 
-  // Drag-resize handlers
-  useEffect(() => {
-    if (!isResizing || !resizeStart) return
-    const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
-    const onMove = (ev: MouseEvent) => {
-      const dx = ev.clientX - resizeStart.x
-      const dy = ev.clientY - resizeStart.y
-      const maxW = Math.round(window.innerWidth * 0.98)
-      const maxH = Math.round(window.innerHeight * 0.96)
-      const nextWBase = clamp(resizeStart.w + dx, 720, maxW)
-      const nextHBase = clamp(resizeStart.h + dy, 480, maxH)
-      // Shift-drag to lock axis when using corner handle (both)
-      let lockX = false, lockY = false
-      if (resizeStart.axis === 'both' && ev.shiftKey) {
-        if (Math.abs(dx) >= Math.abs(dy)) lockY = true; else lockX = true
-      }
-      const nextW = (resizeStart.axis === 'y' || lockX) ? customSize.w : nextWBase
-      const nextH = (resizeStart.axis === 'x' || lockY) ? customSize.h : nextHBase
-      setCustomSize({ w: nextW, h: nextH })
-      setConfig(p => (p.size === 'custom' ? p : { ...p, size: 'custom' }))
-      setShowSizeBadge(true)
-    }
-    const onUp = () => {
-      // Snap to grid and optional presets
-      const round10 = (n: number) => Math.round(n / 10) * 10
-      const snapped = { w: round10(customSize.w), h: round10(customSize.h) }
-      // Preset widths to snap to if within 24px
-      const presetPairs: Array<{ size: ModalSize; w: number }> = [
-        { size: 'sm', w: 640 },
-        { size: 'md', w: 860 },
-        { size: 'lg', w: 1060 },
-        { size: 'xl', w: 1300 },
-        { size: 'fullscreen', w: Math.round(window.innerWidth * 0.98) }
-      ]
-      let snappedSize: ModalSize = 'custom'
-      let bestDiff = Infinity
-      presetPairs.forEach(p => {
-        const diff = Math.abs(snapped.w - p.w)
-        if (diff < bestDiff && diff <= 24) { bestDiff = diff; snappedSize = p.size }
-      })
-      setCustomSize(snapped)
-      setConfig(prev => ({ ...prev, size: snappedSize }))
-
-      setIsResizing(false)
-      setResizeStart(null)
-      setShowSizeBadge(false)
-      try { localStorage.setItem(storageKey + ':customSize', JSON.stringify(snapped)) } catch {}
-      document.body.style.userSelect = ''
-      document.body.style.cursor = ''
-    }
-    document.body.style.userSelect = 'none'
-    document.body.style.cursor = 'nwse-resize'
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp, { once: true })
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp as any)
-      document.body.style.userSelect = ''
-      document.body.style.cursor = ''
-    }
-  }, [isResizing, resizeStart, customSize, storageKey])
+  const onPanelMove = useCallback((pos: { x: number; y: number }) => {
+    setPanelPosition(pos)
+  }, [])
 
   const header = useMemo(() => {
     return data ?? null
@@ -987,7 +853,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({
           setCatalogItems([])
           return
         }
-        const items = await lineItemsCatalogService.toSelectorItems(effectiveOrgId)
+        const items = await transactionLineItemsEnhancedService.getCatalogSelectorItems(effectiveOrgId)
         setCatalogItems(items)
       } catch (error) {
         console.error('Failed to load catalog items:', error)
@@ -1188,178 +1054,99 @@ const TransactionAnalysisModal: React.FC<Props> = ({
     }
   }
 
-  // Totals for breakdowns - must be called before any early returns
+  if (!open) return null
+
+  // Load panel state from localStorage
+  const loadPanelPosition = () => {
+    try {
+      const saved = localStorage.getItem('txAnalysisModal:position')
+      return saved ? JSON.parse(saved) : { x: 100, y: 100 }
+    } catch { return { x: 100, y: 100 } }
+  }
+  const loadPanelSize = () => {
+    try {
+      const saved = localStorage.getItem('txAnalysisModal:size')
+      return saved ? JSON.parse(saved) : { width: 900, height: 600 }
+    } catch { return { width: 900, height: 600 } }
+  }
+  const loadPanelMaximized = () => {
+    try {
+      const saved = localStorage.getItem('txAnalysisModal:maximized')
+      return saved === 'true'
+    } catch { return false }
+  }
+
+  const [panelPosition, setPanelPosition] = useState<{ x: number; y: number }>(loadPanelPosition())
+  const [panelSize, setPanelSize] = useState<{ width: number; height: number }>(loadPanelSize())
+  const [panelMaximized, setPanelMaximized] = useState<boolean>(loadPanelMaximized())
+  const [panelDocked, setPanelDocked] = useState<boolean>(false)
+  const [panelDockPos, setPanelDockPos] = useState<'left' | 'right' | 'top' | 'bottom'>('right')
+
+  // Persist panel state
+  useEffect(() => {
+    try { localStorage.setItem('txAnalysisModal:position', JSON.stringify(panelPosition)) } catch {}
+  }, [panelPosition])
+  useEffect(() => {
+    try { localStorage.setItem('txAnalysisModal:size', JSON.stringify(panelSize)) } catch {}
+  }, [panelSize])
+  useEffect(() => {
+    try { localStorage.setItem('txAnalysisModal:maximized', String(panelMaximized)) } catch {}
+  }, [panelMaximized])
+
   const totalByItem = useMemo(() => rowsByItem.reduce((s, r) => s + (r?.amount || 0), 0), [rowsByItem])
   const totalByCC = useMemo(() => rowsByCC.reduce((s, r) => s + (r?.amount || 0), 0), [rowsByCC])
   const totalByCat = useMemo(() => rowsByCat.reduce((s, r) => s + (r?.amount || 0), 0), [rowsByCat])
 
-  if (!open) return null
-
-  // Compute modal dimensions based on config.size
-  const presetLabel = (sz: ModalSize) => sz === 'sm' ? 'صغير' : sz === 'md' ? 'متوسط' : sz === 'lg' ? 'كبير' : sz === 'xl' ? 'واسع' : sz === 'fullscreen' ? 'ملء الشاشة' : 'مخصص'
-
-  const getModalWidth = () => {
-    if (config.size === 'custom') return `${customSize.w}px`
-    switch (config.size) {
-      case 'sm': return '640px'
-      case 'md': return '860px'
-      case 'lg': return '1060px'
-      case 'xl': return '1300px'
-      case 'fullscreen': return '98vw'
-      default: return '1200px'
-    }
-  }
-  const getModalHeight = () => config.size === 'fullscreen' ? '96vh' : (config.size === 'custom' ? `${customSize.h}px` : '90vh')
-
   return (
-    <div className="transaction-modal" role="dialog" aria-modal="true" dir="rtl" 
-         onClick={onClose} style={{ 
-           position: 'fixed', 
-           inset: 0, 
-           backgroundColor: 'rgba(0, 0, 0, 0.75)', 
-           zIndex: 1000,
-           display: 'flex',
-           alignItems: 'center',
-           justifyContent: 'center'
-         }}>
-      <div ref={contentRef} className="transaction-modal-content transaction-modal-content--wide" 
-           onClick={(e) => e.stopPropagation()}
-           style={{
-             backgroundColor: 'var(--surface, #0f0f0f)',
-             border: '1px solid var(--border, rgba(255,255,255,0.12))',
-             borderRadius: '12px',
-             maxWidth: '98vw',
-             width: getModalWidth(),
-             height: getModalHeight(),
-             position: 'fixed',
-             left: position.x,
-             top: position.y,
-             overflow: 'hidden',
-             display: 'flex',
-             flexDirection: 'column'
-           }}>
-        {/* Live size badge */}
-        {showSizeBadge && (
-          <div style={{ position: 'absolute', top: 8, left: 12, background: 'rgba(0,0,0,0.6)', color: '#eaeaea', padding: '4px 8px', borderRadius: 6, fontSize: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span>{customSize.w} × {customSize.h}</span>
-            <span style={{ opacity: 0.8, fontSize: 11 }}>({presetLabel(config.size)})</span>
-          </div>
-        )}
-        {/* Resize handle overlay (bottom-right) */}
-        <div
-          onMouseDown={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            const rect = contentRef.current ? contentRef.current.getBoundingClientRect() : { width: customSize.w, height: customSize.h }
-            setResizeStart({ x: e.clientX, y: e.clientY, w: Math.round(rect.width), h: Math.round(rect.height), axis: 'both' })
-            setPreResizeSize(customSize)
-            setIsResizing(true)
-          }}
-          style={{ position: 'absolute', right: 8, bottom: 8, width: 18, height: 18, cursor: 'nwse-resize', opacity: 0.6 }}
-          title="اسحب لتغيير الحجم"
-        >
-          <div style={{ width: '100%', height: '100%', borderRight: '2px solid #888', borderBottom: '2px solid #888' }} />
+    <DraggableResizablePanel
+      isOpen={open}
+      onClose={onClose}
+      title={`تحليل التكلفة - ${entryNumber || header?.entry_number || 'غير محدد'}`}
+      subtitle={description || header?.description || ''}
+      position={panelPosition}
+      size={panelSize}
+      onMove={onPanelMove}
+      onResize={onPanelResize}
+      isMaximized={panelMaximized}
+      onMaximize={() => setPanelMaximized(!panelMaximized)}
+      isDocked={panelDocked}
+      dockPosition={panelDockPos}
+      onDock={(pos) => {
+        setPanelDocked(true)
+        setPanelDockPos(pos)
+      }}
+      onResetPosition={() => {
+        setPanelPosition({ x: 80, y: 60 })
+        setPanelSize({ width: 900, height: 600 })
+        setPanelMaximized(false)
+        setPanelDocked(false)
+      }}
+      headerActions={
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button
+            className="ultimate-btn ultimate-btn-edit"
+            onClick={() => setShowSettings((s) => !s)}
+            title="إعدادات النافذة"
+            style={{ fontSize: '12px', padding: '6px 10px' }}
+          >
+            <div className="btn-content"><span className="btn-text">⚙️</span></div>
+          </button>
         </div>
-        {/* Right edge resize */}
-        <div
-          onMouseDown={(e) => {
-            e.preventDefault(); e.stopPropagation();
-            const rect = contentRef.current ? contentRef.current.getBoundingClientRect() : { width: customSize.w, height: customSize.h }
-            setResizeStart({ x: e.clientX, y: e.clientY, w: Math.round(rect.width), h: Math.round(rect.height), axis: 'x' });
-            setPreResizeSize(customSize)
-            setIsResizing(true)
-          }}
-          style={{ position: 'absolute', right: 0, top: 0, width: 6, height: '100%', cursor: 'ew-resize', opacity: 0.001 }}
-          title="اسحب لزيادة العرض"
-        />
-        {/* Bottom edge resize */}
-        <div
-          onMouseDown={(e) => {
-            e.preventDefault(); e.stopPropagation();
-            const rect = contentRef.current ? contentRef.current.getBoundingClientRect() : { width: customSize.w, height: customSize.h }
-            setResizeStart({ x: e.clientX, y: e.clientY, w: Math.round(rect.width), h: Math.round(rect.height), axis: 'y' });
-            setPreResizeSize(customSize)
-            setIsResizing(true)
-          }}
-          style={{ position: 'absolute', left: 0, bottom: 0, height: 6, width: '100%', cursor: 'ns-resize', opacity: 0.001 }}
-          title="اسحب لزيادة الارتفاع"
-        />
-        {/* Left edge resize */}
-        <div
-          onMouseDown={(e) => {
-            e.preventDefault(); e.stopPropagation();
-            const rect = contentRef.current ? contentRef.current.getBoundingClientRect() : { width: customSize.w, height: customSize.h }
-            setResizeStart({ x: e.clientX, y: e.clientY, w: Math.round(rect.width), h: Math.round(rect.height), axis: 'x' });
-            setPreResizeSize(customSize)
-            setIsResizing(true)
-          }}
-          style={{ position: 'absolute', left: 0, top: 0, width: 6, height: '100%', cursor: 'ew-resize', opacity: 0.001 }}
-          title="اسحب لتغيير العرض"
-        />
-        {/* Top edge resize */}
-        <div
-          onMouseDown={(e) => {
-            e.preventDefault(); e.stopPropagation();
-            const rect = contentRef.current ? contentRef.current.getBoundingClientRect() : { width: customSize.w, height: customSize.h }
-            setResizeStart({ x: e.clientX, y: e.clientY, w: Math.round(rect.width), h: Math.round(rect.height), axis: 'y' });
-            setPreResizeSize(customSize)
-            setIsResizing(true)
-          }}
-          style={{ position: 'absolute', left: 0, top: 0, height: 6, width: '100%', cursor: 'ns-resize', opacity: 0.001 }}
-          title="اسحب لتغيير الارتفاع"
-        />
-        <div className="modal-header-row" style={{ 
-          padding: '16px 20px',
-          borderBottom: '1px solid var(--border, rgba(255,255,255,0.12))',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          cursor: isDragging ? 'grabbing' : 'grab'
-        }}
-        onMouseDown={(e) => {
-          e.preventDefault();
-          setIsDragging(true)
-          setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y, origX: position.x, origY: position.y })
-        }}
-        >
-          <div>
-            <h3 className="modal-title" style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--text, #eaeaea)' }}>
-              تحليل تكلفة سطر المعاملة - البنود التفصيلية
-            </h3>
-            <div style={{ color: '#a3a3a3', fontSize: 12, marginTop: 4 }}>
-              {entryNumber ? `رقم القيد: ${entryNumber}` : header?.entry_number ? `رقم القيد: ${header.entry_number}` : ''}
-              {description ? ` — ${description}` : header?.description ? ` — ${header.description}` : ''}
-              {typeof effectiveTolerance === 'number' && (
-                <span style={{ marginInlineStart: 8 }}>(الهامش: {effectiveTolerance})</span>
-              )}
-              <div style={{ fontSize: '11px', marginTop: '4px', fontStyle: 'italic' }}>تحليل تفصيلي لبنود التكلفة المرتبطة بسطر المعاملة المحدد</div>
-            </div>
-          </div>
-          <div className="button-container" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {/* Settings toggle */}
-            <button
-              className="ultimate-btn ultimate-btn-edit"
-              onClick={() => setShowSettings((s) => !s)}
-              title="إعدادات النافذة"
-            >
-              <div className="btn-content"><span className="btn-text">الإعدادات ⚙️</span></div>
-            </button>
-            <button className="ultimate-btn ultimate-btn-delete" onClick={onClose}>
-              <div className="btn-content"><span className="btn-text">إغلاق</span></div>
-            </button>
-          </div>
-        </div>
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
-        {/* Tabs */}
         {/* Config Panel */}
         {showSettings && (
           <div style={{
-            padding: '12px 20px',
+            padding: '12px 16px',
             borderBottom: '1px solid var(--border, rgba(255,255,255,0.12))',
-            backgroundColor: 'var(--surface-2, #1a1a1a)',
+            backgroundColor: 'var(--surface-1, #151515)',
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: 12
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: 10,
+            overflowY: 'auto',
+            maxHeight: '120px'
           }}>
             <div>
               <div style={{ color: '#a3a3a3', fontSize: 12, marginBottom: 6 }}>حجم النافذة</div>
@@ -1445,11 +1232,12 @@ const TransactionAnalysisModal: React.FC<Props> = ({
 
         <div style={{ 
           display: 'flex', 
-          gap: 8, 
-          borderBottom: '1px solid var(--border, rgba(255,255,255,0.12))', 
-          paddingBottom: 8, 
-          padding: '8px 20px 8px 20px',
-          backgroundColor: 'var(--surface-1, #151515)'
+          gap: 6, 
+          borderBottom: '1px solid var(--border, rgba(255,255,255,0.12))',
+          padding: '8px 16px',
+          backgroundColor: 'var(--surface, #0f0f0f)',
+          overflowX: 'auto',
+          flexShrink: 0
         }}>
           <button className={`ultimate-btn ${tab === 'header' ? 'ultimate-btn-success' : 'ultimate-btn-edit'}`} onClick={() => setTab('header')}>
             <div className="btn-content"><span className="btn-text">الملخص</span></div>
@@ -1469,7 +1257,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({
         </div>
 
         {/* Content Area */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px' }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: '12px 14px' }}>
           {loading && (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
               <div style={{ color: '#a3a3a3' }}>جاري تحميل بيانات التحليل...</div>
@@ -2413,8 +2201,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({
           </div>
         </div>
       </div>
-      
-    </div>
+    </DraggableResizablePanel>
   )
 }
 

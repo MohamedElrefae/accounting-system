@@ -86,7 +86,7 @@ const TransactionView: React.FC<Props> = ({ transaction, audit, userNames, onClo
         <div style={{ background: 'var(--mui-palette-background-paper)', border: '1px solid var(--mui-palette-divider)', borderRadius: 8, padding: 12, marginBottom: 16 }}>
           <WithPermission permission="documents.view">
             <AttachDocumentsPanel 
-              orgId={(transaction as any).org_id || (transaction as any).organization_id}
+              orgId={(transaction as any).org_id || ''}
               transactionId={transaction.id}
               projectId={(transaction as any).project_id || undefined}
             />

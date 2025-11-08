@@ -29,14 +29,19 @@ interface StoredColumnPreferences {
   timestamp: number
 }
 
-const PREFERENCES_VERSION = 1
+const PREFERENCES_VERSION = 2
 
 export const useColumnPreferences = ({
   storageKey,
   defaultColumns,
   userId
 }: UseColumnPreferencesOptions) => {
-  const [columns, setColumns] = useState<ColumnConfig[]>(defaultColumns)
+  const sanitize = (cols: ColumnConfig[]): ColumnConfig[] => cols.map(c => ({
+    ...c,
+    // Drop maxWidth to allow unlimited width unless explicitly set later by caller
+    maxWidth: undefined,
+  }))
+  const [columns, setColumns] = useState<ColumnConfig[]>(sanitize(defaultColumns))
   const [serverKey] = useState<string>(storageKey)
 
   // Generate the full storage key including user ID if provided
@@ -51,7 +56,7 @@ export const useColumnPreferences = ({
       const stored = localStorage.getItem(key)
       
       if (!stored) {
-        setColumns(defaultColumns)
+        setColumns(sanitize(defaultColumns))
         return
       }
 
@@ -60,13 +65,13 @@ export const useColumnPreferences = ({
       // Check version compatibility
       if (preferences.version !== PREFERENCES_VERSION) {
         console.log('Column preferences version mismatch, using defaults')
-        setColumns(defaultColumns)
+        setColumns(sanitize(defaultColumns))
         return
       }
 
       // Merge stored preferences with default columns to handle new columns
       const mergedColumns = mergeWithDefaults(preferences.columns, defaultColumns)
-      setColumns(mergedColumns)
+      setColumns(sanitize(mergedColumns))
     } catch (error) {
       console.error('Error loading column preferences:', error)
       setColumns(defaultColumns)
@@ -77,15 +82,16 @@ export const useColumnPreferences = ({
   const savePreferences = useCallback((newColumns: ColumnConfig[]) => {
     try {
       const key = getStorageKey()
+      const sanitized = sanitize(newColumns)
       const preferences: StoredColumnPreferences = {
-        columns: newColumns,
+        columns: sanitized,
         version: PREFERENCES_VERSION,
         userId,
         timestamp: Date.now()
       }
       
       localStorage.setItem(key, JSON.stringify(preferences))
-      setColumns(newColumns)
+      setColumns(sanitized)
     } catch (error) {
       console.error('Error saving column preferences:', error)
     }
@@ -96,7 +102,7 @@ export const useColumnPreferences = ({
     try {
       const key = getStorageKey()
       localStorage.removeItem(key)
-      setColumns(defaultColumns)
+      setColumns(sanitize(defaultColumns))
     } catch (error) {
       console.error('Error resetting column preferences:', error)
     }
@@ -155,7 +161,7 @@ export const useColumnPreferences = ({
         if (cancelled) return
         if (res && res.column_config && Array.isArray(res.column_config.columns)) {
           const merged = mergeWithDefaults(res.column_config.columns as ColumnConfig[], defaultColumns)
-          setColumns(merged)
+          setColumns(sanitize(merged))
         }
       } catch {
         // Silent: fall back to local
@@ -188,8 +194,10 @@ function mergeWithDefaults(stored: ColumnConfig[], defaults: ColumnConfig[]): Co
         ...defaultCol,
         ...storedCol,
         // Ensure these properties come from defaults in case they've changed
+        label: defaultCol.label,
         minWidth: defaultCol.minWidth,
-        maxWidth: defaultCol.maxWidth,
+        // Drop maxWidth to remove hard caps on resizing
+        maxWidth: undefined,
         type: defaultCol.type,
         resizable: defaultCol.resizable,
         sortable: defaultCol.sortable,
@@ -198,21 +206,11 @@ function mergeWithDefaults(stored: ColumnConfig[], defaults: ColumnConfig[]): Co
         pinPriority: storedCol.pinPriority
       }
     }
-    return defaultCol
+    // Also strip maxWidth from defaults
+    return { ...defaultCol, maxWidth: undefined }
   })
 
-  // Add any stored columns that don't exist in defaults (in case of column removal)
-  stored.forEach(storedCol => {
-    if (!defaults.find(defaultCol => defaultCol.key === storedCol.key)) {
-      // Add legacy column but mark it as possibly outdated
-      merged.push({
-        ...storedCol,
-        // Mark legacy columns as potentially removable
-        label: `${storedCol.label} (قديم)`
-      })
-    }
-  })
-
+  // Drop any stored columns that no longer exist in defaults to avoid legacy bleed-through
   return merged
 }
 

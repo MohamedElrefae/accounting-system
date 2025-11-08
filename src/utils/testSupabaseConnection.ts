@@ -58,8 +58,8 @@ export async function testSupabaseConnection() {
   }
 }
 
-// Auto-run test on import (in development mode)
-if (import.meta.env.DEV) {
-  testSupabaseConnection()
-}
+// Auto-run test disabled for performance - call manually when needed
+// if (import.meta.env.DEV) {
+//   testSupabaseConnection()
+// }
 

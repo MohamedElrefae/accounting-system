@@ -6,7 +6,6 @@
 import { supabase } from '../utils/supabase'
 import { formatDateForSupabase } from '../utils/dateHelpers'
 import { getTransactionNumberConfig } from './company-config'
-import { getReadMode } from '../config/featureFlags'
 
 export type UnifiedListParams = { limit?: number };
 
@@ -120,22 +119,34 @@ export interface TransactionRecord {
   entry_number: string
   entry_date: string
   description: string
+  description_ar?: string | null
   reference_number: string | null
-  debit_account_id: string
-  credit_account_id: string
-  amount: number
+  // Legacy single-line fields (removed in multiline schema) kept optional for compatibility
+  debit_account_id?: string | null
+  credit_account_id?: string | null
+  amount?: number | null
+  // Header-level fields
   notes: string | null
-  classification_id?: string | null
-  sub_tree_id?: string | null
-  work_item_id?: string | null
-  cost_center_id?: string | null
+  notes_ar?: string | null
+  project_id?: string | null
+  org_id?: string | null
   is_posted: boolean
   posted_at: string | null
   posted_by: string | null
   created_by: string | null
-  project_id?: string | null
-  org_id?: string | null
-  // Optional approval workflow fields (may not exist until migration applied)
+  // Aggregates from lines (new schema)
+  has_line_items?: boolean
+  line_items_total?: number | null
+  line_items_count?: number | null
+  total_debits?: number | null
+  total_credits?: number | null
+  // Line-level dimension placeholders (optional in headers)
+  classification_id?: string | null
+  sub_tree_id?: string | null
+  work_item_id?: string | null
+  analysis_work_item_id?: string | null
+  cost_center_id?: string | null
+  // Approval workflow
   approval_status?: 'draft' | 'submitted' | 'approved' | 'rejected' | 'revision_requested' | 'cancelled'
   submitted_at?: string | null
   submitted_by?: string | null
@@ -353,14 +364,31 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
     const toIdx = to;
 
     // Map filters to GL2 view columns
-    const f = options?.filters;
-    const gl2Filters: string[] = [];
+    const filters = options?.filters;
     const gl2OrFilters: string[] = [];
 
+    const {
+      search,
+      dateFrom,
+      dateTo,
+      amountFrom,
+      amountTo,
+      debitAccountId,
+      creditAccountId,
+      orgId,
+      approvalStatus,
+      classificationId,
+      expensesCategoryId,
+      workItemId,
+      analysisWorkItemId,
+      costCenterId,
+      projectId,
+    } = filters ?? {};
+
     // Search on number
-    if (f?.search && f.search.trim()) {
-      const s = f.search.trim();
-      gl2OrFilters.push(`number.ilike.%${s}%`);
+    const trimmedSearch = search?.trim();
+    if (trimmedSearch) {
+      gl2OrFilters.push(`number.ilike.%${trimmedSearch}%`);
     }
     // Date range -> posting_date (fallback doc_date)
     // PostgREST cannot OR across columns easily; we use posting_date for consistency
@@ -373,20 +401,16 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
     // Account filters: translate account_id (UUID) to code
     let debitCode: string | null = null;
     let creditCode: string | null = null;
-    if (f?.debitAccountId || f?.creditAccountId) {
-      const ids: string[] = [];
-      if (f?.debitAccountId) ids.push(f.debitAccountId);
-      if (f?.creditAccountId) ids.push(f.creditAccountId);
-      if (ids.length) {
-        const { data: accs } = await supabase
-          .from('accounts')
-          .select('id, code')
-          .in('id', ids);
-        if (accs && accs.length) {
-          for (const a of accs as any[]) {
-            if (f?.debitAccountId === a.id) debitCode = a.code;
-            if (f?.creditAccountId === a.id) creditCode = a.code;
-          }
+    const accountIds = [debitAccountId, creditAccountId].filter((value): value is string => Boolean(value));
+    if (accountIds.length) {
+      const { data: accs } = await supabase
+        .from('accounts')
+        .select('id, code')
+        .in('id', accountIds);
+      if (accs?.length) {
+        for (const a of accs as { id: string; code: string }[]) {
+          if (debitAccountId && debitAccountId === a.id) debitCode = a.code;
+          if (creditAccountId && creditAccountId === a.id) creditCode = a.code;
         }
       }
     }
@@ -402,24 +426,24 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
     if (gl2OrFilters.length) {
       q = (q as any).or(gl2OrFilters.join(','));
     }
-    if (f?.dateFrom) q = q.gte('effective_date', f.dateFrom);
-    if (f?.dateTo) q = q.lte('effective_date', f.dateTo);
-    if (f?.amountFrom != null) q = q.gte('amount', f.amountFrom);
-    if (f?.amountTo != null) q = q.lte('amount', f.amountTo);
+    if (dateFrom) q = q.gte('effective_date', dateFrom);
+    if (dateTo) q = q.lte('effective_date', dateTo);
+    if (amountFrom != null) q = q.gte('amount', amountFrom);
+    if (amountTo != null) q = q.lte('amount', amountTo);
     if (debitCode) q = q.eq('debit_account_code', debitCode);
     if (creditCode) q = q.eq('credit_account_code', creditCode);
-    if (f?.orgId) q = q.eq('org_id', f.orgId);
-    if (f?.approvalStatus) {
-      if (f.approvalStatus === 'posted') q = q.eq('status', 'posted');
-      else if (f.approvalStatus === 'draft') q = q.eq('status', 'draft');
+    if (orgId) q = q.eq('org_id', orgId);
+    if (approvalStatus) {
+      if (approvalStatus === 'posted') q = q.eq('status', 'posted');
+      else if (approvalStatus === 'draft') q = q.eq('status', 'draft');
     }
     // Line-level dimension filters (view exposes these from first debit line)
-    if (f?.classificationId) q = q.eq('classification_id', f.classificationId);
-    if (f?.expensesCategoryId) q = q.eq('expenses_category_id', f.expensesCategoryId);
-    if (f?.workItemId) q = q.eq('work_item_id', f.workItemId);
-    if (f?.analysisWorkItemId) q = q.eq('analysis_work_item_id', f.analysisWorkItemId);
-    if (f?.costCenterId) q = q.eq('cost_center_id', f.costCenterId);
-    if (f?.projectId) q = q.eq('project_id', f.projectId);
+    if (classificationId) q = q.eq('classification_id', classificationId);
+    if (expensesCategoryId) q = q.eq('expenses_category_id', expensesCategoryId);
+    if (workItemId) q = q.eq('work_item_id', workItemId);
+    if (analysisWorkItemId) q = q.eq('analysis_work_item_id', analysisWorkItemId);
+    if (costCenterId) q = q.eq('cost_center_id', costCenterId);
+    if (projectId) q = q.eq('project_id', projectId);
 
     const { data, error, count } = await q;
     if (error) throw error;
@@ -492,17 +516,13 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
     }
     if (f.dateFrom) query = query.gte('entry_date', f.dateFrom)
     if (f.dateTo) query = query.lte('entry_date', f.dateTo)
-    if (f.amountFrom != null) query = query.gte('amount', f.amountFrom)
-    if (f.amountTo != null) query = query.lte('amount', f.amountTo)
-    if (f.debitAccountId) query = query.eq('debit_account_id', f.debitAccountId)
-    if (f.creditAccountId) query = query.eq('credit_account_id', f.creditAccountId)
+    // Amount filters now use header aggregates from multiline model
+    if (f.amountFrom != null) query = query.gte('line_items_total', f.amountFrom)
+    if (f.amountTo != null) query = query.lte('line_items_total', f.amountTo)
     if (f.projectId) query = query.eq('project_id', f.projectId)
     if (f.orgId) query = query.eq('org_id', f.orgId)
-    if (f.classificationId) query = query.eq('classification_id', f.classificationId)
-    if (f.expensesCategoryId) query = query.eq('sub_tree_id', f.expensesCategoryId)
-    if (f.workItemId) query = query.eq('work_item_id', f.workItemId)
-    if (f.analysisWorkItemId) query = query.eq('analysis_work_item_id', f.analysisWorkItemId)
-    if (f.costCenterId) query = query.eq('cost_center_id', f.costCenterId)
+    // Line-level filters (debit/credit/classification/etc.) are not available at header level.
+    // Use enriched endpoints if you need to filter by line attributes.
 
     // New: approval status filter, including "posted"
     if (f.approvalStatus === 'posted') {
@@ -514,9 +534,32 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
 
   const { data, error, count } = await query.range(from, to)
   if (error) throw error
+  const rows = (data || []) as TransactionRecord[]
+
+  // Patch header aggregates from live view to avoid relying on triggers
+  try {
+    const ids = rows.map(r => r.id)
+    if (ids.length > 0) {
+      const { data: aggs, error: aggErr } = await supabase
+        .from('v_tx_line_items_agg')
+        .select('transaction_id, line_items_count, line_items_total')
+        .in('transaction_id', ids)
+      if (!aggErr && Array.isArray(aggs)) {
+        const map = new Map<string, { c: number; t: number }>()
+        for (const a of aggs as any[]) map.set(a.transaction_id, { c: Number(a.line_items_count || 0), t: Number(a.line_items_total || 0) })
+        for (const r of rows) {
+          const m = map.get(r.id)
+          if (m) {
+            ;(r as any).line_items_count = m.c
+            ;(r as any).line_items_total = m.t
+            ;(r as any).has_line_items = m.c > 0
+          }
+        }
+      }
+    }
+  } catch {}
   
-  // Return data as-is (no joins available)
-  return { rows: (data || []) as TransactionRecord[], total: count ?? 0 }
+  return { rows, total: count ?? 0 }
 }
 
 export interface CreateTransactionInput {
@@ -567,11 +610,13 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
     entry_number: entryNumber,
     entry_date: formattedDate,
     description: input.description,
+    description_ar: (input as any).description_ar || null,
     reference_number: input.reference_number || null,
     debit_account_id: input.debit_account_id,
     credit_account_id: input.credit_account_id,
     amount: input.amount,
     notes: input.notes || null,
+    notes_ar: (input as any).notes_ar || null,
     classification_id: input.classification_id || null,
     sub_tree_id: input.sub_tree_id || null,
     work_item_id: input.work_item_id || null,
@@ -608,6 +653,117 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
   return data as TransactionRecord
 }
 
+// Multi-line transaction creation (new schema)
+import { replaceTransactionLines, type TxLineInput } from './transaction-lines'
+
+export interface CreateTransactionWithLinesInput {
+  // Header fields (transactions table)
+  entry_date: string
+  description: string
+  description_ar?: string | null
+  reference_number?: string | null
+  notes?: string | null
+  notes_ar?: string | null
+  project_id?: string | null
+  org_id?: string | null
+  // Lines (transaction_lines table)
+  lines: TxLineInput[]
+}
+
+export async function createTransactionWithLines(input: CreateTransactionWithLinesInput): Promise<TransactionRecord> {
+  // Validate input
+  if (!input.description || input.description.trim().length < 3) {
+    throw new Error('وصف المعاملة مطلوب (3 أحرف على الأقل)')
+  }
+  if (!input.org_id) {
+    throw new Error('المؤسسة مطلوبة')
+  }
+  if (!Array.isArray(input.lines) || input.lines.length < 1) {
+    throw new Error('يجب إضافة سطر واحد على الأقل')
+  }
+
+  // Validate lines balance
+  let totalDebits = 0
+  let totalCredits = 0
+  for (const line of input.lines) {
+    const d = Number(line.debit_amount || 0)
+    const c = Number(line.credit_amount || 0)
+    if (d < 0 || c < 0) throw new Error('المبالغ لا يمكن أن تكون سالبة')
+    if ((d > 0 && c > 0) || (d === 0 && c === 0)) {
+      throw new Error(`السطر ${line.line_no}: يجب إدخال مبلغ مدين أو دائن (ليس كلاهما)`)
+    }
+    totalDebits += d
+    totalCredits += c
+  }
+  if (Math.abs(totalDebits - totalCredits) >= 0.01) {
+    throw new Error(`القيود غير متوازنة - إجمالي المدين: ${totalDebits.toFixed(2)} مقابل إجمالي الدائن: ${totalCredits.toFixed(2)}`)
+  }
+
+  const uid = await getCurrentUserId()
+  
+  // Generate entry number
+  const entryNumber = await getNextTransactionNumber()
+  
+  // Format date
+  const formattedDate = formatDateForSupabase(input.entry_date)
+
+  // Create header
+  const headerPayload = {
+    entry_number: entryNumber,
+    entry_date: formattedDate,
+    description: input.description.trim(),
+    description_ar: input.description_ar?.trim() || null,
+    reference_number: input.reference_number?.trim() || null,
+    notes: input.notes?.trim() || null,
+    notes_ar: input.notes_ar?.trim() || null,
+    project_id: input.project_id || null,
+    org_id: input.org_id,
+    created_by: uid ?? null,
+    // Legacy fields set to null (not used in multi-line model)
+    debit_account_id: null,
+    credit_account_id: null,
+    amount: null,
+  }
+
+  const { data: header, error: headerError } = await supabase
+    .from('transactions')
+    .insert(headerPayload)
+    .select('*')
+    .single()
+
+  if (headerError) {
+    // Handle duplicate entry number error
+    if (headerError.code === '23505' && headerError.message?.includes('entry_number')) {
+      // Retry with a new number
+      const newEntryNumber = await getNextTransactionNumber()
+      headerPayload.entry_number = newEntryNumber
+      const { data: retryData, error: retryError } = await supabase
+        .from('transactions')
+        .insert(headerPayload)
+        .select('*')
+        .single()
+      
+      if (retryError) throw retryError
+      
+      // Create lines for retry
+      await replaceTransactionLines(retryData.id, input.lines)
+      return retryData as TransactionRecord
+    }
+    throw headerError
+  }
+
+  // Create lines
+  try {
+    await replaceTransactionLines(header.id, input.lines)
+  } catch (linesError: any) {
+    // If lines creation fails, delete the header to maintain consistency
+    await supabase.from('transactions').delete().eq('id', header.id)
+    throw new Error(`فشل إنشاء القيود: ${linesError.message}`)
+  }
+
+  return header as TransactionRecord
+}
+
 export async function getTransactionById(id: string): Promise<TransactionRecord | null> {
   const { data, error } = await supabase
     .from('transactions')
@@ -618,13 +774,17 @@ export async function getTransactionById(id: string): Promise<TransactionRecord 
   return data as TransactionRecord
 }
 
-export async function deleteTransaction(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('transactions')
-    .delete()
-    .eq('id', id)
-
+export async function deleteTransaction(id: string, opts?: { force?: boolean; renumber?: boolean }): Promise<{ renumber_applied: boolean }> {
+  // Server-side RPC enforces permissions and cascades deletes to lines and child line items.
+  // force=true allows super admins or managers to delete even if posted (if the function permits).
+  const { data, error } = await supabase.rpc('sp_delete_transaction_cascade', {
+    p_transaction_id: id,
+    p_force: opts?.force ?? false,
+    p_renumber: typeof opts?.renumber === 'boolean' ? opts!.renumber : null,
+  } as any)
   if (error) throw error
+  const renumberApplied = (data as any)?.renumber_applied === true
+  return { renumber_applied: renumberApplied }
 }
 
 export async function updateTransaction(
@@ -636,11 +796,13 @@ export async function updateTransaction(
     'entry_number',
     'entry_date',
     'description',
+    'description_ar',
     'reference_number',
     'debit_account_id',
     'credit_account_id',
     'amount',
     'notes',
+    'notes_ar',
     'classification_id',
     'sub_tree_id',
     'work_item_id',

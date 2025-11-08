@@ -12,7 +12,10 @@
   font-weight: 700;
   cursor: pointer;
   transition: all .2s ease;
-  color: #fff;
+  /* High-contrast default using theme tokens */
+  background-color: var(--accent);
+  background: linear-gradient(135deg, var(--accent), color-mix(in oklab, var(--accent) 85%, black));
+  color: var(--on-accent, #fff);
   user-select: none;
 }
 
@@ -20,14 +23,16 @@
 .ultimate-btn .btn-text { line-height: 1; }
 
 /* Variants */
-.ultimate-btn-primary { background: linear-gradient(135deg,#3b82f6,#1d4ed8); }
-.ultimate-btn-success { background: linear-gradient(135deg,#10b981,#059669); }
-.ultimate-btn-warning { background: linear-gradient(135deg,#f97316,#ea580c); }
-.ultimate-btn-danger { background: linear-gradient(135deg,#ef4444,#dc2626); }
-.ultimate-btn-neutral { background: linear-gradient(135deg,#6b7280,#4b5563); }
+.ultimate-btn-primary { background-color: var(--accent); background: linear-gradient(135deg, var(--accent), color-mix(in oklab, var(--accent) 85%, black)); color: var(--on-accent, #fff); }
+.ultimate-btn-success { background-color: var(--success); background: linear-gradient(135deg, var(--success), var(--success-strong)); color: var(--on-success, var(--on-accent, #fff)); }
+.ultimate-btn-warning { background-color: var(--warning); background: linear-gradient(135deg, var(--warning), var(--warning-strong)); color: var(--on-warning, #111); }
+.ultimate-btn-danger, .ultimate-btn-delete { background-color: var(--error); background: linear-gradient(135deg, var(--error), var(--error-strong)); color: var(--on-error, var(--on-accent, #fff)); }
+.ultimate-btn-neutral { background-color: #4b5563; background: linear-gradient(135deg,#6b7280,#4b5563); color: var(--on-neutral, #fff); }
+.ultimate-btn-posted { background-color: var(--info); background: linear-gradient(135deg, var(--info), var(--info-strong)); color: var(--on-info, var(--on-accent, #fff)); }
 
-.ultimate-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,.15); }
-.ultimate-btn:active { transform: translateY(0); box-shadow: 0 3px 8px rgba(0,0,0,.12); }
+.ultimate-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px color-mix(in oklab, black 15%, transparent); }
+.ultimate-btn:active { transform: translateY(0); box-shadow: 0 3px 8px color-mix(in oklab, black 12%, transparent); }
+.ultimate-btn:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 35%, transparent); }
 
 /* Accessible disabled state */
 .ultimate-btn:disabled {

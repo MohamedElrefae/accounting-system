@@ -32,14 +32,26 @@ export interface CatalogSelectorItem {
 
 class LineItemsCatalogService {
   async list(orgId: string, includeInactive = false): Promise<CatalogItem[]> {
-    const { data, error } = await supabase
-      .from('line_items')
-      .select('*')
+    // Use the safe view exclusively to avoid PostgREST recursion on the table/RPC
+    const selectCols = [
+      'id', 'org_id', 'code', 'name', 'name_ar', 'parent_id', 'level', 'path',
+      'is_selectable', 'item_type', 'specifications', 'base_unit_of_measure',
+      'standard_cost', 'is_active', 'created_at', 'updated_at'
+    ].join(', ')
+
+    let q = supabase
+      .from('v_line_items_browse')
+      .select(selectCols)
       .eq('org_id', orgId)
       .order('path', { ascending: true })
+
+    if (!includeInactive) {
+      q = q.eq('is_active', true)
+    }
+
+    const { data, error } = await q
     if (error) throw error
-    const rows = (data || []) as CatalogItem[]
-    return includeInactive ? rows : rows.filter(r => r.is_active)
+    return (data || []) as CatalogItem[]
   }
 
   async tree(orgId: string, includeInactive = false): Promise<CatalogItem[]> {
