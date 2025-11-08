@@ -6,6 +6,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import useAppStore from './store/useAppStore';
 import { ArabicLanguageService } from './services/ArabicLanguageService';
 import DashboardLayout from './components/layout/DashboardLayout';
+import SkeletonLoader from './components/Common/SkeletonLoader';
 // Debug imports removed - they were causing slow startup
 const LandingDecider = React.lazy(() => import('./pages/LandingDecider'));
 const AccountsTreeLazy = React.lazy(() => import('./pages/MainData/AccountsTree'));
@@ -171,7 +172,7 @@ const App: React.FC = () => {
           </ProtectedRoute>
         }>
           <Route index element={
-            <React.Suspense fallback={<div>Loading...</div>}>
+            <React.Suspense fallback={<SkeletonLoader />}>
               <PerformanceMonitor componentName="LandingDecider">
                 <LandingDecider />
               </PerformanceMonitor>
@@ -194,7 +195,7 @@ const App: React.FC = () => {
           } />
           
           {/* Main Data */}
-          <Route path="/main-data/accounts-tree" element={<React.Suspense fallback={<>Loading...</>}><AccountsTreeLazy /></React.Suspense>} />
+          <Route path="/main-data/accounts-tree" element={<React.Suspense fallback={<SkeletonLoader />}><AccountsTreeLazy /></React.Suspense>} />
           <Route path="/main-data/sub-tree" element={
             <ProtectedRoute requiredAction="sub_tree.view">
               <React.Suspense fallback={<div>Loading...</div>}>
@@ -275,7 +276,7 @@ const App: React.FC = () => {
 
           {/* Transactions - Single row entry */}
           <Route path="/transactions/my" element={
-            <React.Suspense fallback={<div>Loading...</div>}>
+            <React.Suspense fallback={<SkeletonLoader />}>
               <ErrorBoundary>
                 <TransactionsPage />
               </ErrorBoundary>

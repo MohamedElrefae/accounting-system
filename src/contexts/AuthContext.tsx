@@ -294,18 +294,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const init = async () => {
       console.log('🔄 AuthContext: Starting initialization...');
       
-      // Set a shorter timeout to prevent infinite loading
-      const timeoutId = setTimeout(() => {
-        console.warn('⚠️ AuthContext: Loading timeout reached, forcing completion');
-        setLoading(false);
-        setPermissionsLoading(false);
-      }, 5000); // Reduced from 10 seconds
-
       try {
         console.log('📋 AuthContext: Checking session...');
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        
+        // Fast session check with 2-second timeout
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session timeout')), 2000)
+        );
+        
+        const { data: { session } } = await Promise.race([
+          sessionPromise, 
+          timeoutPromise
+        ]) as any;
         
         console.log('📋 AuthContext: Session result:', session ? 'EXISTS' : 'NULL');
         
@@ -313,25 +314,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('✅ AuthContext: User found, setting up...');
           setUser(session.user);
           setLoading(false);
-          clearTimeout(timeoutId);
           
+          // Load profile and permissions async (don't block UI)
           loadProfile(session.user.id).catch((error) => {
-            console.error('Initial profile load failed:', error);
+            console.error('Profile load failed:', error);
           });
           loadRolesAndPermissions(session.user.id).catch((error) => {
-            console.error('Initial permission load failed:', error);
+            console.error('Permission load failed:', error);
           });
           return;
-        } else {
-          console.log('❌ AuthContext: No session found');
         }
       } catch (error) {
-        console.error('💥 AuthContext: Initial auth session fetch failed:', error);
+        console.error('💥 AuthContext: Session fetch failed or timeout:', error);
       }
       
-      console.log('✅ AuthContext: Initialization complete, setting loading to false');
+      // No session or error - immediate fallback
+      console.log('✅ AuthContext: No session, setting loading to false');
       setLoading(false);
-      clearTimeout(timeoutId);
+      setPermissionsLoading(false);
     };
     init();
 
