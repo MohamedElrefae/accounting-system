@@ -33,8 +33,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useUserProfile } from '../../contexts/UserProfileContext';
 // import { ThemeSettings } from "./ThemeSettings"; // Temporarily disabled
 import { mergedTranslations as translations } from '../../data/mockData';
-import OrgSelector from '../organizations/OrgSelector';
-import ProjectSelector from '../organizations/ProjectSelector';
+import OrgSelector from '../Organizations/OrgSelector';
+import ProjectSelector from '../Organizations/ProjectSelector';
 
 interface TopBarProps {
   onMenuClick: () => void;
