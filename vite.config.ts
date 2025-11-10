@@ -60,6 +60,19 @@ const moduleCompatibilityPlugin: PluginOption = {
       }
     }
     
+    // Fix react-is ForwardRef ESM issue
+    if (id.includes('react-is') || id.includes('getDisplayName')) {
+      if (code.includes("import { ForwardRef") && code.includes("from 'react-is'")) {
+        return {
+          code: code.replace(
+            /import\s*{\s*([^}]+)\s*}\s*from\s*['"]react-is['"]/g,
+            "import * as ReactIs from 'react-is'; const { $1 } = ReactIs;"
+          ),
+          map: null
+        }
+      }
+    }
+    
     return null
   },
   generateBundle(options, bundle) {
@@ -114,7 +127,7 @@ export default defineConfig(({ mode }) => {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
-    dedupe: ['react', 'react-dom', '@emotion/react', '@emotion/styled', 'zustand', 'use-sync-external-store']
+    dedupe: ['react', 'react-dom', 'react-is', '@emotion/react', '@emotion/styled', 'zustand', 'use-sync-external-store']
   },
   esbuild: {
     target: 'esnext',
@@ -128,6 +141,7 @@ export default defineConfig(({ mode }) => {
       'react/jsx-runtime',
       'react-dom/client',
       'prop-types',
+      'react-is',
       // State management
       'zustand',
       'use-sync-external-store/shim',
@@ -143,10 +157,10 @@ export default defineConfig(({ mode }) => {
       '@mui/system',
       '@mui/system/colorManipulator',
       '@mui/material',
-      '@mui/material/styles'
+      '@mui/material/styles',
+      '@mui/private-theming'
     ],
     exclude: [
-      '@mui/private-theming', 
       '@mui/icons-material'
     ],
     force: true
