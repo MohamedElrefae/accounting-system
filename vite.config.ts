@@ -47,6 +47,19 @@ const moduleCompatibilityPlugin: PluginOption = {
       }
     }
     
+    // Fix MUI colorManipulator ESM issue
+    if (id.includes('@mui/system/colorManipulator') || id.includes('createPalette')) {
+      if (code.includes("import { darken") && code.includes("from '@mui/system/colorManipulator'")) {
+        return {
+          code: code.replace(
+            /import\s*{\s*([^}]+)\s*}\s*from\s*['"]@mui\/system\/colorManipulator['"]/g,
+            "import * as colorManipulator from '@mui/system/colorManipulator'; const { $1 } = colorManipulator;"
+          ),
+          map: null
+        }
+      }
+    }
+    
     return null
   },
   generateBundle(options, bundle) {
@@ -125,14 +138,16 @@ export default defineConfig(({ mode }) => {
       // ESM compatibility fixes
       'hoist-non-react-statics',
       '@emotion/react',
-      '@emotion/styled'
+      '@emotion/styled',
+      // MUI system modules for compatibility
+      '@mui/system',
+      '@mui/system/colorManipulator',
+      '@mui/material',
+      '@mui/material/styles'
     ],
     exclude: [
       '@mui/private-theming', 
-      '@mui/icons-material',
-      // Let MUI be handled by manual chunks
-      '@mui/material',
-      '@mui/system'
+      '@mui/icons-material'
     ],
     force: true
   },
