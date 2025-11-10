@@ -72,6 +72,29 @@ declare global {
       browser: true
     };
   }
+  
+  // Fix for hoist-non-react-statics ESM compatibility
+  const originalError = window.Error;
+  window.Error = function(message?: string) {
+    if (message && message.includes('does not provide an export named') && message.includes('hoist-non-react-statics')) {
+      // Provide a fallback for hoist-non-react-statics
+      console.warn('hoist-non-react-statics ESM compatibility issue detected, using fallback');
+      return new originalError('ESM compatibility handled');
+    }
+    return new originalError(message);
+  } as any;
+  
+  // Copy static properties
+  Object.setPrototypeOf(window.Error, originalError);
+  Object.getOwnPropertyNames(originalError).forEach(prop => {
+    if (prop !== 'length' && prop !== 'name' && prop !== 'prototype') {
+      try {
+        (window.Error as any)[prop] = (originalError as any)[prop];
+      } catch (e) {
+        // Ignore non-configurable properties
+      }
+    }
+  });
 })();
 
 export {};

@@ -21,7 +21,34 @@ const patchPostgrestWrapperPlugin: PluginOption = {
 
 const moduleCompatibilityPlugin: PluginOption = {
   name: 'module-compatibility',
-  enforce: 'post',
+  enforce: 'pre',
+  transform(code: string, id: string) {
+    // Fix hoist-non-react-statics ESM issue
+    if (id.includes('hoist-non-react-statics')) {
+      if (code.includes('module.exports =')) {
+        return {
+          code: code.replace('module.exports =', 'export default'),
+          map: null
+        }
+      }
+    }
+    
+    // Fix emotion-react isolated hnrs issue
+    if (id.includes('@emotion/react') && id.includes('_isolated-hnrs')) {
+      return {
+        code: code.replace(
+          "import hoistNonReactStatics from 'hoist-non-react-statics'",
+          "import * as hoistNonReactStatics from 'hoist-non-react-statics'; const hoistNonReactStaticsDefault = hoistNonReactStatics.default || hoistNonReactStatics;"
+        ).replace(
+          /hoistNonReactStatics\(/g,
+          'hoistNonReactStaticsDefault('
+        ),
+        map: null
+      }
+    }
+    
+    return null
+  },
   generateBundle(options, bundle) {
     // Add module compatibility to all chunks that might need it
     Object.keys(bundle).forEach(fileName => {
@@ -94,16 +121,18 @@ export default defineConfig(({ mode }) => {
       // Data layer
       '@tanstack/react-query',
       'react-router-dom',
-      '@supabase/supabase-js'
+      '@supabase/supabase-js',
+      // ESM compatibility fixes
+      'hoist-non-react-statics',
+      '@emotion/react',
+      '@emotion/styled'
     ],
     exclude: [
       '@mui/private-theming', 
       '@mui/icons-material',
-      // Let MUI and Emotion be handled by manual chunks
+      // Let MUI be handled by manual chunks
       '@mui/material',
-      '@mui/system',
-      '@emotion/react',
-      '@emotion/styled'
+      '@mui/system'
     ],
     force: true
   },
