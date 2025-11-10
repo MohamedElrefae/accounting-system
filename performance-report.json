@@ -1,0 +1,87 @@
+{
+  "timestamp": "2025-11-10T20:27:10.172Z",
+  "tests": [
+    {
+      "name": "Initial Load",
+      "metrics": {
+        "totalLoadTime": 3197,
+        "domContentLoaded": 0.2999999998137355,
+        "loadComplete": 0,
+        "firstPaint": 0,
+        "firstContentfulPaint": 0
+      },
+      "thresholds": {
+        "totalLoadTime": 3000,
+        "firstContentfulPaint": 2000
+      },
+      "passed": false
+    },
+    {
+      "name": "Route Navigation",
+      "metrics": {
+        "averageNavigationTime": 1446.6,
+        "routes": [
+          {
+            "route": "/transactions",
+            "time": 1086,
+            "passed": false
+          },
+          {
+            "route": "/reports/general-ledger",
+            "time": 1003,
+            "passed": false
+          },
+          {
+            "route": "/main-data/accounts-tree",
+            "time": 2015,
+            "passed": false
+          },
+          {
+            "route": "/inventory",
+            "time": 2077,
+            "passed": false
+          },
+          {
+            "route": "/fiscal/dashboard",
+            "time": 1052,
+            "passed": false
+          }
+        ]
+      },
+      "thresholds": {
+        "averageNavigationTime": 1000
+      },
+      "passed": false
+    },
+    {
+      "name": "Memory Usage",
+      "metrics": {
+        "usedJSHeapSize": 36.236623764038086,
+        "totalJSHeapSize": 37.0978946685791,
+        "jsHeapSizeLimit": 2144
+      },
+      "thresholds": {
+        "usedJSHeapSize": 100
+      },
+      "passed": true
+    },
+    {
+      "name": "Bundle Size",
+      "metrics": {
+        "totalSize": 0.02734375,
+        "jsSize": 0,
+        "cssSize": 0.02734375,
+        "fileCount": 7
+      },
+      "thresholds": {
+        "totalSize": 1500
+      },
+      "passed": true
+    }
+  ],
+  "summary": {
+    "passed": 2,
+    "failed": 2,
+    "warnings": 0
+  }
+}

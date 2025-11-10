@@ -124,7 +124,9 @@ const MovementsPage: React.FC = () => {
                         .maybeSingle()
                       if (error) throw error
                       const txId = data?.transaction_id
-                      if (txId) window.location.href = `/transactions/${txId}`
+                      if (txId) {
+                        try { window.open(`/transactions/${txId}`, '_blank', 'noopener') } catch { /* fallback ignored */ }
+                      }
                     } catch {}
                   }
                   return (

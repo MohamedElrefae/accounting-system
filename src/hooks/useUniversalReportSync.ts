@@ -332,6 +332,11 @@ export function useUniversalReportSync(config: UniversalReportSyncConfig): Repor
   const handleReportEvent = useCallback((event: ReportUpdateEvent) => {
     const currentConfig = configRef.current
 
+    const canTrigger = (t: SyncTrigger) => {
+      const allowed = currentConfig.syncControl?.allowedTriggers
+      return Array.isArray(allowed) ? allowed.includes(t) : true
+    }
+
     setState(prev => ({
       ...prev,
       isConnected: true,
@@ -348,12 +353,12 @@ export function useUniversalReportSync(config: UniversalReportSyncConfig): Repor
     
     lastUpdateTimeoutRef.current = setTimeout(() => {
       setState(prev => ({ ...prev, pendingUpdates: false }))
-    }, currentConfig.updateInterval || 1000)
+    }, currentConfig.updateInterval || 1500)
 
     // Handle different event types
     switch (event.type) {
       case 'DATA_CHANGE':
-        currentConfig.onDataChange?.()
+        if (canTrigger('data_change')) currentConfig.onDataChange?.()
         break
       
       case 'USER_UPDATE':
@@ -363,14 +368,16 @@ export function useUniversalReportSync(config: UniversalReportSyncConfig): Repor
             activeUsers: event.metadata!.activeUsers
           }))
         }
-        currentConfig.onUserUpdate?.(event)
+        if (canTrigger('user_action')) currentConfig.onUserUpdate?.(event)
         break
       
       case 'PAGE_OPEN':
-        // Auto-refresh data when page opens
-        setTimeout(() => {
-          currentConfig.onDataChange?.()
-        }, 500)
+        // Only refresh on page focus if allowed
+        if (canTrigger('page_focus')) {
+          setTimeout(() => {
+            currentConfig.onDataChange?.()
+          }, 300)
+        }
         break
     }
   }, [])
@@ -516,6 +523,7 @@ export function useReportSync(reportId: string, tablesToWatch: string[], onDataC
     onDataChange,
     enableRealTime: true,
     enableUserPresence: true,
-    updateInterval: 1000
+    updateInterval: 1500,
+    syncControl: { allowedTriggers: ['data_change', 'manual', 'interval'] }
   })
 }

@@ -19,6 +19,9 @@ const LandingDecider: React.FC = () => {
     const prefetch = () => { 
       void import('./Dashboard')
       import('../services/dashboard-queries').then(m => { void m.prefetchDashboardQueries(qc, {}) }).catch(() => {})
+      // Prefetch popular report bundles to speed first navigation
+      void import('./Reports/TrialBalanceOriginal')
+      void import('./Reports/GeneralLedger')
     }
     if ('requestIdleCallback' in window) {
       ;(window as any).requestIdleCallback(prefetch, { timeout: 1500 })

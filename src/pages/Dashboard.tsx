@@ -537,8 +537,8 @@ const Dashboard: React.FC = () => {
     const handler = (_e: Event) => {
       void (async () => {
         await Promise.allSettled([
-          qc.invalidateQueries({ queryKey: dashboardQueryKeys.categoryTotals({ orgId: orgIdForQuery, projectId: projectIdForQuery, dateFrom, dateTo, postedOnly }) }),
-          qc.invalidateQueries({ queryKey: dashboardQueryKeys.recentActivity({ orgId: orgIdForQuery, projectId: projectIdForQuery, postedOnly }) }),
+          qc.refetchQueries({ queryKey: dashboardQueryKeys.categoryTotals({ orgId: orgIdForQuery, projectId: projectIdForQuery, dateFrom, dateTo, postedOnly }), type: 'active' }),
+          qc.refetchQueries({ queryKey: dashboardQueryKeys.recentActivity({ orgId: orgIdForQuery, projectId: projectIdForQuery, postedOnly }), type: 'active' }),
         ]);
         await load();
       })();
@@ -600,8 +600,8 @@ const Dashboard: React.FC = () => {
           <Button variant="outlined" size="small" onClick={async () => { 
             setRefreshing(true);
             await Promise.allSettled([
-              qc.invalidateQueries({ queryKey: dashboardQueryKeys.categoryTotals({ orgId: orgIdForQuery, projectId: projectIdForQuery, dateFrom, dateTo, postedOnly }) }),
-              qc.invalidateQueries({ queryKey: dashboardQueryKeys.recentActivity({ orgId: orgIdForQuery, projectId: projectIdForQuery, postedOnly }) }),
+              qc.refetchQueries({ queryKey: dashboardQueryKeys.categoryTotals({ orgId: orgIdForQuery, projectId: projectIdForQuery, dateFrom, dateTo, postedOnly }), type: 'active' }),
+              qc.refetchQueries({ queryKey: dashboardQueryKeys.recentActivity({ orgId: orgIdForQuery, projectId: projectIdForQuery, postedOnly }), type: 'active' }),
             ]);
             await load();
             setRefreshing(false);

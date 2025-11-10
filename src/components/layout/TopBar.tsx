@@ -35,6 +35,7 @@ import { useUserProfile } from '../../contexts/UserProfileContext';
 import { mergedTranslations as translations } from '../../data/mockData';
 import OrgSelector from '../Organizations/OrgSelector';
 import ProjectSelector from '../Organizations/ProjectSelector';
+import { useNavigate } from 'react-router-dom';
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -44,6 +45,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
   const { language, toggleLanguage } = useAppStore();
   const { user, signOut } = useAuth();
   const { profile } = useUserProfile();
+  const navigate = useNavigate();
 
   const {
     themeMode,
@@ -500,7 +502,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
       <Divider />
       <MenuItem onClick={() => {
         handleProfileMenuClose();
-        window.location.href = '/settings/profile';
+        navigate('/settings/profile');
       }}>
         <AccountCircle sx={{ mr: 2 }} />
         {t.profile}

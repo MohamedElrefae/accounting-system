@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getPendingAccessRequestsCount, canManageAccessRequests } from '../services/accessRequestService';
 
-export const useAccessRequestNotifications = (refreshInterval: number = 60000) => {
+// Default to 5 minutes; auto-pauses on hidden tab and refreshes on visibility regain
+export const useAccessRequestNotifications = (refreshInterval: number = 300000) => {
   const [pendingCount, setPendingCount] = useState(0);
   const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -43,15 +44,22 @@ export const useAccessRequestNotifications = (refreshInterval: number = 60000) =
     refresh();
   }, [refresh]);
 
-  // Set up periodic refresh
+  // Refresh on tab becoming visible to feel instant, even with large interval
+  useEffect(() => {
+    const onVisibility = () => { if (!document.hidden) refresh(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [refresh]);
+
+  // Set up periodic refresh with visibility-aware guard
   useEffect(() => {
     if (!canManage) return;
 
-    const interval = setInterval(() => {
-      fetchPendingCount();
-    }, refreshInterval);
+    const id = setInterval(() => {
+      if (!document.hidden) fetchPendingCount();
+    }, Math.max(60000, refreshInterval)); // never less than 1 minute
 
-    return () => clearInterval(interval);
+    return () => clearInterval(id);
   }, [canManage, fetchPendingCount, refreshInterval]);
 
   return {

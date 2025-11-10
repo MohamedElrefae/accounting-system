@@ -588,7 +588,14 @@ export default function EnhancedFiscalPeriodManager() {
   const toggleLanguage = useCallback(() => {
     const newLang = ArabicLanguageService.getCurrentLanguage() === 'en' ? 'ar' : 'en'
     ArabicLanguageService.setLanguage(newLang)
-    window.location.reload()
+    // SPA-friendly: rely on app effect to switch dir/lang; no full reload
+    try {
+      // Trigger a minimal re-render path by pushing same route
+      window.history.pushState({}, '', window.location.pathname + window.location.search + window.location.hash)
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    } catch {
+      // Fallback: avoid hard reload unless absolutely necessary
+    }
   }, [])
 
   // Load periods data

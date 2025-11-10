@@ -1423,7 +1423,8 @@ const GeneralLedger: React.FC = () => {
   }, [loadPresetsAndApplyLast])
 
   useEffect(() => {
-    const load = async () => {
+    let canceled = false
+    const run = async () => {
       setLoading(true)
       setError(null)
       try {
@@ -1454,7 +1455,8 @@ const GeneralLedger: React.FC = () => {
         setLoading(false)
       }
     }
-    load()
+    const t = setTimeout(() => { if (!canceled && !document.hidden) void run() }, 250)
+    return () => { canceled = true; clearTimeout(t) }
   }, [filters.dateFrom, filters.dateTo, filters.includeOpening, filters.postedOnly, accountId, orgId, projectId, pageSize, currentPage, classificationId, analysisWorkItemId, expensesCategoryId])
 
   // Load account summary when on overview - smart pagination approach
@@ -1462,6 +1464,7 @@ const GeneralLedger: React.FC = () => {
   
   useEffect(() => {
     if (view !== 'overview') return
+    let canceled = false
     const loadSummary = async () => {
       setLoadingSummary(true)
       try {
@@ -1516,7 +1519,8 @@ const GeneralLedger: React.FC = () => {
         setLoadingSummary(false)
       }
     }
-    loadSummary()
+    const t = setTimeout(() => { if (!canceled && !document.hidden) void loadSummary() }, 300)
+    return () => { canceled = true; clearTimeout(t) }
   }, [view, filters.dateFrom, filters.dateTo, filters.postedOnly, orgId, projectId, classificationId, analysisWorkItemId, expensesCategoryId])
 
   // Helper: derive previous period range matching the current window length

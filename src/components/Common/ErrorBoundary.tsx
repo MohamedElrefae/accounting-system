@@ -89,7 +89,16 @@ class ErrorBoundary extends Component<Props, State> {
           </details>
           
           <button 
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              try {
+                // SPA-friendly: re-navigate to current path to remount routes without full page reload
+                window.history.pushState({}, '', window.location.pathname + window.location.search + window.location.hash)
+                window.dispatchEvent(new PopStateEvent('popstate'))
+              } catch {
+                // Fallback: controlled reload only if navigation fails
+                window.location.reload()
+              }
+            }}
             style={{
               padding: '8px 16px',
               backgroundColor: '#d63031',
@@ -99,7 +108,7 @@ class ErrorBoundary extends Component<Props, State> {
               cursor: 'pointer'
             }}
           >
-            🔄 تحديث الصفحة (Reload Page)
+            🔄 إعادة المحاولة (Retry)
           </button>
         </div>
       );

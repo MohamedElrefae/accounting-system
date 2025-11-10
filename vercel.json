@@ -1,33 +1,8 @@
 {
-  "version": 2,
-  "builds": [
-    { "src": "package.json", "use": "@vercel/static-build" }
-  ],
-  "buildCommand": "npm ci && npm run build",
-  "outputDirectory": "dist",
-  "headers": [
-    {
-      "source": "/index.html",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-store, must-revalidate" }
-      ]
-    },
-    {
-      "source": "/",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-store, must-revalidate" }
-      ]
-    },
+  "rewrites": [
     {
       "source": "/(.*)",
-      "has": [{ "type": "header", "key": "Accept", "value": ".*text/html.*" }],
-      "headers": [
-        { "key": "Cache-Control", "value": "no-store, must-revalidate" }
-      ]
+      "destination": "/index.html"
     }
-  ],
-  "rewrites": [
-    { "source": "/(assets|js|css)/(.*)", "destination": "/$1/$2" },
-    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

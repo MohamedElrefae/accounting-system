@@ -10,10 +10,12 @@ function getActiveOrgIdSafe(): string | null { try { return localStorage.getItem
 import { RequirePermission } from '@/components/security/RequirePermission'
 import AsyncAutocomplete, { type AsyncOption } from '@/components/Common/AsyncAutocomplete'
 import StatusChip from '@/components/Inventory/StatusChip'
+import { useNavigate } from 'react-router-dom'
 
 const DocumentActionsBar: React.FC = () => {
   const { showToast } = useToast()
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [orgId] = useState<string>(getActiveOrgIdSafe() || '')
   const [documentId, setDocumentId] = useState<string>('')
   const [reason, setReason] = useState<string>('')
@@ -134,7 +136,7 @@ const DocumentActionsBar: React.FC = () => {
             </RequirePermission>
           </Grid>
           <Grid item xs={12} md={3}>
-            <Button variant="text" onClick={() => { if (documentId) window.location.href = `/inventory/documents/${documentId}` }} disabled={!documentId}>View Details</Button>
+            <Button variant="text" onClick={() => { if (documentId) navigate(`/inventory/documents/${documentId}`) }} disabled={!documentId}>View Details</Button>
           </Grid>
         </Grid>
       </CardContent>

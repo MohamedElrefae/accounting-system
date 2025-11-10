@@ -519,7 +519,7 @@ export default function DocumentDetailsDrawer({ open, onClose, document }: Docum
                           if (!file || !document) return;
                           setUploadBusy(true);
                           await svc.createDocumentVersion(document.id, (document as any).org_id, file);
-                          await qc.invalidateQueries({ queryKey: ['document-versions', document.id] });
+                          await qc.refetchQueries({ queryKey: ['document-versions', document.id], type: 'active' });
                           await qc.refetchQueries({ queryKey: ['documents'], type: 'active' });
                         } finally {
                           setUploadBusy(false);
@@ -566,7 +566,7 @@ export default function DocumentDetailsDrawer({ open, onClose, document }: Docum
                               await svc.promoteDocumentVersion(v.id);
                               showToast(`Promoted v${v.version_number} to current`, { severity: 'success' });
                               await qc.refetchQueries({ queryKey: ['documents'], type: 'active' });
-                              await qc.invalidateQueries({ queryKey: ['document-versions', document?.id] });
+                              await qc.refetchQueries({ queryKey: ['document-versions', document?.id], type: 'active' });
                               setSelectedVersion(v);
                               setTab(0);
                             } catch (e: any) {

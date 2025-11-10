@@ -136,9 +136,9 @@ export default function OpeningBalanceImportPage() {
   // Polling fallback for job status in case realtime misses updates
   React.useEffect(() => {
     let timer: any
-    const terminate = (s?: string) => s === 'completed' || s === 'failed' || s === 'partially_completed'
-    if (status?.importId && !terminate(status.status)) {
-      timer = setInterval(async () => {
+    let canceled = false
+    const onVisibility = async () => {
+      if (!document.hidden && status?.importId) {
         try {
           const next = await OpeningBalanceImportService.getImportStatus(status.importId!)
           setStatus(prev => ({
@@ -150,9 +150,31 @@ export default function OpeningBalanceImportPage() {
             errorReport: Array.isArray(next.errorReport) && next.errorReport.length ? next.errorReport : (prev?.errorReport || []),
           }))
         } catch {}
-      }, 2000)
+      }
     }
-    return () => { if (timer) clearInterval(timer) }
+    const terminate = (s?: string) => s === 'completed' || s === 'failed' || s === 'partially_completed'
+    if (status?.importId && !terminate(status.status)) {
+      timer = setInterval(async () => {
+        if (document.hidden || canceled) return
+        try {
+          const next = await OpeningBalanceImportService.getImportStatus(status.importId!)
+          setStatus(prev => ({
+            importId: next.importId,
+            status: next.status,
+            totalRows: next.totalRows,
+            successRows: next.successRows,
+            failedRows: next.failedRows,
+            errorReport: Array.isArray(next.errorReport) && next.errorReport.length ? next.errorReport : (prev?.errorReport || []),
+          }))
+        } catch {}
+      }, 3000)
+      document.addEventListener('visibilitychange', onVisibility)
+    }
+    return () => { 
+      canceled = true
+      if (timer) clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [status?.importId, status?.status])
 
   const onImport = async () => {

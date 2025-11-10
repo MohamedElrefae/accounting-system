@@ -212,6 +212,13 @@ const { data: glSummaryData, error: glError } = await supabase.rpc('get_gl_accou
     }
   }
 
+  // Debounced + visibility-aware reload on filter changes
+  useEffect(() => {
+    let canceled = false
+    const t = setTimeout(() => { if (!canceled && !document.hidden) load() }, 250)
+    return () => { canceled = true; clearTimeout(t) }
+  }, [dateFrom, dateTo, orgId, projectId, postedOnly, includeZeros, activeGroupsOnly])
+
   function doExport(kind: 'excel' | 'csv') {
     const cols = [
       { key: 'code', header: uiLang === 'ar' ? 'رمز الحساب' : 'Account Code', type: 'text' as const },

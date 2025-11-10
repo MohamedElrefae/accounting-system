@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { TransactionLineItemsEditor } from './TransactionLineItemsEditor'
 import {
   transactionLineItemsEnhancedService,
@@ -39,40 +39,42 @@ export const TransactionLineItemsSection: React.FC<TransactionLineItemsSectionPr
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  useEffect(() => {
-    let mounted = true
-    const load = async () => {
-      setLoading(true)
-      setError(null)
-      setSuccess(null)
-      try {
-        const rows = await transactionLineItemsEnhancedService.getLineItemsList(transactionLineId)
-        if (!mounted) return
-        const mapped: EditableTxLineItem[] = rows.map(r => ({
-          id: r.id,
-          line_number: r.line_number,
-          quantity: r.quantity,
-          percentage: r.percentage ?? 100,
-          unit_price: r.unit_price,
-          unit_of_measure: r.unit_of_measure,
-          item_code: r.item_code,
-          item_name: r.item_name,
-          analysis_work_item_id: r.analysis_work_item_id,
-          sub_tree_id: r.sub_tree_id,
-          line_item_catalog_id: r.line_item_catalog_id,
-          work_item_id: r.work_item_id,
-          item_name_ar: r.item_name_ar,
-        }))
-        setItems(mapped)
-      } catch (e: any) {
-        if (mounted) setError(e?.message || 'Failed to load line items')
-      } finally {
-        if (mounted) setLoading(false)
-      }
+  const fetchItems = useCallback(async () => {
+    let canceled = false
+    setLoading(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const rows = await transactionLineItemsEnhancedService.getLineItemsList(transactionLineId)
+      if (canceled) return
+      const mapped: EditableTxLineItem[] = rows.map(r => ({
+        id: r.id,
+        line_number: r.line_number,
+        quantity: r.quantity,
+        percentage: r.percentage ?? 100,
+        unit_price: r.unit_price,
+        unit_of_measure: r.unit_of_measure,
+        item_code: r.item_code,
+        item_name: r.item_name,
+        analysis_work_item_id: r.analysis_work_item_id,
+        sub_tree_id: r.sub_tree_id,
+        line_item_catalog_id: r.line_item_catalog_id,
+        work_item_id: r.work_item_id,
+        item_name_ar: r.item_name_ar,
+      }))
+      setItems(mapped)
+    } catch (e: any) {
+      if (!canceled) setError(e?.message || 'Failed to load line items')
+    } finally {
+      if (!canceled) setLoading(false)
     }
-    load()
-    return () => { mounted = false }
+    return () => { canceled = true }
   }, [transactionLineId])
+
+  useEffect(() => {
+    const cancel = fetchItems()
+    return () => { if (typeof cancel === 'function') cancel() }
+  }, [fetchItems])
 
   const save = async () => {
     setSaving(true)
@@ -93,7 +95,7 @@ export const TransactionLineItemsSection: React.FC<TransactionLineItemsSectionPr
       <div className="tx-lines__header flex-row items-center justify-between">
         <h3 className="text-title">🚀 بنود المعاملة المحسّنة</h3>
         <div className="flex-row gap-2">
-          <button type="button" className="btn btn-secondary" onClick={() => window.location.reload()} disabled={loading || saving}>Reload</button>
+          <button type="button" className="btn btn-secondary" onClick={() => { void fetchItems() }} disabled={loading || saving}>Reload</button>
           <button type="button" className="btn btn-primary" onClick={save} disabled={disabled || loading || saving}>Save lines</button>
         </div>
       </div>

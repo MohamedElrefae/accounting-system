@@ -1308,13 +1308,30 @@ const TransactionsPage: React.FC = () => {
     }
   }
 
-  // Poll lines when form open and editingTx is set (simple, minimal-change wiring)
+  // Poll lines when form open and editingTx is set — pause when tab hidden and back off interval
   useEffect(() => {
     let timer: any = null
-    const tick = async () => {
+    let lastKeyAt = 0
+
+    const onKey = () => { lastKeyAt = Date.now() }
+    const onVisibility = () => {
+      // Trigger a fast refresh when the tab gains focus again
+      if (!document.hidden) {
+        void tick(true)
+      }
+    }
+
+    async function tick(immediate = false) {
       try {
         const txId = editingTx?.id || createdTxId
-        if (formOpen && txId) {
+        // Skip when not visible or form closed
+        if (!document.hidden && formOpen && txId) {
+          // If the user typed in the last 1500ms, delay a bit to avoid jank while typing
+          const sinceType = Date.now() - lastKeyAt
+          if (!immediate && sinceType < 1500) {
+            schedule(800)
+            return
+          }
           const { data, error } = await supabase
             .from('v_transaction_lines_enriched')
             .select('*')
@@ -1328,10 +1345,25 @@ const TransactionsPage: React.FC = () => {
           }
         }
       } catch {}
-      timer = setTimeout(tick, 1200)
+      // Back off slightly to reduce churn
+      schedule(2500)
     }
-    tick()
-    return () => { if (timer) clearTimeout(timer) }
+
+    function schedule(ms: number) {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => void tick(), ms)
+    }
+
+    // Start
+    schedule(300)
+    window.addEventListener('keydown', onKey, { capture: true })
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      if (timer) clearTimeout(timer)
+      window.removeEventListener('keydown', onKey, { capture: true } as any)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [formOpen, editingTx, createdTxId])
 
   // Lines layout preferences (columns/order/visibility)

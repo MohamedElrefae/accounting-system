@@ -195,6 +195,13 @@ export default function ProfitLoss() {
     }
   }
 
+  // Debounced + visibility-aware reload on filter changes
+  useEffect(() => {
+    let canceled = false
+    const t = setTimeout(() => { if (!canceled && !document.hidden) load() }, 250)
+    return () => { canceled = true; clearTimeout(t) }
+  }, [dateFrom, dateTo, orgId, projectId, postedOnly, includeZeros])
+
   function doExport(kind: 'excel' | 'csv') {
     if (!summary) return
 

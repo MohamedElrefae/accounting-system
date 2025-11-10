@@ -294,15 +294,26 @@ const AccountExplorerReport: React.FC = () => {
     }
   }
 
-  // Auto-load data when page opens or when filters change
-  useEffect(() => { 
-    loadData()
+  // Auto-load data when page opens or when filters change (debounced + visibility-aware)
+  useEffect(() => {
+    let canceled = false
+    const t = setTimeout(() => {
+      if (!canceled && !document.hidden) {
+        loadData()
+      }
+    }, 250)
+    return () => { canceled = true; clearTimeout(t) }
   }, [orgId, projectId, postedOnly, mode, dateFrom, dateTo, classificationId, expensesCategoryId, workItemId, costCenterId, debitAccountId, creditAccountId, amountMin, amountMax])
   
   // Initial data load once on mount (in case orgId is not set yet)
   useEffect(() => {
-    loadData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let canceled = false
+    const run = () => { if (!canceled && !document.hidden) loadData() }
+    const vis = () => { if (!document.hidden) run() }
+    // Slight delay to allow initial UI settle
+    const t = setTimeout(run, 200)
+    document.addEventListener('visibilitychange', vis)
+    return () => { canceled = true; clearTimeout(t); document.removeEventListener('visibilitychange', vis) }
   }, [])
 
   // Helpers

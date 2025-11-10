@@ -6,9 +6,19 @@ import { getTransactions } from '../../services/transactions'
 function useQueryParam(name: string): string | null {
   const [val, setVal] = useState<string | null>(null)
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    setVal(params.get(name))
-  }, [])
+    const read = () => {
+      const params = new URLSearchParams(window.location.search)
+      setVal(params.get(name))
+    }
+    read()
+    const onPop = () => read()
+    window.addEventListener('popstate', onPop)
+    window.addEventListener('hashchange', onPop)
+    return () => {
+      window.removeEventListener('popstate', onPop)
+      window.removeEventListener('hashchange', onPop)
+    }
+  }, [name])
   return val
 }
 
@@ -87,7 +97,18 @@ export const TransactionLineItemsPage: React.FC = () => {
               if (manualId && manualId.length > 0) {
                 const url = new URL(window.location.href)
                 url.searchParams.set('id', manualId)
-                window.location.href = url.toString()
+                try {
+                  window.history.pushState({}, '', url.toString())
+                  // Re-run the param reader
+                  const params = new URLSearchParams(window.location.search)
+                  const v = params.get('id')
+                  if (v) {
+                    // Force state update via hash change event fallback
+                    window.dispatchEvent(new PopStateEvent('popstate'))
+                  }
+                } catch {
+                  window.location.href = url.toString()
+                }
               }
             }}
           >

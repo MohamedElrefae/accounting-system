@@ -229,7 +229,16 @@ const { data: summaryData, error: sumErr } = await supabase.rpc('get_gl_account_
     }
   }
 
-  useEffect(() => { loadData().catch(() => { /* noop */ }) }, [mode, postedOnly, orgId, projectId, dateFrom, dateTo])
+  // Debounced + visibility-aware load to avoid bursts while user edits filters
+  useEffect(() => {
+    let canceled = false
+    const t = setTimeout(() => {
+      if (!canceled && !document.hidden) {
+        loadData().catch(() => { /* noop */ })
+      }
+    }, 250)
+    return () => { canceled = true; clearTimeout(t) }
+  }, [mode, postedOnly, orgId, projectId, dateFrom, dateTo])
 
   // Expand to target level 1..4
   async function expandToLevel(targetLevel: number) {

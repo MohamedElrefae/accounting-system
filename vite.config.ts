@@ -19,6 +19,26 @@ const patchPostgrestWrapperPlugin: PluginOption = {
   },
 }
 
+const moduleCompatibilityPlugin: PluginOption = {
+  name: 'module-compatibility',
+  enforce: 'post',
+  generateBundle(options, bundle) {
+    // Add module compatibility to all chunks that might need it
+    Object.keys(bundle).forEach(fileName => {
+      const chunk = bundle[fileName]
+      if (chunk.type === 'chunk' && chunk.isEntry === false) {
+        // Prepend compatibility code to non-entry chunks
+        const compatCode = `(function(){if(typeof window!=='undefined'&&!window.module){window.module={exports:{}};window.exports=window.module.exports;window.global=window;}})();`
+        chunk.code = compatCode + chunk.code
+      }
+    })
+  }
+}
+
+
+
+
+
 // Minimal, clean baseline config
 export default defineConfig(({ mode }) => {
   const plugins: PluginOption[] = [
@@ -26,6 +46,7 @@ export default defineConfig(({ mode }) => {
       include: ['**/*.jsx', '**/*.tsx'],
     }),
     patchPostgrestWrapperPlugin,
+    moduleCompatibilityPlugin,
   ]
 
   if (mode === 'analyze') {
@@ -44,6 +65,10 @@ export default defineConfig(({ mode }) => {
   define: {
     // Fix for some CommonJS modules
     global: 'globalThis',
+    'process.env': '{}',
+    // Additional CommonJS compatibility
+    'process.browser': 'true',
+    'process.version': '"v16.0.0"',
   },
   resolve: {
     alias: {
@@ -57,26 +82,30 @@ export default defineConfig(({ mode }) => {
   },
   optimizeDeps: {
     include: [
+      // Core React - ensure these are optimized together
       'react', 
       'react-dom',
       'react/jsx-runtime',
+      'react-dom/client',
       'prop-types',
-      '@emotion/react',
-      '@emotion/styled',
-      '@mui/material',
-      '@mui/material/styles',
-      '@mui/material/utils',
-      '@mui/icons-material',
-      '@mui/system',
-      '@mui/utils',
+      // State management
       'zustand',
+      'use-sync-external-store/shim',
+      // Data layer
       '@tanstack/react-query',
-      'pdfjs-dist',
       'react-router-dom',
       '@supabase/supabase-js'
     ],
-    exclude: ['@mui/private-theming'],
-    force: false // Changed to false for better caching
+    exclude: [
+      '@mui/private-theming', 
+      '@mui/icons-material',
+      // Let MUI and Emotion be handled by manual chunks
+      '@mui/material',
+      '@mui/system',
+      '@emotion/react',
+      '@emotion/styled'
+    ],
+    force: true
   },
   server: {
     host: true, // allow LAN access and avoids "use --host to expose" message
@@ -105,19 +134,41 @@ export default defineConfig(({ mode }) => {
   build: {
     target: 'esnext',
     minify: 'esbuild',
-    // Avoid large sourcemaps in normal production builds to reduce memory footprint
     sourcemap: mode === 'analyze',
     cssCodeSplit: true,
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       treeshake: { moduleSideEffects: false },
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          mui: ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
-          router: ['react-router-dom'],
-          query: ['@tanstack/react-query'],
-          pdf: ['pdfjs-dist']
+        manualChunks: (id) => {
+          // Keep React in main bundle to avoid chunking issues
+          if (id.includes('react') || id.includes('react-dom')) {
+            return undefined; // Keep in main bundle
+          }
+          // Data layer chunk
+          if (id.includes('@tanstack') || id.includes('@supabase')) {
+            return 'data-layer';
+          }
+          // Heavy features chunk
+          if (id.includes('jspdf') || id.includes('xlsx') || id.includes('html2canvas') || id.includes('recharts')) {
+            return 'heavy-features';
+          }
+          // PDF worker chunk
+          if (id.includes('pdfjs-dist')) {
+            return 'pdf-worker';
+          }
+          // MUI - keep together to avoid conflicts
+          if (id.includes('@mui') || id.includes('@emotion')) {
+            return 'mui-lib';
+          }
+          // Keep state management in main bundle
+          if (id.includes('zustand') || id.includes('use-sync-external-store')) {
+            return undefined; // Keep in main bundle
+          }
+          // Node modules chunk
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
         }
       }
     },

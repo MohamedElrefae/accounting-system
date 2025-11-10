@@ -68,12 +68,12 @@ export const ResetPassword: React.FC = () => {
       console.log('[ResetPassword] Session after update:', !!session);
       
       if (session) {
-        // Already logged in, go to dashboard
+        // Already logged in, go to dashboard (SPA navigation)
         setTimeout(() => {
-          window.location.href = '/';
+          try { navigate('/'); } catch { window.location.href = '/'; }
         }, 1500);
       } else {
-        // Not logged in, go to login page
+        // Not logged in, go to login page (SPA navigation)
         setTimeout(() => {
           navigate('/login');
         }, 3000);
@@ -131,7 +131,7 @@ export const ResetPassword: React.FC = () => {
               {submitting ? 'جاري التحديث...' : 'تحديث كلمة المرور'}
             </Button>
             
-            <Button href="/login" fullWidth variant="text" sx={{ mt: 2 }}>العودة لتسجيل الدخول</Button>
+            <Button onClick={() => navigate('/login')} fullWidth variant="text" sx={{ mt: 2 }}>العودة لتسجيل الدخول</Button>
           </Box>
         )}
       </Paper>
