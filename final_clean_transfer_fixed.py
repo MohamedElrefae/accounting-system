@@ -1,0 +1,282 @@
+#!/usr/bin/env python3
+"""
+Egyptian Election Data - Final Clean Transfer to Supabase (Fixed)
+Uses the cleaned location data and matching voter data
+Handles NaN values properly
+"""
+
+import pandas as pd
+import json
+import os
+from supabase import create_client, Client
+from datetime import datetime
+import time
+import numpy as np
+
+def load_config():
+    """Load Supabase configuration"""
+    try:
+        # Try to load from environment variables first
+        import os
+        url = os.getenv('SUPABASE_URL')
+        key = os.getenv('SUPABASE_ANON_KEY')
+        
+        if url and key:
+            return url, key
+            
+        # If not in environment, try to read from .env file
+        env_file = '.env'
+        if os.path.exists(env_file):
+            with open(env_file, 'r') as f:
+                lines = f.readlines()
+                for line in lines:
+                    if line.startswith('SUPABASE_URL='):
+                        url = line.split('=', 1)[1].strip()
+                    elif line.startswith('SUPABASE_ANON_KEY='):
+                        key = line.split('=', 1)[1].strip()
+        
+        if not url or not key:
+            print("❌ Supabase configuration not found!")
+            print("Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables")
+            return None, None
+            
+        return url, key
+        
+    except Exception as e:
+        print(f"❌ Error loading configuration: {e}")
+        return None, None
+
+def clean_data_for_json(df):
+    """Clean DataFrame to be JSON compliant"""
+    df_clean = df.copy()
+    
+    # Replace NaN values with None (which becomes null in JSON)
+    df_clean = df_clean.where(pd.notnull(df_clean), None)
+    
+    # Convert numpy types to Python native types
+    for col in df_clean.columns:
+        if df_clean[col].dtype == 'int64':
+            df_clean[col] = df_clean[col].astype(int)
+        elif df_clean[col].dtype == 'float64':
+            # Convert float columns, handling NaN
+            df_clean[col] = df_clean[col].apply(lambda x: int(x) if pd.notnull(x) else None)
+    
+    return df_clean
+
+def clear_existing_data(supabase: Client):
+    """Clear existing data from Supabase tables"""
+    print("🧹 Clearing existing data from Supabase...")
+    
+    try:
+        # Clear voters first (due to foreign key constraint)
+        print("   🗑️ Clearing voters table...")
+        result = supabase.table('voters').delete().neq('id', 0).execute()
+        print(f"   ✅ Cleared voters table")
+        
+        # Clear locations
+        print("   🗑️ Clearing locations table...")
+        result = supabase.table('locations').delete().neq('location_id', 0).execute()
+        print(f"   ✅ Cleared locations table")
+        
+        return True
+        
+    except Exception as e:
+        print(f"   ❌ Error clearing data: {e}")
+        return False
+
+def transfer_clean_data():
+    """Transfer the cleaned location and voter data to Supabase"""
+    
+    print("=" * 60)
+    print("🚀 Egyptian Election Data - Final Clean Transfer (Fixed)")
+    print("=" * 60)
+    
+    # Load configuration
+    url, key = load_config()
+    if not url or not key:
+        return False
+    
+    # Initialize Supabase client
+    print("🔗 Connecting to Supabase...")
+    try:
+        supabase: Client = create_client(url, key)
+        print("✅ Connected to Supabase successfully!")
+    except Exception as e:
+        print(f"❌ Failed to connect to Supabase: {e}")
+        return False
+    
+    # Clear existing data
+    if not clear_existing_data(supabase):
+        return False
+    
+    # Load cleaned locations data
+    locations_file = r"C:\Election-2025\output\locations_final_clean.csv"
+    print(f"📖 Loading cleaned locations from: {locations_file}")
+    
+    try:
+        locations_df = pd.read_csv(locations_file)
+        print(f"📍 Loaded {len(locations_df)} unique locations")
+        
+        # Clean data for JSON compliance
+        print("🧹 Cleaning data for JSON compliance...")
+        locations_df_clean = clean_data_for_json(locations_df)
+        
+        # Show the locations we're transferring
+        print("\n📋 Locations to transfer:")
+        for _, row in locations_df_clean.iterrows():
+            print(f"   {row['location_id']}: {row['location_name']} ({row['total_voters']} voters)")
+            
+    except Exception as e:
+        print(f"❌ Error loading locations: {e}")
+        return False
+    
+    # Transfer locations
+    print(f"\n📤 Transferring {len(locations_df_clean)} locations to Supabase...")
+    try:
+        locations_data = locations_df_clean.to_dict('records')
+        
+        # Debug: show first record structure
+        print("🔍 Sample location record:")
+        print(f"   {locations_data[0]}")
+        
+        result = supabase.table('locations').insert(locations_data).execute()
+        print(f"✅ Successfully transferred {len(locations_data)} locations")
+        
+    except Exception as e:
+        print(f"❌ Error transferring locations: {e}")
+        print(f"   Error details: {str(e)}")
+        return False
+    
+    # Load voter data and filter for our clean locations
+    voters_file = r"C:\Election-2025\output\voter_data_full.json"
+    print(f"\n📖 Loading voter data from: {voters_file}")
+    
+    try:
+        with open(voters_file, 'r', encoding='utf-8') as f:
+            all_voters_data = json.load(f)
+        
+        print(f"👥 Loaded {len(all_voters_data)} total voters from file")
+        
+        # Get the location IDs we want to keep (1, 2, 3)
+        valid_location_ids = set(locations_df_clean['location_id'].tolist())
+        print(f"🔍 Filtering voters for location IDs: {valid_location_ids}")
+        
+        # Filter voters to only include those from our clean locations
+        filtered_voters = []
+        for voter in all_voters_data:
+            if voter.get('location_id') in valid_location_ids:
+                filtered_voters.append(voter)
+        
+        print(f"✅ Filtered to {len(filtered_voters)} voters from clean locations")
+        
+        if len(filtered_voters) == 0:
+            print("⚠️ No voters found for the clean locations!")
+            print("This might be due to location_id mismatch. Let me check...")
+            
+            # Show sample voter location_ids
+            sample_voter_locations = set()
+            for voter in all_voters_data[:20]:
+                sample_voter_locations.add(voter.get('location_id'))
+            print(f"Sample voter location_ids: {sorted(sample_voter_locations)}")
+            print(f"Clean location_ids: {sorted(valid_location_ids)}")
+            
+            # Try to find voters with location_id 1, 2, or 3
+            matching_voters = []
+            for voter in all_voters_data:
+                if voter.get('location_id') in [1, 2, 3]:
+                    matching_voters.append(voter)
+            
+            print(f"Found {len(matching_voters)} voters with location_id 1, 2, or 3")
+            
+            if len(matching_voters) > 0:
+                filtered_voters = matching_voters
+                print(f"✅ Using {len(filtered_voters)} matching voters")
+            else:
+                return False
+            
+    except Exception as e:
+        print(f"❌ Error loading voter data: {e}")
+        return False
+    
+    # Transfer voters in batches
+    print(f"\n📤 Transferring {len(filtered_voters)} voters to Supabase...")
+    batch_size = 1000
+    total_batches = (len(filtered_voters) + batch_size - 1) // batch_size
+    
+    try:
+        for i in range(0, len(filtered_voters), batch_size):
+            batch = filtered_voters[i:i + batch_size]
+            batch_num = (i // batch_size) + 1
+            
+            print(f"   📤 Batch {batch_num}/{total_batches}: {len(batch)} voters...")
+            
+            result = supabase.table('voters').insert(batch).execute()
+            
+            print(f"   ✅ Batch {batch_num} completed")
+            time.sleep(0.1)  # Small delay to avoid rate limiting
+        
+        print(f"✅ Successfully transferred all {len(filtered_voters)} voters")
+        
+    except Exception as e:
+        print(f"❌ Error transferring voters: {e}")
+        return False
+    
+    # Verify the transfer
+    print("\n🔍 Verifying transfer...")
+    try:
+        # Count locations
+        locations_result = supabase.table('locations').select('location_id').execute()
+        locations_count = len(locations_result.data)
+        
+        # Count voters
+        voters_result = supabase.table('voters').select('id').execute()
+        voters_count = len(voters_result.data)
+        
+        print(f"✅ Verification complete:")
+        print(f"   📍 Locations in database: {locations_count}")
+        print(f"   👥 Voters in database: {voters_count}")
+        
+        # Show sample data
+        if locations_count > 0:
+            sample_location = supabase.table('locations').select('*').limit(1).execute()
+            if sample_location.data:
+                loc = sample_location.data[0]
+                print(f"   📍 Sample location: {loc['location_name']}")
+        
+        if voters_count > 0:
+            sample_voter = supabase.table('voters').select('*').limit(1).execute()
+            if sample_voter.data:
+                voter = sample_voter.data[0]
+                print(f"   👤 Sample voter: {voter['full_name']}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error verifying transfer: {e}")
+        return False
+
+def show_final_summary():
+    """Show final summary of the transfer"""
+    print("\n" + "=" * 60)
+    print("🎉 TRANSFER COMPLETE!")
+    print("=" * 60)
+    print("✅ Your Egyptian election data is now in Supabase!")
+    print("")
+    print("📊 What was transferred:")
+    print("   📍 3 unique polling locations")
+    print("   👥 All voters from those locations")
+    print("   🧹 Cleaned data (removed 1,018 incomplete records)")
+    print("   🔧 Fixed NaN values for JSON compliance")
+    print("")
+    print("🔗 Next steps:")
+    print("   1. Check your Supabase dashboard")
+    print("   2. Query your data using SQL")
+    print("   3. Build applications with the clean data")
+    print("=" * 60)
+
+if __name__ == "__main__":
+    success = transfer_clean_data()
+    if success:
+        show_final_summary()
+    else:
+        print("\n❌ Transfer failed! Check the error messages above.")

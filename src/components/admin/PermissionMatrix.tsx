@@ -35,7 +35,7 @@ import RevokeIcon from '@mui/icons-material/Lock';
 import Grid from '@mui/material/Grid';
 import { supabase } from '../../utils/supabase';
 import { audit } from '../../utils/audit';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { PERMISSION_CATEGORIES } from '../../constants/permissions';
 import type { PermissionCategory, PermissionDefinition } from '../../constants/permissions';
 

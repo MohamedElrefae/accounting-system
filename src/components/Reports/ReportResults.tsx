@@ -16,7 +16,7 @@ import ResizableTable from '../Common/ResizableTable';
 import type { ColumnConfig as GridCol } from '../Common/ResizableTable';
 import ColumnConfiguration from '../Common/ColumnConfiguration';
 import { useColumnPreferences } from '../../hooks/useColumnPreferences';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import ExportIcon from '@mui/icons-material/GetApp';
 import SaveIcon from '@mui/icons-material/Save';
 import TableIcon from '@mui/icons-material/TableChart';

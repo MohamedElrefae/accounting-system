@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Card, CardContent, Typography, TextField, Button, Avatar, Stack, Alert, CircularProgress } from '@mui/material';
 import Grid from '@mui/material/Grid';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { useUserProfile } from '../../contexts/UserProfileContext';
 import { supabase } from '../../utils/supabase';
 

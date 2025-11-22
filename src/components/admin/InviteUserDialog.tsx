@@ -32,7 +32,7 @@ import ErrorIcon from '@mui/icons-material/Error';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { supabase } from '../../utils/supabase';
 import { audit } from '../../utils/audit';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import type { Role } from './UserFormConfig';
 
 interface InviteUserDialogProps {

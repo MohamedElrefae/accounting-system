@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../utils/supabase'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from './useAuth'
 
 // Aggregates permissions from direct user grants and via roles
 // Tables assumed:

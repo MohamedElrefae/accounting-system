@@ -8,7 +8,11 @@ import DashboardLayout from './components/layout/DashboardLayout';
 import { OptimizedSuspense } from './components/Common/PerformanceOptimizer';
 
 // Import route groups instead of individual components
-import { CoreRoutes, preloadCriticalRoutes } from './routes/RouteGroups';
+import { preloadCriticalRoutes } from './routes/RouteGroups';
+
+// Core dashboard routes (lazy) loaded directly here
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const Welcome = React.lazy(() => import('./pages/Welcome'));
 
 // Lazy load route groups
 const MainDataRoutes = React.lazy(() => import('./routes/MainDataRoutes'));
@@ -75,71 +79,94 @@ const OptimizedApp: React.FC = () => {
             <DashboardLayout />
           </OptimizedProtectedRoute>
         }>
-          {/* Core Routes (Dashboard, Landing) */}
-          <Route path="/*" element={<CoreRoutes />} />
-          
+          {/* Core Routes (Dashboard, Landing) - flattened here for clarity */}
+          <Route
+            index
+            element={
+              <OptimizedSuspense>
+                <Dashboard />
+              </OptimizedSuspense>
+            }
+          />
+          <Route
+            path="dashboard"
+            element={
+              <OptimizedSuspense>
+                <Dashboard />
+              </OptimizedSuspense>
+            }
+          />
+          <Route
+            path="welcome"
+            element={
+              <OptimizedSuspense>
+                <Welcome />
+              </OptimizedSuspense>
+            }
+          />
+
           {/* Main Data Routes */}
-          <Route path="/main-data/*" element={
+          <Route path="main-data/*" element={
             <OptimizedSuspense>
               <MainDataRoutes />
             </OptimizedSuspense>
           } />
           
           {/* Transaction Routes */}
-          <Route path="/transactions/*" element={
+          <Route path="transactions/*" element={
             <OptimizedSuspense>
               <TransactionRoutes />
             </OptimizedSuspense>
           } />
           
           {/* Report Routes */}
-          <Route path="/reports/*" element={
+          <Route path="reports/*" element={
             <OptimizedSuspense>
               <ReportRoutes />
             </OptimizedSuspense>
           } />
           
           {/* Inventory Routes */}
-          <Route path="/inventory/*" element={
+          <Route path="inventory/*" element={
             <OptimizedSuspense>
               <InventoryRoutes />
             </OptimizedSuspense>
           } />
           
           {/* Fiscal Routes */}
-          <Route path="/fiscal/*" element={
+          <Route path="fiscal/*" element={
             <OptimizedSuspense>
               <FiscalRoutes />
             </OptimizedSuspense>
           } />
           
           {/* Admin Routes */}
-          <Route path="/admin/*" element={
+          <Route path="admin/*" element={
             <OptimizedSuspense>
               <AdminRoutes />
             </OptimizedSuspense>
           } />
           
-          <Route path="/approvals/*" element={
+          <Route path="approvals/*" element={
             <OptimizedSuspense>
               <AdminRoutes />
             </OptimizedSuspense>
           } />
           
-          <Route path="/settings/*" element={
+          <Route path="settings/*" element={
             <OptimizedSuspense>
               <AdminRoutes />
             </OptimizedSuspense>
           } />
           
-          <Route path="/performance" element={
+          <Route path="performance" element={
             <OptimizedSuspense>
               <AdminRoutes />
             </OptimizedSuspense>
           } />
           
           {/* Project Attachments */}
-          <Route path="/projects/:id/attachments" element={
+          <Route path="projects/:id/attachments" element={
             <OptimizedProtectedRoute requiredAction="documents.view">
               <OptimizedSuspense>
                 <ProjectAttachmentsPage />

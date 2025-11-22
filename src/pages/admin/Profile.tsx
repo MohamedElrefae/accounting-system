@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Tabs, Tab, Card, CardContent, Typography, TextField, Button, Avatar, Stack, Alert, Divider, Switch, FormControlLabel, CircularProgress, List, ListItem, ListItemText } from '@mui/material';
 import Grid from '@mui/material/Grid';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../utils/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { useUserProfile as useUserProfileCtx } from '../../contexts/UserProfileContext';

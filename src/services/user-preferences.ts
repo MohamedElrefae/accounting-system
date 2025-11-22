@@ -6,23 +6,35 @@ export type LandingPreference = 'welcome' | 'dashboard'
 // Reads the user's landing preference, scoped to active org if available.
 // Falls back to 'dashboard' if none is set or user is not authenticated.
 export async function getLandingPreference(orgId?: string): Promise<LandingPreference> {
-  const { data: auth } = await supabase.auth.getUser()
-  const user = auth?.user
-  if (!user) return 'welcome'
+  try {
+    const { data: auth } = await supabase.auth.getUser()
+    const user = auth?.user
+    if (!user) return 'dashboard' // Default to dashboard for authenticated users
 
-  const effectiveOrgId = orgId ?? getActiveOrgId()
+    const effectiveOrgId = orgId ?? getActiveOrgId()
 
-  let q = supabase
-    .from('user_landing_preferences')
-    .select('landing_preference')
-    .eq('user_id', user.id)
-    .limit(1)
+    let q = supabase
+      .from('user_landing_preferences')
+      .select('landing_preference')
+      .eq('user_id', user.id)
+      .limit(1)
 
-  q = effectiveOrgId ? q.eq('org_id', effectiveOrgId) : (q as any).is('org_id', null)
+    q = effectiveOrgId ? q.eq('org_id', effectiveOrgId) : (q as any).is('org_id', null)
 
-  const { data, error } = await q.single()
-  if (error || !data) return 'welcome'
-  return (data as any).landing_preference as LandingPreference
+    const { data, error } = await q.single()
+    
+    // If table doesn't exist or query fails, default to dashboard
+    if (error) {
+      console.log('Landing preference query failed, defaulting to dashboard:', error.message)
+      return 'dashboard'
+    }
+    
+    if (!data) return 'dashboard'
+    return (data as any).landing_preference as LandingPreference
+  } catch (error) {
+    console.log('Error getting landing preference, defaulting to dashboard:', error)
+    return 'dashboard'
+  }
 }
 
 // Upserts the user's landing preference for the active org (or global/null org).

@@ -3,7 +3,7 @@ import styles from './TransactionLineItems.module.css'
 import { useHasPermission } from '../../hooks/useHasPermission'
 import { useToast } from '../../contexts/ToastContext'
 import { getOrganizations, type Organization } from '../../services/organization'
-import { transactionLineItemsCatalogService, type DbTxLineItem } from '../../services/transaction-line-items-enhanced'
+import { lineItemsCatalogService, type CatalogItem } from '../../services/line-items-catalog'
 
 import ExportButtons from '../../components/Common/ExportButtons'
 import TreeView from '../../components/TreeView/TreeView'
@@ -60,7 +60,6 @@ type TransactionLineItemRow = {
 const TransactionLineItemsPage: React.FC = () => {
   const { showToast } = useToast()
   const hasPermission = useHasPermission()
-  const canView = hasPermission('transaction_line_items.view')
   const canCreate = hasPermission('transaction_line_items.create')
   const canUpdate = hasPermission('transaction_line_items.update')
   const canDelete = hasPermission('transaction_line_items.delete')
@@ -112,8 +111,7 @@ const TransactionLineItemsPage: React.FC = () => {
   })
 
   useEffect(() => {
-    if (!canView) return
-    ;(async () => {
+    (async () => {
       setLoading(true)
       try {
         const [orgList, initialOrgId] = await Promise.all([
@@ -132,25 +130,24 @@ const TransactionLineItemsPage: React.FC = () => {
         setLoading(false)
       }
     })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canView])
+  }, [])
 
   const reload = async (chosen: string) => {
     if (!chosen) return
     setLoading(true)
     try {
-      const catalogItems: DbTxLineItem[] = await transactionLineItemsCatalogService.getCatalogItems(chosen, true)
+      const catalogItems: CatalogItem[] = await lineItemsCatalogService.list(chosen, true)
 
       const itemsWithMeta: TransactionLineItemRow[] = catalogItems.map(item => ({
         id: item.id,
-        item_code: item.item_code || null,
-        item_name: item.item_name || null,
-        item_name_ar: item.item_name_ar || null,
+        item_code: item.code || null,
+        item_name: item.name || null,
+        item_name_ar: item.name_ar || null,
         parent_id: item.parent_id || null,
-        unit_price: item.unit_price ?? 0,
-        unit_of_measure: item.unit_of_measure ?? null,
-        is_active: item.is_active !== false,
-        level: calculateLevelFromCode(item.item_code || ''),
+        unit_price: Number(item.standard_cost ?? 0),
+        unit_of_measure: item.base_unit_of_measure ?? null,
+        is_active: item.is_active,
+        level: item.level ?? calculateLevelFromCode(item.code || ''),
         child_count: 0,
         has_usage: false,
         usage_count: 0,
@@ -161,7 +158,7 @@ const TransactionLineItemsPage: React.FC = () => {
       const maxDepth = Math.max(0, ...itemsWithMeta.map(r => r.level || 1))
       setList(itemsWithMeta)
       setStats({ totalItems: itemsWithMeta.length, rootItems, maxDepth, usageCount: 0 })
-      console.log('✅ Loaded', itemsWithMeta.length, 'catalog items')
+      console.log('✅ Loaded', itemsWithMeta.length, 'catalog items from line_items')
     } catch (e: unknown) {
       showToast((e as Error).message || 'Failed to reload', { severity: 'error' })
     } finally {
@@ -226,11 +223,11 @@ const TransactionLineItemsPage: React.FC = () => {
     return prepareTableData(columns, rows)
   }, [filteredList])
 
-  // Get next code from service
+  // Get next code from unified line_items catalog service
   const getNextCode = async (parentId?: string | null) => {
     if (!orgId) return '1000'
     try {
-      return await transactionLineItemsCatalogService.getNextCatalogItemCode(orgId, parentId ?? undefined)
+      return await lineItemsCatalogService.getNextCode(orgId, parentId ?? null)
     } catch (e: unknown) {
       const error = e as Error
       showToast(
@@ -280,28 +277,25 @@ const TransactionLineItemsPage: React.FC = () => {
     if (!orgId) { showToast('Select organization', { severity: 'warning' }); return }
     try {
       if (editingId) {
-        await transactionLineItemsCatalogService.updateCatalogItem(editingId, orgId, {
-          item_code: form.item_code,
-          item_name: form.item_name,
-          item_name_ar: form.item_name_ar || undefined,
-          parent_id: form.parent_id ? form.parent_id : undefined,
-          unit_of_measure: form.unit_of_measure || undefined,
-          unit_price: form.unit_price,
-          quantity: form.quantity,
+        await lineItemsCatalogService.update(editingId, orgId, {
+          code: form.item_code,
+          name: form.item_name,
+          name_ar: form.item_name_ar || undefined,
+          parent_id: form.parent_id || null,
+          base_unit_of_measure: form.unit_of_measure || undefined,
+          standard_cost: form.unit_price,
           is_active: form.is_active,
-          position: form.position,
         })
         showToast('تم التحديث بنجاح', { severity: 'success' })
       } else {
-        await transactionLineItemsCatalogService.createCatalogItem(orgId, {
-          item_code: form.item_code,
-          item_name: form.item_name,
-          item_name_ar: form.item_name_ar || undefined,
-          parent_id: form.parent_id || undefined,
-          unit_of_measure: form.unit_of_measure,
-          unit_price: form.unit_price,
-          quantity: form.quantity,
-          position: form.position,
+        await lineItemsCatalogService.create(orgId, {
+          code: form.item_code,
+          name: form.item_name,
+          name_ar: form.item_name_ar || undefined,
+          parent_id: form.parent_id || null,
+          base_unit_of_measure: form.unit_of_measure,
+          standard_cost: form.unit_price,
+          is_active: form.is_active,
         })
         showToast('تم الإنشاء بنجاح', { severity: 'success' })
       }
@@ -335,7 +329,7 @@ const TransactionLineItemsPage: React.FC = () => {
 
   const handleToggleActive = async (row: TransactionLineItemRow) => {
     try {
-      await transactionLineItemsCatalogService.updateCatalogItem(row.id, orgId, {
+      await lineItemsCatalogService.update(row.id, orgId, {
         is_active: !row.is_active,
       })
       showToast(row.is_active ? 'تم التعطيل' : 'تم التفعيل', { severity: 'success' })
@@ -349,22 +343,12 @@ const TransactionLineItemsPage: React.FC = () => {
     if (!orgId) return
     if (!confirm(`حذف بند التكلفة ${row.item_code}؟`)) return
     try {
-      await transactionLineItemsCatalogService.deleteCatalogItem(row.id, orgId)
+      await lineItemsCatalogService.remove(row.id, orgId)
       showToast('تم الحذف بنجاح', { severity: 'success' })
       await reload(orgId)
     } catch (e: unknown) {
       showToast((e as Error).message || 'Delete failed', { severity: 'error' })
     }
-  }
-
-  if (!canView) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.header}>
-          <Typography variant="h6">Access denied</Typography>
-        </div>
-      </div>
-    )
   }
 
   return (

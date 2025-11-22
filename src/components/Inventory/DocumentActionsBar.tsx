@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Card, CardContent, Grid, TextField, Button, Typography, MenuItem } from '@mui/material'
 import { useToast } from '@/contexts/ToastContext'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/hooks/useAuth'
 import { approveInventoryDocument, postInventoryDocument, voidInventoryDocument, getInventoryDocument, listRecentDocuments, type InventoryDocumentSummary, type DocType } from '@/services/inventory/documents'
 
 function getActiveOrgIdSafe(): string | null { try { return localStorage.getItem('org_id') } catch { return null } }

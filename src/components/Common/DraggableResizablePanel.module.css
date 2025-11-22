@@ -19,6 +19,9 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .titleBar {
@@ -95,6 +98,29 @@
   overflow: auto;
   padding: 0;
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Force all children to stretch */
+.content > * {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Force form fields to stretch */
+.content form,
+.content form > *,
+.content form input,
+.content form select,
+.content form textarea {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 .resizeHandle {

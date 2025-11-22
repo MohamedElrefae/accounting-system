@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -16,11 +16,13 @@ import {
   Select,
   MenuItem,
 } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
-import CompressIcon from '@mui/icons-material/Compress';
-import ExpandIcon from '@mui/icons-material/ZoomOutMap';
-import DownloadIcon from '@mui/icons-material/Download';
-import SecurityIcon from '@mui/icons-material/Security';
+import {
+  Close as CloseIcon,
+  Download as DownloadIcon,
+  Security as SecurityIcon,
+  UnfoldMore as ExpandIcon,
+  UnfoldLess as CompressIcon,
+} from '../icons/SimpleIcons';
 import { useQueryClient } from '@tanstack/react-query';
 import * as svc from '../../services/documents';
 import { useToast } from '../../contexts/ToastContext';

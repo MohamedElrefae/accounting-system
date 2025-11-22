@@ -22,16 +22,29 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const {
     user,
     loading,
-    permissionsLoading,
     hasRouteAccess,
     hasActionAccess,
+    roles,
   } = useAuth();
   const location = useLocation();
 
-  // Combine loading states for faster rendering
-  const isLoading = loading || permissionsLoading;
+  const isSuperAdmin = Array.isArray(roles) && roles.includes('super_admin');
 
-  if (isLoading) {
+  if (import.meta.env.DEV) {
+    console.log('[ProtectedRoute] render', {
+      pathname: location.pathname,
+      loading,
+      hasUser: !!user,
+      requiredAction: requiredAction ?? null,
+      isSuperAdmin,
+    });
+  }
+
+  // Fast loading check
+  if (loading) {
+    if (import.meta.env.DEV) {
+      console.log('[ProtectedRoute] still loading auth/permissions for', location.pathname);
+    }
     return (
       <div
         style={{
@@ -47,7 +60,18 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (!user) {
+    if (import.meta.env.DEV) {
+      console.log('[ProtectedRoute] no user, redirecting to /login from', location.pathname);
+    }
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Super admin override: always allow if user has super_admin role
+  if (isSuperAdmin) {
+    if (import.meta.env.DEV) {
+      console.log('[ProtectedRoute] super_admin override granted for', location.pathname);
+    }
+    return <>{children}</>;
   }
 
   // Batch permission checks to avoid multiple function calls
@@ -55,7 +79,19 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const routeAllowed = hasRouteAccess(pathname);
   const actionAllowed = !requiredAction || hasActionAccess(requiredAction);
 
+  if (import.meta.env.DEV) {
+    console.log('[ProtectedRoute] permissions check', {
+      pathname,
+      routeAllowed,
+      actionAllowed,
+      requiredAction: requiredAction ?? null,
+    });
+  }
+
   if (!routeAllowed || !actionAllowed) {
+    if (import.meta.env.DEV) {
+      console.log('[ProtectedRoute] access denied, redirecting to', redirectTo ?? '/unauthorized');
+    }
     if (fallback) {
       return <>{fallback}</>;
     }

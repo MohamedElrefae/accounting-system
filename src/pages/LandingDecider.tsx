@@ -7,11 +7,14 @@ const Welcome = React.lazy(() => import('./Welcome'))
 
 const LandingDecider: React.FC = () => {
   const qc = useQueryClient()
+  
   // Fetch server-backed landing preference (scoped by active org via service)
-  const { data: pref, isLoading } = useQuery({
+  const { data: pref, isLoading, error } = useQuery({
     queryKey: ['landingPreference'],
     queryFn: () => getLandingPreference(),
     staleTime: 5 * 60 * 1000,
+    retry: 1, // Only retry once
+    retryDelay: 500,
   })
 
   // Prefetch the dashboard bundle and data on idle to keep the first transition fast
@@ -31,11 +34,15 @@ const LandingDecider: React.FC = () => {
     }
   }, [])
 
-  if (isLoading) return <div />
+  // Show loading state briefly
+  if (isLoading) return <div style={{ padding: '20px' }}>Loading...</div>
+
+  // If there's an error or no preference, default to dashboard
+  const effectivePref = error ? 'dashboard' : (pref || 'dashboard')
 
   return (
-    <React.Suspense fallback={<div />}> 
-      {pref === 'dashboard' ? <Dashboard /> : <Welcome />}
+    <React.Suspense fallback={<div style={{ padding: '20px' }}>Loading dashboard...</div>}> 
+      {effectivePref === 'dashboard' ? <Dashboard /> : <Welcome />}
     </React.Suspense>
   )
 }

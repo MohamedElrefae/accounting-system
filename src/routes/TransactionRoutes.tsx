@@ -14,14 +14,14 @@ const TransactionRoutes: React.FC = () => {
   return (
     <Routes>
       {/* My Transactions */}
-      <Route path="/transactions/my" element={
+      <Route path="my" element={
         <OptimizedSuspense>
           <TransactionsPage />
         </OptimizedSuspense>
       } />
       
       {/* Pending Transactions */}
-      <Route path="/transactions/pending" element={
+      <Route path="pending" element={
         <ProtectedRoute requiredAction="transactions.review">
           <OptimizedSuspense>
             <TransactionsPage />
@@ -30,47 +30,47 @@ const TransactionRoutes: React.FC = () => {
       } />
       
       {/* All Transactions */}
-      <Route path="/transactions/all" element={
+      <Route path="all" element={
         <OptimizedSuspense>
           <TransactionsPage />
         </OptimizedSuspense>
       } />
       
       {/* Enriched Transactions */}
-      <Route path="/transactions/my-enriched" element={
+      <Route path="my-enriched" element={
         <OptimizedSuspense>
           <TransactionsEnrichedPage />
         </OptimizedSuspense>
       } />
       
-      <Route path="/transactions/all-enriched" element={
+      <Route path="all-enriched" element={
         <OptimizedSuspense>
           <TransactionsEnrichedPage />
         </OptimizedSuspense>
       } />
       
       {/* Transaction Details */}
-      <Route path="/transactions/:id" element={
+      <Route path=":id" element={
         <OptimizedSuspense>
           <TransactionDetailsPage />
         </OptimizedSuspense>
       } />
       
       {/* Transaction Line Items */}
-      <Route path="/transactions/line-items" element={
+      <Route path="line-items" element={
         <OptimizedSuspense>
           <TxLineItemsPage />
         </OptimizedSuspense>
       } />
       
-      <Route path="/Transactions/TransactionLineItems" element={
+      <Route path="TransactionLineItems" element={
         <OptimizedSuspense>
           <TxLineItemsPage />
         </OptimizedSuspense>
       } />
       
       {/* Cost Analysis */}
-      <Route path="/transactions/assign-cost-analysis" element={
+      <Route path="assign-cost-analysis" element={
         <ProtectedRoute requiredAction="transactions.cost_analysis">
           <OptimizedSuspense>
             <AssignCostAnalysisPage />

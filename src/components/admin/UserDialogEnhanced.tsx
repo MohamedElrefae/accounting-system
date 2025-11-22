@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { supabase } from '../../utils/supabase';
 import { audit } from '../../utils/audit';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import UnifiedCRUDForm, { type UnifiedCRUDFormHandle } from '../Common/UnifiedCRUDForm';
 import DraggablePanelContainer from '../Common/DraggablePanelContainer';
 import { createUserFormConfig, type UserRecord, type Role } from './UserFormConfig';

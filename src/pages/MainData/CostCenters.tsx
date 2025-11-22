@@ -52,7 +52,6 @@ async function getInitialOrgId(): Promise<string> {
 const CostCentersPage: React.FC = () => {
   const { showToast } = useToast()
   const hasPermission = useHasPermission()
-  const canView = hasPermission('cost_centers.read')
   const canCreate = hasPermission('cost_centers.create')
   const canUpdate = hasPermission('cost_centers.update')
   const canDelete = hasPermission('cost_centers.delete')
@@ -92,7 +91,6 @@ const CostCentersPage: React.FC = () => {
   })
 
   useEffect(() => {
-    if (!canView) return
     (async () => {
       setLoading(true)
       try {
@@ -116,8 +114,7 @@ const CostCentersPage: React.FC = () => {
         setLoading(false)
       }
     })()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canView])
+  }, [])
 
   const reload = async (chosen: string) => {
     if (!chosen) return
@@ -297,16 +294,6 @@ const CostCentersPage: React.FC = () => {
     } catch (e: unknown) {
       showToast((e as Error).message || 'Delete failed', { severity: 'error' })
     }
-  }
-
-  if (!canView) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.header}>
-          <Typography variant="h6">Access denied</Typography>
-        </div>
-      </div>
-    )
   }
 
   return (

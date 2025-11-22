@@ -1,10 +1,6 @@
-import { useContext } from 'react';
-import { AuthContext } from '../contexts/AuthContext';
+import { useOptimizedAuth } from './useOptimizedAuth';
 
+// Unified auth hook used across the app, backed by optimized singleton auth.
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  return useOptimizedAuth();
 };

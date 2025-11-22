@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from './useAuth';
 
 
 export function usePermissions() {

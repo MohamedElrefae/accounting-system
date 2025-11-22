@@ -7,6 +7,11 @@
   color: var(--text-primary);
   border: 1px solid var(--border-light);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
 }
 
 .headerRow {
@@ -86,6 +91,11 @@
 
 .fieldBlock {
   animation: fadeSlide 200ms ease;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 .sectionInfo {
@@ -173,6 +183,9 @@
   display: grid;
   gap: 20px;
   align-items: start;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Reduced gap for more compact layout */
@@ -185,6 +198,9 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* More compact spacing for multi-column layouts */
@@ -221,6 +237,7 @@ button.ultimate-btn:disabled {
 /* Input styling */
 .inputBase {
   width: 100%;
+  max-width: 100%;
   padding: 12px 16px;
   background-color: var(--input-bg);
   color: var(--text-primary);
@@ -229,6 +246,7 @@ button.ultimate-btn:disabled {
   font-size: 14px;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
   outline: none;
+  box-sizing: border-box;
 }
 .inputBase:focus-visible {
   border-color: var(--accent);
@@ -316,6 +334,11 @@ button.ultimate-btn:disabled {
   to { transform: translateY(0); opacity: 1; }
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Account Selector Fields - Make them wider and more prominent */
 .accountSelectorField {
   min-width: 320px;
@@ -343,6 +366,104 @@ button.ultimate-btn:disabled {
   gap: 20px;
 }
 
+/* Section styling for grouped fields */
+.formSection {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--surface, #f8f9fa);
+  border-radius: 8px;
+  border-left: 4px solid var(--primary-blue);
+}
+
+.formSection:last-child {
+  margin-bottom: 0;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--heading-text);
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sectionTitle::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  background: var(--primary-blue);
+  border-radius: 50%;
+}
+
+.sectionFields {
+  display: grid;
+  gap: 16px;
+}
+
+/* Collapsible section support */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: 12px;
+  background: var(--border-light);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  transition: background 0.2s ease;
+}
+
+.sectionHeader:hover {
+  background: var(--border-color);
+}
+
+.sectionHeader.collapsed {
+  margin-bottom: 0;
+}
+
+.sectionContent {
+  animation: slideDown 0.3s ease-out;
+}
+
+.sectionContent.collapsed {
+  display: none;
+}
+
+/* Compact field layout for dense forms */
+.compactLayout .fieldBlock {
+  margin-bottom: 12px;
+}
+
+.compactLayout .labelRow {
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.compactLayout .inputBase {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+/* Field grouping with visual separation */
+.fieldGroup {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+}
+
+.fieldGroup.highlighted {
+  background: rgba(37, 99, 235, 0.05);
+  border-color: var(--primary-blue);
+}
+
 @media (max-width: 768px) {
   .gridContainer.accountFocused {
     grid-template-columns: 1fr;
@@ -350,6 +471,15 @@ button.ultimate-btn:disabled {
   
   .fieldBlock:has([id*="account"]) {
     min-width: 100%;
+  }
+  
+  .formSection {
+    padding: 12px;
+    margin-bottom: 16px;
+  }
+  
+  .sectionTitle {
+    font-size: 13px;
   }
 }
 

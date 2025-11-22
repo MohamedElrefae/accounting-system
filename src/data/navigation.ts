@@ -67,14 +67,15 @@ const baseNavigation: NavigationItem[] = [
         icon: "tree-structure",
         path: "/main-data/work-items"
       },
-      {
-        id: "document-categories",
-        label: "Document Categories",
-        titleEn: "Document Categories",
-        titleAr: "تصنيفات المستندات",
-        icon: "Category",
-        path: "/main-data/document-categories"
-      },
+      // Temporarily hidden: Document Categories (not ready for use)
+      // {
+      //   id: "document-categories",
+      //   label: "Document Categories",
+      //   titleEn: "Document Categories",
+      //   titleAr: "تصنيفات المستندات",
+      //   icon: "Category",
+      //   path: "/main-data/document-categories"
+      // },
       {
         id: "document-templates",
         label: "Document Templates",

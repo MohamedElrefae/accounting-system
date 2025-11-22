@@ -1162,7 +1162,7 @@ class TransactionLineItemsCatalogService {
         .from('transaction_line_items')
         .select('*')
         .eq('org_id', orgId)
-        .is('transaction_id', null) // Catalog items
+        .is('transaction_line_id', null) // Catalog items: templates not tied to any transaction line
         .order('item_code', { ascending: true })
       
       if (error) throw error
@@ -1236,7 +1236,7 @@ class TransactionLineItemsCatalogService {
         .from('transaction_line_items')
         .insert([{
           org_id: orgId,
-          transaction_id: null, // Mark as template
+          transaction_line_id: null, // Mark as template (not associated with a specific transaction line)
           line_number: itemData.position || 1,
           item_code: itemCode,
           item_name: itemData.item_name,
@@ -1290,7 +1290,7 @@ class TransactionLineItemsCatalogService {
         .update(allowed)
         .eq('id', id)
         .eq('org_id', orgId)
-        .is('transaction_id', null) // Ensure it's a catalog item
+        .is('transaction_line_id', null) // Ensure it's a catalog item (template)
         .select()
         .single()
 
@@ -1333,7 +1333,7 @@ class TransactionLineItemsCatalogService {
         .delete()
         .eq('id', id)
         .eq('org_id', orgId)
-        .is('transaction_id', null)
+        .is('transaction_line_id', null)
 
       if (error) throw error
       console.log('✅ Deleted catalog item:', id)
@@ -1354,7 +1354,7 @@ class TransactionLineItemsCatalogService {
           .from('transaction_line_items')
           .select('item_code')
           .eq('org_id', orgId)
-          .is('transaction_id', null)
+          .is('transaction_line_id', null)
           .is('parent_id', null)
           .like('item_code', '[0-9][0-9][0-9][0-9]')
           .order('item_code', { ascending: false })
@@ -1428,7 +1428,7 @@ class TransactionLineItemsCatalogService {
       const { data: usage } = await supabase
         .from('transaction_line_items')
         .select('item_code')
-        .not('transaction_id', 'is', null)
+        .not('transaction_line_id', 'is', null)
         .in('item_code', items.map(item => item.item_code).filter(Boolean))
       
       return {

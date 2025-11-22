@@ -1,0 +1,41 @@
+SAMPLE STRUCTURE BASED ON USER DESCRIPTION
+==================================================
+
+  1: 1
+  2: location_number
+  3: 2
+  4: location_name
+  5: 3
+  6: location_address
+  7: 4
+  8: district
+  9: 5
+ 10: voter_id
+ 11: 6
+ 12: full_name
+ 13: 7
+ 14: source_page
+ 15: 50
+ 16: total_voters
+ 17: 51
+ 18: 6059
+ 19: 52
+ 20: source_page
+ 21: 53
+ 22: 60
+ 23: 60
+ 24: location_number
+ 25: 61
+ 26: location_name
+ 27: 62
+ 28: location_address
+ 29: 63
+ 30: district
+ 31: 64
+ 32: source_page
+ 33: 65
+ 34: total_voters
+ 35: 66
+ 36: 6059
+ 37: 67
+ 38: source_page

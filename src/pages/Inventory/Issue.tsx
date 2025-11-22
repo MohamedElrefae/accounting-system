@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, Typography, Grid, TextField, MenuItem, Button, Divider } from '@mui/material'
 import { useToast } from '@/contexts/ToastContext'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/hooks/useAuth'
 import { listMaterials, type MaterialRow } from '@/services/inventory/materials'
 import { listAnalysisWorkItems, type AnalysisWorkItemFull } from '@/services/analysis-work-items'
 import { listWorkItemsAll, type WorkItemRow } from '@/services/work-items'

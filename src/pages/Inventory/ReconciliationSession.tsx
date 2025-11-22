@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { Box, Button, Container, Paper, Stack, Typography, Tooltip, MenuItem, Select, TextField } from '@mui/material'
 import { DataGrid, type GridColDef } from '@mui/x-data-grid'
 import { ReconciliationService, type ReconLine, type ReconSummary } from '@/services/inventory/reconciliation'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/hooks/useAuth'
 import { getActiveOrgId } from '@/utils/org'
 
 export default function ReconciliationSessionPage() {

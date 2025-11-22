@@ -70,7 +70,7 @@ const AccountsTreePage: React.FC = () => {
   const [accounts, setAccounts] = useState<AccountItem[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [breadcrumbs, setBreadcrumbs] = useState<AncestorItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [projects, setProjects] = useState<{ id: string; code: string; name: string; name_ar?: string }[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [balanceMode, setBalanceMode] = useState<'posted' | 'all'>('all');

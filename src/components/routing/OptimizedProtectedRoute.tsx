@@ -38,13 +38,27 @@ const OptimizedProtectedRoute: React.FC<OptimizedProtectedRouteProps> = ({
   } = useOptimizedAuth();
   const location = useLocation();
 
+  if (import.meta.env.DEV) {
+    console.log('[OptimizedProtectedRoute] render', {
+      pathname: location.pathname,
+      loading,
+      hasUser: !!user,
+    });
+  }
+
   // Fast loading check
   if (loading) {
+    if (import.meta.env.DEV) {
+      console.log('[OptimizedProtectedRoute] still loading auth for', location.pathname);
+    }
     return <MinimalLoader />;
   }
 
   // Fast auth check
   if (!user) {
+    if (import.meta.env.DEV) {
+      console.log('[OptimizedProtectedRoute] no user, redirecting to /login from', location.pathname);
+    }
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
@@ -52,6 +66,15 @@ const OptimizedProtectedRoute: React.FC<OptimizedProtectedRouteProps> = ({
   const pathname = location.pathname;
   const routeAllowed = hasRouteAccess(pathname);
   const actionAllowed = !requiredAction || hasActionAccess(requiredAction);
+
+  if (import.meta.env.DEV) {
+    console.log('[OptimizedProtectedRoute] permissions check', {
+      pathname,
+      routeAllowed,
+      actionAllowed,
+      requiredAction: requiredAction ?? null,
+    });
+  }
 
   if (!routeAllowed || !actionAllowed) {
     if (fallback) {

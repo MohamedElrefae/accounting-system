@@ -36,18 +36,20 @@ export async function getTransactionClassifications(orgId: string): Promise<Tran
 
 /**
  * Get all transaction classifications (for all organizations the user has access to)
- * This is useful for general UI components that need all available classifications
+ * This is useful for general UI components that need all available classifications.
+ *
+ * Implementation detail:
+ * - Uses a SECURITY DEFINER RPC (`get_all_transaction_classifications_secure`) to avoid
+ *   recursive RLS/stack-depth issues on the base table while still enforcing org membership
+ *   via auth.uid() inside the function.
  */
 export async function getAllTransactionClassifications(): Promise<TransactionClassification[]> {
   const { data, error } = await supabase
-    .from('transaction_classification')
-    .select('id, code, name, post_to_costs, org_id, created_at, updated_at')
-    .order('code', { ascending: true })
-    .limit(1000);
+    .rpc('get_all_transaction_classifications_secure');
 
   if (error) {
     console.error('Error fetching all transaction classifications:', error);
-    return []; // Return empty array instead of throwing
+    return [];
   }
   
   return (data as TransactionClassification[]) || [];

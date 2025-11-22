@@ -22,7 +22,7 @@ import WorkIcon from '@mui/icons-material/Work';
 import BusinessIcon from '@mui/icons-material/Business';
 import { supabase } from '../../utils/supabase';
 import { audit } from '../../utils/audit';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 
 interface UserDialogProps {
   open: boolean;

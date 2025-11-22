@@ -31,13 +31,14 @@ import { getActiveOrgId, getActiveProjectId } from '../utils/org';
 import useAppStore from '../store/useAppStore';
 import { useNavigate } from 'react-router-dom';
 import StatCard from '../components/ui/StatCard';
-import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
-import BalanceIcon from '@mui/icons-material/Balance';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import {
+  AccountTree,
+  Receipt,
+  Assessment,
+  AccountBalance,
+  TrendingUp,
+  ExpandMore,
+} from '../components/icons/SimpleIcons';
 import { 
   dashboardStats, 
   translations 
@@ -584,7 +585,7 @@ const Dashboard: React.FC = () => {
             label={language === 'ar' ? 'تقريب القيم الكبيرة' : 'Compact ticks'}
           />
           <IconButton size="small" onClick={() => setShowFilters(v => !v)} aria-label={language === 'ar' ? 'إظهار/إخفاء المرشحات' : 'Toggle filters'}>
-            <ExpandMoreIcon sx={{ transform: showFilters ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+            <ExpandMore sx={{ transform: showFilters ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
           </IconButton>
           <Chip
             size="small"
@@ -724,7 +725,7 @@ const Dashboard: React.FC = () => {
                 {language === 'ar' ? 'البيانات الأساسية' : 'Main Data'}
               </Typography>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 2 }}>
-                <Button variant="outlined" startIcon={<AccountTreeIcon />} onClick={() => navigate('/main-data/accounts-tree')} title={language === 'ar' ? 'فتح شجرة الحسابات' : 'Open Accounts Tree'} accessKey="A" aria-label="Accounts Tree">
+                <Button variant="outlined" startIcon={<AccountTree />} onClick={() => navigate('/main-data/accounts-tree')} title={language === 'ar' ? 'فتح شجرة الحسابات' : 'Open Accounts Tree'} accessKey="A" aria-label="Accounts Tree">
                   {language === 'ar' ? 'شجرة الحسابات' : 'Accounts Tree'}
                 </Button>
               </Box>
@@ -734,7 +735,7 @@ const Dashboard: React.FC = () => {
                 {language === 'ar' ? 'المعاملات' : 'Transactions'}
               </Typography>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 2 }}>
-                <Button variant="outlined" startIcon={<ReceiptLongIcon />} onClick={() => navigate('/transactions/all')} title={language === 'ar' ? 'عرض جميع المعاملات' : 'View all transactions'} accessKey="T" aria-label="All Transactions">
+                <Button variant="outlined" startIcon={<Receipt />} onClick={() => navigate('/transactions/all')} title={language === 'ar' ? 'عرض جميع المعاملات' : 'View all transactions'} accessKey="T" aria-label="All Transactions">
                   {language === 'ar' ? 'كل المعاملات' : 'All Transactions'}
                 </Button>
               </Box>
@@ -744,16 +745,16 @@ const Dashboard: React.FC = () => {
                 {language === 'ar' ? 'التقارير' : 'Reports'}
               </Typography>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 2 }}>
-                <Button variant="outlined" startIcon={<MenuBookIcon />} onClick={() => navigate('/reports/general-ledger')} title={language === 'ar' ? 'عرض دفتر الأستاذ' : 'Open General Ledger'} accessKey="G" aria-label="General Ledger">
+                <Button variant="outlined" startIcon={<Assessment />} onClick={() => navigate('/reports/general-ledger')} title={language === 'ar' ? 'عرض دفتر الأستاذ' : 'Open General Ledger'} accessKey="G" aria-label="General Ledger">
                   {language === 'ar' ? 'دفتر الأستاذ' : 'General Ledger'}
                 </Button>
-                <Button variant="outlined" startIcon={<BalanceIcon />} onClick={() => navigate('/reports/trial-balance')} title={language === 'ar' ? 'عرض ميزان المراجعة' : 'Open Trial Balance'} accessKey="B" aria-label="Trial Balance">
+                <Button variant="outlined" startIcon={<AccountBalance />} onClick={() => navigate('/reports/trial-balance')} title={language === 'ar' ? 'عرض ميزان المراجعة' : 'Open Trial Balance'} accessKey="B" aria-label="Trial Balance">
                   {language === 'ar' ? 'ميزان المراجعة' : 'Trial Balance'}
                 </Button>
-                <Button variant="outlined" startIcon={<TrendingUpIcon />} onClick={() => navigate('/reports/profit-loss')} title={language === 'ar' ? 'عرض قائمة الدخل' : 'Open Profit & Loss'} accessKey="P" aria-label="Profit and Loss">
+                <Button variant="outlined" startIcon={<TrendingUp />} onClick={() => navigate('/reports/profit-loss')} title={language === 'ar' ? 'عرض قائمة الدخل' : 'Open Profit & Loss'} accessKey="P" aria-label="Profit and Loss">
                   {language === 'ar' ? 'قائمة الدخل' : 'Profit & Loss'}
                 </Button>
-                <Button variant="outlined" startIcon={<AccountBalanceIcon />} onClick={() => navigate('/reports/balance-sheet')} title={language === 'ar' ? 'عرض الميزانية' : 'Open Balance Sheet'} accessKey="S" aria-label="Balance Sheet">
+                <Button variant="outlined" startIcon={<AccountBalance />} onClick={() => navigate('/reports/balance-sheet')} title={language === 'ar' ? 'عرض الميزانية' : 'Open Balance Sheet'} accessKey="S" aria-label="Balance Sheet">
                   {language === 'ar' ? 'الميزانية العمومية' : 'Balance Sheet'}
                 </Button>
               </Box>

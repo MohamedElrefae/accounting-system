@@ -23,10 +23,18 @@ SELECT
   NULL::numeric AS total_cost,
   NULL::numeric AS standard_cost,
   tl.created_at,
-  tl.updated_at,
+  tl.created_at AS updated_at,
   -- Aggregates from transaction_line_items
   COALESCE(agg.line_items_count, 0) AS line_items_count,
-  COALESCE(agg.line_items_total, 0::numeric) AS line_items_total
+  COALESCE(agg.line_items_total, 0::numeric) AS line_items_total,
+  -- Header fields from transactions for server-side filtering and search
+  t.entry_number,
+  t.entry_date,
+  t.description AS header_description,
+  t.org_id AS header_org_id,
+  t.project_id AS header_project_id,
+  t.approval_status,
+  t.is_posted
 FROM public.transaction_lines tl
 LEFT JOIN (
   SELECT 
@@ -36,4 +44,5 @@ LEFT JOIN (
   FROM public.transaction_line_items tli
   WHERE tli.transaction_line_id IS NOT NULL
   GROUP BY tli.transaction_line_id
-) agg ON agg.tl_id = tl.id;
+) agg ON agg.tl_id = tl.id
+LEFT JOIN public.transactions t ON t.id = tl.transaction_id;

@@ -5,10 +5,7 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
 import Chip from '@mui/material/Chip';
-import TrendingUp from '@mui/icons-material/TrendingUp';
-import TrendingDown from '@mui/icons-material/TrendingDown';
-import AccountBalance from '@mui/icons-material/AccountBalance';
-import Receipt from '@mui/icons-material/Receipt';
+import { TrendingUp, TrendingDown, AccountBalance, Receipt } from '../icons/SimpleIcons';
 import type { StatCard as StatCardType } from '../../types';
 import useAppStore from '../../store/useAppStore';
 

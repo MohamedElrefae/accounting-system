@@ -72,7 +72,7 @@ import ShieldIcon from '@mui/icons-material/Shield';
 import PermissionIcon from '@mui/icons-material/Key';
 import Refresh from '@mui/icons-material/Refresh';
 import { supabase } from '../../utils/supabase';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { testUserManagementConnection } from '../../utils/testUserManagement';
 
 interface User {

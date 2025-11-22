@@ -22,7 +22,7 @@ import BusinessIcon from '@mui/icons-material/Business';
 import SaveIcon from '@mui/icons-material/Save';
 import { supabase } from '../../utils/supabase';
 import { audit } from '../../utils/audit';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import type { Role } from './UserFormConfig';
 
 type ExistingUserProfileDb = {

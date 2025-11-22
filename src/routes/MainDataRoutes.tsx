@@ -24,14 +24,14 @@ const MainDataRoutes: React.FC = () => {
   return (
     <Routes>
       {/* Accounts Tree */}
-      <Route path="/main-data/accounts-tree" element={
+      <Route path="accounts-tree" element={
         <OptimizedSuspense>
           <AccountsTreeLazy />
         </OptimizedSuspense>
       } />
       
       {/* Sub Tree */}
-      <Route path="/main-data/sub-tree" element={
+      <Route path="sub-tree" element={
         <ProtectedRoute requiredAction="sub_tree.view">
           <OptimizedSuspense>
             <SubTreePage />
@@ -40,21 +40,21 @@ const MainDataRoutes: React.FC = () => {
       } />
       
       {/* Work Items */}
-      <Route path="/main-data/work-items" element={
+      <Route path="work-items" element={
         <OptimizedSuspense>
           <WorkItemsPage />
         </OptimizedSuspense>
       } />
       
       {/* Document Categories */}
-      <Route path="/main-data/document-categories" element={
+      <Route path="document-categories" element={
         <OptimizedSuspense>
           <DocumentCategoriesPage />
         </OptimizedSuspense>
       } />
       
       {/* Document Templates */}
-      <Route path="/main-data/document-templates" element={
+      <Route path="document-templates" element={
         <ProtectedRoute requiredAction="templates.view">
           <OptimizedSuspense>
             <TemplateLibraryPage />
@@ -62,7 +62,7 @@ const MainDataRoutes: React.FC = () => {
         </ProtectedRoute>
       } />
       
-      <Route path="/main-data/document-templates/:id" element={
+      <Route path="document-templates/:id" element={
         <ProtectedRoute requiredAction="templates.manage">
           <OptimizedSuspense>
             <TemplateEditorPage />
@@ -70,7 +70,7 @@ const MainDataRoutes: React.FC = () => {
         </ProtectedRoute>
       } />
       
-      <Route path="/main-data/document-templates/:id/view" element={
+      <Route path="document-templates/:id/view" element={
         <ProtectedRoute requiredAction="templates.view">
           <OptimizedSuspense>
             <TemplateViewerPage />
@@ -79,21 +79,25 @@ const MainDataRoutes: React.FC = () => {
       } />
       
       {/* Analysis Work Items */}
-      <Route path="/main-data/analysis-work-items" element={
-        <OptimizedSuspense>
-          <AnalysisWorkItemsPage />
-        </OptimizedSuspense>
+      <Route path="analysis-work-items" element={
+        <ProtectedRoute requiredAction="work_items.view">
+          <OptimizedSuspense>
+            <AnalysisWorkItemsPage />
+          </OptimizedSuspense>
+        </ProtectedRoute>
       } />
       
       {/* Cost Centers */}
-      <Route path="/main-data/cost-centers" element={
-        <OptimizedSuspense>
-          <CostCentersPage />
-        </OptimizedSuspense>
+      <Route path="cost-centers" element={
+        <ProtectedRoute requiredAction="cost_centers.read">
+          <OptimizedSuspense>
+            <CostCentersPage />
+          </OptimizedSuspense>
+        </ProtectedRoute>
       } />
       
       {/* Transaction Line Items */}
-      <Route path="/main-data/transaction-line-items" element={
+      <Route path="transaction-line-items" element={
         <ProtectedRoute requiredAction="transaction_line_items.read">
           <OptimizedSuspense>
             <TransactionLineItemsCatalogPage />
@@ -102,21 +106,21 @@ const MainDataRoutes: React.FC = () => {
       } />
       
       {/* Organizations */}
-      <Route path="/main-data/organizations" element={
+      <Route path="organizations" element={
         <OptimizedSuspense>
           <OrgManagementTabs />
         </OptimizedSuspense>
       } />
       
       {/* Projects */}
-      <Route path="/main-data/projects" element={
+      <Route path="projects" element={
         <OptimizedSuspense>
           <ProjectManagement />
         </OptimizedSuspense>
       } />
       
       {/* Transaction Classification */}
-      <Route path="/main-data/transaction-classification" element={
+      <Route path="transaction-classification" element={
         <OptimizedSuspense>
           <TransactionClassificationPage />
         </OptimizedSuspense>

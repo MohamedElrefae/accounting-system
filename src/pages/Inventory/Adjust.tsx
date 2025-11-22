@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, Typography, Grid, TextField, MenuItem, Button, Divider } from '@mui/material'
 import { useToast } from '@/contexts/ToastContext'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/hooks/useAuth'
 import { listMaterials, type MaterialRow } from '@/services/inventory/materials'
 import { listInventoryLocations, type InventoryLocationRow } from '@/services/inventory/locations'
 import { createInventoryDocument, addInventoryDocumentLine, approveInventoryDocument, postInventoryDocument, type DocType } from '@/services/inventory/documents'

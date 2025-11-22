@@ -60,7 +60,6 @@ async function getInitialProjectId(): Promise<string> {
 const AnalysisWorkItemsPage: React.FC = () => {
   const { showToast } = useToast()
   const hasPermission = useHasPermission()
-  const canView = hasPermission('work_items.view') // reuse same permission group
   const canCreate = hasPermission('work_items.create')
   const canUpdate = hasPermission('work_items.update')
   const canDelete = hasPermission('work_items.delete')
@@ -82,8 +81,7 @@ const AnalysisWorkItemsPage: React.FC = () => {
   })
 
   useEffect(() => {
-    if (!canView) return
-    ;(async () => {
+    (async () => {
       setLoading(true)
       try {
         const [orgList, initialOrgId, initialProjectId] = await Promise.all([
@@ -102,8 +100,7 @@ const AnalysisWorkItemsPage: React.FC = () => {
         setLoading(false)
       }
     })()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canView])
+  }, [])
 
   const reload = async () => {
     if (!orgId) return
@@ -199,14 +196,6 @@ const AnalysisWorkItemsPage: React.FC = () => {
     } catch (e: unknown) {
       showToast((e as Error)?.message || 'Delete failed', { severity: 'error' })
     }
-  }
-
-  if (!canView) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.header}><Typography variant="h6">Access denied</Typography></div>
-      </div>
-    )
   }
 
   return (

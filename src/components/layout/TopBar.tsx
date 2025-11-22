@@ -13,23 +13,24 @@ import Tooltip from '@mui/material/Tooltip';
 import Divider from '@mui/material/Divider';
 import Popover from '@mui/material/Popover';
 import Stack from '@mui/material/Stack';
-import MenuIcon from '@mui/icons-material/Menu';
-import NotificationsIcon from '@mui/icons-material/Notifications';
-import AccountCircle from '@mui/icons-material/AccountCircle';
-import Brightness4 from '@mui/icons-material/Brightness4';
-import Brightness7 from '@mui/icons-material/Brightness7';
-import LanguageIcon from '@mui/icons-material/Language';
-import SettingsIcon from '@mui/icons-material/Settings';
-import LogoutIcon from '@mui/icons-material/ExitToApp';
 import Switch from '@mui/material/Switch';
 import FormControlLabel from '@mui/material/FormControlLabel';
-import PaletteIcon from '@mui/icons-material/Palette';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import {
+  MenuIcon,
+  NotificationsIcon,
+  AccountCircleIcon,
+  SettingsIcon,
+  HomeIcon,
+  LogoutIcon,
+  VisibilityIcon,
+  VisibilityOffIcon,
+  ArrowBackIcon,
+  ArrowForwardIcon
+} from '../icons/SimpleIcons';
 import useAppStore from '../../store/useAppStore';
 import { useCustomTheme } from '../../contexts/ThemeContext';
 
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { useUserProfile } from '../../contexts/UserProfileContext';
 // import { ThemeSettings } from "./ThemeSettings"; // Temporarily disabled
 import { mergedTranslations as translations } from '../../data/mockData';
@@ -252,7 +253,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
             color="default"
             onClick={(e) => { setScopeAnchor(e.currentTarget); setScopeOpen(true); }}
             onDelete={() => { setScopeOpen((v)=>!v); if (scopeOpen) setScopeAnchor(null); }}
-            deleteIcon={scopeOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            deleteIcon={scopeOpen ? <ArrowBackIcon /> : <ArrowForwardIcon />}
             label={language === 'ar' ? (activeProjectId ? 'نطاق: مشروع' : 'نطاق: كل المشاريع') : (activeProjectId ? 'Scope: Project' : 'Scope: All projects')}
             sx={{
               border: '1px solid',
@@ -281,7 +282,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
                 transition: 'all 0.2s ease',
               }}
             >
-              <PaletteIcon fontSize="small" />
+              <SettingsIcon fontSize="small" />
             </IconButton>
           </Tooltip>
 
@@ -301,7 +302,10 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
                 transition: 'all 0.3s ease',
               }}
             >
-              {themeMode === 'light' ? <Brightness7 fontSize="small" /> : <Brightness4 fontSize="small" />}
+              {themeMode === 'light' ? 
+                <VisibilityIcon fontSize="small" /> : 
+                <VisibilityOffIcon fontSize="small" />
+              }
             </IconButton>
           </Tooltip>
 
@@ -338,7 +342,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
                 transition: 'all 0.2s ease',
               }}
             >
-              <LanguageIcon fontSize="small" sx={{ zIndex: 1 }} />
+              <HomeIcon fontSize="small" sx={{ zIndex: 1 }} />
             </IconButton>
           </Tooltip>
 
@@ -504,7 +508,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
         handleProfileMenuClose();
         navigate('/settings/profile');
       }}>
-        <AccountCircle sx={{ mr: 2 }} />
+        <AccountCircleIcon sx={{ mr: 2 }} />
         {t.profile}
       </MenuItem>
       <MenuItem onClick={handleProfileMenuClose}>

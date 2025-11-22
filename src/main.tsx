@@ -10,11 +10,10 @@ import { StyledEngineProvider } from '@mui/material/styles'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 
-import { AuthProvider } from './contexts/AuthContext'
 import { CustomThemeProvider } from './contexts/ThemeContext'
 import { ToastProvider } from './contexts/ToastContext'
-import { UserProfileProvider } from './contexts/UserProfileContext'
-import { FontPreferencesProvider } from './contexts/FontPreferencesContext'
+import { UserProfileProvider } from './contexts/UserProfileProvider'
+import { FontPreferencesProvider } from './contexts/FontPreferencesProvider'
 
 
 import RtlCacheProvider from './contexts/RtlCacheProvider'
@@ -45,20 +44,18 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
         <StyledEngineProvider injectFirst>
           <RtlCacheProvider>
-            <AuthProvider>
-              <FontPreferencesProvider>
-                <CustomThemeProvider>
-                  <ToastProvider>
-                    <UserProfileProvider>
-                      <App />
-                      {import.meta.env.DEV ? (
-                        <ReactQueryDevtools initialIsOpen={false} />
-                      ) : null}
-                    </UserProfileProvider>
-                  </ToastProvider>
-                </CustomThemeProvider>
-              </FontPreferencesProvider>
-            </AuthProvider>
+            <FontPreferencesProvider>
+              <CustomThemeProvider>
+                <ToastProvider>
+                  <UserProfileProvider>
+                    <App />
+                    {import.meta.env.DEV ? (
+                      <ReactQueryDevtools initialIsOpen={false} />
+                    ) : null}
+                  </UserProfileProvider>
+                </ToastProvider>
+              </CustomThemeProvider>
+            </FontPreferencesProvider>
           </RtlCacheProvider>
         </StyledEngineProvider>
       </QueryClientProvider>

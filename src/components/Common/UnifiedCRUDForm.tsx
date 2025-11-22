@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Save, 
-  X, 
-  AlertCircle, 
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Save,
+  X,
+  AlertCircle,
   Loader2,
   Eye,
   EyeOff,
@@ -23,16 +23,16 @@ export type ValidationWarning = { field: string; message: string };
 export type ValidationResult = { isValid: boolean; errors: ValidationError[]; warnings?: ValidationWarning[] };
 
 // Field Types
-export type FieldType = 
-  | 'text' 
-  | 'email' 
-  | 'password' 
-  | 'number' 
-  | 'select' 
+export type FieldType =
+  | 'text'
+  | 'email'
+  | 'password'
+  | 'number'
+  | 'select'
   | 'searchable-select'
-  | 'checkbox' 
-  | 'textarea' 
-  | 'date' 
+  | 'checkbox'
+  | 'textarea'
+  | 'date'
   | 'tel'
   | 'url';
 
@@ -67,6 +67,14 @@ export interface FormField {
   position?: { row: number; col: number }; // Field position in custom layout
   /** Optional hierarchical options for opening a drilldown modal to select from a tree */
   drilldownOptions?: SearchableSelectOption[];
+  /** Group fields into logical sections */
+  section?: string;
+  /** Priority for field ordering within section (higher = earlier) */
+  priority?: number;
+  /** Show a visual indicator when field is disabled due to dependencies */
+  showDependencyIndicator?: boolean;
+  /** Custom error message when field is disabled due to missing dependency */
+  dependencyErrorMessage?: string;
 }
 
 // Form Configuration
@@ -131,7 +139,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   const [validationWarnings, setValidationWarnings] = useState<ValidationWarning[]>([]);
   // removed unused fieldStates to satisfy noUnusedLocals
   const [autoFilledFields, setAutoFilledFields] = useState<string[]>([]);
-  const [showPasswordFields, setShowPasswordFields] = useState<{[key: string]: boolean}>({});
+  const [showPasswordFields, setShowPasswordFields] = useState<{ [key: string]: boolean }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   const storageKeyPrefix = React.useMemo(() => {
@@ -146,7 +154,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   const [columnOverride, setColumnOverride] = useState<'auto' | 1 | 2 | 3>(() => {
     try {
       const v = localStorage.getItem(storageKeyPrefix + 'columns');
-      if (v === '1' || v === '2' || v === '3') return Number(v) as 1|2|3;
+      if (v === '1' || v === '2' || v === '3') return Number(v) as 1 | 2 | 3;
       return 'auto';
     } catch { return 'auto'; }
   });
@@ -162,7 +170,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       const raw = localStorage.getItem(storageKeyPrefix + 'fieldOrder');
       const arr = raw ? JSON.parse(raw) as string[] : [];
       const defaultOrder = config.fields.map(f => f.id);
-      
+
       // Debug logging for transaction forms
       const isTransactionForm = config.title && (config.title.includes('معاملة') || config.title.includes('transaction'));
       if (isTransactionForm) {
@@ -170,7 +178,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
         console.log('🌳 Default fields include sub_tree_id:', defaultOrder.includes('sub_tree_id'));
         console.log('🌳 Stored fields include sub_tree_id:', arr.includes('sub_tree_id'));
       }
-      
+
       return arr.length > 0 ? arr : defaultOrder;
     } catch { return config.fields.map(f => f.id); }
   });
@@ -179,14 +187,14 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       const raw = localStorage.getItem(storageKeyPrefix + 'visibleFields');
       const arr = raw ? JSON.parse(raw) as string[] : [];
       const defaultFields = new Set(config.fields.map(f => f.id));
-      
+
       // Migration: Ensure sub_tree_id is always visible in transaction forms
       const isTransactionForm = config.title && (config.title.includes('معاملة') || config.title.includes('transaction'));
       if (isTransactionForm) {
         defaultFields.add('sub_tree_id');
         console.log('🌳 Transaction form detected - ensuring sub_tree_id visibility:', config.title);
       }
-      
+
       if (arr.length > 0) {
         const storedFields = new Set(arr);
         // Ensure sub_tree_id is in stored fields too for transaction forms  
@@ -199,7 +207,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       }
       console.log('🌳 Using default visible fields - sub_tree_id included:', defaultFields.has('sub_tree_id'));
       return defaultFields;
-    } catch { 
+    } catch {
       const defaultFields = new Set(config.fields.map(f => f.id));
       // Ensure sub_tree_id is always visible for transaction forms
       const isTransactionFormCatch = config.title && (config.title.includes('معاملة') || config.title.includes('transaction'));
@@ -211,7 +219,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     }
   });
   const [layoutControlsOpen, setLayoutControlsOpen] = useState(false);
-  
+
   // Async options management - track loading states and resolved options per field
   const [fieldOptions, setFieldOptions] = useState<Record<string, any>>({});
   const [fieldOptionsLoading, setFieldOptionsLoading] = useState<Set<string>>(new Set());
@@ -224,7 +232,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     if (fieldOrder.length === 0 || fieldOrder.length !== defaultOrder.length) {
       setFieldOrder(defaultOrder);
     }
-    
+
     try {
       const savedLayoutKey = `form-layout-${config.title || 'default'}`;
       const savedLayout = localStorage.getItem(savedLayoutKey);
@@ -264,7 +272,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   // On first mount, always seed the form data from initialData
   useEffect(() => {
     setFormData(initialData);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Persist preferences
@@ -292,7 +300,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
         // Only apply auto-fill if the field is empty or undefined
         const fieldsToFill: Record<string, unknown> = {};
         const fieldsAutoFilled: string[] = [];
-        
+
         Object.entries(autoFilledData).forEach(([key, value]) => {
           const current = (formData as Record<string, unknown>)[key];
           const isUnset = current === undefined || current === null || (typeof current === 'string' && current === '');
@@ -301,7 +309,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
             fieldsAutoFilled.push(key);
           }
         });
-        
+
         if (Object.keys(fieldsToFill).length > 0) {
           setFormData((prev) => ({ ...prev, ...fieldsToFill }));
           setAutoFilledFields(prev => Array.from(new Set([...prev, ...fieldsAutoFilled])));
@@ -314,26 +322,26 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   useEffect(() => {
     const loadAsyncOptions = async (field: FormField) => {
       if (!field.optionsProvider || !shouldShowField(field)) return;
-      
+
       // Build dependency key to determine when to reload options
       const dependencies = field.dependsOnAny || (field.dependsOn ? [field.dependsOn] : []);
       const dependencyValues = dependencies.map(depId => formData[depId]).join('|');
       const currentKey = `${field.id}:${dependencyValues}`;
-      
+
       // Check if we already have options for this field+dependency combo
       const existingKey = fieldOptions[field.id + '_key'] as string | undefined;
       if (existingKey === currentKey && Array.isArray(fieldOptions[field.id])) {
         return; // Already loaded for these dependencies
       }
-      
+
       // Mark as loading
       setFieldOptionsLoading(prev => new Set(prev).add(field.id));
       setFieldOptionsErrors(prev => ({ ...prev, [field.id]: '' }));
-      
+
       try {
         const result = await field.optionsProvider(formData);
         const options = Array.isArray(result) ? result : [];
-        
+
         setFieldOptions(prev => ({
           ...prev,
           [field.id]: options as SearchableSelectOption[],
@@ -341,8 +349,8 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
         }));
       } catch (error) {
         console.error(`Failed to load options for field ${field.id}:`, error);
-        setFieldOptionsErrors(prev => ({ 
-          ...prev, 
+        setFieldOptionsErrors(prev => ({
+          ...prev,
           [field.id]: error instanceof Error ? error.message : 'Failed to load options'
         }));
         setFieldOptions(prev => ({ ...prev, [field.id]: [] }));
@@ -354,7 +362,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
         });
       }
     };
-    
+
     // Load options for all fields that have optionsProvider
     config.fields
       .filter(field => field.optionsProvider && shouldShowField(field))
@@ -398,17 +406,32 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       }
       return conditionalResult;
     }
-    
+
     // Debug logging for sub_tree_id when it should be visible
     if (field.id === 'sub_tree_id') {
       console.log('🌳 sub_tree_id field should be visible');
     }
-    
+
     return true;
   };
 
-  // Handle field change
-  const handleFieldChange = (fieldId: string, value: unknown, field: FormField) => {
+  // Check if field is disabled due to unmet dependencies
+  const isDisabledByDependency = (field: FormField): boolean => {
+    if (field.dependsOn) {
+      const depValue = formData[field.dependsOn];
+      return !depValue || (typeof depValue === 'string' && depValue.trim() === '');
+    }
+    if (field.dependsOnAny && Array.isArray(field.dependsOnAny)) {
+      return field.dependsOnAny.some(depId => {
+        const depValue = formData[depId];
+        return !depValue || (typeof depValue === 'string' && depValue.trim() === '');
+      });
+    }
+    return false;
+  };
+
+  // Handle field change with debouncing for async validation
+  const handleFieldChange = React.useCallback((fieldId: string, value: unknown, field: FormField) => {
     const updatedFormData = { ...formData, [fieldId]: value };
     setFormData(updatedFormData);
 
@@ -429,7 +452,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       const filtered = prev.filter(e => e.field !== fieldId);
       return [...filtered, ...newErrors];
     });
-    
+
     // Run form-level validation for warnings (but only if no errors)
     if (config.customValidator && newErrors.length === 0) {
       const customValidation = config.customValidator(updatedFormData);
@@ -440,7 +463,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       }
     }
 
-    // Handle dependent fields
+    // Handle dependent fields - reset them when parent changes
     config.fields.forEach((f: FormField) => {
       const depends = f.dependsOn === fieldId;
       const dependsAny = Array.isArray(f.dependsOnAny) && f.dependsOnAny.includes(fieldId);
@@ -455,7 +478,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     if (updatedFormData !== formData) {
       setFormData(updatedFormData);
     }
-  };
+  }, [config.fields, config.customValidator, formData]);
 
   // Validate form
   const validateForm = (): ValidationResult => {
@@ -537,7 +560,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     if (validation.warnings && validation.warnings.length > 0) {
       const warningsText = validation.warnings.map(w => w.message).join('\n• ');
       const confirmMessage = `تم اكتشاف ${validation.warnings.length} تحذير:\n• ${warningsText}\n\nهل تريد المتابعة بالحفظ رغم هذه التحذيرات؟`;
-      
+
       const shouldContinue = window.confirm(confirmMessage);
       if (!shouldContinue) {
         try { showToast?.(`تم إلغاء الحفظ بسبب التحذيرات`, { severity: 'info' }); } catch { void 0; }
@@ -564,7 +587,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   // Compute unsaved changes by shallow compare against initialData for configured fields
   const hasUnsavedChangesInternal = React.useCallback(() => {
     try {
-      const fieldIds = new Set(config.fields.map(f => f.id).concat(['is_active','allow_transactions','level','parent_id']));
+      const fieldIds = new Set(config.fields.map(f => f.id).concat(['is_active', 'allow_transactions', 'level', 'parent_id']));
       for (const key of fieldIds) {
         const cur = (formData as Record<string, unknown>)[key];
         const init = (initialData as Record<string, unknown>)[key];
@@ -597,24 +620,43 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     }));
   };
 
+  // Track form container width for responsive layout
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+
+    observer.observe(containerRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   // Get column layout configuration
   const getColumnConfig = () => {
     // If columnOverride is manually set (not 'auto'), use it directly without responsive logic
     if (columnOverride !== 'auto') {
       return columnOverride;
     }
-    
+
     const defaultColumns = config.layout?.columns || 1;
     const isResponsive = config.layout?.responsive !== false; // Default to true;
-    
+
     // Auto-adjust columns based on form width if responsive and in auto mode
-    if (isResponsive) {
-      // Assume we can estimate form width - in a real scenario, you might use ResizeObserver
-      const estimatedWidth = window.innerWidth;
-      if (estimatedWidth > 800 && defaultColumns === 1) return 2;
-      if (estimatedWidth > 1200 && defaultColumns <= 2) return 3;
+    if (isResponsive && containerWidth > 0) {
+      // Use container width instead of window.innerWidth
+      if (containerWidth > 800 && defaultColumns === 1) return 2;
+      if (containerWidth > 1400 && defaultColumns <= 2) return 3;
     }
-    
+
     return Math.min(Math.max(defaultColumns, 1), 3); // Ensure between 1-3 columns
   };
 
@@ -622,12 +664,12 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   const organizeFieldsIntoColumns = () => {
     // Get visible fields in the specified order
     const allVisibleFields = config.fields.filter(shouldShowField);
-    const orderedFields = fieldOrder.length > 0 
+    const orderedFields = fieldOrder.length > 0
       ? fieldOrder.map(id => allVisibleFields.find(f => f.id === id)).filter(Boolean) as FormField[]
       : allVisibleFields;
-    
+
     const columns = getColumnConfig();
-    const breakpoints = (config.layout?.columnBreakpoints || []).map(bp => ({...bp}));
+    const breakpoints = (config.layout?.columnBreakpoints || []).map(bp => ({ ...bp }));
     // Apply runtime full-width overrides
     for (const bp of breakpoints) {
       if (fullWidthOverrides.has(bp.field)) bp.fullWidth = true;
@@ -638,29 +680,29 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
         breakpoints.push({ field: f.id, fullWidth: true });
       }
     });
-    
+
     if (columns === 1) {
       return [orderedFields];
     }
-    
+
     const result: FormField[][] = Array.from({ length: columns }, () => []);
     let currentColumn = 0;
-    
+
     orderedFields.forEach((field: FormField) => {
       // Check for breakpoint
       const breakpoint = breakpoints.find((bp: { field: string; newColumn?: boolean; fullWidth?: boolean }) => bp.field === field.id);
       if (breakpoint?.newColumn && currentColumn < columns - 1) {
         currentColumn++;
       }
-      
+
       result[currentColumn].push(field);
-      
+
       // Move to next column for balanced distribution
       if (!breakpoint?.fullWidth) {
         currentColumn = (currentColumn + 1) % columns;
       }
     });
-    
+
     return result.filter(column => column.length > 0);
   };
 
@@ -672,14 +714,13 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       }
       return null;
     }
-    
+
     if (field.id === 'sub_tree_id') {
       console.log('🌳 Rendering sub_tree_id field - type:', field.type, 'hasOptionsProvider:', !!field.optionsProvider);
     }
 
     const value = getFieldValue(field.id);
     const error = getFieldError(field.id);
-    // const isAutoFilled = autoFilledFields.includes(field.id);
     const isTouched = touchedFields.has(field.id);
     const showError = error && isTouched;
     const showSuccess = isTouched && !error;
@@ -688,7 +729,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     const resolvedOptions = field.optionsProvider ? (fieldOptions[field.id] || []) : (field.options || []);
     const isLoadingOptions = fieldOptionsLoading.has(field.id);
     const optionsError = fieldOptionsErrors[field.id];
-    
+
     // Check if this field should span full width
     // const isFullWidth = _breakpoint?.fullWidth;
 
@@ -699,15 +740,18 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     ].filter(Boolean).join(' ');
 
     if (field.type === 'select') {
+      const isDisabledByDep = isDisabledByDependency(field);
       return (
         <select
           id={field.id}
           name={field.id}
           value={value as string}
           onChange={(e) => handleFieldChange(field.id, e.target.value, field)}
-          disabled={field.disabled || isLoading}
+          disabled={field.disabled || isLoading || isDisabledByDep}
           required={isFieldRequired(field)}
-          className={[inputClasses, styles.inputSelect, (field.disabled || isLoading) ? styles.inputDisabled : ''].filter(Boolean).join(' ')}
+          className={[inputClasses, styles.inputSelect, (field.disabled || isLoading || isDisabledByDep) ? styles.inputDisabled : ''].filter(Boolean).join(' ')}
+          title={isDisabledByDep ? field.dependencyErrorMessage || 'يعتمد على حقل آخر' : ''}
+          style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
         >
           <option value="">{field.placeholder || `اختر ${field.label}`}</option>
           {resolvedOptions.map((option: SearchableSelectOption) => (
@@ -720,21 +764,41 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     }
 
     if (field.type === 'searchable-select') {
+      const isDisabledByDep = isDisabledByDependency(field);
       return (
-        <SearchableSelect
-          id={field.id}
-          value={value as string}
-          options={resolvedOptions}
-          onChange={(selectedValue) => handleFieldChange(field.id, selectedValue, field)}
-          placeholder={isLoadingOptions ? 'جاري التحميل...' : (optionsError ? 'خطأ في تحميل الخيارات' : field.placeholder)}
-          disabled={field.disabled || isLoading || isLoadingOptions}
-          clearable={field.isClearable !== false}
-          required={isFieldRequired(field)}
-          error={!!showError || !!optionsError}
-          // Drilldown modal support (if provided by field)
-          showDrilldownModal={!!field.drilldownOptions}
-          treeOptions={field.drilldownOptions}
-        />
+        <div style={{ position: 'relative', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }} title={isDisabledByDep ? field.dependencyErrorMessage || 'يعتمد على حقل آخر' : ''}>
+          <SearchableSelect
+            id={field.id}
+            value={value as string}
+            options={resolvedOptions}
+            onChange={(selectedValue) => handleFieldChange(field.id, selectedValue, field)}
+            placeholder={isLoadingOptions ? 'جاري التحميل...' : (optionsError ? '⚠️ خطأ في التحميل' : (isDisabledByDep ? '🔗 معتمد على حقل آخر' : field.placeholder))}
+            disabled={field.disabled || isLoading || isLoadingOptions || isDisabledByDep}
+            clearable={field.isClearable !== false}
+            required={isFieldRequired(field)}
+            error={!!showError || !!optionsError}
+            // Drilldown modal support (if provided by field)
+            showDrilldownModal={!!field.drilldownOptions}
+            treeOptions={field.drilldownOptions}
+          />
+          {isLoadingOptions && (
+            <div style={{
+              position: 'absolute',
+              right: '12px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              pointerEvents: 'none'
+            }}>
+              <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+            </div>
+          )}
+          {optionsError && (
+            <div className={styles.errorText} style={{ marginTop: '4px' }}>
+              <AlertCircle size={12} />
+              {optionsError}
+            </div>
+          )}
+        </div>
       );
     }
 
@@ -753,8 +817,8 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
               accentColor: 'var(--primary-blue)'
             }}
           />
-          <span style={{ 
-            color: value ? '#10b981' : 'var(--text-secondary)', 
+          <span style={{
+            color: value ? '#10b981' : 'var(--text-secondary)',
             fontWeight: '600',
             transition: 'color 0.2s ease'
           }}>
@@ -844,7 +908,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   };
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div ref={containerRef} style={{ position: 'relative' }}>
       {/* Auto-fill notification */}
       {showAutoFillNotification && autoFilledFields.length > 0 && (
         <div className={styles.autoFillBadge}>
@@ -852,7 +916,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
           ✅ تم تعبئة البيانات المقترحة تلقائياً
         </div>
       )}
-      
+
       <form id="unified-crud-form" onSubmit={handleSubmit} className={styles.form}>
         {/* Form Header */}
         <div className={styles.headerRow}>
@@ -874,11 +938,11 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
               </div>
             )}
             {/* Configuration Button */}
-            <button 
+            <button
               type="button"
               onClick={() => setLayoutControlsOpen(!layoutControlsOpen)}
               className="ultimate-btn ultimate-btn-secondary"
-              style={{ 
+              style={{
                 padding: '8px 12px',
                 minHeight: 'auto',
                 fontSize: '13px',
@@ -958,13 +1022,13 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
           onToggle={() => setLayoutControlsOpen(!layoutControlsOpen)}
           showToggleButton={false}
         />
-        
+
         {/* Form Fields with Column Layout */}
         {(() => {
           const fieldColumns = organizeFieldsIntoColumns();
           const actualColumnCount = getColumnConfig(); // Use actual column config, not fieldColumns.length
           const breakpoints = config.layout?.columnBreakpoints || [];
-          
+
           // Check for any full-width fields that need special handling
           const fullWidthFields = config.fields.filter((field: FormField) => {
             // Check both config breakpoints AND runtime overrides
@@ -972,52 +1036,64 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
             const isInOverrides = fullWidthOverrides.has(field.id);
             return isInBreakpoints || isInOverrides;
           });
-          
+
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-                  {/* Full-width fields first */}
+              {/* Full-width fields first */}
               {fullWidthFields.map(field => shouldShowField(field) && (
                 <div key={`full-${field.id}`} className={styles.fullWidthBlock}>
                   {/* Field Label */}
                   {field.type !== 'checkbox' && (
-                    <label htmlFor={field.id} className={styles.labelRow}>
-                      {field.icon && <span>{field.icon}</span>}
-                      <span>{field.label}</span>
+                    <div>
+                      <label htmlFor={field.id} className={styles.labelRow}>
+                        {field.icon && <span>{field.icon}</span>}
+                        <span>{field.label}</span>
+                        {touchedFields.has(field.id) && !getFieldError(field.id) && (
+                          <span style={{ color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <CheckCircle size={14} />
+                          </span>
+                        )}
+                        {isFieldRequired(field) && (
+                          <span className={styles.requiredStar}>
+                            <Star size={12} fill="currentColor" />
+                          </span>
+                        )}
+                        {autoFilledFields.includes(field.id) && (
+                          <span className={styles.autoFilledPill}>
+                            ✨ تم التعبئة تلقائياً
+                          </span>
+                        )}
+                        {field.showDependencyIndicator && isDisabledByDependency(field) && (
+                          <span style={{
+                            color: '#f59e0b',
+                            fontSize: '11px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            marginLeft: '6px'
+                          }} title={field.dependencyErrorMessage || 'يعتمد على حقل آخر'}>
+                            🔗 معتمد
+                          </span>
+                        )}
+                      </label>
                       {field.helpText && (
-                        <span 
-                          style={{ 
-                            color: '#64748b', 
-                            fontSize: '11px', 
-                            marginLeft: '6px',
-                            fontWeight: '400',
-                            opacity: '0.8'
-                          }}
-                          title={field.helpText}
-                        >
-                          ({field.helpText.length > 30 ? field.helpText.substring(0, 30) + '...' : field.helpText})
-                        </span>
+                        <div className={styles.infoText}>
+                          <Info size={12} />
+                          {field.helpText}
+                        </div>
                       )}
-                      {touchedFields.has(field.id) && !getFieldError(field.id) && (
-                        <span style={{ color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                          <CheckCircle size={14} />
-                        </span>
+                      {field.showDependencyIndicator && isDisabledByDependency(field) && (
+                        <div className={styles.infoText} style={{ color: '#f59e0b' }}>
+                          <AlertCircle size={12} />
+                          {field.dependencyErrorMessage || 'يرجى ملء الحقول المطلوبة أولاً'}
+                        </div>
                       )}
-                      {isFieldRequired(field) && (
-                        <span className={styles.requiredStar}>
-                          <Star size={12} fill="currentColor" />
-                        </span>
-                      )}
-                      {autoFilledFields.includes(field.id) && (
-                        <span className={styles.autoFilledPill}>
-                          تم التعبئة تلقائياً
-                        </span>
-                      )}
-                    </label>
+                    </div>
                   )}
-                  
+
                   {/* Field Input */}
                   {renderField(field)}
-                  
+
                   {/* Field Error */}
                   {getFieldError(field.id) && touchedFields.has(field.id) && (
                     <div className={styles.errorText}>
@@ -1027,7 +1103,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
                   )}
                 </div>
               ))}
-              
+
               {/* Column Layout for remaining fields */}
               <div
                 className={styles.gridContainer}
@@ -1043,67 +1119,79 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
                         return !(isInBreakpoints || isInOverrides);
                       })
                       .map((field: FormField) => (
-                      <div key={field.id} className={styles.fieldBlock} style={{ minHeight: 'fit-content' }}>
-                        {/* Field Label */}
-                        {field.type !== 'checkbox' && (
-                          <label htmlFor={field.id} className={styles.labelRow}>
-                            {field.icon && <span>{field.icon}</span>}
-                            <span>{field.label}</span>
-                            {field.helpText && (
-                              <span 
-                                style={{ 
-                                  color: '#64748b', 
-                                  fontSize: '11px', 
-                                  marginLeft: '6px',
-                                  fontWeight: '400',
-                                  opacity: '0.8'
-                                }}
-                                title={field.helpText}
-                              >
-                                ({field.helpText.length > 30 ? field.helpText.substring(0, 30) + '...' : field.helpText})
-                              </span>
-                            )}
-                            {touchedFields.has(field.id) && !getFieldError(field.id) && (
-                              <span style={{ color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                <CheckCircle size={14} />
-                              </span>
-                            )}
-                            {isFieldRequired(field) && (
-                              <span className={styles.requiredStar}>
-                                <Star size={12} fill="currentColor" />
-                              </span>
-                            )}
-                            {autoFilledFields.includes(field.id) && (
-                              <span className={styles.autoFilledPill}>
-                                تم التعبئة تلقائياً
-                              </span>
-                            )}
-                          </label>
-                        )}
-                        
-                        {/* Field Input */}
-                        {renderField(field)}
-                        
-                        {/* Field Error */}
-                        {getFieldError(field.id) && touchedFields.has(field.id) && (
-                          <div style={{ 
-                            color: '#ef4444', 
-                            fontSize: '12px', 
-                            marginTop: '4px', 
-                            display: 'flex', 
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}>
-                            <AlertCircle size={12} />
-                            {getFieldError(field.id)?.message}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                        <div key={field.id} className={styles.fieldBlock} style={{ minHeight: 'fit-content' }}>
+                          {/* Field Label */}
+                          {field.type !== 'checkbox' && (
+                            <div>
+                              <label htmlFor={field.id} className={styles.labelRow}>
+                                {field.icon && <span>{field.icon}</span>}
+                                <span>{field.label}</span>
+                                {touchedFields.has(field.id) && !getFieldError(field.id) && (
+                                  <span style={{ color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                    <CheckCircle size={14} />
+                                  </span>
+                                )}
+                                {isFieldRequired(field) && (
+                                  <span className={styles.requiredStar}>
+                                    <Star size={12} fill="currentColor" />
+                                  </span>
+                                )}
+                                {autoFilledFields.includes(field.id) && (
+                                  <span className={styles.autoFilledPill}>
+                                    ✨ تم التعبئة تلقائياً
+                                  </span>
+                                )}
+                                {field.showDependencyIndicator && isDisabledByDependency(field) && (
+                                  <span style={{
+                                    color: '#f59e0b',
+                                    fontSize: '11px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    marginLeft: '6px'
+                                  }} title={field.dependencyErrorMessage || 'يعتمد على حقل آخر'}>
+                                    🔗 معتمد
+                                  </span>
+                                )}
+                              </label>
+                              {field.helpText && (
+                                <div className={styles.infoText}>
+                                  <Info size={12} />
+                                  {field.helpText}
+                                </div>
+                              )}
+                              {field.showDependencyIndicator && isDisabledByDependency(field) && (
+                                <div className={styles.infoText} style={{ color: '#f59e0b' }}>
+                                  <AlertCircle size={12} />
+                                  {field.dependencyErrorMessage || 'يرجى ملء الحقول المطلوبة أولاً'}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Field Input */}
+                          {renderField(field)}
+
+                          {/* Field Error */}
+                          {getFieldError(field.id) && touchedFields.has(field.id) && (
+                            <div style={{
+                              color: '#ef4444',
+                              fontSize: '12px',
+                              marginTop: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <AlertCircle size={12} />
+                              {getFieldError(field.id)?.message}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                   </div>
                 ))}
               </div>
-              
+
               {/* Column Layout Info */}
               {actualColumnCount > 1 && (
                 <div style={{
@@ -1125,7 +1213,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
             </div>
           );
         })()}
-        
+
         {/* Validation Errors Summary */}
         {validationErrors.length > 0 && (
           <div className={styles.errorSummary}>
@@ -1144,7 +1232,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
             </ul>
           </div>
         )}
-        
+
         {/* Validation Warnings Summary */}
         {validationWarnings.length > 0 && (
           <div style={{
@@ -1168,12 +1256,12 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
             </ul>
           </div>
         )}
-        
+
         {/* Action Buttons */}
         {!hideDefaultActions && (
           <div className={styles.actionsRow}>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={isLoading || isSubmitting}
               className={`ultimate-btn ultimate-btn-add ${styles.btnGrow}`}
             >
@@ -1190,9 +1278,9 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
                 </span>
               </div>
             </button>
-            
-            <button 
-              type="button" 
+
+            <button
+              type="button"
               onClick={onCancel}
               disabled={isLoading || isSubmitting}
               className={`ultimate-btn ultimate-btn-delete ${styles.btnGrow}`}
@@ -1205,7 +1293,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
           </div>
         )}
       </form>
-      
+
     </div>
   );
 });

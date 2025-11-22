@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, Typography, Grid, Divider, Button } from '@mui/material'
 import { useToast } from '@/contexts/ToastContext'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/hooks/useAuth'
 import { getInventoryDocument, listDocumentLines, listInventoryMovements } from '@/services/inventory/documents'
 import { supabase } from '@/utils/supabase'
 import StatusChip from '@/components/Inventory/StatusChip'

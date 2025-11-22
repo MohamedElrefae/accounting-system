@@ -9,43 +9,34 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Collapse from '@mui/material/Collapse';
 import Badge from '@mui/material/Badge';
-import ExpandLess from '@mui/icons-material/ExpandLess';
-import ExpandMore from '@mui/icons-material/ExpandMore';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import AccountTree from '@mui/icons-material/AccountTree';
-import Receipt from '@mui/icons-material/Receipt';
-import Description from '@mui/icons-material/Description';
-import People from '@mui/icons-material/People';
-import LocalShipping from '@mui/icons-material/LocalShipping';
-import Assessment from '@mui/icons-material/Assessment';
-import Inventory from '@mui/icons-material/Inventory';
-import Settings from '@mui/icons-material/Settings';
-import ListIcon from '@mui/icons-material/List';
-import Add from '@mui/icons-material/Add';
-import Edit from '@mui/icons-material/Edit';
-import Book from '@mui/icons-material/Book';
-import Balance from '@mui/icons-material/Balance';
-import ShoppingCart from '@mui/icons-material/ShoppingCart';
-import RequestQuote from '@mui/icons-material/RequestQuote';
-import PersonOutline from '@mui/icons-material/PersonOutline';
-import Assignment from '@mui/icons-material/Assignment';
-import Business from '@mui/icons-material/Business';
-import TrendingUp from '@mui/icons-material/TrendingUp';
-import AccountBalance from '@mui/icons-material/AccountBalance';
-import MonetizationOn from '@mui/icons-material/MonetizationOn';
-import BarChart from '@mui/icons-material/BarChart';
-import Category from '@mui/icons-material/Category';
-import SwapHoriz from '@mui/icons-material/SwapHoriz';
-import Summarize from '@mui/icons-material/Summarize';
-import Group from '@mui/icons-material/Group';
-import Tune from '@mui/icons-material/Tune';
-import Backup from '@mui/icons-material/Backup';
-import Security from '@mui/icons-material/Security';
-import Database from '@mui/icons-material/Storage';
-import Tag from '@mui/icons-material/LocalOffer';
-import FormatSize from '@mui/icons-material/FormatSize';
-import AutoAwesome from '@mui/icons-material/AutoAwesome';
-import Upload from '@mui/icons-material/Upload';
+import {
+  ExpandLess,
+  ExpandMore,
+  Dashboard,
+  AccountTree,
+  Receipt,
+  Description,
+  People,
+  LocalShipping,
+  Assessment,
+  Inventory,
+  Settings,
+  List as ListIcon,
+  Add,
+  Edit,
+  Category,
+  AutoAwesome,
+  AccountBalance,
+  TrendingUp,
+  Group,
+  Tune,
+  Security,
+  Upload,
+  Business,
+  TableChart,
+  CloudUpload,
+  AssignmentTurnedIn,
+} from '@mui/icons-material';
 import useAppStore from '../../store/useAppStore';
 import { navigationItems } from '../../data/navigation';
 import type { NavigationItem } from '../../types';
@@ -57,7 +48,7 @@ export const DRAWER_COLLAPSED_WIDTH = 64;
 const getIcon = (iconName: string) => {
   switch (iconName) {
     case 'Dashboard':
-      return <DashboardIcon />;
+      return <Dashboard />;
     case 'AccountTree':
       return <AccountTree />;
     case 'Receipt':
@@ -81,17 +72,17 @@ const getIcon = (iconName: string) => {
     case 'EditNote':
       return <Edit />;
     case 'Book':
-      return <Book />;
+      return <Description />;
     case 'Balance':
-      return <Balance />;
+      return <AccountBalance />;
     case 'ShoppingCart':
-      return <ShoppingCart />;
+      return <Inventory />;
     case 'RequestQuote':
-      return <RequestQuote />;
+      return <Receipt />;
     case 'PersonOutline':
-      return <PersonOutline />;
+      return <Group />;
     case 'Assignment':
-      return <Assignment />;
+      return <AssignmentTurnedIn />;
     case 'Business':
       return <Business />;
     case 'TrendingUp':
@@ -99,35 +90,35 @@ const getIcon = (iconName: string) => {
     case 'AccountBalance':
       return <AccountBalance />;
     case 'MonetizationOn':
-      return <MonetizationOn />;
+      return <TrendingUp />;
     case 'BarChart':
-      return <BarChart />;
+      return <TableChart />;
     case 'Category':
       return <Category />;
     case 'SwapHoriz':
-      return <SwapHoriz />;
+      return <TrendingUp />;
     case 'Summarize':
-      return <Summarize />;
+      return <Description />;
     case 'Group':
       return <Group />;
     case 'Tune':
       return <Tune />;
     case 'Backup':
-      return <Backup />;
+      return <CloudUpload />;
     case 'Security':
       return <Security />;
     case 'database':
-      return <Database />;
+      return <TableChart />;
     case 'tag':
-      return <Tag />;
+      return <Category />;
     case 'type':
-      return <FormatSize />;
+      return <Tune />;
     case 'AutoAwesome':
       return <AutoAwesome />;
     case 'Upload':
       return <Upload />;
     default:
-      return <DashboardIcon />;
+      return <Dashboard />;
   }
 };
 

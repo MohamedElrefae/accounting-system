@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import './TransactionAnalysisModal.css'
 import ExportButtons from '../../components/Common/ExportButtons'
 import DraggableResizablePanel from '../Common/DraggableResizablePanel'
@@ -8,7 +8,7 @@ import { listLineItems, upsertLineItems, computeLineTotal, validateItems, delete
 import { supabase } from '../../utils/supabase'
 import { listAnalysisWorkItems } from '../../services/analysis-work-items'
 import { getCompanyConfig } from '../../services/company-config'
-import { transactionLineItemsEnhancedService } from '../../services/transaction-line-items-enhanced'
+import { lineItemsCatalogService, type CatalogSelectorItem } from '../../services/line-items-catalog'
 import { getExpensesCategoriesList } from '../../services/sub-tree'
 import { listWorkItemsUnion } from '../../services/work-items'
 import { SearchableDropdown } from '../Common/SearchableDropdown'
@@ -177,6 +177,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({
   const [loadedSubTree, setLoadedSubTree] = useState<any[]>([])
   const [currency, setCurrency] = useState<string>('SAR')
   const [selectedForDelete, setSelectedForDelete] = useState<Set<number>>(new Set())
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
   // State for cost dimension editing
   const lastLoadKeyRef = useRef<string>('')
   useEffect(() => {
@@ -853,7 +854,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({
           setCatalogItems([])
           return
         }
-        const items = await transactionLineItemsEnhancedService.getCatalogSelectorItems(effectiveOrgId)
+        const items = await lineItemsCatalogService.toSelectorItems(effectiveOrgId)
         setCatalogItems(items)
       } catch (error) {
         console.error('Failed to load catalog items:', error)
@@ -1054,8 +1055,6 @@ const TransactionAnalysisModal: React.FC<Props> = ({
     }
   }
 
-  if (!open) return null
-
   // Load panel state from localStorage
   const loadPanelPosition = () => {
     try {
@@ -1093,9 +1092,16 @@ const TransactionAnalysisModal: React.FC<Props> = ({
     try { localStorage.setItem('txAnalysisModal:maximized', String(panelMaximized)) } catch {}
   }, [panelMaximized])
 
+  // Compute aggregated rows from data
+  const rowsByItem = useMemo(() => data?.by_item || [], [data])
+  const rowsByCC = useMemo(() => data?.by_cost_center || [], [data])
+  const rowsByCat = useMemo(() => data?.by_category || [], [data])
+
   const totalByItem = useMemo(() => rowsByItem.reduce((s, r) => s + (r?.amount || 0), 0), [rowsByItem])
   const totalByCC = useMemo(() => rowsByCC.reduce((s, r) => s + (r?.amount || 0), 0), [rowsByCC])
   const totalByCat = useMemo(() => rowsByCat.reduce((s, r) => s + (r?.amount || 0), 0), [rowsByCat])
+
+  if (!open) return null
 
   return (
     <DraggableResizablePanel

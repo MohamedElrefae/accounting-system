@@ -33,9 +33,16 @@ export const cleanupOldAuthData = () => {
  */
 export const validateAuthState = () => {
   try {
-    const hasSupabaseSession = !!sessionStorage.getItem('sb-' + import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] + '-auth-token');
+    // Supabase-js stores auth state under a key like: sb-<project-ref>-auth-token
+    const projectRef = import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] || '';
+    const sbKey = projectRef ? `sb-${projectRef}-auth-token` : null;
+
+    const hasSupabaseSession = sbKey
+      ? !!(localStorage.getItem(sbKey) || sessionStorage.getItem(sbKey))
+      : false;
+
     const hasPermissionCache = Object.keys(sessionStorage).some(key => key.startsWith('perm-cache:'));
-    
+
     if (import.meta.env.DEV) {
       console.log('Auth State Validation:', {
         hasSupabaseSession,

@@ -62,7 +62,7 @@ async function getInitialOrgId(): Promise<string> {
 const SubTreePage: React.FC = () => {
   const { showToast } = useToast()
   const hasPermission = useHasPermission()
-  const canView = hasPermission('sub_tree.view')
+  // View-level permission is enforced by the route guard (ProtectedRoute with requiredAction="sub_tree.view")
   const canCreate = hasPermission('sub_tree.create')
   const canUpdate = hasPermission('sub_tree.update')
   const canDelete = hasPermission('sub_tree.delete')
@@ -87,7 +87,6 @@ const SubTreePage: React.FC = () => {
   })
 
   useEffect(() => {
-    if (!canView) return
     (async () => {
       setLoading(true)
       try {
@@ -115,7 +114,7 @@ const SubTreePage: React.FC = () => {
       }
     })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canView])
+  }, [])
 
   const reload = async (chosen: string) => {
     if (!chosen) return
@@ -269,14 +268,6 @@ const SubTreePage: React.FC = () => {
     } catch (e: unknown) {
       showToast((e as Error).message || 'Delete failed', { severity: 'error' })
     }
-  }
-
-  if (!canView) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.header}><Typography variant="h6">Access denied</Typography></div>
-      </div>
-    )
   }
 
   return (

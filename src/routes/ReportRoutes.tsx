@@ -19,7 +19,7 @@ const ReportRoutes: React.FC = () => {
   return (
     <Routes>
       {/* Trial Balance */}
-      <Route path="/reports/trial-balance" element={
+      <Route path="trial-balance" element={
         <ProtectedRoute>
           <OptimizedSuspense>
             <TrialBalanceOriginalPage />
@@ -27,7 +27,7 @@ const ReportRoutes: React.FC = () => {
         </ProtectedRoute>
       } />
       
-      <Route path="/reports/trial-balance-all-levels" element={
+      <Route path="trial-balance-all-levels" element={
         <ProtectedRoute>
           <OptimizedSuspense>
             <TrialBalanceAllLevelsPage />
@@ -36,7 +36,7 @@ const ReportRoutes: React.FC = () => {
       } />
       
       {/* General Ledger */}
-      <Route path="/reports/general-ledger" element={
+      <Route path="general-ledger" element={
         <ProtectedRoute>
           <OptimizedSuspense>
             <GeneralLedgerPage />
@@ -45,7 +45,7 @@ const ReportRoutes: React.FC = () => {
       } />
       
       {/* Account Explorer */}
-      <Route path="/reports/account-explorer" element={
+      <Route path="account-explorer" element={
         <ProtectedRoute>
           <OptimizedSuspense>
             <AccountExplorerReportPage />
@@ -54,7 +54,7 @@ const ReportRoutes: React.FC = () => {
       } />
       
       {/* Financial Statements */}
-      <Route path="/reports/profit-loss" element={
+      <Route path="profit-loss" element={
         <ProtectedRoute>
           <OptimizedSuspense>
             <ProfitLossPage />
@@ -62,7 +62,7 @@ const ReportRoutes: React.FC = () => {
         </ProtectedRoute>
       } />
       
-      <Route path="/reports/balance-sheet" element={
+      <Route path="balance-sheet" element={
         <ProtectedRoute>
           <OptimizedSuspense>
             <BalanceSheetPage />
@@ -71,7 +71,7 @@ const ReportRoutes: React.FC = () => {
       } />
       
       {/* Usage Reports */}
-      <Route path="/reports/main-data/work-item-usage" element={
+      <Route path="main-data/work-item-usage" element={
         <ProtectedRoute>
           <OptimizedSuspense>
             <WorkItemUsagePage />
@@ -79,7 +79,7 @@ const ReportRoutes: React.FC = () => {
         </ProtectedRoute>
       } />
       
-      <Route path="/reports/main-data/analysis-item-usage" element={
+      <Route path="main-data/analysis-item-usage" element={
         <ProtectedRoute>
           <OptimizedSuspense>
             <AnalysisItemUsagePage />
@@ -88,7 +88,7 @@ const ReportRoutes: React.FC = () => {
       } />
       
       {/* Transaction Classification Reports */}
-      <Route path="/reports/main-data/transaction-classification" element={
+      <Route path="main-data/transaction-classification" element={
         <ProtectedRoute>
           <OptimizedSuspense>
             <TransactionClassificationReportsPage />
@@ -97,7 +97,7 @@ const ReportRoutes: React.FC = () => {
       } />
       
       {/* Custom Reports */}
-      <Route path="/reports/custom" element={
+      <Route path="custom" element={
         <OptimizedSuspense>
           <CustomReportsPage />
         </OptimizedSuspense>

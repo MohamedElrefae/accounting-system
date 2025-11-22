@@ -9,22 +9,24 @@ import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import { getCompanyConfig } from '../../services/company-config'
 import { fetchPrefixRules, type PrefixRule } from '../../services/account-prefix-map'
-import Visibility from '@mui/icons-material/Visibility'
-import VisibilityOff from '@mui/icons-material/VisibilityOff'
-import Bolt from '@mui/icons-material/Bolt'
-import Print from '@mui/icons-material/Print'
-import Refresh from '@mui/icons-material/Refresh'
-import IosShare from '@mui/icons-material/IosShare'
-import TableView from '@mui/icons-material/TableView'
-import ExpandMore from '@mui/icons-material/ExpandMore'
-import ExpandLess from '@mui/icons-material/ExpandLess'
-import UnfoldMore from '@mui/icons-material/UnfoldMore'
-import UnfoldLess from '@mui/icons-material/UnfoldLess'
+import {
+  Visibility,
+  VisibilityOff,
+  Bolt,
+  Print,
+  Refresh,
+  IosShare,
+  TableView,
+  ExpandMore,
+  ExpandLess,
+  UnfoldMore,
+  UnfoldLess,
+  PictureAsPdf,
+} from '../../components/icons/SimpleIcons';
 import { fetchTransactionsDateRange } from '../../services/reports/common';
 import { getActiveOrgId } from '../../utils/org';
 import { fetchOrganizations, type LookupOption } from '../../services/lookups';
 import { PDFGenerator, type PDFOptions, type PDFTableData } from '../../services/pdf-generator';
-import PictureAsPdf from '@mui/icons-material/PictureAsPdf';
 
 interface TBRow {
   account_id: string
