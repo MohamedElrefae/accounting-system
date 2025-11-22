@@ -1,25 +1,34 @@
 /* SearchableSelect Container */
 .container {
   position: relative;
-  width: 100%;
-  min-width: 320px; /* Wider minimum width for account fields */
+  width: 100% !important;
+  min-width: 0 !important;
+  /* Allow shrinking to fit parent */
+  max-width: 100% !important;
+  box-sizing: border-box !important;
   font-size: 16px;
   direction: rtl;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 /* Compact variant for tables/unified dense rows */
 .compact {
-  min-width: 220px;
+  min-width: 0;
+  /* Allow shrinking to fit parent */
 }
+
 .compact .selectButton {
   min-height: 44px;
   padding: 10px 14px;
   font-size: 14px;
 }
+
 .compact .searchInput {
   padding: 8px 14px 8px 44px;
   font-size: 14px;
 }
+
 .compact .option {
   padding: 10px 14px;
   font-size: 14px;
@@ -31,10 +40,11 @@
 
 /* Select Button */
 .selectButton {
-  display: flex;
+  display: flex !important;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
+  width: 100% !important;
+  max-width: 100% !important;
   min-height: 52px;
   padding: 16px 20px;
   background: var(--field_bg);
@@ -46,6 +56,7 @@
   font-weight: 500;
   color: var(--text);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box !important;
 }
 
 .selectButton:hover {
@@ -135,11 +146,8 @@
 
 /* Dropdown */
 .dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  z-index: 1000;
+  position: fixed;
+  z-index: 10000;
   background: var(--surface);
   border: 2px solid var(--accent);
   border-top: none;
@@ -147,8 +155,9 @@
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
   max-height: 400px;
   overflow: hidden;
-  display: flex;
+  display: flex !important;
   flex-direction: column;
+  box-sizing: border-box !important;
 }
 
 /* Search Container */
@@ -193,7 +202,8 @@
 }
 
 .searchInput {
-  width: 100%;
+  width: 100% !important;
+  max-width: 100% !important;
   padding: 12px 20px 12px 50px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -205,6 +215,7 @@
   direction: rtl;
   transition: all 0.2s ease;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  box-sizing: border-box !important;
 }
 
 .searchInput:focus {
@@ -333,12 +344,12 @@
   .dropdown {
     max-height: 280px;
   }
-  
+
   .selectButton {
     min-height: 48px;
     padding: 14px 16px;
   }
-  
+
   .option {
     padding: 16px;
   }
@@ -349,11 +360,11 @@
   .selectButton {
     border-width: 3px;
   }
-  
+
   .optionHighlighted {
     border: 2px solid var(--accent);
   }
-  
+
   .optionSelected {
     border: 2px solid var(--surface);
   }

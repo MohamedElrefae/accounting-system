@@ -49,6 +49,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const storageKey = React.useMemo(() => id ? `searchableSelect.expanded.${id}` : null, [id]);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -144,6 +145,20 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   };
   const selectedOption = value ? findOptionDeep(options, value) : undefined;
 
+  // Calculate dropdown position when opening
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom,
+        left: rect.left,
+        width: rect.width
+      });
+    } else {
+      setDropdownPosition(null);
+    }
+  }, [isOpen]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -184,7 +199,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
         break;
       case 'ArrowDown':
         e.preventDefault();
-        setHighlightedIndex(prev => 
+        setHighlightedIndex(prev =>
           prev < visibleFlatOptions.length - 1 ? prev + 1 : prev
         );
         break;
@@ -403,7 +418,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
         <span className={styles.selectedText} aria-required={required}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        
+
         <div className={styles.indicators}>
           {showDrilldownModal && !disabled && (
             <button
@@ -428,16 +443,24 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
               <X size={14} />
             </button>
           )}
-          <ChevronDown 
-            size={16} 
+          <ChevronDown
+            size={16}
             className={[styles.chevron, isOpen ? styles.chevronUp : ''].filter(Boolean).join(' ')}
           />
         </div>
       </div>
 
       {/* Dropdown */}
-      {isOpen && (
-        <div className={styles.dropdown} role="listbox">
+      {isOpen && dropdownPosition && (
+        <div
+          className={styles.dropdown}
+          role="listbox"
+          style={{
+            top: `${dropdownPosition.top}px`,
+            left: `${dropdownPosition.left}px`,
+            width: `${dropdownPosition.width}px`
+          }}
+        >
           {/* Search Input */}
           <div className={styles.searchContainer}>
             <Search size={16} className={styles.searchIcon} />
@@ -533,7 +556,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
       )}
       {/* Drilldown Modal */}
       {showDrilldownModal && isTreeOpen && (
-        <div 
+        <div
           style={{
             position: 'fixed', inset: '0', background: 'rgba(0,0,0,0.4)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999

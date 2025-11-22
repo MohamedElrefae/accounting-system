@@ -299,7 +299,7 @@ export async function getAccounts(): Promise<Account[]> {
 
   let query = supabase
     .from('accounts')
-    .select('id, code, name, is_postable, allow_transactions, category, parent_id, level, org_id')
+    .select('id, code, name, name_ar, is_postable, allow_transactions, category, parent_id, level, org_id')
     .eq('status', 'active')
     .order('code', { ascending: true })
 
@@ -309,8 +309,17 @@ export async function getAccounts(): Promise<Account[]> {
 
   const { data, error } = await query
   if (error) throw error
-  // Strip org_id before returning
-  return ((data as any[]) || []).map(row => ({ id: row.id, code: row.code, name: row.name, is_postable: (row.is_postable ?? row.allow_transactions ?? false), category: row.category, parent_id: row.parent_id, level: row.level })) as Account[]
+  // Strip org_id before returning, but include name_ar
+  return ((data as any[]) || []).map(row => ({ 
+    id: row.id, 
+    code: row.code, 
+    name: row.name, 
+    name_ar: row.name_ar,
+    is_postable: (row.is_postable ?? row.allow_transactions ?? false), 
+    category: row.category, 
+    parent_id: row.parent_id, 
+    level: row.level 
+  })) as Account[]
 }
 
 export async function getCurrentUserId(): Promise<string | null> {
@@ -355,191 +364,67 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
   const pendingOnly = options?.filters?.pendingOnly ?? false
   const page = options?.page ?? 1
   const pageSize = options?.pageSize ?? 20
-  const from = (page - 1) * pageSize
-  const to = from + pageSize - 1
-
-// Use main transactions table (not GL2 view)
-  if (false) { // Disabled: Always use main transactions table
-    const fromIdx = from;
-    const toIdx = to;
-
-    // Map filters to GL2 view columns
-    const filters = options?.filters;
-    const gl2OrFilters: string[] = [];
-
-    const {
-      search,
-      dateFrom,
-      dateTo,
-      amountFrom,
-      amountTo,
-      debitAccountId,
-      creditAccountId,
-      orgId,
-      approvalStatus,
-      classificationId,
-      expensesCategoryId,
-      workItemId,
-      analysisWorkItemId,
-      costCenterId,
-      projectId,
-    } = filters ?? {};
-
-    // Search on number
-    const trimmedSearch = search?.trim();
-    if (trimmedSearch) {
-      gl2OrFilters.push(`number.ilike.%${trimmedSearch}%`);
-    }
-    // Date range -> posting_date (fallback doc_date)
-    // PostgREST cannot OR across columns easily; we use posting_date for consistency
-    // The view populates posting_date for posted; for drafts we used doc_date at display only.
-    // It is acceptable to filter on posting_date only for now.
-
-    // Amount filters
-    // The view exposes amount for two-line journals
-
-    // Account filters: translate account_id (UUID) to code
-    let debitCode: string | null = null;
-    let creditCode: string | null = null;
-    const accountIds = [debitAccountId, creditAccountId].filter((value): value is string => Boolean(value));
-    if (accountIds.length) {
-      const { data: accs } = await supabase
-        .from('accounts')
-        .select('id, code')
-        .in('id', accountIds);
-      if (accs?.length) {
-        for (const a of accs as { id: string; code: string }[]) {
-          if (debitAccountId && debitAccountId === a.id) debitCode = a.code;
-          if (creditAccountId && creditAccountId === a.id) creditCode = a.code;
-        }
-      }
-    }
-
-    // Build the query
-    let q = supabase
-      .from('v_gl2_journals_enriched')
-      .select('journal_id, org_id, number, doc_date, posting_date, status, debit_account_code, debit_account_name, credit_account_code, credit_account_name, amount, total_debits, total_credits', { count: 'exact' })
-      .order('posting_date', { ascending: false, nullsFirst: false })
-      .range(fromIdx, toIdx);
-
-    // Apply filters
-    if (gl2OrFilters.length) {
-      q = (q as any).or(gl2OrFilters.join(','));
-    }
-    if (dateFrom) q = q.gte('effective_date', dateFrom);
-    if (dateTo) q = q.lte('effective_date', dateTo);
-    if (amountFrom != null) q = q.gte('amount', amountFrom);
-    if (amountTo != null) q = q.lte('amount', amountTo);
-    if (debitCode) q = q.eq('debit_account_code', debitCode);
-    if (creditCode) q = q.eq('credit_account_code', creditCode);
-    if (orgId) q = q.eq('org_id', orgId);
-    if (approvalStatus) {
-      if (approvalStatus === 'posted') q = q.eq('status', 'posted');
-      else if (approvalStatus === 'draft') q = q.eq('status', 'draft');
-    }
-    // Line-level dimension filters (view exposes these from first debit line)
-    if (classificationId) q = q.eq('classification_id', classificationId);
-    if (expensesCategoryId) q = q.eq('expenses_category_id', expensesCategoryId);
-    if (workItemId) q = q.eq('work_item_id', workItemId);
-    if (analysisWorkItemId) q = q.eq('analysis_work_item_id', analysisWorkItemId);
-    if (costCenterId) q = q.eq('cost_center_id', costCenterId);
-    if (projectId) q = q.eq('project_id', projectId);
-
-    const { data, error, count } = await q;
-    if (error) throw error;
-
-    // Build code->name map for nicer labels
-    // Mapping not required; view already exposes names
-    const rows = (data || []).map((r: any) => ({
-      id: r.journal_id,
-      entry_number: r.number,
-      entry_date: r.doc_date || r.posting_date,
-      description: '',
-      reference_number: null,
-      debit_account_id: r.debit_account_code,
-      credit_account_id: r.credit_account_code,
-      amount: Number(r.amount ?? 0),
-      notes: null,
-      classification_id: null,
-      sub_tree_id: null,
-      work_item_id: null,
-      cost_center_id: null,
-      is_posted: String(r.status).toLowerCase() === 'posted',
-      posted_at: null,
-      posted_by: null,
-      created_by: null,
-      project_id: null,
-      org_id: r.org_id ?? null,
-      approval_status: String(r.status).toLowerCase() === 'posted' ? 'approved' : 'draft',
-      submitted_at: null,
-      submitted_by: null,
-      reviewed_at: null,
-      reviewed_by: null,
-      review_action: null,
-      review_reason: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      // Display helpers used by UI (code - name)
-      _debit_display: r.debit_account_code ? `${r.debit_account_code} - ${r.debit_account_name ?? ''}`.trim() : '',
-      _credit_display: r.credit_account_code ? `${r.credit_account_code} - ${r.credit_account_name ?? ''}`.trim() : '',
-    })) as any[];
-    return { rows: rows as any, total: count ?? rows.length };
-  }
-
-  // Dynamic query - no joins (relationships don't exist in schema)
-  let query = supabase
-    .from('transactions')
-    .select('*', { count: 'exact' })
-    .order('entry_date', { ascending: false })
-
-  if (scope === 'my') {
-    const uid = await getCurrentUserId()
-    if (uid) {
-      query = query.eq('created_by', uid)
-    } else {
-      return { rows: [], total: 0 }
-    }
-  }
-
-  if (pendingOnly) {
-    query = query.eq('is_posted', false).eq('approval_status', 'submitted')
-  }
 
   const f = options?.filters
-  if (f) {
-    if (f.search && f.search.trim()) {
-      const s = f.search.trim()
-      // Use ilike on a few columns
-      query = query.or(
-        `entry_number.ilike.%${s}%,description.ilike.%${s}%,reference_number.ilike.%${s}%,notes.ilike.%${s}%`
-      )
-    }
-    if (f.dateFrom) query = query.gte('entry_date', f.dateFrom)
-    if (f.dateTo) query = query.lte('entry_date', f.dateTo)
-    // Amount filters now use header aggregates from multiline model
-    if (f.amountFrom != null) query = query.gte('line_items_total', f.amountFrom)
-    if (f.amountTo != null) query = query.lte('line_items_total', f.amountTo)
-    if (f.projectId) query = query.eq('project_id', f.projectId)
-    if (f.orgId) query = query.eq('org_id', f.orgId)
-    // Line-level filters (debit/credit/classification/etc.) are not available at header level.
-    // Use enriched endpoints if you need to filter by line attributes.
 
-    // New: approval status filter, including "posted"
-    if (f.approvalStatus === 'posted') {
-      query = query.eq('is_posted', true)
-    } else if (f.approvalStatus) {
-      query = query.eq('approval_status', f.approvalStatus)
-    }
+  // Use enriched RPC that can filter on both header and line-level dimensions.
+  // Step 1: ask server for eligible transaction IDs with exact pagination.
+  const createdBy = scope === 'my' ? await getCurrentUserId() : null
+
+  const { data: idRows, error: idErr } = await supabase.rpc('list_transactions_enriched_rows', {
+    p_scope: scope,
+    p_pending_only: pendingOnly,
+    p_search: f?.search || null,
+    p_date_from: f?.dateFrom || null,
+    p_date_to: f?.dateTo || null,
+    p_amount_from: f?.amountFrom ?? null,
+    p_amount_to: f?.amountTo ?? null,
+    p_debit_account_id: f?.debitAccountId || null,
+    p_credit_account_id: f?.creditAccountId || null,
+    p_project_id: f?.projectId || null,
+    p_org_id: f?.orgId || null,
+    p_classification_id: f?.classificationId || null,
+    p_sub_tree_id: f?.expensesCategoryId || null,
+    p_work_item_id: f?.workItemId || null,
+    p_analysis_work_item_id: f?.analysisWorkItemId || null,
+    p_cost_center_id: f?.costCenterId || null,
+    p_approval_status: f?.approvalStatus || null,
+    p_created_by: createdBy || null,
+    p_page: page,
+    p_page_size: pageSize,
+  } as any)
+
+  if (idErr) throw idErr
+
+  const ids = (idRows || []).map((r: any) => r.id as string)
+  const total = (idRows && idRows.length > 0 && typeof (idRows[0] as any).total_count === 'number')
+    ? Number((idRows[0] as any).total_count)
+    : 0
+
+  if (ids.length === 0) {
+    return { rows: [], total }
   }
 
-  const { data, error, count } = await query.range(from, to)
+  // Step 2: load transaction headers for those IDs and preserve RPC ordering.
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .in('id', ids)
+
   if (error) throw error
-  const rows = (data || []) as TransactionRecord[]
+
+  const byId = new Map<string, TransactionRecord>()
+  for (const row of (data || []) as TransactionRecord[]) {
+    byId.set(row.id, row)
+  }
+
+  const rows: TransactionRecord[] = ids
+    .map(id => byId.get(id))
+    .filter((r): r is TransactionRecord => Boolean(r))
 
   // Patch header aggregates from live view to avoid relying on triggers
   try {
-    const ids = rows.map(r => r.id)
-    if (ids.length > 0) {
+    if (rows.length > 0) {
       const { data: aggs, error: aggErr } = await supabase
         .from('v_tx_line_items_agg')
         .select('transaction_id, line_items_count, line_items_total')
@@ -558,8 +443,8 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
       }
     }
   } catch {}
-  
-  return { rows, total: count ?? 0 }
+
+  return { rows, total }
 }
 
 export interface CreateTransactionInput {

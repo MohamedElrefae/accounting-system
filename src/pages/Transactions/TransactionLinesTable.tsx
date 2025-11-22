@@ -70,10 +70,18 @@ const TransactionLinesTable: React.FC<TransactionLinesTableProps> = ({
 }) => {
   // Prepare table data
   const tableData = useMemo(() => {
-    const accLabel = (id?: string | null) => {
-      if (!id) return ''
-      const a = accounts.find(x => x.id === id)
-      return a ? `${a.code} - ${a.name}` : id
+    const accLabel = (line: any) => {
+      // Use enriched data from v_transaction_lines_enriched view
+      // which includes account_code, account_name, and account_name_ar
+      if (line.account_code && (line.account_name_ar || line.account_name)) {
+        return `${line.account_code} - ${line.account_name_ar || line.account_name}`
+      }
+      // Fallback to looking up from accounts array if enriched data not available
+      if (line.account_id) {
+        const a = accounts.find(x => x.id === line.account_id)
+        return a ? `${a.code} - ${a.name}` : line.account_id
+      }
+      return ''
     }
 
     const catMap: Record<string, string> = {}
@@ -81,7 +89,7 @@ const TransactionLinesTable: React.FC<TransactionLinesTableProps> = ({
 
     return lines.map((line: any) => ({
       line_no: line.line_no,
-      account_label: accLabel(line.account_id),
+      account_label: accLabel(line),
       debit_amount: line.debit_amount,
       credit_amount: line.credit_amount,
       description: line.description || '—',
@@ -130,8 +138,8 @@ const TransactionLinesTable: React.FC<TransactionLinesTableProps> = ({
           return (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{count}</span>
-              <button 
-                className="ultimate-btn ultimate-btn-edit" 
+              <button
+                className="ultimate-btn ultimate-btn-edit"
                 onClick={() => onOpenDocuments?.(row.original)}
                 title="المستندات المرفقة"
               >
@@ -144,8 +152,8 @@ const TransactionLinesTable: React.FC<TransactionLinesTableProps> = ({
         // Handle cost analysis column - separate column for cost analysis
         if (column.key === 'cost_analysis') {
           return (
-            <button 
-              className="ultimate-btn ultimate-btn-success" 
+            <button
+              className="ultimate-btn ultimate-btn-success"
               onClick={() => onOpenCostAnalysis?.(row.original)}
               title="تحليل التكلفة"
               style={{ width: '100%' }}
@@ -159,16 +167,16 @@ const TransactionLinesTable: React.FC<TransactionLinesTableProps> = ({
         if (column.key === 'actions') {
           return (
             <div className="tree-node-actions" style={{ display: 'flex', gap: '4px' }}>
-              <button 
-                className="ultimate-btn ultimate-btn-edit" 
+              <button
+                className="ultimate-btn ultimate-btn-edit"
                 onClick={() => onEditLine(row.original)}
                 title="تعديل السطر"
               >
                 <div className="btn-content"><span className="btn-text">تعديل</span></div>
               </button>
-              
-              <button 
-                className="ultimate-btn ultimate-btn-delete" 
+
+              <button
+                className="ultimate-btn ultimate-btn-delete"
                 onClick={() => onDeleteLine(row.original.id)}
                 title="حذف السطر"
               >
