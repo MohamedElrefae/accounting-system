@@ -1,0 +1,74 @@
+/* Global Z-Index Fixes for Material-UI Components */
+/* Z-Index Hierarchy:
+   10002 - Modals & Dialogs
+   10001 - Popups, Menus, Dropdowns
+   10000 - Draggable Panel & Backdrops
+   9998  - Panel Backdrop
+*/
+
+/* Ensure Material-UI popups appear above draggable panels */
+.MuiPopover-root {
+  z-index: 10001 !important;
+}
+
+.MuiMenu-root {
+  z-index: 10001 !important;
+}
+
+.MuiDialog-root {
+  z-index: 10002 !important;
+}
+
+.MuiModal-root {
+  z-index: 10002 !important;
+}
+
+.MuiTooltip-popper {
+  z-index: 10001 !important;
+}
+
+.MuiBackdrop-root {
+  z-index: 10000 !important;
+}
+
+/* Ensure context menus appear above panels */
+.MuiContextMenu-root {
+  z-index: 10001 !important;
+}
+
+/* Ensure autocomplete dropdowns appear above panels */
+.MuiAutocomplete-popper {
+  z-index: 10001 !important;
+}
+
+/* Ensure select dropdowns appear above panels */
+.MuiSelect-popper {
+  z-index: 10001 !important;
+}
+
+/* Ensure snackbars appear above everything */
+.MuiSnackbar-root {
+  z-index: 10003 !important;
+}
+
+/* Ensure alerts appear above everything */
+.MuiAlert-root {
+  z-index: 10003 !important;
+}
+
+/* Ensure any dropdown or popup appears above panels */
+[role="menu"],
+[role="listbox"],
+[role="dialog"],
+[role="tooltip"],
+.dropdown,
+.popup,
+.context-menu,
+.menu {
+  z-index: 10001 !important;
+}
+
+/* Ensure popper elements appear above panels */
+[data-popper-placement] {
+  z-index: 10001 !important;
+}

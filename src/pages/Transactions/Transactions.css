@@ -92,16 +92,56 @@ border-bottom: 1px solid var(--border);
 .tree-node-actions { display: flex; gap: 0.5rem; }
 
 /* Ultimate buttons using unified tokens */
-.ultimate-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 8px 12px; border: none; border-radius: 8px; font-weight: 600; color: var(--on-accent, #fff); cursor: pointer; transition: all .2s ease; }
+.ultimate-btn { 
+  position: relative; 
+  display: inline-flex; 
+  align-items: center; 
+  justify-content: center; 
+  min-height: 40px; 
+  padding: 8px 12px; 
+  border: 1px solid var(--border); 
+  border-radius: 8px; 
+  font-weight: 600; 
+  color: var(--text); 
+  background: linear-gradient(135deg, var(--surface), color-mix(in oklab, var(--surface) 90%, var(--accent) 10%));
+  cursor: pointer; 
+  transition: all .2s ease; 
+}
 .ultimate-btn .btn-content { display: inline-flex; align-items: center; gap: 8px; }
-.ultimate-btn-add { background: linear-gradient(135deg, var(--success), var(--success-strong)); }
-.ultimate-btn-edit { background: linear-gradient(135deg, var(--accent), color-mix(in oklab, var(--accent) 85%, black)); }
-.ultimate-btn-success { background: linear-gradient(135deg, var(--success), var(--success-strong)); }
-.ultimate-btn-warning { background: linear-gradient(135deg, var(--warning), var(--warning-strong)); }
-.ultimate-btn-delete { background: linear-gradient(135deg, var(--error), var(--error-strong)); }
+.ultimate-btn-add { background: linear-gradient(135deg, var(--success), var(--success-strong)); color: var(--on-accent, #fff); border: none; }
+.ultimate-btn-edit { background: linear-gradient(135deg, var(--accent), color-mix(in oklab, var(--accent) 85%, black)); color: var(--on-accent, #fff); border: none; }
+.ultimate-btn-success { background: linear-gradient(135deg, var(--success), var(--success-strong)); color: var(--on-accent, #fff); border: none; }
+.ultimate-btn-warning { background: linear-gradient(135deg, var(--warning), var(--warning-strong)); color: var(--on-accent, #000); border: none; }
+.ultimate-btn-delete { background: linear-gradient(135deg, var(--error), var(--error-strong)); color: var(--on-accent, #fff); border: none; }
+/* Neutral button style for secondary actions */
+.ultimate-btn-neutral { 
+  background: linear-gradient(135deg, var(--surface), color-mix(in oklab, var(--surface) 85%, var(--muted_text) 15%)); 
+  color: var(--text); 
+  border: 1px solid var(--border); 
+}
 /* Posted badge */
-.ultimate-btn-posted { background: linear-gradient(135deg, var(--info), var(--info-strong)); }
+.ultimate-btn-posted { background: linear-gradient(135deg, var(--info), var(--info-strong)); color: var(--on-accent, #fff); border: none; }
+/* Icon-only buttons */
+.ultimate-btn-icon {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 8px;
+  background: linear-gradient(135deg, var(--surface), color-mix(in oklab, var(--surface) 90%, var(--accent) 10%));
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.ultimate-btn-icon:hover {
+  background: linear-gradient(135deg, var(--accent), color-mix(in oklab, var(--accent) 85%, black));
+  color: var(--on-accent, #fff);
+  border-color: var(--accent);
+}
 .ultimate-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px color-mix(in oklab, black 15%, transparent); }
+.ultimate-btn:disabled { 
+  opacity: 0.5; 
+  cursor: not-allowed; 
+  transform: none; 
+  box-shadow: none; 
+}
 
 /* Modal aligned to theme */
 .transaction-modal { position: fixed; inset: 0; background: color-mix(in oklab, black 55%, transparent); display: flex; align-items: center; justify-content: center; }

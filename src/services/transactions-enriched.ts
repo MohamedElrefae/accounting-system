@@ -104,6 +104,23 @@ export async function getTransactionsEnrichedView(filters: EnrichedViewFilters, 
   if (idErr) throw idErr
   const ids = (idRows || []).map((r: any) => r.id)
   const total = (idRows && idRows.length > 0 && typeof (idRows[0] as any).total_count === 'number') ? Number((idRows[0] as any).total_count) : 0
+  
+  // Build a map of line approval data from the RPC result
+  const lineApprovalMap: Record<string, { 
+    lines_total_count: number; 
+    lines_approved_count: number; 
+    computed_approval_status: string 
+  }> = {}
+  for (const r of (idRows || []) as any[]) {
+    if (r.id) {
+      lineApprovalMap[r.id] = {
+        lines_total_count: r.lines_total_count || 0,
+        lines_approved_count: r.lines_approved_count || 0,
+        computed_approval_status: r.computed_approval_status || 'draft'
+      }
+    }
+  }
+  
   if (ids.length === 0) return { rows: [], total }
 
   // Fetch the enriched rows by ids, ordered by entry_date desc for stable display
@@ -115,5 +132,19 @@ export async function getTransactionsEnrichedView(filters: EnrichedViewFilters, 
 
   const { data, error } = await q
   if (error) throw error
-  return { rows: (data || []) as any[], total }
+  
+  // Merge line approval data into the rows
+  const enrichedRows = (data || []).map((row: any) => {
+    const txId = row.transaction_id || row.id
+    const approvalData = lineApprovalMap[txId] || { lines_total_count: 0, lines_approved_count: 0, computed_approval_status: 'draft' }
+    return {
+      ...row,
+      lines_total_count: approvalData.lines_total_count,
+      lines_approved_count: approvalData.lines_approved_count,
+      // Use computed status from line-level approval if available
+      approval_status: approvalData.computed_approval_status || row.approval_status || 'draft'
+    }
+  })
+  
+  return { rows: enrichedRows, total }
 }

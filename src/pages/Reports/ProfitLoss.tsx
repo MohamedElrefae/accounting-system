@@ -8,7 +8,7 @@ import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import { getCompanyConfig } from '../../services/company-config'
 import { fetchTransactionsDateRange } from '../../services/reports/common';
-import { fetchProfitLossReport, type PLFilters, type PLRow, type PLSummary } from '../../services/reports/profit-loss'
+import { getProfitLoss, type UnifiedFilters, type ProfitLossRow as PLRow, type ProfitLossSummary as PLSummary } from '../../services/reports/unified-financial-query'
 import { getActiveOrgId, getActiveProjectId } from '../../utils/org'
 import { fetchOrganizations, type LookupOption } from '../../services/lookups'
 import Visibility from '@mui/icons-material/Visibility'
@@ -169,7 +169,7 @@ export default function ProfitLoss() {
       setLoading(true)
       setError('')
 
-      const filters: PLFilters = {
+      const filters: UnifiedFilters = {
         dateFrom,
         dateTo,
         orgId: orgId || null,
@@ -177,7 +177,7 @@ export default function ProfitLoss() {
         postedOnly
       }
 
-      const result = await fetchProfitLossReport(filters)
+      const result = await getProfitLoss(filters)
       
       let filteredRows = result.rows
       if (!includeZeros) {

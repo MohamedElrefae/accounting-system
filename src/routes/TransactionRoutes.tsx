@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import ProtectedRoute from '../components/routing/ProtectedRoute';
 import { OptimizedSuspense } from '../components/Common/PerformanceOptimizer';
+import { TransactionsDataProvider } from '../contexts/TransactionsDataContext';
 
 // Transaction-related routes grouped together for better performance
 const TransactionsPage = React.lazy(() => import('../pages/Transactions/Transactions'));
@@ -12,13 +13,14 @@ const AssignCostAnalysisPage = React.lazy(() => import('../pages/Transactions/As
 
 const TransactionRoutes: React.FC = () => {
   return (
-    <Routes>
-      {/* My Transactions */}
-      <Route path="my" element={
-        <OptimizedSuspense>
-          <TransactionsPage />
-        </OptimizedSuspense>
-      } />
+    <TransactionsDataProvider>
+      <Routes>
+        {/* My Transactions */}
+        <Route path="my" element={
+          <OptimizedSuspense>
+            <TransactionsPage />
+          </OptimizedSuspense>
+        } />
       
       {/* Pending Transactions */}
       <Route path="pending" element={
@@ -78,6 +80,7 @@ const TransactionRoutes: React.FC = () => {
         </ProtectedRoute>
       } />
     </Routes>
+    </TransactionsDataProvider>
   );
 };
 

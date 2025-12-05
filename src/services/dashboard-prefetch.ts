@@ -1,5 +1,5 @@
 import { getCompanyConfig } from './company-config'
-import { getCategoryTotals, type AccountBalanceFilter } from './account-balances'
+import { getCategoryTotals, type UnifiedFilters } from './reports/unified-financial-query'
 import { getActiveOrgId } from '../utils/org'
 import { supabase } from '../utils/supabase'
 
@@ -11,12 +11,12 @@ export async function prefetchDashboard(): Promise<void> {
     // 1) Company config (currency/format + shortcuts)
     void getCompanyConfig().catch(() => {})
 
-    // 2) Unified category totals used for stat cards
-    const filters: AccountBalanceFilter = {
-      dateFrom: '',
-      dateTo: '',
+    // 2) Unified category totals used for stat cards - SINGLE SOURCE OF TRUTH
+    const filters: UnifiedFilters = {
+      dateFrom: null,
+      dateTo: null,
       postedOnly: false,
-      orgId,
+      orgId: orgId || null,
     }
     void getCategoryTotals(filters).catch(() => {})
 

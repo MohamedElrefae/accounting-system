@@ -1,6 +1,9 @@
 // Import polyfills first
 import './polyfills'
 
+// Import z-index fixes FIRST to ensure they apply globally
+import './styles/z-index-fixes.css'
+
 import React, { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'

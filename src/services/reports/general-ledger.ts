@@ -4,11 +4,10 @@ import { supabase } from '../../utils/supabase'
  * General Ledger Report Service
  * 
  * Note: This service uses the get_general_ledger_report stored procedure which provides
- * detailed transaction-level data with running balances. The stored procedure should
- * implement the same natural balance logic as the canonical balance service for consistency.
+ * detailed transaction-level data with running balances.
  * 
- * For account-level aggregated balances, use the canonical balance service instead:
- * import { getAccountBalances } from '../account-balances'
+ * For account-level aggregated balances, use the unified financial query service:
+ * import { fetchGLSummary } from './unified-financial-query'
  */
 
 export interface GLFilters {
@@ -78,7 +77,7 @@ export async function fetchGeneralLedgerReport(filters: GLFilters): Promise<GLRo
       ? UNCLASSIFIED_UUID
       : (filters.classificationId ?? null),
     p_analysis_work_item_id: filters.analysisWorkItemId ?? null,
-    p_sub_tree_id: filters.expensesCategoryId ?? null,
+    p_expenses_category_id: filters.expensesCategoryId ?? null,
   })
 
   if (error) throw error

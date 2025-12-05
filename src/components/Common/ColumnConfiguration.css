@@ -1,4 +1,4 @@
-/* Column Configuration Modal - Unified Theme Support */
+/* Column Configuration Modal - Unified Theme Support with RTL */
 .column-config-overlay {
   position: fixed;
   inset: 0;
@@ -8,6 +8,7 @@
   justify-content: center;
   z-index: 1000;
   backdrop-filter: blur(2px);
+  direction: rtl; /* RTL support */
 }
 
 [data-theme="light"] .column-config-modal {
@@ -27,6 +28,8 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  direction: rtl; /* RTL support */
+  text-align: right; /* RTL text alignment */
 }
 
 .resizable-modal {
@@ -47,6 +50,7 @@
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
+  text-align: right; /* RTL */
 }
 
 .config-subtitle {
@@ -54,6 +58,7 @@
   font-size: 0.875rem;
   color: var(--text-secondary, #999);
   font-weight: 400;
+  text-align: right; /* RTL */
 }
 
 .close-button {
@@ -141,6 +146,7 @@
   font-weight: 600;
   font-size: 0.875rem;
   color: var(--text-secondary, #999);
+  text-align: right; /* RTL */
 }
 
 .column-config-list {
@@ -284,6 +290,7 @@
   font-weight: 500;
   color: var(--text-primary, #eaeaea);
   overflow: hidden;
+  text-align: right; /* RTL */
 }
 
 .label-content {
@@ -294,6 +301,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex-direction: row-reverse; /* RTL - icon on right */
+  justify-content: flex-end; /* RTL */
 }
 
 .pin-icon {
@@ -400,9 +409,128 @@
   padding: 1rem 1.5rem;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start; /* RTL - buttons on right */
   gap: 0.75rem;
   background: var(--surface-elevated, #2a2a2a);
+}
+
+/* RTL Support for Controls */
+.column-config-controls {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--surface, #1a1a1a);
+  direction: rtl;
+}
+
+.bulk-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-start; /* RTL */
+}
+
+/* Search/Filter Input RTL */
+.search-input,
+.filter-input {
+  text-align: right;
+  direction: rtl;
+  padding-right: 12px;
+  padding-left: 12px;
+}
+
+/* Width input RTL */
+.width-input {
+  direction: ltr; /* Numbers should be LTR */
+  text-align: center;
+}
+
+/* Priority select RTL */
+.priority-select {
+  direction: rtl;
+  text-align: right;
+  padding-right: 8px;
+  padding-left: 24px; /* Space for dropdown arrow */
+}
+
+/* Search Box RTL */
+.search-box {
+  margin-top: 1rem;
+}
+
+.config-search-input {
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: var(--surface, #1a1a1a);
+  color: var(--text-primary, #eaeaea);
+  font-size: 0.875rem;
+  direction: rtl;
+  text-align: right;
+  transition: all 0.2s ease;
+}
+
+.config-search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.config-search-input::placeholder {
+  color: var(--text-secondary, #999);
+  text-align: right;
+}
+
+/* Header cells RTL */
+.header-drag,
+.header-visibility,
+.header-freeze,
+.header-label,
+.header-width,
+.header-priority,
+.header-minwidth {
+  text-align: right;
+}
+
+/* Sizing presets RTL */
+.sizing-presets {
+  direction: rtl;
+}
+
+/* Accessibility improvements */
+.config-btn:focus,
+.close-button:focus,
+.width-input:focus,
+.priority-select:focus,
+.config-search-input:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.visibility-control input[type="checkbox"]:focus + .checkbox-label,
+.freeze-control input[type="checkbox"]:focus + .checkbox-label {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Keyboard navigation */
+.column-config-item:focus-within {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
+/* Screen reader only text */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 /* Scrollbar styling */
@@ -422,4 +550,33 @@
 
 .column-config-list::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.5);
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .column-config-modal {
+    min-width: 95vw;
+    width: 95vw;
+    max-height: 95vh;
+  }
+  
+  .config-list-header,
+  .column-config-item {
+    grid-template-columns: 40px 50px 50px 1fr 100px;
+    font-size: 0.75rem;
+  }
+  
+  .header-minwidth,
+  .priority-control {
+    display: none;
+  }
+  
+  .bulk-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .sizing-presets {
+    flex-wrap: wrap;
+  }
 }

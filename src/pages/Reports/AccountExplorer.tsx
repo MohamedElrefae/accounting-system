@@ -13,6 +13,7 @@ import { getAllTransactionClassifications, type TransactionClassification } from
 import { getExpensesCategoriesList } from '../../services/sub-tree'
 import { listWorkItemsAll } from '../../services/work-items'
 import { getCostCentersForSelector } from '../../services/cost-centers'
+import { fetchGLSummary, type UnifiedFilters } from '../../services/reports/unified-financial-query'
 import TableView from '@mui/icons-material/TableView'
 import Print from '@mui/icons-material/Print'
 import PictureAsPdf from '@mui/icons-material/PictureAsPdf'
@@ -212,30 +213,19 @@ const AccountExplorerReport: React.FC = () => {
         org_id: string
       }>
 
-      // 2) Fetch GL summary for current filters
-      const { data: summaryData, error: sumErr } = await supabase.rpc('get_gl_account_summary_filtered', {
-        p_date_from: mode === 'range' ? (dateFrom || null) : null,
-        p_date_to: dateTo || null,
-        p_org_id: orgIdRef.current || null,
-        p_project_id: projectId || null,
-        p_posted_only: postedOnly,
-        p_limit: null,
-        p_offset: null,
-        p_classification_id: classificationId || null,
-        p_analysis_work_item_id: workItemId || null,
-        p_expenses_category_id: expensesCategoryId || null,
-        p_sub_tree_id: expensesCategoryId || null,
-      })
-      if (sumErr) throw sumErr
-      const summaryRows = (summaryData || []) as Array<{
-        account_id: string
-        opening_debit?: number
-        opening_credit?: number
-        period_debits?: number
-        period_credits?: number
-        closing_debit?: number
-        closing_credit?: number
-      }>
+      // 2) Fetch GL summary using unified-financial-query for consistency
+      const filters: UnifiedFilters = {
+        dateFrom: mode === 'range' ? (dateFrom || null) : null,
+        dateTo: dateTo || null,
+        orgId: orgIdRef.current || null,
+        projectId: projectId || null,
+        postedOnly,
+        classificationId: classificationId || null,
+        analysisWorkItemId: workItemId || null,
+        expensesCategoryId: expensesCategoryId || null,
+        subTreeId: expensesCategoryId || null,
+      }
+      const summaryRows = await fetchGLSummary(filters)
       const amountsById = new Map<string, Amounts>()
       for (const r of summaryRows) {
         amountsById.set(r.account_id, {

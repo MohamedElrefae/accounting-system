@@ -27,6 +27,7 @@ import { fetchTransactionsDateRange } from '../../services/reports/common';
 import { getActiveOrgId } from '../../utils/org';
 import { fetchOrganizations, type LookupOption } from '../../services/lookups';
 import { PDFGenerator, type PDFOptions, type PDFTableData } from '../../services/pdf-generator';
+import { fetchGLSummary, type UnifiedFilters } from '../../services/reports/unified-financial-query';
 
 interface TBRow {
   account_id: string
@@ -156,24 +157,16 @@ export default function TrialBalanceOriginal() {
       setLoading(true)
       setError('')
 
-      // Use GL Summary function directly for guaranteed consistency with all financial reports
-      // This ensures 100% consistency with Trial Balance All Levels, Balance Sheet, P&L, etc.
+      // Use unified-financial-query for guaranteed consistency with all financial reports
+      const filters: UnifiedFilters = {
+        dateFrom,
+        dateTo,
+        orgId: orgId || null,
+        projectId: projectId || null,
+        postedOnly,
+      }
       
-const { data: glSummaryData, error: glError } = await supabase.rpc('get_gl_account_summary_filtered', {
-        p_date_from: dateFrom,
-        p_date_to: dateTo,
-        p_org_id: orgId || null,
-        p_project_id: projectId || null,
-        p_posted_only: postedOnly,
-        p_limit: null,
-        p_offset: null,
-        p_classification_id: null,
-        p_analysis_work_item_id: null,
-        p_expenses_category_id: null,
-        p_sub_tree_id: null
-      })
-      
-      if (glError) throw glError
+      const glSummaryData = await fetchGLSummary(filters)
       
       // Helper function to classify account type from account code
       function classifyAccountByCode(code: string): TBRow['account_type'] {

@@ -79,8 +79,26 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
       setDraggedIndex(null)
       setDropTargetIndex(null)
       dragCounter.current = 0
+      
+      // Add keyboard support for Escape key
+      const handleEscape = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          onClose()
+        }
+      }
+      document.addEventListener('keydown', handleEscape)
+      
+      // Focus trap - focus first interactive element
+      setTimeout(() => {
+        const firstButton = document.querySelector('.column-config-modal button') as HTMLElement
+        firstButton?.focus()
+      }, 100)
+      
+      return () => {
+        document.removeEventListener('keydown', handleEscape)
+      }
     }
-  }, [isOpen, columns])
+  }, [isOpen, columns, onClose])
 
   const filteredWorking = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -284,14 +302,31 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
 
   if (!isOpen) return null
   return (
-    <div className="column-config-overlay" onClick={onClose}>
-      <div className="column-config-modal resizable-modal" onClick={(e) => e.stopPropagation()}>
+    <div 
+      className="column-config-overlay" 
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="column-config-title"
+    >
+      <div 
+        className="column-config-modal resizable-modal" 
+        onClick={(e) => e.stopPropagation()}
+        role="document"
+      >
         <div className="column-config-header">
           <div>
-            <h3>إعدادات الأعمدة</h3>
+            <h3 id="column-config-title">إعدادات الأعمدة</h3>
             <p className="config-subtitle">تكوين الرؤية وترتيب وعرض الأعمدة وأولوية التثبيت</p>
           </div>
-          <button className="close-button" onClick={onClose}>×</button>
+          <button 
+            className="close-button" 
+            onClick={onClose}
+            aria-label="إغلاق"
+            title="إغلاق"
+          >
+            ×
+          </button>
         </div>
 
         <div className="column-config-controls">
@@ -299,12 +334,16 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
             <button 
               className="config-btn config-btn-success"
               onClick={() => toggleAll(true)}
+              aria-label="إظهار جميع الأعمدة"
+              title="إظهار جميع الأعمدة"
             >
               إظهار الكل
             </button>
             <button 
               className="config-btn config-btn-warning"
               onClick={() => toggleAll(false)}
+              aria-label="إخفاء جميع الأعمدة"
+              title="إخفاء جميع الأعمدة"
             >
               إخفاء الكل
             </button>
@@ -312,6 +351,8 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
               <button 
                 className="config-btn config-btn-secondary"
                 onClick={resetToDefaults}
+                aria-label="استعادة الإعدادات الافتراضية"
+                title="استعادة الإعدادات الافتراضية"
               >
                 استعادة الافتراضي
               </button>
@@ -327,11 +368,15 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
             </div>
           </div>
           <div className="search-box">
+            <label htmlFor="column-search" className="sr-only">بحث عن عمود</label>
             <input
+              id="column-search"
               className="config-search-input"
               placeholder="بحث عن عمود..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              aria-label="بحث عن عمود"
+              type="search"
             />
           </div>
         </div>
@@ -488,8 +533,22 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
         </div>
 
         <div className="column-config-footer">
-          <button className="config-btn config-btn-secondary" onClick={onClose}>إلغاء</button>
-          <button className="config-btn config-btn-success" onClick={applyChanges}>حفظ التغييرات</button>
+          <button 
+            className="config-btn config-btn-success" 
+            onClick={applyChanges}
+            aria-label="حفظ التغييرات وإغلاق"
+            title="حفظ التغييرات وإغلاق"
+          >
+            حفظ التغييرات
+          </button>
+          <button 
+            className="config-btn config-btn-secondary" 
+            onClick={onClose}
+            aria-label="إلغاء وإغلاق بدون حفظ"
+            title="إلغاء وإغلاق بدون حفظ"
+          >
+            إلغاء
+          </button>
         </div>
       </div>
     </div>

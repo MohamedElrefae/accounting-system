@@ -1,4 +1,11 @@
-import { supabase } from '../../utils/supabase'
+/**
+ * GL Account Summary Service - WRAPPER
+ * 
+ * This service wraps unified-financial-query for backward compatibility.
+ * New code should use unified-financial-query.ts directly.
+ */
+
+import { fetchGLSummary, type UnifiedFilters, type GLSummaryRow } from './unified-financial-query'
 
 export interface GLAccountSummaryFilters {
   dateFrom?: string | null
@@ -32,21 +39,39 @@ export interface GLAccountSummaryRow {
 }
 
 export async function fetchGLAccountSummary(filters: GLAccountSummaryFilters): Promise<GLAccountSummaryRow[]> {
-const { data, error } = await supabase.rpc('get_gl_account_summary_filtered', {
-    p_date_from: filters.dateFrom ?? null,
-    p_date_to: filters.dateTo ?? null,
-    p_org_id: filters.orgId ?? null,
-    p_project_id: filters.projectId ?? null,
-    p_posted_only: filters.postedOnly ?? true,
-    p_limit: filters.limit ?? null,
-    p_offset: filters.offset ?? null,
-    p_classification_id: filters.classificationId ?? null,
-    p_analysis_work_item_id: filters.analysisWorkItemId ?? null,
-    p_expenses_category_id: filters.expensesCategoryId ?? null,
-    p_sub_tree_id: filters.expensesCategoryId ?? null,
-  })
-  if (error) throw error
-  return (data as GLAccountSummaryRow[]) ?? []
+  const unifiedFilters: UnifiedFilters = {
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo,
+    orgId: filters.orgId,
+    projectId: filters.projectId,
+    postedOnly: filters.postedOnly ?? true,
+    limit: filters.limit,
+    offset: filters.offset,
+    classificationId: filters.classificationId,
+    analysisWorkItemId: filters.analysisWorkItemId,
+    expensesCategoryId: filters.expensesCategoryId,
+    subTreeId: filters.expensesCategoryId,
+  }
+
+  const rows = await fetchGLSummary(unifiedFilters)
+  
+  // Map to legacy format
+  return rows.map((row: GLSummaryRow) => ({
+    account_id: row.account_id,
+    account_code: row.account_code,
+    account_name_ar: row.account_name_ar || null,
+    account_name_en: row.account_name_en || null,
+    opening_balance: row.opening_debit - row.opening_credit,
+    opening_debit: row.opening_debit,
+    opening_credit: row.opening_credit,
+    period_debits: row.period_debits,
+    period_credits: row.period_credits,
+    period_net: row.period_debits - row.period_credits,
+    closing_balance: row.closing_debit - row.closing_credit,
+    closing_debit: row.closing_debit,
+    closing_credit: row.closing_credit,
+    transaction_count: row.transaction_count,
+  }))
 }
 
 export interface GLTotals {
@@ -60,25 +85,10 @@ export interface GLTotals {
 }
 
 export async function fetchGLTotals(filters: Omit<GLAccountSummaryFilters, 'limit' | 'offset'>): Promise<GLTotals> {
-  const { data, error } = await supabase.rpc('get_gl_totals', {
-    p_date_from: filters.dateFrom ?? null,
-    p_date_to: filters.dateTo ?? null,
-    p_org_id: filters.orgId ?? null,
-    p_project_id: filters.projectId ?? null,
-    p_posted_only: filters.postedOnly ?? true,
-    p_classification_id: filters.classificationId ?? null,
-    p_cost_center_id: null,
-    p_work_item_id: null,
-    p_sub_tree_id: filters.expensesCategoryId ?? null,
-    p_debit_account_id: null,
-    p_credit_account_id: null,
-    p_amount_min: null,
-    p_amount_max: null,
-    p_analysis_work_item_id: filters.analysisWorkItemId ?? null,
-  })
-  if (error) throw error
-  const rows = (data as GLTotals[]) ?? []
-  return rows[0] || {
+  // Use unified service and calculate totals
+  const rows = await fetchGLAccountSummary(filters)
+  
+  const totals: GLTotals = {
     opening_debit: 0,
     opening_credit: 0,
     period_debits: 0,
@@ -87,4 +97,16 @@ export async function fetchGLTotals(filters: Omit<GLAccountSummaryFilters, 'limi
     closing_credit: 0,
     transaction_count: 0,
   }
+  
+  for (const row of rows) {
+    totals.opening_debit += row.opening_debit
+    totals.opening_credit += row.opening_credit
+    totals.period_debits += row.period_debits
+    totals.period_credits += row.period_credits
+    totals.closing_debit += row.closing_debit
+    totals.closing_credit += row.closing_credit
+    totals.transaction_count += row.transaction_count
+  }
+  
+  return totals
 }

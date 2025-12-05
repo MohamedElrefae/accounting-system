@@ -20,6 +20,7 @@ export async function fetchTransactionsDateRange(filters: DateRangeFilters): Pro
     let query = supabase
       .from('transactions')
       .select('entry_date')
+      .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
       .not('entry_date', 'is', null)
       .order('entry_date', { ascending: true })
 
@@ -69,7 +70,8 @@ export async function getAccountBalance(accountId: string, dateFrom?: string, da
   try {
     let query = supabase
       .from('transactions')
-      .select('debit_account_id, credit_account_id, amount')
+      .select('debit_account_id, credit_account_id, amount, is_wizard_draft')
+      .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
       .or(`debit_account_id.eq.${accountId},credit_account_id.eq.${accountId}`)
 
     if (dateFrom) {

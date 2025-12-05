@@ -1,41 +1,41 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '../utils/supabase';
-import { Box, Button, Container, Paper, Stack, Typography } from '@mui/material';
+import React, { useEffect } from 'react';
+import { useOptimizedAuth } from '../hooks/useOptimizedAuth';
 
-export default function AuthDebug() {
-  const [session, setSession] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = async () => {
-    setError(null);
-    const { data, error } = await supabase.auth.getSession();
-    if (error) setError(error.message);
-    setSession(data?.session ?? null);
-  };
+export default function AuthDebugPage() {
+  const auth = useOptimizedAuth();
 
   useEffect(() => {
-    load();
-  }, []);
+    console.log('🔍 AUTH DEBUG PAGE - Full State:', {
+      user: auth.user,
+      profile: auth.profile,
+      roles: auth.roles,
+      loading: auth.loading,
+      hasResolvedPermissions: !!auth.resolvedPermissions,
+      resolvedPermissions: auth.resolvedPermissions ? {
+        routes: Array.from(auth.resolvedPermissions.routes),
+        actions: Array.from(auth.resolvedPermissions.actions),
+      } : null,
+    });
+
+    // Test the specific permission
+    const hasApprovalsReview = auth.hasActionAccess('approvals.review');
+    console.log('🔍 hasActionAccess("approvals.review"):', hasApprovalsReview);
+  }, [auth]);
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Paper sx={{ p: 3, direction: 'rtl' }}>
-        <Typography variant="h5" gutterBottom>تشخيص نظام الدخول</Typography>
-        <Stack direction="row" spacing={2} mb={2}>
-          <Button variant="contained" onClick={load}>تحديث الحالة</Button>
-          <Button variant="outlined" onClick={async () => { await supabase.auth.signOut(); await load(); }}>تسجيل الخروج</Button>
-        </Stack>
-        {error && (
-          <Box sx={{ color: 'error.main', mb: 2 }}>خطأ: {error}</Box>
-        )}
-        <pre style={{ background: '#111', color: '#0f0', padding: 12, borderRadius: 8, overflow: 'auto' }}>
-{JSON.stringify({
-  supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
-  hasAnonKey: Boolean(import.meta.env.VITE_SUPABASE_ANON_KEY),
-  session,
-}, null, 2)}
-        </pre>
-      </Paper>
-    </Container>
+    <div style={{ padding: '20px', fontFamily: 'monospace' }}>
+      <h1>Auth Debug Page</h1>
+      <pre style={{ background: '#f5f5f5', padding: '15px', borderRadius: '5px' }}>
+        {JSON.stringify({
+          user: auth.user?.email || 'No user',
+          roles: auth.roles,
+          loading: auth.loading,
+          hasResolvedPermissions: !!auth.resolvedPermissions,
+          actionsCount: auth.resolvedPermissions?.actions.size || 0,
+          routesCount: auth.resolvedPermissions?.routes.size || 0,
+        }, null, 2)}
+      </pre>
+      <p>Check the console for full details</p>
+    </div>
   );
 }

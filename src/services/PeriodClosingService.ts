@@ -167,6 +167,7 @@ export class PeriodClosingService {
       supabase
         .from('transactions')
         .select('amount, entry_date')
+        .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
         .eq('org_id', orgId)
         .gte('entry_date', p.start_date)
         .lte('entry_date', p.end_date),

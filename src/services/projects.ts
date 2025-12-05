@@ -296,17 +296,19 @@ export async function getProjectDashboard(projectId: string): Promise<ProjectDas
     return dashboard
   }
 
-  // Get recent and pending transactions counts
+  // Get recent and pending transactions counts (exclude wizard drafts)
   const [recentResult, pendingResult] = await Promise.all([
     supabase
       .from('transactions')
       .select('id', { count: 'exact' })
+      .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
       .eq('project_id', projectId)
       .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
       .limit(1),
     supabase
       .from('transactions')
       .select('id', { count: 'exact' })
+      .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
       .eq('project_id', projectId)
       .eq('is_posted', false)
       .limit(1)

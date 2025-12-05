@@ -34,10 +34,11 @@ export async function debugAccountRollups(orgId: string): Promise<RollupsDebugIn
   console.log('✅ Found', accounts?.length || 0, 'accounts (showing first 10)');
   console.log('📄 Sample accounts:', accounts?.map(a => ({ id: a.id, code: a.code, name: a.name_ar || a.name })));
   
-  // 2. Check transactions count and details
+  // 2. Check transactions count and details (exclude wizard drafts)
   const { count: transactionCount, error: txError } = await supabase
     .from('transactions')
     .select('*', { count: 'exact', head: true })
+    .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
     .eq('org_id', orgId);
   
   if (txError) {
@@ -46,10 +47,11 @@ export async function debugAccountRollups(orgId: string): Promise<RollupsDebugIn
     console.log('✅ Found', transactionCount || 0, 'transactions');
   }
   
-  // 2.1 Get sample transactions to see structure
+  // 2.1 Get sample transactions to see structure (exclude wizard drafts)
   const { data: sampleTx, error: sampleTxError } = await supabase
     .from('transactions')
     .select('id, org_id, debit_account_id, credit_account_id, amount, is_posted')
+    .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
     .eq('org_id', orgId)
     .limit(5);
   
@@ -167,10 +169,11 @@ export async function manualRollupsCalculation(orgId: string, accountIds: string
   console.log('🤔 Manual rollups calculation for', accountIds.length, 'accounts');
   
   try {
-    // Get transactions for these specific accounts
+    // Get transactions for these specific accounts (exclude wizard drafts)
     const { data: transactions, error: txError } = await supabase
       .from('transactions')
       .select('id, debit_account_id, credit_account_id, amount, is_posted')
+      .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
       .eq('org_id', orgId)
       .or(`debit_account_id.in.(${accountIds.join(',')}),credit_account_id.in.(${accountIds.join(',')})`);
     

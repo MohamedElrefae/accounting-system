@@ -1,0 +1,71 @@
+-- 1. Get fiscal_years table structure
+| column_name    | data_type                | is_nullable | column_default    |
+| -------------- | ------------------------ | ----------- | ----------------- |
+| id             | uuid                     | NO          | gen_random_uuid() |
+| org_id         | uuid                     | NO          | null              |
+| year_number    | integer                  | NO          | null              |
+| name_en        | text                     | NO          | null              |
+| name_ar        | text                     | YES         | null              |
+| description_en | text                     | YES         | null              |
+| description_ar | text                     | YES         | null              |
+| start_date     | date                     | NO          | null              |
+| end_date       | date                     | NO          | null              |
+| status         | text                     | NO          | 'draft'::text     |
+| is_current     | boolean                  | NO          | false             |
+| closed_at      | timestamp with time zone | YES         | null              |
+| closed_by      | uuid                     | YES         | null              |
+| created_by     | uuid                     | YES         | null              |
+| updated_by     | uuid                     | YES         | null              |
+| created_at     | timestamp with time zone | NO          | now()             |
+| updated_at     | timestamp with time zone | NO          | now()             |
+
+-- 2. Get fiscal_periods table structure
+
+
+| column_name    | data_type                | is_nullable | column_default    |
+| -------------- | ------------------------ | ----------- | ----------------- |
+| id             | uuid                     | NO          | gen_random_uuid() |
+| org_id         | uuid                     | NO          | null              |
+| fiscal_year_id | uuid                     | NO          | null              |
+| period_number  | integer                  | NO          | null              |
+| period_code    | text                     | NO          | null              |
+| name_en        | text                     | NO          | null              |
+| name_ar        | text                     | YES         | null              |
+| description_en | text                     | YES         | null              |
+| description_ar | text                     | YES         | null              |
+| start_date     | date                     | NO          | null              |
+| end_date       | date                     | NO          | null              |
+| status         | text                     | NO          | 'open'::text      |
+| is_current     | boolean                  | NO          | false             |
+| closing_notes  | text                     | YES         | null              |
+| closed_at      | timestamp with time zone | YES         | null              |
+| closed_by      | uuid                     | YES         | null              |
+| created_by     | uuid                     | YES         | null              |
+| updated_by     | uuid                     | YES         | null              |
+| created_at     | timestamp with time zone | NO          | now()             |
+| updated_at     | timestamp with time zone | NO          | now()             |
+-- 3. Get all fiscal-related tables
+
+| table_name                       |
+| -------------------------------- |
+| trial_balance_view_period        |
+| fiscal_years                     |
+| fiscal_periods                   |
+| period_closing_checklists        |
+| opening_balance_imports          |
+| opening_balances                 |
+| opening_balance_validation_rules |
+
+-- 4. Get functions related to fiscal
+
+| routine_name                           | return_type |
+| -------------------------------------- | ----------- |
+| create_fiscal_year                     | uuid        |
+| fn_can_manage_fiscal                   | boolean     |
+| fn_can_manage_fiscal_v2                | boolean     |
+| close_fiscal_period                    | boolean     |
+| validate_opening_balances              | jsonb       |
+| validate_construction_opening_balances | jsonb       |
+| import_opening_balances                | uuid        |
+| debug_fiscal_context                   | jsonb       |
+| get_period_activity                    | record      |

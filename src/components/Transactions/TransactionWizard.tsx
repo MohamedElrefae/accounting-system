@@ -5,6 +5,7 @@ import type { Organization } from '../../types'
 import type { TransactionClassification } from '../../services/transaction-classification'
 import type { ExpensesCategoryRow } from '../../types/sub-tree'
 import type { WorkItemRow } from '../../types/work-items'
+// Data now comes from TransactionsDataContext via props - no independent fetching
 import {
   Stepper,
   Step,
@@ -29,11 +30,13 @@ import {
   CheckCircle,
   Edit,
   ExpandLess,
-  Settings
+  Settings,
+  Send
 } from '@mui/icons-material'
 import './TransactionWizard.css'
 import AttachDocumentsPanel from '../documents/AttachDocumentsPanel'
 import SearchableSelect from '../Common/SearchableSelect'
+import TransactionApprovalStatus from '../Approvals/TransactionApprovalStatus'
 
 interface TransactionWizardProps {
   open: boolean
@@ -46,6 +49,22 @@ interface TransactionWizardProps {
   categories?: ExpensesCategoryRow[]
   workItems?: WorkItemRow[]
   costCenters?: Array<{ id: string; code: string; name: string; name_ar?: string | null; project_id?: string | null; level: number }>
+  analysisItemsMap?: Record<string, { id?: string; code: string; name: string }>
+
+  // NEW: Edit mode support
+  mode?: 'create' | 'edit'
+  transactionId?: string
+  initialData?: {
+    header: Record<string, any>
+    lines: TxLine[]
+  }
+
+  // NEW: Approval context
+  approvalStatus?: string
+  canEdit?: boolean
+
+  // NEW: Callbacks
+  onEditComplete?: () => void
 }
 
 type StepType = 'basic' | 'lines' | 'review'
@@ -100,7 +119,16 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   classifications = [],
   categories = [],
   workItems = [],
-  costCenters = []
+  costCenters = [],
+  analysisItemsMap = {},
+
+  // NEW: Edit mode props
+  mode = 'create',
+  transactionId,
+  initialData,
+  approvalStatus,
+  canEdit = true,
+  onEditComplete
 }) => {
   const [currentStep, setCurrentStep] = useState<StepType>('basic')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -128,6 +156,31 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       notes_ar: ''
     }
   })
+
+  // ========== DATA FROM CONTEXT (via props) ==========
+  // All dropdown data now comes from TransactionsDataContext through parent props
+  // No independent fetching - single source of truth
+  const effectiveCategories = categories
+  const effectiveCostCenters = costCenters
+  const effectiveWorkItems = workItems
+  const effectiveClassifications = classifications
+  const effectiveAnalysisItems = analysisItemsMap
+
+  // Log when wizard opens with context data
+  useEffect(() => {
+    if (open) {
+      console.log('📦 TransactionWizard opened with context data:', {
+        categories: effectiveCategories.length,
+        costCenters: effectiveCostCenters.length,
+        workItems: effectiveWorkItems.length,
+        classifications: effectiveClassifications.length,
+        analysisItems: Object.keys(effectiveAnalysisItems).length,
+        accounts: accounts.length,
+        organizations: organizations.length,
+        projects: projects.length
+      })
+    }
+  }, [open, effectiveCategories.length, effectiveCostCenters.length, effectiveWorkItems.length, effectiveClassifications.length, effectiveAnalysisItems, accounts.length, organizations.length, projects.length])
 
   // Lines data (transaction_lines table)
   const [lines, setLines] = useState<TxLine[]>([
@@ -162,6 +215,40 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       }
     }
   }, [])
+
+  // NEW: Load initial data in edit mode
+  const initialDataLoadedRef = React.useRef(false)
+
+  useEffect(() => {
+    // Reset the flag when wizard closes
+    if (!open) {
+      initialDataLoadedRef.current = false
+      return
+    }
+
+    // Only load once per open session
+    if (mode === 'edit' && initialData && !initialDataLoadedRef.current) {
+      console.log('📝 Loading transaction data for edit mode:', transactionId)
+
+      // Load header data
+      if (initialData.header) {
+        setHeaderData(initialData.header)
+      }
+
+      // Load lines data
+      if (initialData.lines && initialData.lines.length > 0) {
+        setLines(initialData.lines)
+      }
+
+      // Set transaction ID for edit mode
+      if (transactionId) {
+        setDraftTransactionId(transactionId)
+      }
+
+      initialDataLoadedRef.current = true
+      console.log('✅ Transaction data loaded successfully')
+    }
+  }, [mode, open, transactionId])
 
   const saveColumnConfig = (config: Record<string, ColumnConfig>) => {
     localStorage.setItem('transaction_wizard_column_config', JSON.stringify(config))
@@ -202,10 +289,10 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         handlePrev()
       }
     }
-    // Esc: Close
+    // Esc: Close (with cleanup)
     if (e.key === 'Escape') {
       e.preventDefault()
-      onClose()
+      handleCloseWithCleanup()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, currentStepIndex])
@@ -235,12 +322,13 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   // Filter projects by org
   const filteredProjects = useMemo(() => {
     if (!headerData.org_id) return projects
-    return projects.filter(p => p.org_id === headerData.org_id)
+    const scoped = projects.filter(p => p.org_id === headerData.org_id || !p.org_id)
+    return scoped.length > 0 ? scoped : projects
   }, [projects, headerData.org_id])
 
   // Prepare options for SearchableSelect
   const organizationOptions = useMemo(() =>
-    organizations.map(org => ({ value: org.id, label: org.name })),
+    organizations.map(org => ({ value: org.id, label: `${org.code} - ${org.name}` })),
     [organizations]
   )
 
@@ -250,18 +338,26 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   )
 
   const costCenterOptions = useMemo(() =>
-    costCenters.map(cc => ({ value: cc.id, label: `${cc.code} - ${cc.name}` })),
-    [costCenters]
+    effectiveCostCenters.map(cc => ({ value: cc.id, label: `${cc.code} - ${cc.name}` })),
+    [effectiveCostCenters]
   )
 
   const workItemOptions = useMemo(() =>
-    workItems.map(wi => ({ value: wi.id, label: `${wi.code} - ${wi.name}` })),
-    [workItems]
+    effectiveWorkItems.map(wi => ({ value: wi.id, label: `${wi.code} - ${wi.name}` })),
+    [effectiveWorkItems]
   )
 
   const classificationOptions = useMemo(() =>
-    classifications.map(cls => ({ value: cls.id, label: `${cls.code} - ${cls.name}` })),
-    [classifications]
+    effectiveClassifications.map(cls => ({ value: cls.id, label: `${cls.code} - ${cls.name}` })),
+    [effectiveClassifications]
+  )
+
+  const analysisItemOptions = useMemo(() =>
+    Object.entries(effectiveAnalysisItems).map(([id, item]) => ({
+      value: id,
+      label: `${item.code} - ${item.name}`
+    })),
+    [effectiveAnalysisItems]
   )
 
   const accountOptions = useMemo(() =>
@@ -300,8 +396,10 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         sub_tree_id: line.sub_tree_id || (headerData.default_sub_tree_id || undefined)
       })))
 
-      // Create draft transaction for document management
-      createDraftTransaction()
+      // NOTE: Draft transactions are NOT created during navigation anymore.
+      // Files are staged in state (lineAttachments, transactionAttachments) and uploaded after save.
+      // This prevents orphan records if user cancels the wizard.
+      // For edit mode, line.id is already set from the loaded transaction.
 
       setCurrentStep('lines')
     } else if (currentStep === 'lines') {
@@ -350,7 +448,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     }
   }
 
-  // Create draft transaction for document management
+  // Create draft transaction for document management (lazy - only when user attaches documents)
   const createDraftTransaction = async () => {
     if (draftTransactionId) return draftTransactionId // Already created
 
@@ -359,7 +457,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       const authService = await import('../../services/authService')
       const userId = await authService.AuthService.getCurrentUserId()
 
-      // Create draft transaction
+      // Create TEMPORARY wizard draft transaction (marked for cleanup)
       const { data: transaction, error: txError } = await supabase
         .from('transactions')
         .insert({
@@ -371,7 +469,10 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
           reference_number: headerData.reference_number || null,
           notes: headerData.notes || null,
           notes_ar: headerData.notes_ar || null,
-          created_by: userId
+          created_by: userId,
+          // Mark as wizard draft - will be filtered from normal queries
+          is_wizard_draft: true,
+          wizard_draft_created_at: new Date().toISOString()
         })
         .select()
         .single()
@@ -387,7 +488,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     }
   }
 
-  // Create draft line when user fills in account (for document management)
+  // Create draft line for document management (lazy - only when user wants to attach documents)
   const createDraftLine = async (lineIndex: number) => {
     if (draftLineIds[lineIndex]) return draftLineIds[lineIndex] // Already created
 
@@ -439,7 +540,244 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     }
   }
 
+  // Cleanup wizard draft when closing without saving (prevents orphan records)
+  const cleanupWizardDraft = async () => {
+    if (!draftTransactionId) return
+    
+    // Only cleanup if this is a wizard-created draft (not edit mode)
+    if (mode === 'edit') return
+    
+    try {
+      const { supabase } = await import('../../utils/supabase')
+      
+      // Delete the wizard draft transaction (cascade will delete lines)
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', draftTransactionId)
+        .eq('is_wizard_draft', true) // Safety: only delete if it's a wizard draft
+      
+      if (error) {
+        console.error('Failed to cleanup wizard draft:', error)
+      } else {
+        console.log('🧹 Wizard draft cleaned up:', draftTransactionId)
+      }
+    } catch (error) {
+      console.error('Failed to cleanup wizard draft:', error)
+    }
+  }
+
+  // Convert wizard draft to real transaction (remove draft flag)
+  const finalizeWizardDraft = async () => {
+    if (!draftTransactionId) return
+    
+    try {
+      const { supabase } = await import('../../utils/supabase')
+      
+      // Remove wizard draft flag - transaction becomes permanent
+      const { error } = await supabase
+        .from('transactions')
+        .update({
+          is_wizard_draft: false,
+          wizard_draft_created_at: null
+        })
+        .eq('id', draftTransactionId)
+      
+      if (error) {
+        console.error('Failed to finalize wizard draft:', error)
+      } else {
+        console.log('✅ Wizard draft finalized:', draftTransactionId)
+      }
+    } catch (error) {
+      console.error('Failed to finalize wizard draft:', error)
+    }
+  }
+
+  // Handle close with cleanup of wizard drafts
+  const handleCloseWithCleanup = async () => {
+    // Cleanup any wizard draft before closing
+    await cleanupWizardDraft()
+    
+    // Reset state
+    setDraftTransactionId(null)
+    setDraftLineIds({})
+    
+    // Call the original onClose
+    onClose()
+  }
+
+  // ========== BUSINESS RULE VALIDATION ==========
+  const validateBusinessRules = (): { isValid: boolean; errors: Record<string, string> } => {
+    const validationErrors: Record<string, string> = {}
+
+    // 1. Validate header fields
+    if (!headerData.entry_date) {
+      validationErrors.entry_date = 'تاريخ القيد مطلوب'
+    } else {
+      const entryDate = new Date(headerData.entry_date)
+      const today = new Date()
+      today.setHours(23, 59, 59, 999)
+      if (entryDate > today) {
+        validationErrors.entry_date = 'لا يمكن إدخال تاريخ مستقبلي'
+      }
+      // Check if date is too old (more than 1 year)
+      const oneYearAgo = new Date()
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
+      if (entryDate < oneYearAgo) {
+        validationErrors.entry_date = 'تحذير: التاريخ قديم جداً (أكثر من سنة)'
+      }
+    }
+
+    if (!headerData.description || headerData.description.trim().length < 3) {
+      validationErrors.description = 'وصف المعاملة مطلوب (3 أحرف على الأقل)'
+    }
+
+    if (!headerData.org_id) {
+      validationErrors.org_id = 'المؤسسة مطلوبة'
+    }
+
+    // 2. Validate lines exist
+    if (lines.length < 2) {
+      validationErrors.lines = 'يجب إضافة سطرين على الأقل (مدين ودائن)'
+    }
+
+    // 3. Validate each line
+    let hasDebitLine = false
+    let hasCreditLine = false
+
+    lines.forEach((line, idx) => {
+      if (!line.account_id) {
+        validationErrors[`line_${idx}_account`] = `السطر ${idx + 1}: الحساب مطلوب`
+      }
+
+      const debit = Number(line.debit_amount) || 0
+      const credit = Number(line.credit_amount) || 0
+
+      if (debit <= 0 && credit <= 0) {
+        validationErrors[`line_${idx}_amount`] = `السطر ${idx + 1}: يجب إدخال مبلغ مدين أو دائن`
+      }
+
+      if (debit > 0 && credit > 0) {
+        validationErrors[`line_${idx}_xor`] = `السطر ${idx + 1}: لا يمكن إدخال مدين ودائن معاً في نفس السطر`
+      }
+
+      if (debit > 0) hasDebitLine = true
+      if (credit > 0) hasCreditLine = true
+    })
+
+    // 4. Must have at least one debit and one credit line
+    if (!hasDebitLine) {
+      validationErrors.no_debit = 'يجب وجود سطر مدين واحد على الأقل'
+    }
+    if (!hasCreditLine) {
+      validationErrors.no_credit = 'يجب وجود سطر دائن واحد على الأقل'
+    }
+
+    // 5. Validate balance
+    if (!totals.isBalanced) {
+      validationErrors.balance = `القيود غير متوازنة - الفرق: ${Math.abs(totals.diff).toLocaleString('ar-SA')} ريال`
+    }
+
+    return {
+      isValid: Object.keys(validationErrors).length === 0,
+      errors: validationErrors
+    }
+  }
+
+  // NEW: Save as Draft (without approval)
+  const handleSaveDraft = async () => {
+    // Validate business rules first
+    const validation = validateBusinessRules()
+    if (!validation.isValid) {
+      setErrors(validation.errors)
+      // Scroll to top to show errors
+      const content = document.querySelector('.tx-wizard-content')
+      if (content) content.scrollTop = 0
+      return
+    }
+
+    setIsSubmitting(true)
+    setErrors({})
+    try {
+      const finalData = {
+        entry_date: headerData.entry_date,
+        description: headerData.description,
+        description_ar: headerData.description_ar || null,
+        org_id: headerData.org_id,
+        project_id: headerData.project_id || null,
+        classification_id: headerData.classification_id || null,
+        reference_number: headerData.reference_number || null,
+        notes: headerData.notes || null,
+        notes_ar: headerData.notes_ar || null,
+        lines: lines.map(line => ({
+          line_no: line.line_no,
+          account_id: line.account_id,
+          debit_amount: Number(line.debit_amount) || 0,
+          credit_amount: Number(line.credit_amount) || 0,
+          description: line.description || null,
+          org_id: line.org_id || headerData.org_id,
+          project_id: line.project_id || headerData.project_id || null,
+          cost_center_id: line.cost_center_id || null,
+          work_item_id: line.work_item_id || null,
+          analysis_work_item_id: line.analysis_work_item_id || null,
+          classification_id: line.classification_id || null,
+          sub_tree_id: line.sub_tree_id || null
+        })),
+        attachments: {
+          transaction: transactionAttachments,
+          lines: Object.fromEntries(Object.entries(lineAttachments).map(([idx, files]) => [Number(idx), files]))
+        },
+        // Save as draft - do NOT submit for approval
+        submitForApproval: false
+      }
+
+      await onSubmit(finalData)
+      // Finalize wizard draft (remove draft flag) if one was created
+      await finalizeWizardDraft()
+      
+      setErrors({ success: '✅ تم حفظ المعاملة كمسودة بنجاح!' })
+
+      setTimeout(() => {
+        setTransactionAttachments([])
+        setLineAttachments({})
+        setCompletedSteps(new Set())
+        setDraftTransactionId(null)
+        setDraftLineIds({})
+        setHeaderData({
+          entry_date: new Date().toISOString().split('T')[0],
+          description: '',
+          description_ar: '',
+          org_id: localStorage.getItem('default_org_id') || (organizations[0]?.id || ''),
+          project_id: localStorage.getItem('default_project_id') || '',
+          default_cost_center_id: '',
+          default_work_item_id: '',
+          default_sub_tree_id: '',
+          classification_id: '',
+          reference_number: '',
+          notes: '',
+          notes_ar: ''
+        })
+        setLines([])
+        onClose()
+      }, 1500)
+    } catch (error: any) {
+      setErrors({ submit: error?.message || 'فشل حفظ المعاملة' })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const handleSubmit = async () => {
+    // Validate business rules first
+    const validation = validateBusinessRules()
+    if (!validation.isValid) {
+      setErrors(validation.errors)
+      // Scroll to top to show errors
+      const content = document.querySelector('.tx-wizard-content')
+      if (content) content.scrollTop = 0
+      return
+    }
+
     setIsSubmitting(true)
     setErrors({})
     try {
@@ -474,14 +812,19 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         attachments: {
           transaction: transactionAttachments,
           lines: Object.fromEntries(Object.entries(lineAttachments).map(([idx, files]) => [Number(idx), files]))
-        }
+        },
+        // Submit for approval automatically
+        submitForApproval: true
       }
 
       // Call onSubmit which should save to Supabase
       await onSubmit(finalData)
 
+      // Finalize wizard draft (remove draft flag) if one was created
+      await finalizeWizardDraft()
+
       // Show success message
-      setErrors({ success: '✅ تم حفظ المعاملة بنجاح!' })
+      setErrors({ success: '✅ تم حفظ المعاملة وإرسالها للاعتماد بنجاح!' })
 
       // Wait 2 seconds to show success message, then close
       setTimeout(() => {
@@ -489,6 +832,8 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         setTransactionAttachments([])
         setLineAttachments({})
         setCompletedSteps(new Set())
+        setDraftTransactionId(null)
+        setDraftLineIds({})
         setHeaderData({
           entry_date: new Date().toISOString().split('T')[0],
           description: '',
@@ -590,7 +935,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       case 'analysis_work_item_id':
         return (
           <SearchableSelect
-            options={[]}
+            options={analysisItemOptions}
             value={line.analysis_work_item_id || ''}
             onChange={(val) => updateLine(idx, { analysis_work_item_id: val || undefined })}
             placeholder="بدون بند تحليل"
@@ -606,7 +951,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
           />
         )
       case 'sub_tree_id':
-        const subTreeOptions = categories
+        const subTreeOptions = effectiveCategories
           .filter(c => c.org_id === (line.org_id || headerData.org_id))
           .map(c => ({ value: c.id, label: `${c.code} - ${c.description}` }))
         return (
@@ -629,8 +974,8 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       <DraggablePanelContainer
         storageKey="txWizard"
         isOpen={open}
-        onClose={onClose}
-        title="معاملة جديدة - خطوة بخطوة"
+        onClose={handleCloseWithCleanup}
+        title={mode === 'edit' ? `تعديل المعاملة${transactionId ? ` - ${transactionId.substring(0, 8)}` : ''}` : "معاملة جديدة - خطوة بخطوة"}
         subtitle={`الخطوة ${currentStepIndex + 1} من ${steps.length}: ${steps[currentStepIndex].label}`}
         defaults={{
           position: () => ({ x: 60, y: 40 }),
@@ -641,6 +986,36 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         <div className="tx-wizard" dir="rtl">
           {/* Material-UI Stepper */}
           <Box sx={{ width: '100%', padding: '20px 20px 0 20px', background: '#0f172a' }}>
+            {/* NEW: Show approval status in edit mode */}
+            {mode === 'edit' && approvalStatus && (
+              <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2, justifyContent: 'center' }}>
+                <Chip
+                  label={
+                    approvalStatus === 'draft' ? '📝 مسودة' :
+                      approvalStatus === 'submitted' ? '📤 مُرسلة' :
+                        approvalStatus === 'approved' ? '✅ معتمدة' :
+                          approvalStatus === 'revision_requested' ? '🔄 طلب تعديل' :
+                            approvalStatus === 'rejected' ? '❌ مرفوضة' :
+                              approvalStatus
+                  }
+                  color={
+                    approvalStatus === 'approved' ? 'success' :
+                      approvalStatus === 'rejected' ? 'error' :
+                        approvalStatus === 'revision_requested' ? 'warning' :
+                          'default'
+                  }
+                  sx={{ fontSize: '14px', fontWeight: 600 }}
+                />
+                {!canEdit && (
+                  <Chip
+                    label="🔒 للقراءة فقط"
+                    color="error"
+                    size="small"
+                  />
+                )}
+              </Box>
+            )}
+
             <Stepper activeStep={currentStepIndex} alternativeLabel sx={{ background: 'transparent' }}>
               {steps.map((step, idx) => (
                 <Step key={step.id} completed={completedSteps.has(step.id)}>
@@ -723,29 +1098,19 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                         <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600, color: '#f1f5f9' }}>
                           المؤسسة <span style={{ color: '#ef4444' }}>*</span>
                         </label>
-                        <select
+                        <SearchableSelect
+                          id="wizard.basic.org"
                           value={headerData.org_id}
-                          onChange={(e) => setHeaderData(prev => ({ ...prev, org_id: e.target.value, project_id: '' }))}
-                          style={{
-                            width: '100%',
-                            padding: '12px',
-                            borderRadius: '8px',
-                            border: `2px solid ${errors.org_id ? '#ef4444' : '#475569'}`,
-                            fontSize: '14px',
-                            backgroundColor: '#334155',
-                            color: '#f1f5f9',
-                            fontFamily: 'inherit'
-                          }}
-                        >
-                          <option value="" disabled>اختر المؤسسة...</option>
-                          {organizations.map(org => (
-                            <option key={org.id} value={org.id}>{org.code} - {org.name}</option>
-                          ))}
-                        </select>
-                        {errors.org_id && (
+                          options={organizationOptions}
+                          onChange={(val) => setHeaderData(prev => ({ ...prev, org_id: val, project_id: '' }))}
+                          placeholder="اختر المؤسسة..."
+                          required
+                          error={!!errors.org_id}
+                          clearable={false}
+                        />
+                        {errors.org_id ? (
                           <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{errors.org_id}</div>
-                        )}
-                        {!errors.org_id && (
+                        ) : (
                           <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '4px' }}>اختر المؤسسة المسؤولة عن هذه المعاملة</div>
                         )}
                       </div>
@@ -788,27 +1153,15 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                         <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600, color: '#f1f5f9' }}>
                           المشروع
                         </label>
-                        <select
-                          value={headerData.project_id}
-                          onChange={(e) => setHeaderData(prev => ({ ...prev, project_id: e.target.value }))}
+                        <SearchableSelect
+                          id="wizard.basic.project"
+                          value={headerData.project_id || ''}
+                          options={[{ value: '', label: 'بدون مشروع' }, ...projectOptions]}
+                          onChange={(val) => setHeaderData(prev => ({ ...prev, project_id: val }))}
+                          placeholder="بدون مشروع"
+                          clearable
                           disabled={!headerData.org_id}
-                          style={{
-                            width: '100%',
-                            padding: '12px',
-                            borderRadius: '8px',
-                            border: '2px solid #475569',
-                            fontSize: '14px',
-                            backgroundColor: !headerData.org_id ? '#1e293b' : '#334155',
-                            color: '#f1f5f9',
-                            fontFamily: 'inherit',
-                            cursor: !headerData.org_id ? 'not-allowed' : 'pointer'
-                          }}
-                        >
-                          <option value="">بدون مشروع</option>
-                          {filteredProjects.map(proj => (
-                            <option key={proj.id} value={proj.id}>{proj.code} - {proj.name}</option>
-                          ))}
-                        </select>
+                        />
                         <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '4px' }}>
                           {!headerData.org_id ? '⚠️ اختر المؤسسة أولاً' : 'اختياري - حدد المشروع المرتبط'}
                         </div>
@@ -1094,37 +1447,113 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                                     </div>
                                   )}
 
-                                  {/* Per-line attachments - Full functionality with draft support */}
+                                  {/* Per-line attachments - Full document management */}
                                   <div style={{ marginTop: '16px', background: '#0f172a', borderRadius: '8px', padding: '16px', border: '1px solid #334155' }}>
                                     {(line.id || draftLineIds[idx]) ? (
-                                      // Full AttachDocumentsPanel with all features
+                                      // Full AttachDocumentsPanel with all features (edit mode or after enabling)
                                       <AttachDocumentsPanel
                                         orgId={headerData.org_id || ''}
                                         transactionLineId={line.id || draftLineIds[idx]}
                                         projectId={headerData.project_id || undefined}
                                       />
                                     ) : line.account_id && ((Number(line.debit_amount) || 0) > 0 || (Number(line.credit_amount) || 0) > 0) ? (
-                                      // Account and amount filled - show button to enable documents
-                                      <Box sx={{ textAlign: 'center', padding: '24px' }}>
-                                        <Typography variant="body2" sx={{ color: '#94a3b8', marginBottom: '12px' }}>
-                                          📎 جاهز لإرفاق المستندات
+                                      // Line is ready - show options to attach documents
+                                      <>
+                                        <Typography variant="body2" sx={{ fontWeight: 600, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px', color: '#f1f5f9', fontSize: '15px' }}>
+                                          <AttachFile sx={{ fontSize: 18 }} />
+                                          مرفقات السطر {idx + 1}
                                         </Typography>
-                                        <Button
-                                          variant="contained"
-                                          size="small"
-                                          onClick={async () => {
-                                            await createDraftLine(idx)
-                                          }}
-                                          sx={{
-                                            backgroundColor: '#3b82f6',
-                                            '&:hover': { backgroundColor: '#2563eb' }
-                                          }}
-                                        >
-                                          تفعيل إدارة المستندات
-                                        </Button>
-                                      </Box>
+                                        
+                                        {/* Show staged files */}
+                                        {lineAttachments[idx] && lineAttachments[idx].length > 0 && (
+                                          <Box sx={{ marginBottom: '12px' }}>
+                                            {lineAttachments[idx].map((file, fileIdx) => (
+                                              <Box key={fileIdx} sx={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                justifyContent: 'space-between',
+                                                padding: '8px 12px',
+                                                background: '#1e293b',
+                                                borderRadius: '6px',
+                                                marginBottom: '6px'
+                                              }}>
+                                                <Typography variant="body2" sx={{ color: '#f1f5f9', fontSize: '13px' }}>
+                                                  📄 {file.name}
+                                                </Typography>
+                                                <Button
+                                                  size="small"
+                                                  onClick={() => {
+                                                    setLineAttachments(prev => ({
+                                                      ...prev,
+                                                      [idx]: prev[idx].filter((_, i) => i !== fileIdx)
+                                                    }))
+                                                  }}
+                                                  sx={{ minWidth: 'auto', color: '#ef4444', padding: '2px 8px' }}
+                                                >
+                                                  ✕
+                                                </Button>
+                                              </Box>
+                                            ))}
+                                          </Box>
+                                        )}
+                                        
+                                        {/* Two options: Quick upload OR Full document management */}
+                                        <Box sx={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                          {/* Option 1: Quick file upload (staged) */}
+                                          <input
+                                            type="file"
+                                            id={`line-file-${idx}`}
+                                            multiple
+                                            style={{ display: 'none' }}
+                                            onChange={(e) => {
+                                              const files = Array.from(e.target.files || [])
+                                              if (files.length > 0) {
+                                                setLineAttachments(prev => ({
+                                                  ...prev,
+                                                  [idx]: [...(prev[idx] || []), ...files]
+                                                }))
+                                              }
+                                              e.target.value = '' // Reset for re-selection
+                                            }}
+                                          />
+                                          <label htmlFor={`line-file-${idx}`}>
+                                            <Button
+                                              variant="outlined"
+                                              component="span"
+                                              size="small"
+                                              startIcon={<AttachFile />}
+                                              sx={{
+                                                color: '#94a3b8',
+                                                borderColor: '#475569',
+                                                '&:hover': { borderColor: '#3b82f6', color: '#3b82f6' }
+                                              }}
+                                            >
+                                              رفع ملف جديد
+                                            </Button>
+                                          </label>
+                                          
+                                          {/* Option 2: Enable full document management (link existing, templates, etc.) */}
+                                          <Button
+                                            variant="contained"
+                                            size="small"
+                                            onClick={async () => {
+                                              await createDraftLine(idx)
+                                            }}
+                                            sx={{
+                                              backgroundColor: '#3b82f6',
+                                              '&:hover': { backgroundColor: '#2563eb' }
+                                            }}
+                                          >
+                                            🔗 ربط مستند موجود
+                                          </Button>
+                                        </Box>
+                                        
+                                        <Typography variant="caption" sx={{ display: 'block', color: '#64748b', marginTop: '8px', textAlign: 'center' }}>
+                                          رفع ملف جديد: سيتم الرفع عند الحفظ | ربط مستند موجود: يفتح إدارة المستندات الكاملة
+                                        </Typography>
+                                      </>
                                     ) : (
-                                      // Before line is ready: Show requirements
+                                      // Line not ready yet - show requirements
                                       <>
                                         <Typography variant="body2" sx={{ fontWeight: 600, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px', color: '#f1f5f9', fontSize: '15px' }}>
                                           المستندات المرفقة
@@ -1139,9 +1568,6 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                                           </Typography>
                                           <Typography variant="caption" sx={{ display: 'block' }}>
                                             2️⃣ أدخل المبلغ (مدين أو دائن)
-                                          </Typography>
-                                          <Typography variant="caption" sx={{ display: 'block', marginTop: '8px', color: '#3b82f6' }}>
-                                            ثم اضغط "تفعيل إدارة المستندات"
                                           </Typography>
                                         </Box>
                                       </>
@@ -1329,7 +1755,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
 
                 {/* Attachments Summary */}
                 {(Object.values(lineAttachments).some(files => files.length > 0) || transactionAttachments.length > 0) && (
-                  <Paper elevation={2} sx={{ padding: '20px' }}>
+                  <Paper elevation={2} sx={{ padding: '20px', marginBottom: '20px' }}>
                     <Typography variant="h6" sx={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       📎 المرفقات
                     </Typography>
@@ -1351,6 +1777,32 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                     ))}
                   </Paper>
                 )}
+
+                {/* Approval Status Preview */}
+                {draftTransactionId && (
+                  <Box sx={{ marginBottom: '20px' }}>
+                    <Alert severity="info" sx={{ marginBottom: '16px' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, marginBottom: '8px' }}>
+                        📋 حالة الاعتماد
+                      </Typography>
+                      <Typography variant="body2">
+                        سيتم إرسال هذه المعاملة للاعتماد تلقائياً. سيحتاج كل سطر إلى موافقة منفصلة من المعتمدين المخولين.
+                      </Typography>
+                    </Alert>
+                    <TransactionApprovalStatus transactionId={draftTransactionId} />
+                  </Box>
+                )}
+
+                {!draftTransactionId && (
+                  <Alert severity="success" sx={{ marginBottom: '20px' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, marginBottom: '8px' }}>
+                      ✅ جاهز للإرسال
+                    </Typography>
+                    <Typography variant="body2">
+                      عند الضغط على "إرسال للاعتماد"، سيتم حفظ المعاملة وإرسالها تلقائياً لنظام الاعتماد المتدرج.
+                    </Typography>
+                  </Alert>
+                )}
               </div>
             )}
           </div>
@@ -1368,15 +1820,54 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
 
             <Box sx={{ display: 'flex', gap: '12px' }}>
               {currentStep === 'review' ? (
-                <Button
-                  variant="contained"
-                  color="success"
-                  startIcon={<Save />}
-                  onClick={handleSubmit}
-                  disabled={isSubmitting || !totals.isBalanced}
-                >
-                  {isSubmitting ? 'جاري الحفظ...' : '💾 حفظ المعاملة'}
-                </Button>
+                <>
+                  {/* NEW: Save as Draft Button */}
+                  <Button
+                    variant="outlined"
+                    startIcon={<Save />}
+                    onClick={handleSaveDraft}
+                    disabled={isSubmitting || !totals.isBalanced}
+                    size="large"
+                    sx={{
+                      borderColor: '#94a3b8',
+                      color: '#94a3b8',
+                      fontWeight: 600,
+                      fontSize: '16px',
+                      padding: '12px 32px',
+                      '&:hover': {
+                        borderColor: '#cbd5e1',
+                        background: 'rgba(148, 163, 184, 0.1)'
+                      },
+                      '&:disabled': {
+                        borderColor: '#475569',
+                        color: '#64748b'
+                      }
+                    }}
+                  >
+                    {isSubmitting ? '⏳ جاري الحفظ...' : '💾 حفظ كمسودة'}
+                  </Button>
+
+                  {/* Send for Approval Button */}
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<Send />}
+                    onClick={handleSubmit}
+                    disabled={isSubmitting || !totals.isBalanced}
+                    size="large"
+                    sx={{
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                      fontWeight: 600,
+                      fontSize: '16px',
+                      padding: '12px 32px',
+                      '&:hover': {
+                        background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                      }
+                    }}
+                  >
+                    {isSubmitting ? '⏳ جاري الإرسال...' : '📤 إرسال للاعتماد'}
+                  </Button>
+                </>
               ) : (
                 <Button
                   variant="contained"

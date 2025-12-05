@@ -58,11 +58,10 @@ const initializeAuth = async () => {
 
     if (session?.user) {
       authState.user = session.user;
+      // Load auth data BEFORE setting loading=false
+      await loadAuthData(session.user.id);
       authState.loading = false;
       notifyListeners();
-      
-      // Load auth data async
-      loadAuthData(session.user.id);
     } else {
       authState.loading = false;
       notifyListeners();

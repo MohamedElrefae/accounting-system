@@ -104,12 +104,13 @@ export interface Project {
   code: string
   name: string
   description?: string
-  status: 'active' | 'inactive' | 'completed'
+  status: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled' | 'inactive'
   start_date?: string
   end_date?: string
   budget_amount?: number
   created_by?: string
   org_id?: string
+  is_active?: boolean | null
   created_at: string
   updated_at: string
 }
@@ -147,13 +148,16 @@ export interface TransactionRecord {
   analysis_work_item_id?: string | null
   cost_center_id?: string | null
   // Approval workflow
-  approval_status?: 'draft' | 'submitted' | 'approved' | 'rejected' | 'revision_requested' | 'cancelled'
+  approval_status?: 'draft' | 'submitted' | 'approved' | 'rejected' | 'revision_requested' | 'cancelled' | 'pending'
   submitted_at?: string | null
   submitted_by?: string | null
   reviewed_at?: string | null
   reviewed_by?: string | null
   review_action?: 'approved' | 'rejected' | 'revision_requested' | null
   review_reason?: string | null
+  // Aggregated approval stats
+  lines_total_count?: number
+  lines_approved_count?: number
   created_at: string
   updated_at: string
 }
@@ -216,11 +220,12 @@ export async function getNextTransactionNumber(config?: TransactionNumberConfig)
       pattern = `${actualConfig.prefix}${actualConfig.separator}%`
     }
     
-    // Get the highest number for this pattern
+    // Get the highest number for this pattern (exclude wizard drafts)
     const { data, error } = await supabase
       .from('transactions')
       .select('entry_number')
       .ilike('entry_number', pattern)
+      .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
       .order('entry_number', { ascending: false })
       .limit(1)
     
@@ -367,68 +372,96 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
 
   const f = options?.filters
 
-  // Use enriched RPC that can filter on both header and line-level dimensions.
-  // Step 1: ask server for eligible transaction IDs with exact pagination.
-  const createdBy = scope === 'my' ? await getCurrentUserId() : null
+  // Build query on transactions table directly
+  let query = supabase
+    .from('transactions')
+    .select('*', { count: 'exact' })
+    // Exclude wizard drafts - these are temporary records for document attachment
+    .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
 
-  const { data: idRows, error: idErr } = await supabase.rpc('list_transactions_enriched_rows', {
-    p_scope: scope,
-    p_pending_only: pendingOnly,
-    p_search: f?.search || null,
-    p_date_from: f?.dateFrom || null,
-    p_date_to: f?.dateTo || null,
-    p_amount_from: f?.amountFrom ?? null,
-    p_amount_to: f?.amountTo ?? null,
-    p_debit_account_id: f?.debitAccountId || null,
-    p_credit_account_id: f?.creditAccountId || null,
-    p_project_id: f?.projectId || null,
-    p_org_id: f?.orgId || null,
-    p_classification_id: f?.classificationId || null,
-    p_sub_tree_id: f?.expensesCategoryId || null,
-    p_work_item_id: f?.workItemId || null,
-    p_analysis_work_item_id: f?.analysisWorkItemId || null,
-    p_cost_center_id: f?.costCenterId || null,
-    p_approval_status: f?.approvalStatus || null,
-    p_created_by: createdBy || null,
-    p_page: page,
-    p_page_size: pageSize,
-  } as any)
-
-  if (idErr) throw idErr
-
-  const ids = (idRows || []).map((r: any) => r.id as string)
-  const total = (idRows && idRows.length > 0 && typeof (idRows[0] as any).total_count === 'number')
-    ? Number((idRows[0] as any).total_count)
-    : 0
-
-  if (ids.length === 0) {
-    return { rows: [], total }
+  // Apply filters
+  if (scope === 'my') {
+    const uid = await getCurrentUserId()
+    if (uid) query = query.eq('created_by', uid)
   }
 
-  // Step 2: load transaction headers for those IDs and preserve RPC ordering.
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .in('id', ids)
+  if (pendingOnly) {
+    query = query.eq('is_posted', false)
+  }
+
+  if (f?.search) {
+    const s = f.search
+    // Search in description, reference_number, entry_number
+    query = query.or(`description.ilike.%${s}%,reference_number.ilike.%${s}%,entry_number.ilike.%${s}%`)
+  }
+
+  if (f?.dateFrom) query = query.gte('entry_date', f.dateFrom)
+  if (f?.dateTo) query = query.lte('entry_date', f.dateTo)
+  if (f?.amountFrom) query = query.gte('amount', f.amountFrom)
+  if (f?.amountTo) query = query.lte('amount', f.amountTo)
+  
+  if (f?.debitAccountId) query = query.eq('debit_account_id', f.debitAccountId)
+  if (f?.creditAccountId) query = query.eq('credit_account_id', f.creditAccountId)
+  
+  if (f?.projectId) query = query.eq('project_id', f.projectId)
+  if (f?.orgId) query = query.eq('org_id', f.orgId)
+  if (f?.classificationId) query = query.eq('classification_id', f.classificationId)
+  if (f?.expensesCategoryId) query = query.eq('sub_tree_id', f.expensesCategoryId)
+  if (f?.workItemId) query = query.eq('work_item_id', f.workItemId)
+  if (f?.analysisWorkItemId) query = query.eq('analysis_work_item_id', f.analysisWorkItemId)
+  if (f?.costCenterId) query = query.eq('cost_center_id', f.costCenterId)
+  
+  if (f?.approvalStatus) query = query.eq('approval_status', f.approvalStatus)
+
+  // Pagination
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+  
+  query = query
+    .order('entry_date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .range(from, to)
+
+  const { data, error, count } = await query
 
   if (error) throw error
 
-  const byId = new Map<string, TransactionRecord>()
-  for (const row of (data || []) as TransactionRecord[]) {
-    byId.set(row.id, row)
-  }
-
-  const rows: TransactionRecord[] = ids
-    .map(id => byId.get(id))
-    .filter((r): r is TransactionRecord => Boolean(r))
+  const rows = (data || []) as TransactionRecord[]
+  const total = count || 0
 
   // Patch header aggregates from live view to avoid relying on triggers
   try {
     if (rows.length > 0) {
+      const ids = rows.map(r => r.id)
+      
+      // 1. Fetch line items aggregates
       const { data: aggs, error: aggErr } = await supabase
         .from('v_tx_line_items_agg')
         .select('transaction_id, line_items_count, line_items_total')
         .in('transaction_id', ids)
+        
+      // 2. Fetch approval stats for pending transactions
+      const pendingIds = rows.filter(r => !r.is_posted).map(r => r.id)
+      let approvalStatsMap = new Map<string, { total: number; approved: number }>()
+      
+      if (pendingIds.length > 0) {
+        const { data: approvalStats } = await supabase
+          .from('transaction_lines')
+          .select('transaction_id, line_status')
+          .in('transaction_id', pendingIds)
+          
+        if (approvalStats) {
+          for (const stat of approvalStats) {
+            const current = approvalStatsMap.get(stat.transaction_id) || { total: 0, approved: 0 }
+            current.total++
+            if (stat.line_status === 'approved') {
+              current.approved++
+            }
+            approvalStatsMap.set(stat.transaction_id, current)
+          }
+        }
+      }
+
       if (!aggErr && Array.isArray(aggs)) {
         const map = new Map<string, { c: number; t: number }>()
         for (const a of aggs as any[]) map.set(a.transaction_id, { c: Number(a.line_items_count || 0), t: Number(a.line_items_total || 0) })
@@ -438,6 +471,20 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
             ;(r as any).line_items_count = m.c
             ;(r as any).line_items_total = m.t
             ;(r as any).has_line_items = m.c > 0
+          }
+          
+          // Patch approval stats
+          const stats = approvalStatsMap.get(r.id)
+          if (stats) {
+            ;(r as any).lines_total_count = stats.total
+            ;(r as any).lines_approved_count = stats.approved
+            
+            // Patch approval status if all lines are approved but header status is lagging
+            if (stats.total > 0 && stats.approved === stats.total && (r.approval_status === 'draft' || r.approval_status === 'submitted' || r.approval_status === 'pending')) {
+              r.approval_status = 'approved'
+            } else if (stats.approved > 0 && stats.approved < stats.total && (r.approval_status === 'draft' || r.approval_status === 'submitted')) {
+              r.approval_status = 'pending'
+            }
           }
         }
       }
@@ -791,11 +838,22 @@ export async function rejectTransaction(id: string, reason: string): Promise<voi
 }
 
 export async function submitTransaction(id: string, note?: string | null): Promise<void> {
-  const { error } = await supabase.rpc('submit_transaction', {
+  // Get current user ID
+  const userId = await getCurrentUserId()
+  if (!userId) throw new Error('User not authenticated')
+  
+  // Use line-based approval workflow
+  const { data, error } = await supabase.rpc('submit_transaction_for_line_approval', {
     p_transaction_id: id,
-    p_note: note ?? null,
+    p_submitted_by: userId,
   })
-  if (error) throw error
+  
+  if (error) {
+    console.error('Submit transaction error:', error)
+    throw error
+  }
+  
+  console.log('✅ Transaction submitted for line approval:', data)
 }
 
 export async function getUserDisplayMap(ids: string[]): Promise<Record<string, string>> {
@@ -819,7 +877,6 @@ export async function getProjects(): Promise<Project[]> {
   const { data, error } = await supabase
     .from('projects')
     .select('*')
-    .eq('status', 'active')
     .order('code', { ascending: true })
 
   if (error) throw error

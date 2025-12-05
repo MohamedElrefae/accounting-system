@@ -8,7 +8,7 @@ import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import { getCompanyConfig } from '../../services/company-config'
 import { fetchTransactionsDateRange } from '../../services/reports/common'
-import { fetchBalanceSheetReport, type BSFilters, type BSRow } from '../../services/reports/balance-sheet'
+import { getBalanceSheet, type UnifiedFilters, type BalanceSheetRow as BSRow } from '../../services/reports/unified-financial-query'
 import { getActiveOrgId, getActiveProjectId } from '../../utils/org'
 import { fetchOrganizations, type LookupOption } from '../../services/lookups'
 import Visibility from '@mui/icons-material/Visibility'
@@ -195,14 +195,15 @@ export default function BalanceSheet() {
       setLoading(true)
       setError('')
 
-      const filters: BSFilters = {
-        asOfDate,
+      const filters: UnifiedFilters = {
+        dateFrom: null, // Balance Sheet is as-of date
+        dateTo: asOfDate,
         orgId: orgId || null,
         projectId: projectId || null,
         postedOnly
       }
 
-      const result = await fetchBalanceSheetReport(filters)
+      const result = await getBalanceSheet(filters)
       
       // Transform the service result into the expected data structure
       const assets = result.rows.filter(r => r.account_type === 'assets')
@@ -1167,19 +1168,19 @@ export default function BalanceSheet() {
                 <div className="balance-sheet-ratios">
                   <div className="ratio-line">
                     <span className="ratio-label">{uiLang === 'ar' ? 'نسبة المديونية' : 'Debt Ratio'}</span>
-                    <span className="ratio-value">{formatArabicCurrency(parseFloat(((data.total_liabilities / data.total_assets) * 100).toFixed(2)), 'none')}%</span>
+                    <span className="ratio-value">{data.total_assets !== 0 ? formatArabicCurrency(parseFloat(((data.total_liabilities / data.total_assets) * 100).toFixed(2)), 'none') : '0'}%</span>
                   </div>
                   <div className="ratio-line">
                     <span className="ratio-label">{uiLang === 'ar' ? 'نسبة حقوق الملكية' : 'Equity Ratio'}</span>
-                    <span className="ratio-value">{formatArabicCurrency(parseFloat(((data.total_equity / data.total_assets) * 100).toFixed(2)), 'none')}%</span>
+                    <span className="ratio-value">{data.total_assets !== 0 ? formatArabicCurrency(parseFloat(((data.total_equity / data.total_assets) * 100).toFixed(2)), 'none') : '0'}%</span>
                   </div>
                   <div className="ratio-line">
                     <span className="ratio-label">{uiLang === 'ar' ? 'معدل العائد على الأصول' : 'Return on Assets'}</span>
-                    <span className="ratio-value">{formatArabicCurrency(parseFloat(((data.net_worth / data.total_assets) * 100).toFixed(2)), 'none')}%</span>
+                    <span className="ratio-value">{data.total_assets !== 0 ? formatArabicCurrency(parseFloat(((data.net_worth / data.total_assets) * 100).toFixed(2)), 'none') : '0'}%</span>
                   </div>
                   <div className="ratio-line">
                     <span className="ratio-label">{uiLang === 'ar' ? 'معدل العائد على حقوق الملكية' : 'Return on Equity'}</span>
-                    <span className="ratio-value">{data.total_equity !== 0 ? formatArabicCurrency(parseFloat(((data.net_worth / data.total_equity) * 100).toFixed(2)), 'none') : formatArabicCurrency(0, 'none')}%</span>
+                    <span className="ratio-value">{data.total_equity !== 0 ? formatArabicCurrency(parseFloat(((data.net_worth / data.total_equity) * 100).toFixed(2)), 'none') : '0'}%</span>
                   </div>
                 </div>
               </div>

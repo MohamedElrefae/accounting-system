@@ -464,6 +464,162 @@ export const TuneIcon: React.FC<SvgIconProps> = (props) => (
   </SvgIcon>
 );
 
+export const FlagIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M14.4 14H21V3h-6.4L13.3 0h-2.3v3H4v10h10.4l.6 1zm-6.4-2H6V5h2v7z"/>
+  </SvgIcon>
+);
+
+export const MessageIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+  </SvgIcon>
+);
+
+export const ShieldIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/>
+  </SvgIcon>
+);
+
+export const PersonAddAltIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+  </SvgIcon>
+);
+
+export const AnalyticsIcon: React.FC<SvgIconProps> = (props) => (
+  <AssessmentIcon {...props} />
+);
+
+export const TimelineIcon: React.FC<SvgIconProps> = (props) => (
+  <TrendingUpIcon {...props} />
+);
+
+export const StarIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2l-2.81 6.63L2 9.24l5.46 4.73L5.82 21z"/>
+  </SvgIcon>
+);
+
+export const PersonOffIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4zm7.76-9.64l-1.41-1.41L13 10.34 4.41 1.76 3 3.17 10.59 10.76 3 18.34l1.41 1.41L13 12.17l8.59 8.58 1.41-1.41L14.41 10.76z"/>
+  </SvgIcon>
+);
+
+export const AdminIcon: React.FC<SvgIconProps> = (props) => (
+  <AdminPanelSettingsIcon {...props} />
+);
+
+export const WorkIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M20 6h-2.18c.11-.89.3-1.74.84-2.55.33-.52.35-1.21.05-1.66-.3-.45-.84-.72-1.39-.72-.55 0-1.09.27-1.39.72-.54.81-.73 1.66-.84 2.55H9.18c-.11-.89-.3-1.74-.84-2.55-.3-.45-.84-.72-1.39-.72-.55 0-1.09.27-1.39.72-.3.45-.28 1.14.05 1.66.54.81.73 1.66.84 2.55H4c-1.1 0-1.99.9-1.99 2L2 19c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 13H4V8h16v11z"/>
+  </SvgIcon>
+);
+
+export const CompareIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V5h2v12zm4 0h-2v-4h2v4z"/>
+  </SvgIcon>
+);
+
+export const MoreHorizIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+  </SvgIcon>
+);
+
+export const VisibilityOutlinedIcon: React.FC<SvgIconProps> = (props) => (
+  <VisibilityIcon {...props} />
+);
+
+export const EditOutlinedIcon: React.FC<SvgIconProps> = (props) => (
+  <EditIcon {...props} />
+);
+
+export const ArrowUpwardIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M7 14l5-5 5 5z"/>
+  </SvgIcon>
+);
+
+export const ArrowDownwardIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M7 10l5 5 5-5z"/>
+  </SvgIcon>
+);
+
+export const CheckIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+  </SvgIcon>
+);
+
+export const DatasetIcon: React.FC<SvgIconProps> = (props) => (
+  <TableChartIcon {...props} />
+);
+
+export const MoreIcon: React.FC<SvgIconProps> = (props) => (
+  <MoreVertIcon {...props} />
+);
+
+export const ExpandIcon: React.FC<SvgIconProps> = (props) => (
+  <ExpandMoreIcon {...props} />
+);
+
+export const CollapseIcon: React.FC<SvgIconProps> = (props) => (
+  <ExpandLessIcon {...props} />
+);
+
+export const NumbersIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M5 9h2V7H5v2zm4 0h2V7H9v2zm4 0h2V7h-2v2zM5 13h2v-2H5v2zm4 0h2v-2H9v2zm4 0h2v-2h-2v2zM3 3v18h18V3H3zm16 16H5V5h14v14z"/>
+  </SvgIcon>
+);
+
+export const EventIcon: React.FC<SvgIconProps> = (props) => (
+  <CalendarTodayIcon {...props} />
+);
+
+// Additional common icons
+export const CheckBoxIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-5.04-6.71l-2.75-3.54-1.3 1.04 4.05 5.21 6.3-6.33-1.3-1.04-4.7 4.66z"/>
+  </SvgIcon>
+);
+
+export const CheckBoxOutlineBlankIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
+  </SvgIcon>
+);
+
+export const RadioButtonCheckedIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0-2c3.87 0 7 3.13 7 7s-3.13 7-7 7-7-3.13-7-7 3.13-7 7-7zm0-2C6.48 3 2 7.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 3 12 3z"/>
+  </SvgIcon>
+);
+
+export const RadioButtonUncheckedIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/>
+  </SvgIcon>
+);
+
+export const TextFieldsIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M2.5 4v3h5v12h3V7h5V4h-13zm19 5h-9v3h9V9zM3 14h9v-2H3v2z"/>
+  </SvgIcon>
+);
+
+// Create a proxy for any missing icons
+const createMissingIconProxy = (name: string): React.FC<SvgIconProps> => (props) => (
+  <SvgIcon {...props}>
+    <circle cx="12" cy="12" r="10"/>
+  </SvgIcon>
+);
+
 // Export all icons with their MUI names for compatibility
 export {
   MenuIcon as Menu,
@@ -559,6 +715,34 @@ export {
   PhoneIcon as Phone,
   ScheduleIcon as Schedule,
   PersonIcon as Person,
+  FlagIcon as Flag,
+  MessageIcon as Message,
+  ShieldIcon as Shield,
+  PersonAddAltIcon as PersonAddAlt,
+  AnalyticsIcon as Analytics,
+  TimelineIcon as Timeline,
+  StarIcon as Star,
+  PersonOffIcon as PersonOff,
+  AdminIcon as Admin,
+  WorkIcon as Work,
+  CompareIcon as Compare,
+  MoreHorizIcon as MoreHoriz,
+  VisibilityOutlinedIcon as VisibilityOutlined,
+  EditOutlinedIcon as EditOutlined,
+  ArrowUpwardIcon as ArrowUpward,
+  ArrowDownwardIcon as ArrowDownward,
+  CheckIcon as Check,
+  DatasetIcon as Dataset,
+  MoreIcon as More,
+  ExpandIcon as Expand,
+  CollapseIcon as Collapse,
+  NumbersIcon as Numbers,
+  EventIcon as Event,
+  CheckBoxIcon as CheckBox,
+  CheckBoxOutlineBlankIcon as CheckBoxOutlineBlank,
+  RadioButtonCheckedIcon as RadioButtonChecked,
+  RadioButtonUncheckedIcon as RadioButtonUnchecked,
+  TextFieldsIcon as TextFields,
 };
 
 // Default export for compatibility with default imports
@@ -655,6 +839,8 @@ const icons = {
   Phone: PhoneIcon,
   Schedule: ScheduleIcon,
   Person: PersonIcon,
+  Flag: FlagIcon,
+  Message: MessageIcon,
 };
 
 export default icons;

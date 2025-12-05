@@ -55,7 +55,7 @@ export interface ClassificationReportResult {
 }
 
 export async function fetchTransactionClassificationSummary(filters: ClassificationReportFilters): Promise<ClassificationReportResult> {
-  // Load transactions with minimal fields and org info via project
+  // Load transactions with minimal fields and org info via project (exclude wizard drafts)
   let q = supabase
     .from('transactions')
     .select(`
@@ -66,6 +66,7 @@ export async function fetchTransactionClassificationSummary(filters: Classificat
       is_posted,
       projects(org_id)
     `)
+    .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
 
   if (filters.dateFrom) q = q.gte('entry_date', filters.dateFrom)
   if (filters.dateTo) q = q.lte('entry_date', filters.dateTo)
@@ -169,6 +170,7 @@ export async function fetchClassificationAccountBreakdown(classificationId: stri
       classification_id,
       projects(org_id)
     `)
+    .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
 
   if (filters.dateFrom) q = q.gte('entry_date', filters.dateFrom)
   if (filters.dateTo) q = q.lte('entry_date', filters.dateTo)
@@ -249,6 +251,7 @@ export async function fetchClassificationTimeline(classificationId: string | nul
   let q = supabase
     .from('transactions')
     .select('amount, entry_date, is_posted, project_id, classification_id, projects(org_id)')
+    .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
 
   if (filters.dateFrom) q = q.gte('entry_date', filters.dateFrom)
   if (filters.dateTo) q = q.lte('entry_date', filters.dateTo)

@@ -203,6 +203,7 @@ export async function fetchNextCostCenterCode(orgId: string, parentId?: string |
 }
 
 // Cost Centers for dropdown/selectors (filtered by org and optionally project)
+// Uses RPC function with security definer to bypass RLS issues
 export async function getCostCentersForSelector(orgId: string, projectId?: string | null): Promise<Array<{
   id: string
   code: string
@@ -211,6 +212,31 @@ export async function getCostCentersForSelector(orgId: string, projectId?: strin
   project_id?: string | null
   level: number
 }>> {
+  // Try RPC first (security definer bypasses RLS)
+  try {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_cost_centers_for_selector', {
+      p_org_id: orgId,
+      p_project_id: projectId || null
+    })
+    
+    if (!rpcError && rpcData) {
+      console.log('✅ Cost centers loaded via RPC:', rpcData.length)
+      return rpcData as Array<{
+        id: string
+        code: string
+        name: string
+        name_ar?: string | null
+        project_id?: string | null
+        level: number
+      }>
+    }
+    
+    console.warn('⚠️ RPC failed, falling back to direct query:', rpcError?.message)
+  } catch (err) {
+    console.warn('⚠️ RPC exception, falling back to direct query:', err)
+  }
+  
+  // Fallback to direct query
   let query = supabase
     .from('cost_centers')
     .select('id, code, name, name_ar, project_id')
@@ -225,7 +251,10 @@ export async function getCostCentersForSelector(orgId: string, projectId?: strin
 
   const { data, error } = await query
 
-  if (error) throw new Error(`Failed to fetch cost centers for selector: ${error.message}`)
+  if (error) {
+    console.error('❌ Cost centers direct query failed:', error.message)
+    return [] // Return empty array instead of throwing to prevent cascade failures
+  }
 
   return ((data as any[]) || []).map((cc: any) => ({
     ...cc,

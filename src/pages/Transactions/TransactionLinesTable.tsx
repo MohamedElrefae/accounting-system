@@ -41,12 +41,16 @@ interface TransactionLinesTableProps {
   wrapMode: boolean
   loading: boolean
   selectedLineId?: string
+  mode?: 'my' | 'pending' | 'all'
   onColumnResize: (key: string, width: number) => void
   onEditLine: (line: TransactionLineRecord) => void
   onDeleteLine: (id: string) => void
   onSelectLine: (line: TransactionLineRecord) => void
   onOpenDocuments?: (line: TransactionLineRecord) => void
   onOpenCostAnalysis?: (line: TransactionLineRecord) => void
+  onOpenLineReview?: (line: TransactionLineRecord) => void
+  onApproveLine?: (lineId: string) => void
+  onRejectLine?: (lineId: string) => void
 }
 
 const TransactionLinesTable: React.FC<TransactionLinesTableProps> = ({
@@ -61,12 +65,16 @@ const TransactionLinesTable: React.FC<TransactionLinesTableProps> = ({
   wrapMode,
   loading,
   selectedLineId,
+  mode = 'my',
   onColumnResize,
   onEditLine,
   onDeleteLine,
   onSelectLine,
   onOpenDocuments,
-  onOpenCostAnalysis
+  onOpenCostAnalysis,
+  onOpenLineReview,
+  onApproveLine,
+  onRejectLine
 }) => {
   // Prepare table data
   const tableData = useMemo(() => {
@@ -106,6 +114,8 @@ const TransactionLinesTable: React.FC<TransactionLinesTableProps> = ({
       tax_amount: line.tax_amount || 0,
       total_cost: line.total_cost || 0,
       standard_cost: line.standard_cost || 0,
+      // Line approval status
+      line_status: line.line_status || 'draft',
       actions: null,
       original: line
     }))
@@ -163,26 +173,88 @@ const TransactionLinesTable: React.FC<TransactionLinesTableProps> = ({
           )
         }
 
+        // Handle line status badge
+        if (column.key === 'line_status') {
+          const status = (row.original as any).line_status || 'draft'
+          const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
+            draft: { label: 'مسودة', color: '#6b7280', icon: '📝' },
+            pending: { label: 'قيد المراجعة', color: '#f59e0b', icon: '⏳' },
+            approved: { label: 'معتمد', color: '#10b981', icon: '✅' },
+            rejected: { label: 'مرفوض', color: '#ef4444', icon: '❌' },
+            request_change: { label: 'طلب تعديل', color: '#f59e0b', icon: '✏️' }
+          }
+          const config = statusConfig[status] || statusConfig.draft
+
+          return (
+            <span
+              style={{
+                background: config.color,
+                color: 'white',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                display: 'inline-block'
+              }}
+              title={config.label}
+            >
+              {config.icon} {config.label}
+            </span>
+          )
+        }
+
         // Handle actions column
         if (column.key === 'actions') {
-          return (
-            <div className="tree-node-actions" style={{ display: 'flex', gap: '4px' }}>
-              <button
-                className="ultimate-btn ultimate-btn-edit"
-                onClick={() => onEditLine(row.original)}
-                title="تعديل السطر"
-              >
-                <div className="btn-content"><span className="btn-text">تعديل</span></div>
-              </button>
+          const lineStatus = (row.original as any).line_status || 'draft'
+          const isPosted = lineStatus === 'posted'
+          console.log('🔍 Line action rendering:', `mode=${mode}, lineStatus=${lineStatus}, lineNo=${row.original.line_no}`)
 
+          // Pending mode: show review button (always visible, disabled if posted)
+          if (mode === 'pending') {
+            return (
               <button
-                className="ultimate-btn ultimate-btn-delete"
-                onClick={() => onDeleteLine(row.original.id)}
-                title="حذف السطر"
+                className="ultimate-btn ultimate-btn-success"
+                onClick={() => !isPosted && onOpenLineReview?.(row.original)}
+                disabled={isPosted}
+                title={isPosted ? 'لا يمكن مراجعة السطر المرحل' : 'مراجعة واعتماد السطر'}
+                style={{
+                  opacity: isPosted ? 0.5 : 1,
+                  cursor: isPosted ? 'not-allowed' : 'pointer'
+                }}
               >
-                <div className="btn-content"><span className="btn-text">حذف</span></div>
+                <div className="btn-content"><span className="btn-text">مراجعة</span></div>
               </button>
-            </div>
+            )
+          }
+
+          // My/All mode: show edit/delete buttons
+          if (lineStatus !== 'approved' && lineStatus !== 'posted') {
+            return (
+              <div className="tree-node-actions" style={{ display: 'flex', gap: '4px' }}>
+                <button
+                  className="ultimate-btn ultimate-btn-edit"
+                  onClick={() => onEditLine(row.original)}
+                  title="تعديل السطر"
+                >
+                  <div className="btn-content"><span className="btn-text">تعديل</span></div>
+                </button>
+
+                <button
+                  className="ultimate-btn ultimate-btn-delete"
+                  onClick={() => onDeleteLine(row.original.id)}
+                  title="حذف السطر"
+                >
+                  <div className="btn-content"><span className="btn-text">حذف</span></div>
+                </button>
+              </div>
+            )
+          }
+
+          // Approved/Posted: show status only
+          return (
+            <span style={{ color: '#10b981', fontSize: '12px' }}>
+              {lineStatus === 'approved' ? '✅ معتمد' : '📌 مرحل'}
+            </span>
           )
         }
 

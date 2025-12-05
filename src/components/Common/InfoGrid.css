@@ -1,0 +1,36 @@
+/* Info Grid - Using unified theme tokens */
+.info-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.info-grid.columns-1 {
+  grid-template-columns: 1fr;
+}
+
+.info-grid.columns-2 {
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.info-grid.columns-3 {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.info-grid.columns-4 {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .info-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+}
+
+/* Print styles */
+@media print {
+  .info-grid {
+    gap: 8px;
+  }
+}

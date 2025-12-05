@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
-import ProtectedRoute from '../components/routing/ProtectedRoute';
+import OptimizedProtectedRoute from '../components/routing/OptimizedProtectedRoute';
 import { OptimizedSuspense } from '../components/Common/PerformanceOptimizer';
 
 // Admin routes - rarely used, load on demand
@@ -15,7 +15,6 @@ const PerformanceDashboardPage = React.lazy(() => import('../pages/PerformanceDa
 const ApprovalsInbox = React.lazy(() => import('../pages/Approvals/Inbox'));
 const DocumentApprovalsPage = React.lazy(() => import('../pages/Approvals/DocumentApprovals'));
 const ApprovalsWorkflowsPage = React.lazy(() => import('../pages/Approvals/Workflows'));
-const ApprovalsTestWorkflowPage = React.lazy(() => import('../pages/Approvals/TestWorkflow'));
 
 // Settings
 const FontSettings = React.lazy(() => import('../components/Settings/FontSettings'));
@@ -25,87 +24,79 @@ const AdminRoutes: React.FC = () => {
     <Routes>
       {/* User Management */}
       <Route path="/admin/users" element={
-        <ProtectedRoute requiredAction="users.manage">
+        <OptimizedProtectedRoute requiredAction="users.manage">
           <OptimizedSuspense>
             <UserManagementSystem />
           </OptimizedSuspense>
-        </ProtectedRoute>
+        </OptimizedProtectedRoute>
       } />
-      
+
       {/* System Diagnostics */}
       <Route path="/admin/diagnostics" element={
-        <ProtectedRoute requiredAction="users.manage">
+        <OptimizedProtectedRoute requiredAction="users.manage">
           <OptimizedSuspense>
             <Diagnostics />
           </OptimizedSuspense>
-        </ProtectedRoute>
+        </OptimizedProtectedRoute>
       } />
-      
+
       {/* Profile Management */}
       <Route path="/admin/profile" element={
         <OptimizedSuspense>
           <Profile />
         </OptimizedSuspense>
       } />
-      
+
       {/* Database Export */}
       <Route path="/admin/export-database" element={
-        <ProtectedRoute requiredAction="data.export">
+        <OptimizedProtectedRoute requiredAction="data.export">
           <OptimizedSuspense>
             <ExportDatabasePage />
           </OptimizedSuspense>
-        </ProtectedRoute>
+        </OptimizedProtectedRoute>
       } />
-      
+
       {/* Account Prefix Mapping */}
       <Route path="/admin/account-prefix-mapping" element={
-        <ProtectedRoute requiredAction="accounts.manage">
+        <OptimizedProtectedRoute requiredAction="accounts.manage">
           <OptimizedSuspense>
             <AccountPrefixMappingPage />
           </OptimizedSuspense>
-        </ProtectedRoute>
+        </OptimizedProtectedRoute>
       } />
-      
+
       {/* Performance Dashboard */}
       <Route path="/performance" element={
         <OptimizedSuspense>
           <PerformanceDashboardPage />
         </OptimizedSuspense>
       } />
-      
-      {/* Approvals */}
-      <Route path="/approvals/inbox" element={
-        <ProtectedRoute requiredAction="approvals.review">
+
+      {/* Approvals - Using relative paths since mounted at /approvals/* */}
+      <Route path="inbox" element={
+        <OptimizedProtectedRoute requiredAction="approvals.review">
           <OptimizedSuspense>
             <ApprovalsInbox />
           </OptimizedSuspense>
-        </ProtectedRoute>
+        </OptimizedProtectedRoute>
       } />
-      
-      <Route path="/approvals/documents" element={
-        <ProtectedRoute requiredAction="approvals.review">
+
+      <Route path="documents" element={
+        <OptimizedProtectedRoute requiredAction="approvals.review">
           <OptimizedSuspense>
             <DocumentApprovalsPage />
           </OptimizedSuspense>
-        </ProtectedRoute>
+        </OptimizedProtectedRoute>
       } />
-      
-      <Route path="/approvals/workflows" element={
-        <ProtectedRoute requiredAction="approvals.manage">
+
+      <Route path="workflows" element={
+        <OptimizedProtectedRoute requiredAction="approvals.manage">
           <OptimizedSuspense>
             <ApprovalsWorkflowsPage />
           </OptimizedSuspense>
-        </ProtectedRoute>
+        </OptimizedProtectedRoute>
       } />
-      
-      <Route path="/approvals/test-workflow" element={
-        <ProtectedRoute requiredAction="approvals.manage">
-          <OptimizedSuspense>
-            <ApprovalsTestWorkflowPage />
-          </OptimizedSuspense>
-        </ProtectedRoute>
-      } />
-      
+
       {/* Settings */}
       <Route path="/settings/fonts" element={
         <OptimizedSuspense>

@@ -425,10 +425,11 @@ const Dashboard: React.FC = () => {
         }));
         setRecent(recentDerived);
       } else {
-        // Legacy single-line transactions table
+        // Legacy single-line transactions table (exclude wizard drafts)
         let recentQ = supabase
           .from('transactions')
           .select('id, entry_date, description, amount, debit_account_id, credit_account_id, is_posted')
+          .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
           .order('entry_date', { ascending: false })
           .order('created_at', { ascending: false })
           .limit(10);
@@ -480,6 +481,7 @@ const Dashboard: React.FC = () => {
         let rangeQ = supabase
           .from('transactions')
           .select('id, entry_date, amount, debit_account_id, credit_account_id, is_posted')
+          .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
           .gte('entry_date', startStr)
           .order('entry_date', { ascending: true });
         if (dateTo) rangeQ = rangeQ.lte('entry_date', dateTo);

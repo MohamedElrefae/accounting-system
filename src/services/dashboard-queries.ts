@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/react-query'
 import { supabase } from '../utils/supabase'
-import { getCategoryTotals, type AccountBalanceFilter } from './account-balances'
+import { getCategoryTotalsLegacyFormat } from './reports/unified-financial-query'
 import { getReadMode } from '../config/featureFlags'
 
 export interface RecentRow {
@@ -38,14 +38,22 @@ export const dashboardQueryKeys = {
 }
 
 export async function fetchCategoryTotals(f: { orgId?: string; projectId?: string; dateFrom?: string; dateTo?: string; postedOnly?: boolean }) {
-  const filters: AccountBalanceFilter = {
-    orgId: f.orgId,
-    projectId: f.projectId,
-    dateFrom: f.dateFrom || '',
-    dateTo: f.dateTo || '',
-    postedOnly: !!f.postedOnly,
+  console.log('🎯 Dashboard fetchCategoryTotals called with:', f)
+  try {
+    // Use unified financial query service - SINGLE SOURCE OF TRUTH
+    const result = await getCategoryTotalsLegacyFormat({
+      orgId: f.orgId || null,
+      projectId: f.projectId || null,
+      dateFrom: f.dateFrom || null,
+      dateTo: f.dateTo || null,
+      postedOnly: !!f.postedOnly,
+    })
+    console.log('✅ Dashboard fetchCategoryTotals result:', result)
+    return result
+  } catch (error) {
+    console.error('❌ Dashboard fetchCategoryTotals error:', error)
+    throw error
   }
-  return await getCategoryTotals(filters)
 }
 
 export async function fetchRecentActivity(f: { orgId?: string; projectId?: string; postedOnly?: boolean }): Promise<RecentRow[]> {
@@ -104,10 +112,11 @@ export async function fetchRecentActivity(f: { orgId?: string; projectId?: strin
     return out
   }
 
-  // Legacy
+  // Legacy (exclude wizard drafts)
   let recentQ = supabase
     .from('transactions')
     .select('id, entry_date, description, amount, debit_account_id, credit_account_id, is_posted')
+    .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
     .order('entry_date', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(10)

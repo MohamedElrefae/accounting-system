@@ -9,16 +9,13 @@ import type { UniversalTableData, UniversalTableColumn } from '../../utils/Unive
 import { getCompanyConfig } from '../../services/company-config'
 import { fetchProjects, fetchOrganizations, type LookupOption } from '../../services/lookups'
 import { getActiveProjectId } from '../../utils/org'
+import { fetchGLSummary, type UnifiedFilters } from '../../services/reports/unified-financial-query'
 
 /**
  * Trial Balance All Levels Report
  * 
- * This report uses the get_gl_account_summary stored procedure for hierarchical balance data.
- * The stored procedure should implement the same natural balance logic as the canonical
- * balance service (getAccountBalances) for consistency across all reports.
- * 
- * For simple account-level balances, consider using the canonical service:
- * import { getAccountBalances } from '../../services/account-balances'
+ * This report uses the unified-financial-query service for hierarchical balance data.
+ * This ensures 100% consistency with Dashboard, Balance Sheet, P&L, and all other reports.
  */
 import IosShare from '@mui/icons-material/IosShare'
 import TableView from '@mui/icons-material/TableView'
@@ -83,15 +80,7 @@ export default function TrialBalanceAllLevels() {
     category: string | null
     org_id: string
   }
-  type GLSummaryRow = {
-    account_id: string
-    opening_debit?: number | null
-    opening_credit?: number | null
-    period_debits?: number | null
-    period_credits?: number | null
-    closing_debit?: number | null
-    closing_credit?: number | null
-  }
+  // GLSummaryRow type is now imported from unified-financial-query
 
   const orgIdRef = useRef<string | null>(null)
 
@@ -139,22 +128,15 @@ export default function TrialBalanceAllLevels() {
       if (accRes.error) throw accRes.error
       const accounts = (accRes.data || []) as DBAccount[]
 
-      // 2) Fetch GL summary for current filters
-const { data: summaryData, error: sumErr } = await supabase.rpc('get_gl_account_summary_filtered', {
-        p_date_from: mode === 'range' ? (dateFrom || null) : null,
-        p_date_to: dateTo || null,
-        p_org_id: orgIdRef.current || null,
-        p_project_id: projectId || null,
-        p_posted_only: postedOnly,
-        p_limit: null,
-        p_offset: null,
-        p_classification_id: null,
-        p_analysis_work_item_id: null,
-        p_expenses_category_id: null,
-        p_sub_tree_id: null,
-      })
-      if (sumErr) throw sumErr
-      const summaryRows = (summaryData || []) as GLSummaryRow[]
+      // 2) Fetch GL summary using unified-financial-query for consistency
+      const filters: UnifiedFilters = {
+        dateFrom: mode === 'range' ? (dateFrom || null) : null,
+        dateTo: dateTo || null,
+        orgId: orgIdRef.current || null,
+        projectId: projectId || null,
+        postedOnly,
+      }
+      const summaryRows = await fetchGLSummary(filters)
       const amountsById = new Map<string, TBAmounts>()
       for (const r of summaryRows) {
         amountsById.set(r.account_id, {

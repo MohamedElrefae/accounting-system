@@ -47,11 +47,12 @@ export class ConstructionCostAllocation {
     }))
   }
 
-  // Compute monthly actuals from transactions within range [from,to]
+  // Compute monthly actuals from transactions within range [from,to] (exclude wizard drafts)
   static async listMonthlyActuals(orgId: string, projectId?: string | null, from?: string, to?: string) {
     let q = supabase
       .from('transactions')
       .select('entry_date,amount,project_id')
+      .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
       .eq('org_id', orgId)
     if (projectId) q = q.eq('project_id', projectId)
     if (from) q = q.gte('entry_date', from)

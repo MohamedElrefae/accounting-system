@@ -1,6 +1,15 @@
 import React from 'react'
 import type { TransactionRecord, TransactionAudit } from '../../services/transactions'
-import type { ApprovalHistoryRow } from '../../services/approvals'
+// Approval history type - moved to local definition
+type ApprovalHistoryRow = {
+  id: string
+  request_id: string
+  step_order: number
+  action: 'approve' | 'reject' | 'request_changes' | 'comment'
+  reason: string | null
+  actor_user_id: string
+  created_at: string
+}
 import AttachDocumentsPanel from '../../components/documents/AttachDocumentsPanel'
 import { WithPermission } from '../../components/Common/withPermission'
 

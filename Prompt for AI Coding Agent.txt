@@ -1,0 +1,36 @@
+Prompt for AI Coding Agent
+Copy and paste this entire prompt to your AI coding agent:
+
+Please make the following change to fix a permission check timing issue:
+
+File: 
+src/hooks/useOptimizedAuth.ts
+
+Location: Lines 59-65
+
+Current code:
+
+if (session?.user) {
+      authState.user = session.user;
+      authState.loading = false;
+      notifyListeners();
+      
+      // Load auth data async
+      loadAuthData(session.user.id);
+Replace with:
+
+if (session?.user) {
+      authState.user = session.user;
+      
+      // Load auth data BEFORE setting loading=false
+      await loadAuthData(session.user.id);
+      
+      authState.loading = false;
+      notifyListeners();
+What changed:
+
+Moved the line await loadAuthData(session.user.id); to BEFORE authState.loading = false;
+Added the await keyword
+This ensures user roles are loaded before the app tries to check permissions
+Please make this exact change and save the file.
+

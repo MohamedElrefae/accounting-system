@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { CircularProgress, Box, Typography, Button, Chip, Stack, Grid, TextField, MenuItem } from '@mui/material'
 import UnifiedTransactionDetailsPanel from '@/components/Transactions/UnifiedTransactionDetailsPanel'
+import EnhancedLineApprovalManager from '@/components/Approvals/EnhancedLineApprovalManager'
 import { findInventoryDocumentByTransaction, listInventoryPostingsByTransaction, listMovementsByDocument, listTransactionsLinkedToDocuments, type InventoryPostingLink } from '@/services/inventory/documents'
 import { getTransactionById, getTransactionAudit, getUserDisplayMap, type TransactionRecord, getAccounts, getProjects } from '@/services/transactions'
 
@@ -24,6 +25,7 @@ const TransactionDetailsPage: React.FC = () => {
   const [mvFrom, setMvFrom] = useState<string>('')
   const [mvTo, setMvTo] = useState<string>('')
   const [mvSort, setMvSort] = useState<'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'>('date_desc')
+  const [approvalModalOpen, setApprovalModalOpen] = useState(false)
 
   // Load saved filters on mount
   useEffect(() => {
@@ -35,9 +37,9 @@ const TransactionDetailsPage: React.FC = () => {
         if (typeof saved.mvLoc === 'string') setMvLoc(saved.mvLoc)
         if (typeof saved.mvFrom === 'string') setMvFrom(saved.mvFrom)
         if (typeof saved.mvTo === 'string') setMvTo(saved.mvTo)
-        if (['date_desc','date_asc','amount_desc','amount_asc'].includes(saved.mvSort)) setMvSort(saved.mvSort)
+        if (['date_desc', 'date_asc', 'amount_desc', 'amount_asc'].includes(saved.mvSort)) setMvSort(saved.mvSort)
       }
-    } catch {}
+    } catch { }
   }, [])
 
   // Persist filters whenever they change
@@ -45,22 +47,22 @@ const TransactionDetailsPage: React.FC = () => {
     try {
       const toSave = { mvType, mvLoc, mvFrom, mvTo, mvSort }
       localStorage.setItem('txDetails:mvFilters', JSON.stringify(toSave))
-    } catch {}
+    } catch { }
   }, [mvType, mvLoc, mvFrom, mvTo, mvSort])
 
   const filteredSortedMovements = useMemo(() => {
-    const filtered = movements.filter((m:any) => {
+    const filtered = movements.filter((m: any) => {
       if (mvType && m.movement_type !== mvType) return false
       if (mvLoc && m.location_id !== mvLoc) return false
-      if (mvFrom && String(m.movement_date).slice(0,10) < mvFrom) return false
-      if (mvTo && String(m.movement_date).slice(0,10) > mvTo) return false
+      if (mvFrom && String(m.movement_date).slice(0, 10) < mvFrom) return false
+      if (mvTo && String(m.movement_date).slice(0, 10) > mvTo) return false
       return true
     })
-    const sorted = [...filtered].sort((a:any,b:any) => {
+    const sorted = [...filtered].sort((a: any, b: any) => {
       if (mvSort === 'date_desc') return (a.movement_date > b.movement_date ? -1 : 1)
       if (mvSort === 'date_asc') return (a.movement_date < b.movement_date ? -1 : 1)
-      const aAmt = Number(a.total_cost ?? a.unit_cost * a.quantity ?? 0)
-      const bAmt = Number(b.total_cost ?? b.unit_cost * b.quantity ?? 0)
+      const aAmt = Number(a.total_cost ?? ((a.unit_cost ?? 0) * (a.quantity ?? 0)))
+      const bAmt = Number(b.total_cost ?? ((b.unit_cost ?? 0) * (b.quantity ?? 0)))
       if (mvSort === 'amount_desc') return bAmt - aAmt
       if (mvSort === 'amount_asc') return aAmt - bAmt
       return 0
@@ -100,7 +102,7 @@ const TransactionDetailsPage: React.FC = () => {
               try {
                 const rows = await listMovementsByDocument(l.document_id)
                 allMovs.push(...rows)
-              } catch {}
+              } catch { }
             }
             setMovements(allMovs)
             // Fetch other GL transactions linked to the same documents
@@ -108,7 +110,7 @@ const TransactionDetailsPage: React.FC = () => {
               const docIds = links.map(l => l.document_id)
               const others = await listTransactionsLinkedToDocuments({ orgId: txRow.org_id, documentIds: docIds, excludeTransactionId: txRow.id })
               setOtherLinkedTx(others.map(o => ({ transaction_id: o.transaction_id, entry_number: o.entry_number })))
-            } catch {}
+            } catch { }
           }
         }
         // Build user map from fields
@@ -176,7 +178,7 @@ const TransactionDetailsPage: React.FC = () => {
           <Stack direction="row" spacing={1} flexWrap="wrap" mt={0.5}>
             {otherLinkedTx.map(t => (
               <Button key={t.transaction_id} size="small" onClick={() => navigate(`/transactions/${t.transaction_id}`)}>
-                {t.entry_number ?? t.transaction_id.slice(0,8)}
+                {t.entry_number ?? t.transaction_id.slice(0, 8)}
               </Button>
             ))}
           </Stack>
@@ -191,29 +193,29 @@ const TransactionDetailsPage: React.FC = () => {
           {/* Quick Filters - analogous to PowerShell Where-Object on the client side */}
           <Grid container spacing={1} sx={{ mb: 1 }}>
             <Grid item xs={12} md={3}>
-              <TextField label="Movement Type" select fullWidth value={mvType} onChange={e=>setMvType(e.target.value)}>
+              <TextField label="Movement Type" select fullWidth value={mvType} onChange={e => setMvType(e.target.value)}>
                 <MenuItem value="">All</MenuItem>
-                {Array.from(new Set(movements.map((m:any)=>m.movement_type))).map((t:string)=> (
+                {Array.from(new Set(movements.map((m: any) => m.movement_type))).map((t: string) => (
                   <MenuItem key={t} value={t}>{t}</MenuItem>
                 ))}
               </TextField>
             </Grid>
             <Grid item xs={12} md={3}>
-              <TextField label="Location" select fullWidth value={mvLoc} onChange={e=>setMvLoc(e.target.value)}>
+              <TextField label="Location" select fullWidth value={mvLoc} onChange={e => setMvLoc(e.target.value)}>
                 <MenuItem value="">All</MenuItem>
-                {Array.from(new Set(movements.map((m:any)=>m.location_id))).map((l:string)=> (
+                {Array.from(new Set(movements.map((m: any) => m.location_id))).map((l: string) => (
                   <MenuItem key={l} value={l}>{l}</MenuItem>
                 ))}
               </TextField>
             </Grid>
             <Grid item xs={12} md={2}>
-              <TextField type="date" label="From" InputLabelProps={{ shrink: true }} fullWidth value={mvFrom} onChange={e=>setMvFrom(e.target.value)} />
+              <TextField type="date" label="From" InputLabelProps={{ shrink: true }} fullWidth value={mvFrom} onChange={e => setMvFrom(e.target.value)} />
             </Grid>
             <Grid item xs={12} md={2}>
-              <TextField type="date" label="To" InputLabelProps={{ shrink: true }} fullWidth value={mvTo} onChange={e=>setMvTo(e.target.value)} />
+              <TextField type="date" label="To" InputLabelProps={{ shrink: true }} fullWidth value={mvTo} onChange={e => setMvTo(e.target.value)} />
             </Grid>
             <Grid item xs={12} md={2}>
-              <TextField label="Sort" select fullWidth value={mvSort} onChange={e=>setMvSort(e.target.value as any)}>
+              <TextField label="Sort" select fullWidth value={mvSort} onChange={e => setMvSort(e.target.value as any)}>
                 <MenuItem value="date_desc">Date ↓</MenuItem>
                 <MenuItem value="date_asc">Date ↑</MenuItem>
                 <MenuItem value="amount_desc">Amount ↓</MenuItem>
@@ -226,13 +228,13 @@ const TransactionDetailsPage: React.FC = () => {
           <Box display="flex" justifyContent="flex-end" sx={{ mb: 1 }}>
             <Button size="small" variant="outlined" onClick={() => {
               const rows = filteredSortedMovements
-              const headers = ['movement_id','document_id','movement_date','movement_type','material_id','location_id','uom_id','quantity','unit_cost','total_cost']
+              const headers = ['movement_id', 'document_id', 'movement_date', 'movement_type', 'material_id', 'location_id', 'uom_id', 'quantity', 'unit_cost', 'total_cost']
               const csvRows = [headers.join(',')]
               for (const r of rows) {
                 const vals = [
                   r.id,
                   r.document_id,
-                  String(r.movement_date ?? '').replace('T',' ').split('.')[0],
+                  String(r.movement_date ?? '').replace('T', ' ').split('.')[0],
                   r.movement_type,
                   r.material_id,
                   r.location_id,
@@ -243,14 +245,14 @@ const TransactionDetailsPage: React.FC = () => {
                 ]
                 csvRows.push(vals.map(v => {
                   const s = String(v ?? '')
-                  return /[",\n]/.test(s) ? '"' + s.replaceAll('"','""') + '"' : s
+                  return /[",\n]/.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s
                 }).join(','))
               }
               const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' })
               const url = URL.createObjectURL(blob)
               const a = document.createElement('a')
               a.href = url
-              a.download = `linked_movements_${(tx?.id || 'transaction').toString().slice(0,8)}.csv`
+              a.download = `linked_movements_${(tx?.id || 'transaction').toString().slice(0, 8)}.csv`
               document.body.appendChild(a)
               a.click()
               document.body.removeChild(a)
@@ -258,14 +260,14 @@ const TransactionDetailsPage: React.FC = () => {
             }}>Export CSV</Button>
           </Box>
 
-          {filteredSortedMovements.map((m:any) => (
+          {filteredSortedMovements.map((m: any) => (
             <div key={m.id} style={{ display: 'flex', gap: 16, fontSize: 14, padding: '4px 0' }}>
               <span>{m.movement_type}</span>
               <span>Loc: {m.location_id}</span>
               <span>Qty: {m.quantity}</span>
               <span>Unit Cost: {m.unit_cost}</span>
               <span>Total: {m.total_cost}</span>
-              <span>Date: {String(m.movement_date).slice(0,10)}</span>
+              <span>Date: {String(m.movement_date).slice(0, 10)}</span>
             </div>
           ))}
           {filteredSortedMovements.length === 0 && (
@@ -273,6 +275,33 @@ const TransactionDetailsPage: React.FC = () => {
           )}
         </Box>
       )}
+
+      {/* Review Button for Transactions - Always visible, disabled if posted */}
+      {tx && (
+        <Box mb={2} display="flex" justifyContent="flex-end">
+          <Button
+            variant="contained"
+            onClick={() => setApprovalModalOpen(true)}
+            disabled={tx.is_posted}
+            title={tx.is_posted ? 'لا يمكن مراجعة المعاملة المرحلة' : 'مراجعة واعتماد المعاملة'}
+            sx={{
+              background: tx.is_posted ? '#ccc' : 'var(--accent)',
+              color: tx.is_posted ? '#666' : 'var(--on-accent)',
+              fontWeight: 600,
+              padding: '10px 24px',
+              borderRadius: 'var(--radius-md)',
+              cursor: tx.is_posted ? 'not-allowed' : 'pointer',
+              opacity: tx.is_posted ? 0.6 : 1,
+              '&:hover': {
+                background: tx.is_posted ? '#ccc' : 'var(--accent-primary-hover)'
+              }
+            }}
+          >
+            مراجعة واعتماد المعاملة
+          </Button>
+        </Box>
+      )}
+
       <UnifiedTransactionDetailsPanel
         transaction={tx}
         audit={audit}
@@ -293,6 +322,22 @@ const TransactionDetailsPage: React.FC = () => {
         canPost={false}
         canManage={false}
       />
+
+      {/* Approval Workflow Modal */}
+      {approvalModalOpen && tx && (
+        <EnhancedLineApprovalManager
+          transactionId={tx.id}
+          onApprovalComplete={() => {
+            setApprovalModalOpen(false)
+            // Reload transaction to get updated status
+            window.location.reload()
+          }}
+          onApprovalFailed={(error) => {
+            console.error('Approval failed:', error)
+            setApprovalModalOpen(false)
+          }}
+        />
+      )}
     </Box>
   )
 }

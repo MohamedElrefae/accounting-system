@@ -122,6 +122,9 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
         x: Math.max(minX, Math.min(maxX, nextX)),
         y: Math.max(minY, Math.min(maxY, nextY))
       };
+      
+      // Apply the new position
+      onMove(newPosition);
     } else if (isResizing && (!isMaximized || freeDragRef.current) && (!isDocked || freeDragRef.current)) {
       let newWidth = Math.max(400, resizeStart.width + (e.clientX - resizeStart.x));
       let newHeight = Math.max(300, resizeStart.height + (e.clientY - resizeStart.y));

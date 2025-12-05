@@ -1,10 +1,23 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import DraggableResizablePanel from '../Common/DraggableResizablePanel'
+import { TabsContainer } from '../Common/TabsContainer'
+import { ExpandableSection } from '../Common/ExpandableSection'
+import { InfoField } from '../Common/InfoField'
+import { InfoGrid } from '../Common/InfoGrid'
 import UnifiedCRUDForm, { type UnifiedCRUDFormHandle } from '../Common/UnifiedCRUDForm'
 import { createTransactionFormConfig } from './TransactionFormConfig'
-import TransactionDetailsLayoutControls, { DEFAULT_DETAIL_SECTIONS, type TransactionDetailsConfig } from './TransactionDetailsLayoutControls'
-import type { TransactionRecord, TransactionAudit, Account, Project } from '../../services/transactions'
-import type { ApprovalHistoryRow } from '../../services/approvals'
+import { type TransactionRecord, type TransactionAudit, type Account, type Project } from '../../services/transactions'
+import { TransactionLineCard } from './TransactionLineCard'
+// Approval history type - moved to local definition
+type ApprovalHistoryRow = {
+  id: string
+  request_id: string
+  step_order: number
+  action: 'approve' | 'reject' | 'request_changes' | 'comment'
+  reason: string | null
+  actor_user_id: string
+  created_at: string
+}
 import type { Organization } from '../../types'
 import type { TransactionClassification } from '../../services/transaction-classification'
 import type { ExpensesCategoryRow } from '../../types/sub-tree'
@@ -13,8 +26,16 @@ import './UnifiedTransactionDetailsPanel.css'
 import { TransactionLineItemsSection } from '../line-items/TransactionLineItemsSection'
 import AttachDocumentsPanel from '../documents/AttachDocumentsPanel'
 import { getTransactionLines } from '../../services/transaction-lines'
-import { WithPermission } from '../Common/withPermission'
 import { useToast } from '../../contexts/ToastContext'
+import MultiLineEditor from './MultiLineEditor'
+import { TransactionSettingsPanel } from './TransactionSettingsPanel'
+import ColumnConfiguration from '../Common/ColumnConfiguration'
+import type { ColumnConfig } from '../Common/ColumnConfiguration'
+import {
+  getDefaultFieldConfig,
+  loadFieldConfig,
+  saveFieldConfig
+} from '../../config/transactionFieldConfigs'
 
 export interface UnifiedTransactionDetailsPanelProps {
   transaction: TransactionRecord
@@ -22,7 +43,10 @@ export interface UnifiedTransactionDetailsPanelProps {
   approvalHistory: ApprovalHistoryRow[]
   userNames: Record<string, string>
   categoryLabel?: string
-  
+
+  // Transaction lines (single source of truth)
+  transactionLines?: any[]
+
   // Data for editing
   accounts: Account[]
   projects: Project[]
@@ -32,7 +56,7 @@ export interface UnifiedTransactionDetailsPanelProps {
   workItems: WorkItemRow[]
   costCenters: Array<{ id: string; code: string; name: string; name_ar?: string | null; project_id?: string | null; level: number }>
   analysisItemsMap: Record<string, { code: string; name: string }>
-  
+
   // Callbacks
   onClose: () => void
   onUpdate?: (updatedTransaction: TransactionRecord) => Promise<void>
@@ -42,14 +66,15 @@ export interface UnifiedTransactionDetailsPanelProps {
   onReject?: (transactionId: string, reason: string) => Promise<void>
   onRequestRevision?: (transactionId: string, reason: string) => Promise<void>
   onPost?: (transactionId: string) => Promise<void>
-  
+  onEditWithWizard?: (transaction: TransactionRecord) => Promise<void>
+
   // Permissions
   canEdit?: boolean
   canDelete?: boolean
   canReview?: boolean
   canPost?: boolean
   canManage?: boolean
-  
+
   // UI state
   currentUserId?: string | null
   mode?: 'my' | 'pending' | 'all'
@@ -63,6 +88,7 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
   approvalHistory,
   userNames,
   categoryLabel,
+  transactionLines: propsTransactionLines,
   accounts,
   projects,
   organizations,
@@ -79,6 +105,7 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
   onReject,
   onRequestRevision,
   onPost,
+  onEditWithWizard,
   canEdit = false,
   canDelete = false,
   canReview = false,
@@ -89,10 +116,85 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('view')
   const [isLoading, setIsLoading] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [txLines, setTxLines] = useState<any[]>([])
-  const [linesState, setLinesState] = useState<{ totalDebits: number; totalCredits: number; isBalanced: boolean; linesCount: number }>({ totalDebits: 0, totalCredits: 0, isBalanced: false, linesCount: 0 })
-  
+  const [fetchedTransaction, setFetchedTransaction] = useState<TransactionRecord | null>(null)
+  const [txLines, setTxLines] = useState<any[]>(propsTransactionLines || [])
+  const [linesState, setLinesState] = useState<{ totalDebits: number; totalCredits: number; isBalanced: boolean; linesCount: number }>({
+    totalDebits: 0,
+    totalCredits: 0,
+    isBalanced: false,
+    linesCount: 0
+  })
+
+  // Active tab state with persistence
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('transactionDetails:activeTab')
+      return saved || 'basic'
+    } catch {
+      return 'basic'
+    }
+  })
+
+  // Display settings from localStorage
+  const [displaySettings, setDisplaySettings] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('transactionSettings:display') || '{}')
+    } catch {
+      return {}
+    }
+  })
+
+  // UI settings from localStorage
+  const [uiSettings, setUISettings] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('transactionSettings:ui') || '{}')
+    } catch {
+      return {}
+    }
+  })
+
+  // Layout settings from localStorage
+  const [layoutSettings, setLayoutSettings] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('transactionSettings:layout') || '{}')
+    } catch {
+      return {}
+    }
+  })
+
+  // Listen for settings changes via custom events
+  useEffect(() => {
+    const handleSettingsChange = (event: Event) => {
+      const customEvent = event as CustomEvent
+      const { type, settings } = customEvent.detail
+
+      if (type === 'display') {
+        setDisplaySettings(settings)
+      } else if (type === 'ui') {
+        setUISettings(settings)
+      } else if (type === 'layout') {
+        setLayoutSettings(settings)
+      }
+    }
+
+    window.addEventListener('transactionSettingsChanged', handleSettingsChange)
+    return () => window.removeEventListener('transactionSettingsChanged', handleSettingsChange)
+  }, [])
+
+  // Consume transaction lines from props (single source of truth)
+  useEffect(() => {
+    if (propsTransactionLines) {
+      setTxLines(propsTransactionLines)
+    }
+  }, [propsTransactionLines])
+
+  // Use fetched transaction if available, otherwise fall back to props
+  const effectiveTransaction = fetchedTransaction || transaction
+
+  const { showToast } = useToast()
+
   // Panel state with persistence
   const [panelPosition, setPanelPosition] = useState<{ x: number; y: number }>(() => {
     try {
@@ -103,8 +205,8 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
   const [panelSize, setPanelSize] = useState<{ width: number; height: number }>(() => {
     try {
       const saved = localStorage.getItem('transactionDetailsPanel:size');
-      return saved ? JSON.parse(saved) : { width: 900, height: 800 };
-    } catch { return { width: 900, height: 800 }; }
+      return saved ? JSON.parse(saved) : { width: 1000, height: 800 };
+    } catch { return { width: 1000, height: 800 }; }
   })
   const [panelMax, setPanelMax] = useState<boolean>(() => {
     try {
@@ -124,522 +226,394 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
       return (saved as 'left' | 'right' | 'top' | 'bottom') || 'right';
     } catch { return 'right'; }
   })
-  
-  const { showToast } = useToast()
-  
+
   // Action modals
   const [reviewModalOpen, setReviewModalOpen] = useState(false)
   const [reviewAction, setReviewAction] = useState<'approve' | 'reject' | 'revise' | null>(null)
   const [reviewReason, setReviewReason] = useState('')
   const [submitModalOpen, setSubmitModalOpen] = useState(false)
   const [submitNote, setSubmitNote] = useState('')
-  
-  // Delete confirm modal state
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
-  const [deleteDefaultRenumber, setDeleteDefaultRenumber] = useState<boolean>(false)
-  const [deleteOverrideEnabled, setDeleteOverrideEnabled] = useState<boolean>(false)
-  const [deleteOverrideRenumber, setDeleteOverrideRenumber] = useState<boolean>(false)
-  const [deleteForce, setDeleteForce] = useState<boolean>(false)
-  
-  // Config modal state
-  const [configModalOpen, setConfigModalOpen] = useState(false)
-  
-  // Comprehensive transaction details configuration
-  const [detailsConfig, setDetailsConfig] = useState<TransactionDetailsConfig>(() => {
-    try {
-      const saved = localStorage.getItem('transactionDetailsLayoutConfig');
-      const parsed = saved ? JSON.parse(saved) : null;
-      
-      return {
-        visibleSections: new Set(parsed?.visibleSections || DEFAULT_DETAIL_SECTIONS.map(s => s.id)),
-        sectionOrder: parsed?.sectionOrder || DEFAULT_DETAIL_SECTIONS.map(s => s.id),
-        fullWidthSections: new Set(parsed?.fullWidthSections || []),
-        columnsPerSection: parsed?.columnsPerSection || 2
-      };
-    } catch {
-      return {
-        visibleSections: new Set(DEFAULT_DETAIL_SECTIONS.map(s => s.id)),
-        sectionOrder: DEFAULT_DETAIL_SECTIONS.map(s => s.id),
-        fullWidthSections: new Set([]),
-        columnsPerSection: 2
-      };
-    }
-  })
-  
+
+
+
+  // Field configuration modals
+  const [basicInfoConfigOpen, setBasicInfoConfigOpen] = useState(false)
+  const [lineItemsConfigOpen, setLineItemsConfigOpen] = useState(false)
+  const [approvalsConfigOpen, setApprovalsConfigOpen] = useState(false)
+  const [documentsConfigOpen, setDocumentsConfigOpen] = useState(false)
+  const [auditConfigOpen, setAuditConfigOpen] = useState(false)
+
+  // Field configurations
+  const [basicInfoFields, setBasicInfoFields] = useState<ColumnConfig[]>(() =>
+    loadFieldConfig('basicInfo') || getDefaultFieldConfig('basicInfo')
+  )
+  const [lineItemsFields, setLineItemsFields] = useState<ColumnConfig[]>(() =>
+    loadFieldConfig('lineItems') || getDefaultFieldConfig('lineItems')
+  )
+  const [approvalsFields, setApprovalsFields] = useState<ColumnConfig[]>(() =>
+    loadFieldConfig('approvals') || getDefaultFieldConfig('approvals')
+  )
+  const [documentsFields, setDocumentsFields] = useState<ColumnConfig[]>(() =>
+    loadFieldConfig('documents') || getDefaultFieldConfig('documents')
+  )
+  const [auditFields, setAuditFields] = useState<ColumnConfig[]>(() =>
+    loadFieldConfig('audit') || getDefaultFieldConfig('audit')
+  )
+
   const formRef = useRef<UnifiedCRUDFormHandle>(null)
 
-  // Build header form config with external lines validity gating Save
-  const headerFormConfig = useMemo(() => {
-    try {
-      return createTransactionFormConfig(
-        true,
-        accounts,
-        projects,
-        organizations,
-        classifications,
-        transaction,
-        categories,
-        workItems,
-        costCenters,
-        { linesBalanced: linesState.isBalanced, linesCount: linesState.linesCount }
-      )
-    } catch {
-      return createTransactionFormConfig(
-        true,
-        accounts,
-        projects,
-        organizations,
-        classifications,
-        transaction,
-        categories,
-        workItems,
-        costCenters
-      )
-    }
-  }, [accounts, projects, organizations, classifications, transaction, categories, workItems, costCenters, linesState.isBalanced, linesState.linesCount])
-  
-  // Configuration change handlers
-  const handleSectionOrderChange = (newOrder: string[]) => {
-    setDetailsConfig(prev => ({ ...prev, sectionOrder: newOrder }))
+  // Helper function to filter visible fields (order is preserved from array)
+  const getVisibleFields = (fields: ColumnConfig[]) => {
+    return fields.filter(f => f.visible)
   }
 
-  const handleColumnCountChange = (count: 1 | 2 | 3) => {
-    setDetailsConfig(prev => ({ ...prev, columnsPerSection: count }))
+  // Field value mapper - maps field keys to actual values
+  const getFieldValue = (fieldKey: string): any => {
+    const tx = effectiveTransaction
+    const fieldMap: Record<string, any> = {
+      // Basic transaction fields
+      entry_number: tx.entry_number,
+      entry_date: formatDate(tx.entry_date),
+      description: tx.description,
+      reference_number: tx.reference_number || '—',
+      status: <span className={`status-badge ${unifiedStatus.cls}`}>{unifiedStatus.label}</span>,
+
+      // Organization & Project
+      organization: organizations.find(o => o.id === tx.org_id)?.name || '—',
+      project: projects.find(p => p.id === tx.project_id)?.name || '—',
+      cost_center: getCostCenterLabel(tx.cost_center_id),
+      work_item: getWorkItemLabel((tx as any).work_item_id),
+      analysis_work_item: getAnalysisWorkItemLabel((tx as any).analysis_work_item_id),
+      category: (tx as any).category_name || '—',
+
+      // Totals (calculated from lines for accuracy)
+      total_debits: <span className="amount">{formatCurrency(totalDebits)}</span>,
+      total_credits: <span className="amount">{formatCurrency(totalCredits)}</span>,
+      balance_status: isBalanced ? '✅ متوازن' : '❌ غير متوازن',
+      lines_count: txLines.length,
+
+      // Audit fields
+      created_by: userNames[tx.created_by || ''] || '—',
+      created_at: tx.created_at ? formatDateTime(tx.created_at) : '—',
+      notes: tx.notes || '—',
+    }
+
+    return fieldMap[fieldKey] || '—'
   }
 
-  const handleFullWidthToggle = (sectionId: string) => {
-    setDetailsConfig(prev => {
-      const newFullWidthSections = new Set(prev.fullWidthSections)
-      if (newFullWidthSections.has(sectionId)) {
-        newFullWidthSections.delete(sectionId)
-      } else {
-        newFullWidthSections.add(sectionId)
-      }
-      return { ...prev, fullWidthSections: newFullWidthSections }
-    })
+  // Line item value mapper - maps field keys to line item values
+  const getLineItemValue = (line: any, fieldKey: string, idx: number): any => {
+    const fieldMap: Record<string, any> = {
+      line_no: idx + 1,
+      account: getAccountLabel(line.account_id),
+      debit: parseFloat(line.debit || 0).toLocaleString('ar-EG'),
+      credit: parseFloat(line.credit || 0).toLocaleString('ar-EG'),
+      description: line.description || '—',
+      project: projects.find(p => p.id === line.project_id)?.name || '—',
+      cost_center: getCostCenterLabel(line.cost_center_id),
+      work_item: getWorkItemLabel(line.work_item_id),
+      category: (line as any).category_name || '—',
+      analysis_work_item: getAnalysisWorkItemLabel(line.analysis_work_item_id),
+      line_status: line.status || 'active',
+    }
+
+    return fieldMap[fieldKey] || '—'
   }
 
-  const handleVisibilityToggle = (sectionId: string) => {
-    setDetailsConfig(prev => {
-      const newVisibleSections = new Set(prev.visibleSections)
-      if (newVisibleSections.has(sectionId)) {
-        newVisibleSections.delete(sectionId)
-      } else {
-        newVisibleSections.add(sectionId)
-      }
-      return { ...prev, visibleSections: newVisibleSections }
-    })
-  }
-  
-  const handleSaveLayout = () => {
-    // Configuration is already auto-saved via useEffect, just close modal
-    setConfigModalOpen(false)
-    // Note: Would need toast context to show success message
-  }
-  
-  const handleResetLayout = () => {
-    const defaultConfig: TransactionDetailsConfig = {
-      visibleSections: new Set(DEFAULT_DETAIL_SECTIONS.map(s => s.id)),
-      sectionOrder: DEFAULT_DETAIL_SECTIONS.map(s => s.id),
-      fullWidthSections: new Set([]),
-      columnsPerSection: 2
+  // Approval value mapper - maps field keys to approval values
+  const getApprovalValue = (approval: ApprovalHistoryRow, fieldKey: string, idx: number): any => {
+    const actionMap: Record<string, string> = {
+      approve: 'اعتماد',
+      request_changes: 'إرجاع للتعديل',
+      reject: 'رفض',
     }
-    setDetailsConfig(defaultConfig)
-  }
-  
-  const handleRememberLayout = () => {
-    // This creates a persistent layout preference that survives browser sessions
-    try {
-      const layoutPreference = {
-        ...detailsConfig,
-        visibleSections: Array.from(detailsConfig.visibleSections),
-        fullWidthSections: Array.from(detailsConfig.fullWidthSections),
-        rememberTimestamp: Date.now(),
-        rememberAsPreferred: true // Flag to indicate this is a user's preferred layout
-      };
-      localStorage.setItem('transactionDetailsPreferredLayout', JSON.stringify(layoutPreference));
-      localStorage.setItem('transactionDetailsLayoutConfig', JSON.stringify(layoutPreference));
-      
-      // Could show success toast here if toast context is available
-      // toast.success('تم حفظ التخطيط المفضل بنجاح');
-    } catch (error) {
-      console.error('Failed to remember layout:', error);
-    }
-  }
-  
-  // Save current modal layout and size as preferred
-  const handleSaveModalLayout = () => {
-    try {
-      const modalPreference = {
-        position: panelPosition,
-        size: panelSize,
-        maximized: panelMax,
-        docked: panelDocked,
-        dockPosition: panelDockPos,
-        savedTimestamp: Date.now(),
-        userPreferred: true
-      };
-      localStorage.setItem('transactionDetailsPanel:preferred', JSON.stringify(modalPreference));
-      console.log('✅ تم حفظ تخطيط المودال الحالي كمفضل');
-      
-      // Visual feedback - could be replaced with toast notification
-      const tempBadge = document.createElement('div');
-      tempBadge.textContent = '✅ تم حفظ التخطيط';
-      tempBadge.style.cssText = `
-        position: fixed; top: 20px; right: 20px; z-index: 10000;
-        background: #10b981; color: white; padding: 8px 16px;
-        border-radius: 6px; font-size: 14px; font-weight: 500;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        pointer-events: none; transition: opacity 0.3s ease;
-      `;
-      document.body.appendChild(tempBadge);
-      setTimeout(() => {
-        tempBadge.style.opacity = '0';
-        setTimeout(() => document.body.removeChild(tempBadge), 300);
-      }, 2000);
-    } catch (error) {
-      console.error('Failed to save modal layout:', error);
-    }
-  }
-  
-  // Reset modal to default layout and size
-  const handleResetModalLayout = () => {
-    setPanelPosition({ x: 150, y: 150 });
-    setPanelSize({ width: 900, height: 800 });
-    setPanelMax(false);
-    setPanelDocked(false);
-    setPanelDockPos('right');
-    
-    // Clear saved preferences
-    try {
-      localStorage.removeItem('transactionDetailsPanel:preferred');
-      localStorage.removeItem('transactionDetailsPanel:position');
-      localStorage.removeItem('transactionDetailsPanel:size');
-      localStorage.removeItem('transactionDetailsPanel:maximized');
-      localStorage.removeItem('transactionDetailsPanel:docked');
-      localStorage.removeItem('transactionDetailsPanel:dockPosition');
-      console.log('🔄 تم إعادة تعيين تخطيط المودال للافتراضي');
-    } catch {}
-  }
-  
-  // Helper function to check if a section should be visible
-  const isSectionVisible = (sectionId: string): boolean => {
-    return detailsConfig.visibleSections.has(sectionId)
-  }
-  
-  // Legacy compatibility helpers (map new config to old column config properties)
-  // (Removed unused columnConfig placeholder)
-  
-  // Persist details configuration
-  useEffect(() => {
-    try {
-      const configToSave = {
-        ...detailsConfig,
-        visibleSections: Array.from(detailsConfig.visibleSections), // Convert Set to Array for JSON
-        fullWidthSections: Array.from(detailsConfig.fullWidthSections) // Convert Set to Array for JSON
-      };
-      localStorage.setItem('transactionDetailsLayoutConfig', JSON.stringify(configToSave));
-    } catch {}
-  }, [detailsConfig])
-  
-  // Persist panel position
-  useEffect(() => {
-    try {
-      localStorage.setItem('transactionDetailsPanel:position', JSON.stringify(panelPosition));
-    } catch {}
-  }, [panelPosition])
-  
-  // Persist panel size
-  useEffect(() => {
-    try {
-      localStorage.setItem('transactionDetailsPanel:size', JSON.stringify(panelSize));
-    } catch {}
-  }, [panelSize])
-  
-  // Persist panel maximized state
-  useEffect(() => {
-    try {
-      localStorage.setItem('transactionDetailsPanel:maximized', String(panelMax));
-    } catch {}
-  }, [panelMax])
-  
-  // Persist panel docked state
-  useEffect(() => {
-    try {
-      localStorage.setItem('transactionDetailsPanel:docked', String(panelDocked));
-    } catch {}
-  }, [panelDocked])
-  
-  // Persist panel dock position
-  useEffect(() => {
-    try {
-      localStorage.setItem('transactionDetailsPanel:dockPosition', panelDockPos);
-    } catch {}
-  }, [panelDockPos])
 
-  // Get account label helper
+    const fieldMap: Record<string, any> = {
+      step: idx + 1,
+      action: actionMap[approval.action] || 'ملاحظة',
+      user: userNames[approval.actor_user_id] || approval.actor_user_id.substring(0, 8),
+      date: approval.created_at ? formatDateTime(approval.created_at) : '—',
+      reason: approval.reason || '—',
+      status: approval.action,
+    }
+
+    return fieldMap[fieldKey] || '—'
+  }
+
+  // Audit value mapper - maps field keys to audit values
+  const getAuditValue = (audit: TransactionAudit, fieldKey: string): any => {
+    const fieldMap: Record<string, any> = {
+      action: audit.action,
+      user: audit.actor_id ? (userNames[audit.actor_id] || audit.actor_id.substring(0, 8)) : '—',
+      date: audit.created_at ? formatDateTime(audit.created_at) : '—',
+      details: audit.action,
+      ip_address: '—', // Not available in current schema
+    }
+
+    return fieldMap[fieldKey] || '—'
+  }
+
+  // Helper functions
   const getAccountLabel = (accountId?: string | null) => {
     if (!accountId) return '—'
     const account = accounts.find(a => a.id === accountId)
     return account ? `${account.code} - ${account.name}` : accountId
   }
 
-  // Get work item label helper
   const getWorkItemLabel = (workItemId?: string | null) => {
     if (!workItemId) return '—'
     const workItem = workItems.find(w => w.id === workItemId)
     return workItem ? `${workItem.code} - ${workItem.name}` : workItemId
   }
 
-  // Get analysis work item label helper
   const getAnalysisWorkItemLabel = (analysisWorkItemId?: string | null) => {
     if (!analysisWorkItemId) return '—'
     const item = analysisItemsMap[analysisWorkItemId]
     return item ? `${item.code} - ${item.name}` : analysisWorkItemId
   }
 
-  // Get cost center label helper
   const getCostCenterLabel = (costCenterId?: string | null) => {
     if (!costCenterId) return '—'
     const costCenter = costCenters.find(cc => cc.id === costCenterId)
     return costCenter ? `${costCenter.code} - ${costCenter.name}` : costCenterId
   }
 
-  // Extract latest submit note from audit details
-  const auditSubmitNote = useMemo(() => {
-    for (const row of audit) {
-      try {
-        const d: any = row.details
-        if (d && typeof d === 'object' && d.note) {
-          return String(d.note)
-        }
-      } catch {}
-    }
-    return ''
-  }, [audit])
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('ar-EG', {
+      style: 'currency',
+      currency: 'EGP',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount)
+  }
 
-  // Unified approval status (includes posted)
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('ar-EG')
+  }
+
+  const formatDateTime = (date: string) => {
+    return new Date(date).toLocaleString('ar-EG')
+  }
+
+  // Calculate totals from lines (source of truth for accuracy)
+  const { totalDebits, totalCredits, isBalanced } = useMemo(() => {
+    const debits = txLines.reduce((sum, line) => sum + (parseFloat(line.debit_amount || line.debit) || 0), 0)
+    const credits = txLines.reduce((sum, line) => sum + (parseFloat(line.credit_amount || line.credit) || 0), 0)
+    const balanced = Math.abs(debits - credits) < 0.01
+    return { totalDebits: debits, totalCredits: credits, isBalanced: balanced }
+  }, [txLines])
+
+  // Unified approval status - calculated from lines for accuracy
   const unifiedStatus = useMemo(() => {
-    const st = transaction.is_posted ? 'posted' : String((transaction as any).approval_status || 'draft')
+    const tx = effectiveTransaction
+
+    // If posted, always show posted
+    if (tx.is_posted) {
+      return { label: 'مرحلة', cls: 'status-posted', tip: 'تم الترحيل' }
+    }
+
+    // Calculate status from lines if available
+    if (txLines.length > 0) {
+      const approvedCount = txLines.filter(line => line.line_status === 'approved').length
+      const rejectedCount = txLines.filter(line => line.line_status === 'rejected').length
+
+      if (approvedCount === txLines.length) {
+        return { label: 'معتمدة', cls: 'status-approved', tip: 'تم اعتماد جميع السطور' }
+      } else if (rejectedCount > 0) {
+        return { label: 'يحتاج تعديل', cls: 'status-revision', tip: 'تم رفض بعض السطور' }
+      } else if (approvedCount > 0) {
+        return { label: 'قيد المراجعة', cls: 'status-submitted', tip: `${approvedCount} من ${txLines.length} سطور معتمدة` }
+      }
+    }
+
+    // Fallback to header status
+    const st = String((tx as any).approval_status || 'draft')
     const map: Record<string, { label: string; cls: string; tip: string }> = {
       draft: { label: 'مسودة', cls: 'status-draft', tip: 'لم يتم إرسالها للمراجعة بعد' },
       submitted: { label: 'مُرسلة', cls: 'status-submitted', tip: 'بإنتظار المراجعة' },
-      revision_requested: { label: 'طلب تعديل', cls: 'status-revision', tip: 'أُعيدت للتعديل — أعد الإرسال بعد التصحيح' },
+      pending: { label: 'قيد المراجعة', cls: 'status-submitted', tip: 'بإنتظار اعتماد السطور' },
+      revision_requested: { label: 'طلب تعديل', cls: 'status-revision', tip: 'أُعيدت للتعديل' },
+      requires_revision: { label: 'يحتاج تعديل', cls: 'status-revision', tip: 'تم رفض بعض السطور' },
       approved: { label: 'معتمدة', cls: 'status-approved', tip: 'تم الاعتماد' },
       rejected: { label: 'مرفوضة', cls: 'status-rejected', tip: 'تم الرفض' },
-      cancelled: { label: 'ملغاة', cls: 'status-cancelled', tip: 'ألغى المُرسل الإرسال' },
-      posted: { label: 'مرحلة', cls: 'status-posted', tip: 'تم الترحيل (مُثبت في الدفاتر)' },
+      cancelled: { label: 'ملغاة', cls: 'status-cancelled', tip: 'ملغاة' },
     }
     return map[st] || map['draft']
-  }, [transaction])
+  }, [effectiveTransaction, txLines])
 
-  // Load transaction lines for view mode (read-only section)
+  // Use transaction lines from props (single source of truth) - ONLY if not yet fetched
   useEffect(() => {
-    (async () => {
-      try {
-        const rows = await getTransactionLines(transaction.id)
-        setTxLines(rows || [])
-      } catch {
-        // ignore in view; editors can still load
-      }
-    })()
-  }, [transaction.id])
+    if (propsTransactionLines && !fetchedTransaction) {
+      setTxLines(propsTransactionLines)
+    }
+  }, [propsTransactionLines, fetchedTransaction])
 
-  // Load company config (renumber flag) for delete confirmation UI
+  // Persist panel states
   useEffect(() => {
-    (async () => {
-      try {
-        const { getCompanyConfig } = await import('../../services/company-config')
-        const cfg = await getCompanyConfig()
-        const flag = !!(cfg as any).renumber_transactions_after_delete
-        setDeleteDefaultRenumber(flag)
-        setDeleteOverrideEnabled(false)
-        setDeleteOverrideRenumber(flag)
-        setDeleteForce(false)
-      } catch {
-        setDeleteDefaultRenumber(false)
-        setDeleteOverrideEnabled(false)
-        setDeleteOverrideRenumber(false)
-        setDeleteForce(false)
-      }
-    })()
-  }, [])
-
-  // Form configuration
-  const transactionFormConfig = useMemo(() => {
-    return createTransactionFormConfig(
-      true, // isEdit
-      accounts,
-      projects,
-      organizations,
-      classifications,
-      transaction,
-      categories,
-      workItems,
-      costCenters
-    )
-  }, [accounts, projects, organizations, classifications, transaction, categories, workItems, costCenters])
-
-  // Initial form data for editing
-  const initialFormData = useMemo(() => ({
-    entry_number: transaction.entry_number,
-    entry_date: transaction.entry_date,
-    description: transaction.description,
-    description_ar: (transaction as any).description_ar || '',
-    debit_account_id: transaction.debit_account_id,
-    credit_account_id: transaction.credit_account_id,
-    amount: transaction.amount,
-    reference_number: transaction.reference_number || '',
-    notes: transaction.notes || '',
-    notes_ar: (transaction as any).notes_ar || '',
-    classification_id: transaction.classification_id || '',
-    sub_tree_id: (transaction as any).sub_tree_id || '',
-    work_item_id: (transaction as any).work_item_id || '',
-    analysis_work_item_id: (transaction as any).analysis_work_item_id || '',
-    cost_center_id: transaction.cost_center_id || '',
-    org_id: transaction.org_id || '',
-    project_id: transaction.project_id || ''
-  }), [transaction])
-
-  // Handle form submission
-  const handleFormSubmit = async (data: any) => {
-    if (!onUpdate) return
-    
-    setIsLoading(true)
-    setError(null)
     try {
-      const updateData = {
-        entry_date: data.entry_date,
-        description: data.description,
-        description_ar: data.description_ar || null,
-        reference_number: data.reference_number || null,
-        debit_account_id: data.debit_account_id,
-        credit_account_id: data.credit_account_id,
-        amount: parseFloat(data.amount),
-        notes: data.notes || null,
-        notes_ar: data.notes_ar || null,
-        classification_id: data.classification_id || null,
-        sub_tree_id: data.sub_tree_id || null,
-        work_item_id: data.work_item_id || null,
-        analysis_work_item_id: data.analysis_work_item_id || null,
-        cost_center_id: data.cost_center_id || null,
-        org_id: data.org_id || null,
-        project_id: data.project_id || null,
-      }
-      
-      const updatedTransaction = { ...transaction, ...updateData }
-      await onUpdate(updatedTransaction)
-      setViewMode('view')
-    } catch (err: any) {
-      setError(err.message || 'فشل في تحديث المعاملة')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+      localStorage.setItem('transactionDetailsPanel:position', JSON.stringify(panelPosition));
+    } catch { }
+  }, [panelPosition])
 
-  const handleFormCancel = () => {
-    setViewMode('view')
-    setError(null)
-  }
-
-  // Handle review actions
-  const handleReviewSubmit = async () => {
-    if (!reviewAction) return
-    
-    setIsLoading(true)
+  useEffect(() => {
     try {
-      if (reviewAction === 'approve' && onApprove) {
-        await onApprove(transaction.id, reviewReason || undefined)
-      } else if (reviewAction === 'reject' && onReject) {
-        if (!reviewReason.trim()) throw new Error('يرجى إدخال سبب الرفض')
-        await onReject(transaction.id, reviewReason)
-      } else if (reviewAction === 'revise' && onRequestRevision) {
-        if (!reviewReason.trim()) throw new Error('يرجى إدخال سبب الإرجاع للتعديل')
-        await onRequestRevision(transaction.id, reviewReason)
-      }
-      setReviewModalOpen(false)
-      setReviewAction(null)
-      setReviewReason('')
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+      localStorage.setItem('transactionDetailsPanel:size', JSON.stringify(panelSize));
+    } catch { }
+  }, [panelSize])
 
-  // Handle submit for review
-  const handleSubmitForReview = async () => {
-    if (!onSubmitForReview) return
-    
-    setIsLoading(true)
+  useEffect(() => {
     try {
-      await onSubmitForReview(transaction.id, submitNote)
-      setSubmitModalOpen(false)
-      setSubmitNote('')
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setIsLoading(false)
-    }
+      localStorage.setItem('transactionDetailsPanel:maximized', String(panelMax));
+    } catch { }
+  }, [panelMax])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionDetailsPanel:docked', String(panelDocked));
+    } catch { }
+  }, [panelDocked])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionDetailsPanel:dockPosition', panelDockPos);
+    } catch { }
+  }, [panelDockPos])
+
+  // Field configuration handlers
+  const handleBasicInfoFieldsChange = (newConfig: ColumnConfig[]) => {
+    setBasicInfoFields(newConfig)
+    saveFieldConfig('basicInfo', newConfig)
   }
 
-  // Handle delete
+  const handleLineItemsFieldsChange = (newConfig: ColumnConfig[]) => {
+    setLineItemsFields(newConfig)
+    saveFieldConfig('lineItems', newConfig)
+  }
+
+  const handleApprovalsFieldsChange = (newConfig: ColumnConfig[]) => {
+    setApprovalsFields(newConfig)
+    saveFieldConfig('approvals', newConfig)
+  }
+
+  const handleDocumentsFieldsChange = (newConfig: ColumnConfig[]) => {
+    setDocumentsFields(newConfig)
+    saveFieldConfig('documents', newConfig)
+  }
+
+  const handleAuditFieldsChange = (newConfig: ColumnConfig[]) => {
+    setAuditFields(newConfig)
+    saveFieldConfig('audit', newConfig)
+  }
+
+  // Action handlers
   const handleDelete = async () => {
-    // Open confirm modal instead of immediate delete
     setDeleteModalOpen(true)
   }
 
   const handleDeleteConfirm = async () => {
     setIsLoading(true)
     try {
-      const renumberOpt = deleteOverrideEnabled ? deleteOverrideRenumber : undefined
-      const forceOpt = !!canManage && deleteForce
       const { deleteTransaction } = await import('../../services/transactions')
-      const res = await deleteTransaction(transaction.id, { force: forceOpt, renumber: renumberOpt })
+      await deleteTransaction(effectiveTransaction.id)
       setDeleteModalOpen(false)
-      showToast(res.renumber_applied ? 'تم حذف المعاملة وتمت إعادة الترقيم' : 'تم حذف المعاملة بدون إعادة ترقيم', { severity: 'success' })
-      try { window.dispatchEvent(new CustomEvent('transactions:refresh', { detail: { deleted_id: transaction.id, renumber_applied: res.renumber_applied } })) } catch {}
+      showToast('تم حذف المعاملة بنجاح', { severity: 'success' })
       onClose()
     } catch (err: any) {
       setError(err.message)
+      showToast(err.message, { severity: 'error' })
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Handle post transaction
-  const handlePost = async () => {
-    if (!onPost) return
-    
+  const handleReviewSubmit = async () => {
+    if (!reviewAction) return
+
     setIsLoading(true)
     try {
-      await onPost(transaction.id)
+      if (reviewAction === 'approve' && onApprove) {
+        await onApprove(effectiveTransaction.id, reviewReason || undefined)
+      } else if (reviewAction === 'reject' && onReject) {
+        if (!reviewReason.trim()) throw new Error('يرجى إدخال سبب الرفض')
+        await onReject(effectiveTransaction.id, reviewReason)
+      } else if (reviewAction === 'revise' && onRequestRevision) {
+        if (!reviewReason.trim()) throw new Error('يرجى إدخال سبب الإرجاع للتعديل')
+        await onRequestRevision(effectiveTransaction.id, reviewReason)
+      }
+      setReviewModalOpen(false)
+      setReviewAction(null)
+      setReviewReason('')
+      showToast('تم تنفيذ الإجراء بنجاح', { severity: 'success' })
     } catch (err: any) {
       setError(err.message)
+      showToast(err.message, { severity: 'error' })
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Determine which actions are available
-  const availableActions: Array<{ key: string; label: string; className: string; onClick: () => void }> = useMemo(() => {
+  const handleSubmitForReview = async () => {
+    if (!onSubmitForReview) return
+
+    setIsLoading(true)
+    try {
+      await onSubmitForReview(effectiveTransaction.id, submitNote)
+      setSubmitModalOpen(false)
+      setSubmitNote('')
+      showToast('تم إرسال المعاملة للمراجعة', { severity: 'success' })
+    } catch (err: any) {
+      setError(err.message)
+      showToast(err.message, { severity: 'error' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handlePost = async () => {
+    if (!onPost) return
+
+    setIsLoading(true)
+    try {
+      await onPost(effectiveTransaction.id)
+      showToast('تم ترحيل المعاملة بنجاح', { severity: 'success' })
+    } catch (err: any) {
+      setError(err.message)
+      showToast(err.message, { severity: 'error' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Determine available actions
+  const availableActions = useMemo(() => {
     const actions = []
-    const isPosted = transaction.is_posted
-    const approvalStatus = (transaction as any).approval_status || 'draft'
-    const isOwner = transaction.created_by === currentUserId
-    
-    // Edit action
-    if (!isPosted && canEdit && (mode === 'my' ? isOwner : canManage)) {
+    const tx = effectiveTransaction
+    const isPosted = tx.is_posted
+    // Use unifiedStatus as the source of truth for approval
+    const isApproved = unifiedStatus.cls === 'status-approved' || unifiedStatus.cls === 'status-posted'
+    const isOwner = tx.created_by === currentUserId
+
+    // Edit: Only if not posted AND not approved
+    if (!isPosted && !isApproved && canEdit && (mode === 'my' ? isOwner : canManage)) {
       actions.push({
         key: 'edit',
         label: 'تعديل',
         className: 'ultimate-btn ultimate-btn-edit',
-        onClick: () => setViewMode('edit')
+        onClick: () => {
+          // Use TransactionWizard for edit if callback provided
+          if (onEditWithWizard) {
+            onEditWithWizard(tx)
+          } else {
+            // Fallback to legacy edit mode
+            setViewMode('edit')
+          }
+        }
       })
     }
-    
-    // Delete action
-    if (!isPosted && canDelete && (mode === 'my' ? isOwner : canManage)) {
+
+    // Delete: Only if not posted AND not approved
+    if (!isPosted && !isApproved && canDelete && (mode === 'my' ? isOwner : canManage)) {
       actions.push({
         key: 'delete',
         label: 'حذف',
@@ -647,9 +621,11 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
         onClick: handleDelete
       })
     }
-    
-    // Submit for review
-    if (!isPosted && onSubmitForReview && !['submitted', 'approved', 'rejected'].includes(approvalStatus)) {
+
+    // Submit: Only if not posted AND not approved AND not already submitted (pending)
+    // We check unifiedStatus.cls for 'status-submitted' to see if it's pending
+    const isPending = unifiedStatus.cls === 'status-submitted'
+    if (!isPosted && !isApproved && !isPending && onSubmitForReview) {
       if ((mode === 'my' && isOwner) || canManage) {
         actions.push({
           key: 'submit',
@@ -659,22 +635,20 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
         })
       }
     }
-    
-    // Review actions (for pending mode)
-    if (mode === 'pending' && !isPosted && canReview && onApprove && onReject && onRequestRevision) {
-      if (approvalStatus !== 'approved') {
-        actions.push({
-          key: 'approve',
-          label: 'اعتماد',
-          className: 'ultimate-btn ultimate-btn-success',
-          onClick: () => {
-            setReviewAction('approve')
-            setReviewReason('')
-            setReviewModalOpen(true)
-          }
-        })
-      }
-      
+
+    // Approval Actions: Only if pending AND not approved
+    if (mode === 'pending' && !isPosted && !isApproved && canReview && onApprove && onReject && onRequestRevision) {
+      actions.push({
+        key: 'approve',
+        label: 'اعتماد',
+        className: 'ultimate-btn ultimate-btn-success',
+        onClick: () => {
+          setReviewAction('approve')
+          setReviewReason('')
+          setReviewModalOpen(true)
+        }
+      })
+
       actions.push(
         {
           key: 'revise',
@@ -698,9 +672,9 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
         }
       )
     }
-    
-    // Post action
-    if (canPost && onPost && approvalStatus === 'approved' && !isPosted) {
+
+    // Post: Only if approved AND not posted
+    if (canPost && onPost && isApproved && !isPosted) {
       actions.push({
         key: 'post',
         label: 'ترحيل',
@@ -708,14 +682,24 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
         onClick: handlePost
       })
     }
-    
+
     return actions
-  }, [transaction, canEdit, canDelete, canReview, canPost, canManage, currentUserId, mode, onSubmitForReview, onApprove, onReject, onRequestRevision, onPost])
+  }, [effectiveTransaction, unifiedStatus, canEdit, canDelete, canReview, canPost, canManage, currentUserId, mode, onSubmitForReview, onApprove, onReject, onRequestRevision, onPost])
+
+  // Define tabs
+  const tabs = useMemo(() => [
+    { id: 'basic', label: 'معلومات أساسية', icon: '📄' },
+    { id: 'lines', label: 'القيود', icon: '📊', badge: txLines.length },
+    { id: 'approvals', label: 'الموافقات', icon: '✅', badge: approvalHistory.length },
+    { id: 'documents', label: 'المستندات', icon: '📎' },
+    { id: 'audit', label: 'السجلات', icon: '📜', badge: audit.length },
+    { id: 'settings', label: 'الإعدادات', icon: '⚙️' },
+  ], [txLines.length, approvalHistory.length, audit.length])
 
   return (
     <>
       <DraggableResizablePanel
-        title={`تفاصيل المعاملة - ${transaction.entry_number}`}
+        title={`تفاصيل المعاملة - ${effectiveTransaction.description || effectiveTransaction.entry_number}`}
         isOpen={true}
         onClose={onClose}
         position={panelPosition}
@@ -732,91 +716,45 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
         }}
         onResetPosition={() => {
           setPanelPosition({ x: 150, y: 150 })
-          setPanelSize({ width: 900, height: 800 })
+          setPanelSize({ width: 1000, height: 800 })
           setPanelMax(false)
           setPanelDocked(false)
         }}
       >
-        <div className="unified-transaction-details">
+        <div className={`unified-transaction-details ${uiSettings.compactMode ? 'compact-mode' : ''} font-${uiSettings.fontSize || 'medium'} table-${uiSettings.tableRowHeight || 'normal'}`}>
           {error && (
-            <div className="error-message">{error}</div>
+            <div className="error-message" style={{
+              padding: '12px',
+              background: 'var(--error)',
+              color: 'white',
+              borderRadius: 'var(--radius-md)',
+              marginBottom: '16px'
+            }}>
+              {error}
+            </div>
           )}
-          
+
           {viewMode === 'view' ? (
             <>
               {/* Header with actions */}
-              <div className="details-header">
-                <div className="details-actions">
-                  {/* Configuration Layout Controls */}
-                  <TransactionDetailsLayoutControls
-                    sections={DEFAULT_DETAIL_SECTIONS}
-                    sectionOrder={detailsConfig.sectionOrder}
-                    columnCount={detailsConfig.columnsPerSection}
-                    onColumnCountChange={handleColumnCountChange}
-                    onSectionOrderChange={handleSectionOrderChange}
-                    fullWidthSections={detailsConfig.fullWidthSections}
-                    onFullWidthToggle={handleFullWidthToggle}
-                    visibleSections={detailsConfig.visibleSections}
-                    onVisibilityToggle={handleVisibilityToggle}
-                    onResetLayout={handleResetLayout}
-                    onSaveLayout={handleSaveLayout}
-                    onRememberLayout={handleRememberLayout}
-                    isOpen={configModalOpen}
-                    onToggle={() => setConfigModalOpen(!configModalOpen)}
-                    showToggleButton={false} // Hide default button, we'll add our own
-                  />
-                  
-                  {/* Config button */}
-                  <button
-                    className="ultimate-btn ultimate-btn-secondary"
-                    onClick={() => setConfigModalOpen(!configModalOpen)}
-                    disabled={isLoading}
-                    title="إعدادات عرض التفاصيل"
-                    style={{
-                      background: configModalOpen ? 'var(--accent-primary)' : 'var(--surface)',
-                      color: configModalOpen ? 'var(--button-text)' : 'var(--text-secondary)',
-                      border: '1px solid var(--border-light)'
-                    }}
-                  >
-                    <div className="btn-content">
-                      <span className="btn-text">⚙️ الإعدادات</span>
-                    </div>
-                  </button>
-                  
-                  {/* Save Modal Layout Button */}
-                  <button
-                    className="ultimate-btn ultimate-btn-success"
-                    onClick={handleSaveModalLayout}
-                    disabled={isLoading}
-                    title="حفظ حجم وموضع المودال الحالي كمفضل"
-                    style={{
-                      fontSize: '12px',
-                      padding: '6px 10px',
-                      border: '1px solid var(--border-light)'
-                    }}
-                  >
-                    <div className="btn-content">
-                      <span className="btn-text">💾 حفظ التخطيط</span>
-                    </div>
-                  </button>
-                  
-                  {/* Reset Modal Layout Button */}
-                  <button
-                    className="ultimate-btn ultimate-btn-warning"
-                    onClick={handleResetModalLayout}
-                    disabled={isLoading}
-                    title="إعادة تعيين حجم وموضع المودال للافتراضي"
-                    style={{
-                      fontSize: '12px',
-                      padding: '6px 10px',
-                      border: '1px solid var(--border-light)'
-                    }}
-                  >
-                    <div className="btn-content">
-                      <span className="btn-text">🔄 إعادة تعيين</span>
-                    </div>
-                  </button>
-                  
+              <div className="details-header" style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '16px',
+                borderBottom: '1px solid var(--border)',
+                background: 'var(--background)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <h2 style={{ margin: 0, color: 'var(--heading)' }}>
+                    {effectiveTransaction.description || effectiveTransaction.entry_number}
+                    {isRefreshing && <span style={{ fontSize: '12px', opacity: 0.6, marginRight: '8px' }}>(جاري التحديث...)</span>}
+                  </h2>
+                  <span className={`status-badge ${unifiedStatus.cls}`} title={unifiedStatus.tip}>
+                    {unifiedStatus.label}
+                  </span>
+                </div>
+                <div className="details-actions" style={{ display: 'flex', gap: '8px' }}>
                   {availableActions.map(action => (
                     <button
                       key={action.key}
@@ -832,306 +770,295 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
                 </div>
               </div>
 
-              {/* Main Details Grid Container - all sections rendered dynamically */}
-              <div 
-                className="details-grid-container" 
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${detailsConfig.columnsPerSection}, 1fr)`,
-                  gap: 'var(--spacing-lg)',
-                  padding: 'var(--spacing-lg)'
-                }}
+              {/* Tabs Container */}
+              <TabsContainer
+                tabs={tabs}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                persistKey="transactionDetails"
               >
-                {(() => {
-                  // Create comprehensive section data mapping
-                  const allSectionsData = {
-                    basic_info: {
-                      title: 'المعلومات الأساسية',
-                      fields: [
-                        { id: 'entry_number', label: 'رقم القيد', value: transaction.entry_number },
-                        { id: 'entry_date', label: 'التاريخ', value: new Date(transaction.entry_date).toLocaleDateString('ar-EG') },
-                        { id: 'description', label: 'البيان', value: transaction.description },
-                      ]
-                    },
-                    amount_info: {
-                      title: 'المبلغ والمرجع',
-                      fields: [
-                        { id: 'amount', label: 'المبلغ', value: (
-                          (() => {
-                            const amt = (transaction as any).total_debits ?? (transaction as any).line_items_total ?? null;
-                            return (amt != null) ? `${Number(amt).toLocaleString('ar-EG')} ج.م` : '—'
-                          })()
-                        ), className: 'amount-value' },
-                        { id: 'reference_number', label: 'المرجع', value: transaction.reference_number || '—' },
-                      ]
-                    },
-                    accounts_info: {
-                      title: 'الحسابات',
-                      fields: [
-                        ...((transaction as any).debit_account_id ? [{ id: 'debit_account', label: 'الحساب المدين', value: getAccountLabel((transaction as any).debit_account_id) }] : []),
-                        ...((transaction as any).credit_account_id ? [{ id: 'credit_account', label: 'الحساب الدائن', value: getAccountLabel((transaction as any).credit_account_id) }] : []),
-                      ]
-                    },
-                    approval_status: {
-                      title: 'حالة الاعتماد',
-                      fields: [
-                        { 
-                          id: 'approval_status', 
-                          label: 'حالة الاعتماد', 
-                          value: (
-                            <span className={`status-badge ${unifiedStatus.cls}`} title={unifiedStatus.tip}>
-                              {unifiedStatus.label}
-                            </span>
-                          )
-                        },
-                      ]
-                    },
-                    classification_info: {
-                      title: 'التصنيف والفئة',
-                      fields: [
-                        { id: 'classification', label: 'التصنيف', value: (transaction as any).transaction_classification?.name || '—' },
-                        { id: 'category', label: 'الشجرة الفرعية', value: categoryLabel || '—' },
-                      ]
-                    },
-                    work_items: {
-                      title: 'عناصر العمل',
-                      fields: [
-                        { id: 'work_item', label: 'عنصر العمل', value: getWorkItemLabel((transaction as any).work_item_id) },
-                        { id: 'analysis_work_item', label: 'بند التحليل', value: getAnalysisWorkItemLabel((transaction as any).analysis_work_item_id) },
-                      ]
-                    },
-                    org_project: {
-                      title: 'المؤسسة والمشروع',
-                      fields: [
-                        { id: 'organization', label: 'المؤسسة', value: organizations.find(o => o.id === transaction.org_id)?.name || '—' },
-                        { id: 'project', label: 'المشروع', value: projects.find(p => p.id === transaction.project_id)?.name || '—' },
-                        { id: 'cost_center', label: 'مركز التكلفة', value: getCostCenterLabel(transaction.cost_center_id) },
-                      ]
-                    },
-                    notes_field: {
-                      title: 'الملاحظات',
-                      fields: transaction.notes ? [
-                        { id: 'notes', label: 'الملاحظات', value: transaction.notes, className: 'notes-value' },
-                      ] : []
-                    },
-                    system_info: {
-                      title: 'معلومات النظام',
-                      fields: [
-                        { id: 'created_by', label: 'أنشئت بواسطة', value: transaction.created_by ? (userNames[transaction.created_by] || transaction.created_by) : '—' },
-                        { id: 'created_at', label: 'تاريخ الإنشاء', value: transaction.created_at ? new Date(transaction.created_at).toLocaleString('ar-EG') : '—' },
-                      ]
-                    },
-                    lines_view: {
-                      title: 'القيود التفصيلية',
-                      fields: txLines.length > 0 ? [
-                        {
-                          id: 'tx_lines_table',
-                          label: '',
-                          value: (
-                            <div style={{ overflowX: 'auto' }}>
-                              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <thead>
-                                  <tr>
-                                    <th style={{ textAlign: 'center' }}>#</th>
-                                    <th>الحساب</th>
-                                    <th style={{ textAlign: 'right' }}>مدين</th>
-                                    <th style={{ textAlign: 'right' }}>دائن</th>
-                                    <th>البيان</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {txLines.map((l:any, idx:number) => (
-                                    <tr key={`${l.id || idx}`}>
-                                      <td style={{ textAlign: 'center' }}>{l.line_no}</td>
-<td>{getAccountLabel(l.account_id)}</td>
-                                      <td style={{ textAlign: 'right' }}>{Number(l.debit_amount || 0).toLocaleString('ar-EG')}</td>
-                                      <td style={{ textAlign: 'right' }}>{Number(l.credit_amount || 0).toLocaleString('ar-EG')}</td>
-                                      <td>{l.description || ''}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          )
-                        }
-                      ] : []
-                    },
-                    posting_info: {
-                      title: 'معلومات الترحيل',
-                      fields: transaction.posted_by ? [
-                        { id: 'posted_by', label: 'مرحلة بواسطة', value: userNames[transaction.posted_by] || transaction.posted_by },
-                        { id: 'posted_at', label: 'تاريخ الترحيل', value: transaction.posted_at ? new Date(transaction.posted_at).toLocaleString('ar-EG') : '—' },
-                      ] : []
-                    },
-                    submit_notes: {
-                      title: 'ملاحظات الإرسال',
-                      fields: auditSubmitNote ? [
-                        { id: 'submit_note', label: 'ملاحظات الإرسال', value: auditSubmitNote, className: 'submit-note-display' },
-                      ] : []
-                    },
-                    audit_trail: {
-                      title: 'سجل الإجراءات',
-                      fields: audit.length > 0 ? [
-                        { 
-                          id: 'audit_list', 
-                          label: '', 
-                          value: (
-                            <div className="audit-list">
-                              {audit.map(row => (
-                                <div key={row.id} className="audit-item">
-                                  <div className="audit-header">
-                                    <span className="audit-action">{row.action}</span>
-                                    <span className="audit-date">{row.created_at ? new Date(row.created_at).toLocaleString('ar-EG') : '—'}</span>
-                                  </div>
-                                  <div className="audit-user">
-                                    {row.actor_id ? (userNames[row.actor_id] || row.actor_id.substring(0, 8)) : '—'}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) 
-                        },
-                      ] : []
-                    },
-                    approval_history: {
-                      title: 'سجل الموافقات',
-                      fields: (approvalHistory && approvalHistory.length > 0) ? [
-                        { 
-                          id: 'approval_list', 
-                          label: '', 
-                          value: (
-                            <div className="approval-list">
-                              {approvalHistory.map((r) => (
-                                <div key={r.id} className="approval-item">
-                                  <div className="approval-header">
-                                    <span className="approval-step">الخطوة #{r.step_order}</span>
-                                    <span className="approval-action">
-                                      {r.action === 'approve' ? 'اعتماد' : 
-                                       r.action === 'request_changes' ? 'إرجاع للتعديل' : 
-                                       r.action === 'reject' ? 'رفض' : 'ملاحظة'}
-                                    </span>
-                                    <span className="approval-date">{r.created_at ? new Date(r.created_at).toLocaleString('ar-EG') : '—'}</span>
-                                  </div>
-                                  <div className="approval-user">
-                                    {userNames[r.actor_user_id] || r.actor_user_id.substring(0, 8)}
-                                  </div>
-                                  {r.reason && (
-                                    <div className="approval-reason">
-                                      السبب: {r.reason}
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          ) 
-                        },
-                      ] : []
-                    },
-                    documents: {
-                      title: 'المستندات المرفقة',
-                      fields: [
-                        {
-                          id: 'documents_panel',
-                          label: '',
-                          value: (
-                            <AttachDocumentsPanel 
+                {/* Tab 1: Basic Info */}
+                {activeTab === 'basic' && (
+                  <div className="tab-content">
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px', padding: '0 16px' }}>
+                      <button
+                        className="ultimate-btn ultimate-btn-edit"
+                        onClick={() => setBasicInfoConfigOpen(true)}
+                        title="تخصيص حقول المعلومات الأساسية"
+                        style={{ fontSize: '12px', padding: '6px 12px' }}
+                      >
+                        <div className="btn-content"><span className="btn-text">⚙️ تخصيص الحقول</span></div>
+                      </button>
+                    </div>
+                    <ExpandableSection
+                      title="معلومات المعاملة"
+                      icon="📄"
+                      defaultExpanded={true}
+                      persistKey="tx-basic-info"
+                    >
+                      <InfoGrid columns={layoutSettings.infoGridColumns || 2}>
+                        {getVisibleFields(basicInfoFields).map(field => (
+                          <InfoField
+                            key={field.key}
+                            label={field.label}
+                            value={getFieldValue(field.key)}
+                            fullWidth={field.key === 'description' || field.key === 'notes'}
+                          />
+                        ))}
+                      </InfoGrid>
+                    </ExpandableSection>
+                  </div>
+                )}
+
+                {/* Tab 2: Line Items */}
+                {activeTab === 'lines' && (
+                  <div className="tab-content">
+                    <ExpandableSection
+                      title={`قيود المعاملة (${txLines.length})`}
+                      icon="📊"
+                      badge={txLines.length}
+                      defaultExpanded={true}
+                      persistKey="tx-lines-cards"
+                    >
+                      {txLines.length > 0 ? (
+                        <div className="lines-cards-container">
+                          {txLines.map((line: any, idx: number) => (
+                            <TransactionLineCard
+                              key={line.id || idx}
+                              line={line}
+                              lineIndex={idx}
+                              accounts={accounts}
+                              projects={projects}
+                              costCenters={costCenters}
+                              workItems={workItems}
+                              classifications={classifications as unknown as Array<{ id: string; code: string | number; name: string }>}
+                              categories={categories}
+                              analysisItemsMap={analysisItemsMap}
                               orgId={transaction.org_id || ''}
-                              transactionId={transaction.id}
                               projectId={transaction.project_id || undefined}
                             />
-                          )
-                        }
-                      ]
-                    }
-                  };
+                          ))}
 
-                  // Filter and order ALL sections based on configuration
-                  return detailsConfig.sectionOrder
-                    .filter((sectionId: string) => {
-                      // Always show documents section
-                      if (sectionId === 'documents') return true;
-                      
-                      return isSectionVisible(sectionId) && 
-                        (allSectionsData as any)[sectionId] && 
-                        ((allSectionsData as any)[sectionId].fields as any[]).length > 0;
-                    })
-                    .map((sectionId: string) => {
-                      const section = (allSectionsData as any)[sectionId] as { title: string; fields: Array<{ id: string; label: string; value: React.ReactNode; className?: string }>; };
-                      const isFullWidth = detailsConfig.fullWidthSections.has(sectionId);
-                      
-                      return (
-                        <div 
-                          key={sectionId} 
-                          className={`details-section ${isFullWidth ? 'section-full-width' : ''}`}
-                          style={{
-                            gridColumn: isFullWidth ? '1 / -1' : 'auto'
-                          }}
-                        >
-                          <h3 className="section-title">{section.title}</h3>
-                          <div 
-                            className="info-grid" 
-                            style={{
-                              gridTemplateColumns: isFullWidth 
-                                ? `repeat(${detailsConfig.columnsPerSection}, 1fr)` 
-                                : 'repeat(auto-fit, minmax(200px, 1fr))'
-                            }}
-                          >
-                            {section.fields.map((field: { id: string; label: string; value: React.ReactNode; className?: string }) => (
-                              <div key={field.id} className={`info-item ${field.label === '' ? 'info-item--full' : ''}`}>
-                                {field.label && <label className="info-label">{field.label}</label>}
-                                <div className={`info-value ${field.className || ''}`}>
-                                  {field.value}
-                                </div>
-                              </div>
-                            ))}
+                          {/* Totals Summary */}
+                          <div className="lines-totals-summary">
+                            <div className="totals-row">
+                              <span className="totals-label">إجمالي المدين:</span>
+                              <span className="totals-value debit">{totalDebits.toLocaleString('ar-EG')}</span>
+                            </div>
+                            <div className="totals-row">
+                              <span className="totals-label">إجمالي الدائن:</span>
+                              <span className="totals-value credit">{totalCredits.toLocaleString('ar-EG')}</span>
+                            </div>
+                            <div className="totals-row balance">
+                              {isBalanced ? (
+                                <span className="balance-status balanced">✅ متوازن</span>
+                              ) : (
+                                <span className="balance-status unbalanced">
+                                  ❌ غير متوازن (الفرق: {Math.abs(totalDebits - totalCredits).toLocaleString('ar-EG')})
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      );
-                    });
-                })()}
-              </div>
+                      ) : (
+                        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted_text)' }}>
+                          لا توجد قيود تفصيلية
+                        </div>
+                      )}
+                    </ExpandableSection>
+                  </div>
+                )}
+
+                {/* Tab 3: Approvals */}
+                {activeTab === 'approvals' && (
+                  <div className="tab-content">
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px', padding: '0 16px' }}>
+                      <button
+                        className="ultimate-btn ultimate-btn-edit"
+                        onClick={() => setApprovalsConfigOpen(true)}
+                        title="تخصيص حقول الموافقات"
+                        style={{ fontSize: '12px', padding: '6px 12px' }}
+                      >
+                        <div className="btn-content"><span className="btn-text">⚙️ تخصيص الحقول</span></div>
+                      </button>
+                    </div>
+                    <ExpandableSection
+                      title="حالة الموافقة الحالية"
+                      icon="✅"
+                      defaultExpanded={true}
+                      persistKey="tx-approval-status"
+                    >
+                      <InfoGrid columns={layoutSettings.infoGridColumns || 2}>
+                        <InfoField
+                          label="الحالة"
+                          value={
+                            <span className={`status-badge ${unifiedStatus.cls}`}>
+                              {unifiedStatus.label}
+                            </span>
+                          }
+                        />
+                        {transaction.is_posted && (
+                          <>
+                            <InfoField
+                              label="مرحلة بواسطة"
+                              value={userNames[transaction.posted_by || ''] || '—'}
+                            />
+                            <InfoField
+                              label="تاريخ الترحيل"
+                              value={transaction.posted_at ? formatDateTime(transaction.posted_at) : '—'}
+                            />
+                          </>
+                        )}
+                      </InfoGrid>
+                    </ExpandableSection>
+
+                    {approvalHistory.length > 0 && (
+                      <ExpandableSection
+                        title={`سجل الموافقات (${approvalHistory.length} إجراءات)`}
+                        icon="📋"
+                        badge={approvalHistory.length}
+                        defaultExpanded={true}
+                        persistKey="tx-approval-history"
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {approvalHistory.map((row, idx) => (
+                            <div key={row.id} style={{
+                              padding: '12px',
+                              background: 'var(--field_bg)',
+                              borderRadius: 'var(--radius-md)',
+                              borderLeft: '4px solid var(--accent)'
+                            }}>
+                              <InfoGrid columns={layoutSettings.infoGridColumns || 2}>
+                                {getVisibleFields(approvalsFields).map(field => (
+                                  <InfoField
+                                    key={field.key}
+                                    label={field.label}
+                                    value={getApprovalValue(row, field.key, idx)}
+                                  />
+                                ))}
+                              </InfoGrid>
+                            </div>
+                          ))}
+                        </div>
+                      </ExpandableSection>
+                    )}
+                  </div>
+                )}
+
+                {/* Tab 4: Documents */}
+                {activeTab === 'documents' && (
+                  <div className="tab-content">
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px', padding: '0 16px' }}>
+                      <button
+                        className="ultimate-btn ultimate-btn-edit"
+                        onClick={() => setDocumentsConfigOpen(true)}
+                        title="تخصيص حقول المستندات"
+                        style={{ fontSize: '12px', padding: '6px 12px' }}
+                      >
+                        <div className="btn-content"><span className="btn-text">⚙️ تخصيص الحقول</span></div>
+                      </button>
+                    </div>
+                    <ExpandableSection
+                      title="المستندات المرفقة"
+                      icon="📎"
+                      defaultExpanded={true}
+                      persistKey="tx-documents"
+                    >
+                      <AttachDocumentsPanel
+                        orgId={transaction.org_id || ''}
+                        transactionId={transaction.id}
+                        projectId={transaction.project_id || undefined}
+                      />
+                    </ExpandableSection>
+                  </div>
+                )}
+
+                {/* Tab 5: Audit Trail */}
+                {activeTab === 'audit' && (
+                  <div className="tab-content">
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px', padding: '0 16px' }}>
+                      <button
+                        className="ultimate-btn ultimate-btn-edit"
+                        onClick={() => setAuditConfigOpen(true)}
+                        title="تخصيص حقول السجلات"
+                        style={{ fontSize: '12px', padding: '6px 12px' }}
+                      >
+                        <div className="btn-content"><span className="btn-text">⚙️ تخصيص الحقول</span></div>
+                      </button>
+                    </div>
+                    <ExpandableSection
+                      title={`سجل الإجراءات (${audit.length} إجراءات)`}
+                      icon="📜"
+                      badge={audit.length}
+                      defaultExpanded={true}
+                      persistKey="tx-audit"
+                    >
+                      {audit.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {audit.map((row) => (
+                            <div key={row.id} style={{
+                              padding: '12px',
+                              background: 'var(--field_bg)',
+                              borderRadius: 'var(--radius-md)',
+                              borderLeft: '4px solid var(--border)'
+                            }}>
+                              <InfoGrid columns={layoutSettings.infoGridColumns || 2}>
+                                {getVisibleFields(auditFields).map(field => (
+                                  <InfoField
+                                    key={field.key}
+                                    label={field.label}
+                                    value={getAuditValue(row, field.key)}
+                                  />
+                                ))}
+                              </InfoGrid>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted_text)' }}>
+                          لا توجد إجراءات مسجلة
+                        </div>
+                      )}
+                    </ExpandableSection>
+                  </div>
+                )}
+
+                {/* Tab 6: Settings */}
+                {activeTab === 'settings' && (
+                  <div className="tab-content">
+                    <TransactionSettingsPanel
+                      onSettingsChange={(settings) => {
+                        // Settings are automatically persisted to localStorage
+                        console.log('Settings updated:', settings)
+                      }}
+                      onSave={async () => {
+                        // Optional: Save settings to server if needed
+                        showToast('تم حفظ الإعدادات بنجاح', { severity: 'success' })
+                      }}
+                      onReset={() => {
+                        showToast('تم إعادة تعيين الإعدادات', { severity: 'info' })
+                      }}
+                    />
+                  </div>
+                )}
+              </TabsContainer>
             </>
           ) : (
             // Edit mode
             <div className="details-edit-mode">
-<div style={{ marginBottom: '16px' }}>
+              <div style={{ marginBottom: '16px' }}>
                 <MultiLineEditor
                   transactionId={transaction.id}
                   accounts={accounts}
                   orgId={transaction.org_id || ''}
                   disabled={isLoading}
-                  onSaved={() => {/* optional hook after save */}}
+                  onSaved={() => {
+                    setViewMode('view')
+                    showToast('تم حفظ التعديلات بنجاح', { severity: 'success' })
+                  }}
                   onLinesStateChange={(s) => setLinesState(s)}
                 />
               </div>
-              <UnifiedCRUDForm
-                ref={formRef}
-                config={headerFormConfig}
-                initialData={initialFormData}
-                resetOnInitialDataChange={false}
-                onSubmit={handleFormSubmit}
-                onCancel={handleFormCancel}
-                isLoading={isLoading}
-              />
-
-              {/* Transaction Line Items Editor Section */}
-              {txLines.length > 0 && (
-                <div style={{ marginTop: 'var(--spacing-xl)' }}>
-                  <TransactionLineItemsSection
-                    transactionLineId={txLines[0]?.id || ''}
-                    orgId={transaction.org_id || ''}
-                    disabled={isLoading || !txLines[0]?.id}
-                    workItems={workItems}
-                    analysisItems={analysisItemsMap}
-                    costCenters={costCenters}
-                    transactionLineDefaults={{
-                      work_item_id: txLines[0]?.work_item_id,
-                      analysis_work_item_id: txLines[0]?.analysis_work_item_id,
-                      sub_tree_id: txLines[0]?.sub_tree_id,
-                    }}
-                  />
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -1151,31 +1078,6 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
               <div style={{ marginBottom: 12 }}>
                 سيتم حذف المعاملة رقم <strong>{transaction.entry_number}</strong> وجميع القيود التفصيلية المرتبطة بها نهائياً.
               </div>
-              <div style={{ marginBottom: 8 }}>
-                حالة إعادة الترقيم الافتراضية من الإعدادات: <strong>{deleteDefaultRenumber ? 'مفعّل' : 'معطّل'}</strong>
-              </div>
-              <div className="checkbox-field" style={{ marginBottom: 8 }}>
-                <label>
-                  <input type="checkbox" checked={deleteOverrideEnabled} onChange={e => setDeleteOverrideEnabled(e.target.checked)} />
-                  تجاهل الإعداد الافتراضي لهذه العملية فقط
-                </label>
-              </div>
-              {deleteOverrideEnabled && (
-                <div className="checkbox-field" style={{ marginInlineStart: 16, marginBottom: 8 }}>
-                  <label>
-                    <input type="checkbox" checked={deleteOverrideRenumber} onChange={e => setDeleteOverrideRenumber(e.target.checked)} />
-                    إعادة ترقيم الأرقام بعد الحذف في هذه العملية
-                  </label>
-                </div>
-              )}
-              {canManage && (
-                <div className="checkbox-field" style={{ marginTop: 8 }}>
-                  <label>
-                    <input type="checkbox" checked={deleteForce} onChange={e => setDeleteForce(e.target.checked)} />
-                    فرض الحذف (للمدراء/المشرفين فقط)
-                  </label>
-                </div>
-              )}
               <div className="modal-actions" style={{ marginTop: 16 }}>
                 <button className="ultimate-btn ultimate-btn-success" onClick={handleDeleteConfirm} disabled={isLoading}>
                   <div className="btn-content"><span className="btn-text">تأكيد الحذف</span></div>
@@ -1195,8 +1097,8 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">
-                {reviewAction === 'approve' ? 'اعتماد المعاملة' : 
-                 reviewAction === 'revise' ? 'إرجاع للتعديل' : 'رفض المعاملة'}
+                {reviewAction === 'approve' ? 'اعتماد المعاملة' :
+                  reviewAction === 'revise' ? 'إرجاع للتعديل' : 'رفض المعاملة'}
               </h3>
               <button className="ultimate-btn ultimate-btn-delete" onClick={() => !isLoading && setReviewModalOpen(false)}>
                 <div className="btn-content"><span className="btn-text">إغلاق</span></div>
@@ -1209,18 +1111,30 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
                 placeholder={reviewAction === 'approve' ? 'ملاحظات (اختياري)' : 'السبب (إلزامي)'}
                 value={reviewReason}
                 onChange={e => setReviewReason(e.target.value)}
+                style={{
+                  width: '100%',
+                  minHeight: '100px',
+                  padding: '12px',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--field_bg)',
+                  color: 'var(--text)',
+                  fontSize: '14px',
+                  fontFamily: 'inherit',
+                  resize: 'vertical'
+                }}
               />
               <div className="modal-actions">
-                <button 
-                  className="ultimate-btn ultimate-btn-success" 
-                  onClick={handleReviewSubmit} 
+                <button
+                  className="ultimate-btn ultimate-btn-success"
+                  onClick={handleReviewSubmit}
                   disabled={isLoading}
                 >
                   <div className="btn-content"><span className="btn-text">تأكيد</span></div>
                 </button>
-                <button 
-                  className="ultimate-btn ultimate-btn-warning" 
-                  onClick={() => !isLoading && setReviewModalOpen(false)} 
+                <button
+                  className="ultimate-btn ultimate-btn-warning"
+                  onClick={() => !isLoading && setReviewModalOpen(false)}
                   disabled={isLoading}
                 >
                   <div className="btn-content"><span className="btn-text">إلغاء</span></div>
@@ -1248,18 +1162,30 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
                 placeholder="أدخل سبب/ملاحظات الإرسال"
                 value={submitNote}
                 onChange={e => setSubmitNote(e.target.value)}
+                style={{
+                  width: '100%',
+                  minHeight: '100px',
+                  padding: '12px',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--field_bg)',
+                  color: 'var(--text)',
+                  fontSize: '14px',
+                  fontFamily: 'inherit',
+                  resize: 'vertical'
+                }}
               />
               <div className="modal-actions">
-                <button 
-                  className="ultimate-btn ultimate-btn-success" 
-                  onClick={handleSubmitForReview} 
+                <button
+                  className="ultimate-btn ultimate-btn-success"
+                  onClick={handleSubmitForReview}
                   disabled={isLoading}
                 >
                   <div className="btn-content"><span className="btn-text">تأكيد الإرسال</span></div>
                 </button>
-                <button 
-                  className="ultimate-btn ultimate-btn-warning" 
-                  onClick={() => !isLoading && setSubmitModalOpen(false)} 
+                <button
+                  className="ultimate-btn ultimate-btn-warning"
+                  onClick={() => !isLoading && setSubmitModalOpen(false)}
                   disabled={isLoading}
                 >
                   <div className="btn-content"><span className="btn-text">إلغاء</span></div>
@@ -1269,7 +1195,69 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
           </div>
         </div>
       )}
-      
+
+      {/* Field Configuration Modals */}
+      <ColumnConfiguration
+        columns={basicInfoFields}
+        onConfigChange={handleBasicInfoFieldsChange}
+        isOpen={basicInfoConfigOpen}
+        onClose={() => setBasicInfoConfigOpen(false)}
+        onReset={() => {
+          const defaults = getDefaultFieldConfig('basicInfo')
+          handleBasicInfoFieldsChange(defaults)
+        }}
+        sampleData={[]} // No sample data needed for field configuration
+      />
+
+      <ColumnConfiguration
+        columns={lineItemsFields}
+        onConfigChange={handleLineItemsFieldsChange}
+        isOpen={lineItemsConfigOpen}
+        onClose={() => setLineItemsConfigOpen(false)}
+        onReset={() => {
+          const defaults = getDefaultFieldConfig('lineItems')
+          handleLineItemsFieldsChange(defaults)
+        }}
+        sampleData={[]} // No sample data needed for field configuration
+      />
+
+      <ColumnConfiguration
+        columns={approvalsFields}
+        onConfigChange={handleApprovalsFieldsChange}
+        isOpen={approvalsConfigOpen}
+        onClose={() => setApprovalsConfigOpen(false)}
+        onReset={() => {
+          const defaults = getDefaultFieldConfig('approvals')
+          handleApprovalsFieldsChange(defaults)
+        }}
+        sampleData={[]} // No sample data needed for field configuration
+      />
+
+      <ColumnConfiguration
+        columns={documentsFields}
+        onConfigChange={handleDocumentsFieldsChange}
+        isOpen={documentsConfigOpen}
+        onClose={() => setDocumentsConfigOpen(false)}
+        onReset={() => {
+          const defaults = getDefaultFieldConfig('documents')
+          handleDocumentsFieldsChange(defaults)
+        }}
+        sampleData={[]} // No sample data needed for field configuration
+      />
+
+      <ColumnConfiguration
+        columns={auditFields}
+        onConfigChange={handleAuditFieldsChange}
+        isOpen={auditConfigOpen}
+        onClose={() => setAuditConfigOpen(false)}
+        onReset={() => {
+          const defaults = getDefaultFieldConfig('audit')
+          handleAuditFieldsChange(defaults)
+        }}
+        sampleData={[]} // No sample data needed for field configuration
+      />
+
+
     </>
   )
 }

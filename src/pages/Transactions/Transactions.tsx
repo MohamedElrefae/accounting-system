@@ -1,24 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
-import { getAccounts, getTransactions, createTransaction, deleteTransaction, updateTransaction, getTransactionAudit, getCurrentUserId, getProjects, approveTransaction, requestRevision, rejectTransaction, submitTransaction, cancelSubmission, postTransaction, getUserDisplayMap, type Account, type TransactionRecord, type TransactionAudit, type Project } from '../../services/transactions'
-import { getTransactionLines } from '../../services/transaction-lines'
-import { uploadDocument, linkDocumentToTransactionLine } from '../../services/documents'
-import { listWorkItemsAll } from '../../services/work-items'
-import type { WorkItemRow } from '../../types/work-items'
+import { getAccounts, getTransactions, deleteTransaction, updateTransaction, getTransactionAudit, getCurrentUserId, getProjects, approveTransaction, requestRevision, rejectTransaction, submitTransaction, cancelSubmission, postTransaction, getUserDisplayMap, type Account, type TransactionRecord, type TransactionAudit } from '../../services/transactions'
 import { getOrganizations } from '../../services/organization'
+import { getAllTransactionClassifications } from '../../services/transaction-classification'
 import { getActiveProjectId } from '../../utils/org'
-import { getAllTransactionClassifications, type TransactionClassification } from '../../services/transaction-classification'
-import { getExpensesCategoriesList } from '../../services/sub-tree'
-import { listAnalysisWorkItems } from '../../services/analysis-work-items'
-import type { Organization } from '../../types'
-import type { ExpensesCategoryRow } from '../../types/sub-tree'
 import { useHasPermission } from '../../hooks/useHasPermission'
 import './Transactions.css'
 import { useToast } from '../../contexts/ToastContext'
+import { useTransactionsData } from '../../contexts/TransactionsDataContext'
 import ExportButtons from '../../components/Common/ExportButtons'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
 import UnifiedTransactionDetailsPanel from '../../components/Transactions/UnifiedTransactionDetailsPanel'
-import { getApprovalHistoryByTransactionId, type ApprovalHistoryRow } from '../../services/approvals'
 import ClientErrorLogs from '../admin/ClientErrorLogs'
 import PermissionBadge from '../../components/Common/PermissionBadge'
 import { WithPermission } from '../../components/Common/withPermission'
@@ -26,7 +18,6 @@ import { logClientError } from '../../services/telemetry'
 import UnifiedCRUDForm, { type UnifiedCRUDFormHandle } from '../../components/Common/UnifiedCRUDForm'
 import DraggableResizablePanel from '../../components/Common/DraggableResizablePanel'
 import { createTransactionFormConfig } from '../../components/Transactions/TransactionFormConfig'
-import { getCostCentersForSelector } from '../../services/cost-centers'
 import ResizableTable from '../../components/Common/ResizableTable'
 import ColumnConfiguration from '../../components/Common/ColumnConfiguration'
 import type { ColumnConfig } from '../../components/Common/ColumnConfiguration'
@@ -38,7 +29,6 @@ import { getCompanyConfig } from '../../services/company-config'
 import TransactionAnalysisModal from '../../components/Transactions/TransactionAnalysisModal'
 import TransactionWizard from '../../components/Transactions/TransactionWizard'
 import AttachDocumentsPanel from '../../components/documents/AttachDocumentsPanel'
-import { getReadMode } from '../../config/featureFlags'
 import TransactionsHeaderTable from './TransactionsHeaderTable'
 import TransactionLinesTable from './TransactionLinesTable'
 import formStyles from '../../components/Common/UnifiedCRUDForm.module.css'
@@ -46,27 +36,28 @@ import FormLayoutControls from '../../components/Common/FormLayoutControls'
 import type { FormField } from '../../components/Common/UnifiedCRUDForm'
 import { Star } from 'lucide-react'
 import ReactDOM from 'react-dom'
-
-interface FilterState {
-  dateFrom: string
-  dateTo: string
-  amountFrom: string
-  amountTo: string
-}
+import { useFilterState } from '../../hooks/useFilterState'
+import UnifiedFilterBar from '../../components/Common/UnifiedFilterBar'
 
 const TransactionsPage: React.FC = () => {
-  const [accounts, setAccounts] = useState<Account[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
-  const [organizations, setOrganizations] = useState<Organization[]>([])
-  const [classifications, setClassifications] = useState<TransactionClassification[]>([])
+  const {
+    organizations,
+    projects,
+    accounts,
+    costCenters,
+    workItems,
+    categories,
+    classifications,
+    analysisItemsMap,
+    currentUserId,
+    isLoading: _contextLoading,
+    error: _contextError,
+    refreshAll: _refreshContextData,
+    refreshAnalysisItems,
+  } = useTransactionsData()
   const [transactions, setTransactions] = useState<TransactionRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [categories, setCategories] = useState<ExpensesCategoryRow[]>([])
-  const [workItems, setWorkItems] = useState<WorkItemRow[]>([])
-  const [analysisItemsMap, setAnalysisItemsMap] = useState<Record<string, { code: string; name: string }>>({})
-  const [costCenters, setCostCenters] = useState<Array<{ id: string; code: string; name: string; name_ar?: string | null; project_id?: string | null; level: number }>>([])
-  const [searchTerm, setSearchTerm] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [_formErrors, _setFormErrors] = useState<Record<string, string>>({})
   // const [postingId, setPostingId] = useState<string | null>(null)
@@ -85,7 +76,7 @@ const TransactionsPage: React.FC = () => {
   // Debug: track which form is open
   useEffect(() => { try { console.log('🧪 Form state -> wizardOpen:', wizardOpen, 'formOpen:', formOpen); } catch { } }, [wizardOpen, formOpen])
   const [audit, setAudit] = useState<TransactionAudit[]>([])
-  const [approvalHistory, setApprovalHistory] = useState<ApprovalHistoryRow[]>([])
+  const [approvalHistory, setApprovalHistory] = useState<any[]>([])
   // Keep create-mode title even after header insert until user saves draft/post
   const [keepCreateTitle, setKeepCreateTitle] = useState<boolean>(false)
 
@@ -186,108 +177,72 @@ const TransactionsPage: React.FC = () => {
     setAnalysisTransaction(null)
   }
 
-  const [filters, setFilters] = useState<FilterState>({
+  const defaultFilterValues = useMemo(() => ({
+    search: '',
     dateFrom: '',
     dateTo: '',
     amountFrom: '',
     amountTo: '',
+    orgId: '',
+    projectId: (() => { try { return (localStorage.getItem('project_id') || '') as string } catch { return '' } })(),
+    debitAccountId: '',
+    creditAccountId: '',
+    classificationId: '',
+    expensesCategoryId: '',
+    workItemId: '',
+    analysisWorkItemId: '',
+    costCenterId: '',
+    approvalStatus: '',
+  }), [])
+
+  const {
+    filters: unifiedFilters,
+    updateFilter,
+    resetFilters,
+  } = useFilterState({
+    storageKey: 'transactions_filters',
+    defaultValues: defaultFilterValues,
   })
-  const [debitFilterId, setDebitFilterId] = useState<string>('')
-  const [creditFilterId, setCreditFilterId] = useState<string>('')
-  const [orgFilterId, setOrgFilterId] = useState<string>('')
-  const [projectFilterId, setProjectFilterId] = useState<string>(() => {
-    try { return (localStorage.getItem('project_id') || '') as string } catch { return '' }
-  })
+
+  const [appliedFilters, setAppliedFilters] = useState(unifiedFilters)
+  const filtersInitializedRef = useRef(false)
+  const [filtersDirty, setFiltersDirty] = useState(false)
   const [useGlobalProjectTx, setUseGlobalProjectTx] = useState<boolean>(() => { try { return localStorage.getItem('transactions:useGlobalProject') === '1' } catch { return true } })
 
-  // Individual filter width control state - all filters
-  const defaultFilterWidths = {
-    search: 150,
-    dateFrom: 120,
-    dateTo: 120,
-    approval: 140,
-    org: 180,
-    project: 180,
-    debit: 200,
-    credit: 200,
-    classification: 180,
-    expenses: 180,
-    workitem: 180,
-    analysisworkitem: 180,
-    amountFrom: 100,
-    amountTo: 100
-  }
+  // Handle apply filters - copy unifiedFilters to appliedFilters and trigger reload
+  const handleApplyFilters = useCallback(() => {
+    setAppliedFilters({ ...unifiedFilters })
+    setFiltersDirty(false)
+    setPage(1)
+  }, [unifiedFilters])
 
-  const [filterWidths, setFilterWidths] = useState<Record<string, number>>(() => {
-    try {
-      const saved = localStorage.getItem('transactions_filter_widths')
-      const parsed = saved ? JSON.parse(saved) : {}
-      // Merge with defaults to ensure all keys exist
-      return { ...defaultFilterWidths, ...parsed }
-    } catch {
-      return defaultFilterWidths
-    }
-  })
+  // Handle reset filters
+  const handleResetFilters = useCallback(() => {
+    resetFilters()
+    setAppliedFilters({ ...defaultFilterValues })
+    setFiltersDirty(false)
+    setPage(1)
+  }, [resetFilters, defaultFilterValues])
 
-  const updateFilterWidth = (filterId: string, width: number) => {
-    setFilterWidths(prev => ({ ...prev, [filterId]: width }))
-  }
-
-  // Filter width modal state
-  const [filterWidthModalOpen, setFilterWidthModalOpen] = useState(false)
-
-  // Filter visibility state - includes all filters
-  const defaultFilterVisibility = {
-    search: true,
-    dateFrom: true,
-    dateTo: true,
-    approval: true,
-    org: true,
-    project: true,
-    debit: true,
-    credit: true,
-    classification: true,
-    expenses: true,
-    workitem: true,
-    analysisworkitem: true,
-    costcenter: true,
-    amountFrom: true,
-    amountTo: true
-  }
-
-  const [filterVisibility, setFilterVisibility] = useState<Record<string, boolean>>(() => {
-    try {
-      const saved = localStorage.getItem('transactions_filter_visibility')
-      const parsed = saved ? JSON.parse(saved) : {}
-      return { ...defaultFilterVisibility, ...parsed }
-    } catch {
-      return defaultFilterVisibility
-    }
-  })
-
-  const toggleFilterVisibility = (filterId: string) => {
-    setFilterVisibility(prev => ({ ...prev, [filterId]: !prev[filterId] }))
-  }
-
-  // Persist filter visibility
+  // Track if filters are dirty (unifiedFilters differs from appliedFilters)
   useEffect(() => {
-    try { localStorage.setItem('transactions_filter_visibility', JSON.stringify(filterVisibility)) } catch { }
-  }, [filterVisibility])
+    const isDirty = JSON.stringify(unifiedFilters) !== JSON.stringify(appliedFilters)
+    setFiltersDirty(isDirty)
+  }, [unifiedFilters, appliedFilters])
 
-  const [classificationFilterId, setClassificationFilterId] = useState<string>('')
-  const [expensesCategoryFilterId, setExpensesCategoryFilterId] = useState<string>('')
-  const [workItemFilterId, setWorkItemFilterId] = useState<string>('')
-  const [costCenterFilterId, setCostCenterFilterId] = useState<string>('')
+  // Initialize appliedFilters from unifiedFilters on first load
+  useEffect(() => {
+    if (!filtersInitializedRef.current) {
+      setAppliedFilters({ ...unifiedFilters })
+      filtersInitializedRef.current = true
+    }
+  }, [unifiedFilters])
+
+  // Note: Filter width and visibility are now managed by UnifiedFilterBar internally
+
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [userNames, setUserNames] = useState<Record<string, string>>({})
-  // Quick approval status filter (client-side)
-  const [approvalFilter, setApprovalFilter] = useState<'all' | 'draft' | 'submitted' | 'revision_requested' | 'approved' | 'rejected' | 'cancelled'>(() => {
-    try {
-      return (localStorage.getItem('transactions_approval_filter') as any) || 'all'
-    } catch { return 'all' }
-  })
   // Wrap mode preference (persisted per user locally)
   const [wrapMode, setWrapMode] = useState<boolean>(() => {
     try {
@@ -301,18 +256,15 @@ const TransactionsPage: React.FC = () => {
     if (!useGlobalProjectTx) return
     try {
       const pid = getActiveProjectId() || ''
-      setProjectFilterId(pid)
+      if (pid && pid !== unifiedFilters.projectId) {
+        updateFilter('projectId', pid)
+      }
     } catch { }
-  }, [useGlobalProjectTx, orgFilterId])
+  }, [useGlobalProjectTx, unifiedFilters.orgId, unifiedFilters.projectId, updateFilter])
 
   useEffect(() => {
     try { localStorage.setItem('transactions:useGlobalProject', useGlobalProjectTx ? '1' : '0') } catch { }
   }, [useGlobalProjectTx])
-
-  // Persist individual filter widths
-  useEffect(() => {
-    try { localStorage.setItem('transactions_filter_widths', JSON.stringify(filterWidths)) } catch { }
-  }, [filterWidths])
 
   // Persist wrapMode to server when available
   useEffect(() => {
@@ -332,10 +284,6 @@ const TransactionsPage: React.FC = () => {
       })()
   }, [wrapMode, currentUserId])
 
-  // Persist approval filter selection
-  useEffect(() => {
-    try { localStorage.setItem('transactions_approval_filter', approvalFilter) } catch { }
-  }, [approvalFilter])
   // Persist wrap mode selection
   useEffect(() => {
     try { localStorage.setItem('transactions_table_wrap', wrapMode ? '1' : '0') } catch { }
@@ -347,6 +295,77 @@ const TransactionsPage: React.FC = () => {
 
   // Lines state for bottom table
   const [transactionLines, setTransactionLines] = useState<any[]>([])
+
+  // Lines filter using unified filter system
+  const defaultLinesFilterValues = useMemo(() => ({
+    search: '',
+    amountFrom: '',
+    amountTo: '',
+    debitAccountId: '',
+    creditAccountId: '',
+    projectId: '',
+    costCenterId: '',
+    workItemId: '',
+    analysisWorkItemId: '',
+    classificationId: '',
+    expensesCategoryId: '',
+  }), [])
+
+  const {
+    filters: linesUnifiedFilters,
+    updateFilter: updateLinesFilter,
+    resetFilters: resetLinesFilters,
+  } = useFilterState({
+    storageKey: 'transactions_lines_filters',
+    defaultValues: defaultLinesFilterValues,
+  })
+
+  // Filter transaction lines based on linesUnifiedFilters (client-side, immediate)
+  const filteredTransactionLines = useMemo(() => {
+    if (!transactionLines.length) return transactionLines
+    const f = linesUnifiedFilters
+    return transactionLines.filter(line => {
+      // Search filter - matches description or account name/code
+      if (f.search) {
+        const searchLower = f.search.toLowerCase()
+        const desc = (line.description || '').toLowerCase()
+        const accName = (line.account_name || line.account_name_ar || '').toLowerCase()
+        const accCode = (line.account_code || '').toLowerCase()
+        if (!desc.includes(searchLower) && !accName.includes(searchLower) && !accCode.includes(searchLower)) {
+          return false
+        }
+      }
+      // Amount range filter
+      if (f.amountFrom) {
+        const minAmt = parseFloat(f.amountFrom)
+        const lineAmt = Math.max(line.debit_amount || 0, line.credit_amount || 0)
+        if (lineAmt < minAmt) return false
+      }
+      if (f.amountTo) {
+        const maxAmt = parseFloat(f.amountTo)
+        const lineAmt = Math.max(line.debit_amount || 0, line.credit_amount || 0)
+        if (lineAmt > maxAmt) return false
+      }
+      // Debit account filter
+      if (f.debitAccountId && (line.debit_amount || 0) > 0 && line.account_id !== f.debitAccountId) return false
+      // Credit account filter  
+      if (f.creditAccountId && (line.credit_amount || 0) > 0 && line.account_id !== f.creditAccountId) return false
+      // Project filter
+      if (f.projectId && line.project_id !== f.projectId) return false
+      // Cost center filter
+      if (f.costCenterId && line.cost_center_id !== f.costCenterId) return false
+      // Work item filter
+      if (f.workItemId && line.work_item_id !== f.workItemId) return false
+      // Analysis work item filter
+      if (f.analysisWorkItemId && line.analysis_work_item_id !== f.analysisWorkItemId) return false
+      // Classification filter
+      if (f.classificationId && line.classification_id !== f.classificationId) return false
+      // Expenses category filter
+      if (f.expensesCategoryId && line.sub_tree_id !== f.expensesCategoryId) return false
+      return true
+    })
+  }, [transactionLines, linesUnifiedFilters])
+
   const [lineWrapMode, setLineWrapMode] = useState<boolean>(() => {
     try {
       const raw = localStorage.getItem('transactions_lines_table_wrap')
@@ -398,25 +417,14 @@ const TransactionsPage: React.FC = () => {
   }, [selectedTransactionId])
 
   // Refresh Analysis Work Items label cache when org/project filter changes
+  // Note: analysisItemsMap now comes from TransactionsDataContext, so this effect
+  // is only needed if we want to refresh based on filter changes. For now, we rely on context.
   useEffect(() => {
-    (async () => {
-      try {
-        const effectiveOrgId = orgFilterId || organizations[0]?.id || ''
-        if (!effectiveOrgId) return
-        const list = await listAnalysisWorkItems({
-          orgId: effectiveOrgId,
-          projectId: projectFilterId || null,
-          onlyWithTx: false,
-          includeInactive: true,
-        })
-        const map: Record<string, { code: string; name: string }> = {}
-        for (const a of list) map[a.id] = { code: a.code, name: a.name }
-        setAnalysisItemsMap(map)
-      } catch {
-        // no-op on failure; keep previous cache
-      }
-    })()
-  }, [orgFilterId, projectFilterId, organizations])
+    // Context already provides analysisItemsMap; this effect can trigger refreshAnalysisItems if needed
+    if (appliedFilters.orgId) {
+      refreshAnalysisItems(appliedFilters.orgId, appliedFilters.projectId || null).catch(() => {})
+    }
+  }, [appliedFilters.orgId, appliedFilters.projectId, refreshAnalysisItems])
 
   // Column configuration state (renamed for clarity - headers table)
   const [headersColumnConfigOpen, setHeadersColumnConfigOpen] = useState(false)
@@ -532,13 +540,12 @@ const TransactionsPage: React.FC = () => {
     try {
       const params = new URLSearchParams(location.search)
       const wid = params.get('workItemId') || ''
-      if (wid && wid !== workItemFilterId) {
-        setWorkItemFilterId(wid)
+      if (wid && wid !== unifiedFilters.workItemId) {
+        updateFilter('workItemId', wid)
         setPage(1)
       }
     } catch { }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.search])
+  }, [location.search, unifiedFilters.workItemId, updateFilter])
   const hasPerm = useHasPermission()
   const { showToast } = useToast()
   const [showDiag, setShowDiag] = useState(false)
@@ -742,32 +749,6 @@ const TransactionsPage: React.FC = () => {
     userId: currentUserId || undefined
   })
 
-  // Refetch transactions whenever filters/scope/pagination change
-  useEffect(() => {
-    // Note: reload() uses current state (including mode and filters)
-    reload().catch(() => { })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    searchTerm,
-    filters.dateFrom,
-    filters.dateTo,
-    filters.amountFrom,
-    filters.amountTo,
-    (filters as any).analysis_work_item_id,
-    debitFilterId,
-    creditFilterId,
-    orgFilterId,
-    projectFilterId,
-    classificationFilterId,
-    expensesCategoryFilterId,
-    workItemFilterId,
-    costCenterFilterId,
-    page,
-    pageSize,
-    mode,
-    approvalFilter, // now server-side filtered
-  ])
-
   // Global refresh via CustomEvent (from details panel or elsewhere)
   useEffect(() => {
     const handler = (_e: Event) => { reload().catch(() => { }) }
@@ -788,21 +769,10 @@ const TransactionsPage: React.FC = () => {
           getAllTransactionClassifications().catch(() => []), // Don't fail if classifications service isn't available
           getCurrentUserId(),
         ])
-        // Prime analysis items map for all projects (shallow) — optional light cache
-        try {
-          const defaultOrgId = orgsList[0]?.id || ''
-          if (defaultOrgId) {
-            const list = await listAnalysisWorkItems({ orgId: defaultOrgId, projectId: null, onlyWithTx: false, includeInactive: true })
-            const map: Record<string, { code: string; name: string }> = {}
-            for (const a of list) map[a.id] = { code: a.code, name: a.name }
-            setAnalysisItemsMap(map)
-          }
-        } catch { }
-        setAccounts(accs)
-        setProjects(projectsList)
-        setOrganizations(orgsList)
-        setClassifications(classificationsList)
-        setCurrentUserId(uid)
+        // analysisItemsMap now comes from TransactionsDataContext, no need to fetch here
+        // Reference data (accounts, projects, orgs, classifications) also comes from context
+        // We only need to wait for context to load, then reload transactions
+        void accs; void projectsList; void orgsList; void classificationsList; void uid;
 
         // Load server preferences (wrapMode + columns + frozenCount) when user is known
         try {
@@ -837,59 +807,27 @@ const TransactionsPage: React.FC = () => {
     load()
   }, [location.pathname])
 
-  // When opening the CRUD form, refresh accounts to pick up newly added accounts from the tree
+  // When opening the CRUD form, log for debugging
+  // Note: accounts, categories, costCenters now come from TransactionsDataContext
   useEffect(() => {
     if (!formOpen) return
     // Runtime verification badge log
     console.log('🟢 line-editor v2 active', { createdTxId, isEditing: !!editingTx })
-    getAccounts().then(setAccounts).catch(() => { })
+    console.log('🌳 Form opened - using context data:', {
+      accountsCount: accounts.length,
+      categoriesCount: categories.length,
+      costCentersCount: costCenters.length,
+      organizationsCount: organizations.length
+    })
+  }, [formOpen, editingTx, accounts.length, categories.length, costCenters.length, organizations.length])
 
-    // Load categories for ALL organizations to ensure dropdown works for any selected org
-    // This is more robust than loading just for one org
-    if (organizations.length > 0) {
-      console.log('🌳 Form opened - loading categories for all orgs:', organizations.length);
-      Promise.all(organizations.map(org =>
-        getExpensesCategoriesList(org.id).catch(err => {
-          console.warn('Failed to load categories for org', org.id, err);
-          return [];
-        })
-      )).then(orgCategoriesLists => {
-        // Merge all categories from all organizations
-        const merged: Record<string, ExpensesCategoryRow> = {}
-        let totalCategories = 0;
-        for (const catList of orgCategoriesLists) {
-          for (const cat of catList) {
-            merged[cat.id] = cat;
-            totalCategories++;
-          }
-        }
-        const allCategories = Object.values(merged);
-        console.log('🌳 Categories loaded for form - total:', totalCategories, 'unique:', allCategories.length);
-        setCategories(allCategories);
-      }).catch(err => {
-        console.error('🌳 Failed to load categories for form:', err);
-        setCategories([]);
-      });
-
-      // Load cost centers for the form's organization
-      const orgIdForForm = editingTx?.org_id || organizations.find(org => org.code === 'MAIN')?.id || organizations[0]?.id || ''
-      if (orgIdForForm) {
-        getCostCentersForSelector(orgIdForForm).then(setCostCenters).catch(() => setCostCenters([]))
-      }
-    } else {
-      console.log('🌳 No organizations available, clearing categories');
-      setCategories([])
-      setCostCenters([])
-    }
-  }, [formOpen, editingTx, organizations])
-
-  async function reload() {
+  const reload = useCallback(async () => {
+    const effectiveFilters = appliedFilters
     console.log('🚀 Reload triggered with filters:', {
       mode,
-      approvalFilter,
-      debitFilterId: debitFilterId || 'none',
-      creditFilterId: creditFilterId || 'none',
-      orgFilterId: orgFilterId || 'none',
+      approvalStatus: effectiveFilters.approvalStatus || 'none',
+      orgId: effectiveFilters.orgId || 'none',
+      projectId: effectiveFilters.projectId || 'none',
       page,
       pageSize
     });
@@ -897,21 +835,21 @@ const TransactionsPage: React.FC = () => {
     const filtersToUse = {
       scope: (mode === 'my' ? 'my' : 'all') as 'all' | 'my',
       pendingOnly: mode === 'pending',
-      search: searchTerm,
-      dateFrom: filters.dateFrom || undefined,
-      dateTo: filters.dateTo || undefined,
-      amountFrom: filters.amountFrom ? parseFloat(filters.amountFrom) : undefined,
-      amountTo: filters.amountTo ? parseFloat(filters.amountTo) : undefined,
-      debitAccountId: debitFilterId || undefined,
-      creditAccountId: creditFilterId || undefined,
-      orgId: orgFilterId || undefined,
-      projectId: projectFilterId || undefined,
-      classificationId: classificationFilterId || undefined,
-      expensesCategoryId: expensesCategoryFilterId || undefined,
-      workItemId: workItemFilterId || undefined,
-      costCenterId: costCenterFilterId || undefined,
-      analysisWorkItemId: (filters as any).analysis_work_item_id || undefined,
-      approvalStatus: approvalFilter !== 'all' ? (approvalFilter as any as ('submitted' | 'approved' | 'draft' | 'rejected' | 'revision_requested' | 'cancelled' | 'posted')) : undefined,
+      search: effectiveFilters.search || undefined,
+      dateFrom: effectiveFilters.dateFrom || undefined,
+      dateTo: effectiveFilters.dateTo || undefined,
+      amountFrom: effectiveFilters.amountFrom ? parseFloat(effectiveFilters.amountFrom) : undefined,
+      amountTo: effectiveFilters.amountTo ? parseFloat(effectiveFilters.amountTo) : undefined,
+      debitAccountId: effectiveFilters.debitAccountId || undefined,
+      creditAccountId: effectiveFilters.creditAccountId || undefined,
+      orgId: effectiveFilters.orgId || undefined,
+      projectId: effectiveFilters.projectId || undefined,
+      classificationId: effectiveFilters.classificationId || undefined,
+      expensesCategoryId: effectiveFilters.expensesCategoryId || undefined,
+      workItemId: effectiveFilters.workItemId || undefined,
+      costCenterId: effectiveFilters.costCenterId || undefined,
+      analysisWorkItemId: effectiveFilters.analysisWorkItemId || undefined,
+      approvalStatus: effectiveFilters.approvalStatus ? (effectiveFilters.approvalStatus as 'submitted' | 'approved' | 'draft' | 'rejected' | 'revision_requested' | 'cancelled' | 'posted') : undefined,
     };
     console.log('🔍 Calling getTransactions with filters:', filtersToUse);
 
@@ -933,39 +871,8 @@ const TransactionsPage: React.FC = () => {
     setTransactions(rows || [])
     setTotalCount(total)
 
-    // Load expenses categories for all orgs present in the page results (union)
-    try {
-      const orgIds = Array.from(new Set((rows || []).map(r => r.org_id).filter(Boolean))) as string[]
-      if (orgIds.length > 0) {
-        const lists = await Promise.all(orgIds.map(id => getExpensesCategoriesList(id).catch(() => [])))
-        const merged: Record<string, ExpensesCategoryRow> = {}
-        for (const list of lists) {
-          for (const r of list) merged[r.id] = r
-        }
-        setCategories(Object.values(merged))
-      } else {
-        setCategories([])
-      }
-    } catch {
-      // non-fatal
-    }
-
-    // Load work items for all orgs present (all items incl. overrides) for id->label mapping
-    try {
-      const orgIds = Array.from(new Set((rows || []).map(r => r.org_id).filter(Boolean))) as string[]
-      if (orgIds.length > 0) {
-        const lists = await Promise.all(orgIds.map(id => listWorkItemsAll(id).catch(() => [])))
-        const merged: Record<string, WorkItemRow> = {}
-        for (const list of lists) {
-          for (const r of list) merged[r.id] = r
-        }
-        setWorkItems(Object.values(merged))
-      } else {
-        setWorkItems([])
-      }
-    } catch {
-      // non-fatal
-    }
+    // Note: categories, workItems now come from TransactionsDataContext
+    // No need to fetch them here - context provides them
 
     // resolve creator/poster names
     const ids: string[] = []
@@ -974,7 +881,7 @@ const TransactionsPage: React.FC = () => {
       const map = await getUserDisplayMap(ids)
       setUserNames(map)
     } catch { }
-  }
+  }, [appliedFilters, mode, page, pageSize])
 
   // Client-side status filter (other filters are server-side)
   // Server-side approval filter now applied; no extra client filtering
@@ -1680,7 +1587,8 @@ const TransactionsPage: React.FC = () => {
     }
   }
 
-  useEffect(() => { reload().catch(() => { }) }, [searchTerm, filters.dateFrom, filters.dateTo, filters.amountFrom, filters.amountTo, (filters as any).analysis_work_item_id, debitFilterId, creditFilterId, orgFilterId, projectFilterId, classificationFilterId, expensesCategoryFilterId, workItemFilterId, costCenterFilterId, page, pageSize, mode])
+  // Reload transactions when appliedFilters, pagination, or mode changes
+  useEffect(() => { reload().catch(() => { }) }, [reload])
 
   if (loading) return <div className="loading-container"><div className="loading-spinner" />جاري التحميل...</div>
   if (error) return <div className="error-container">خطأ: {error}</div>
@@ -1740,87 +1648,17 @@ const TransactionsPage: React.FC = () => {
                 <div className="btn-content"><span className="btn-text">⚙️ إعدادات الأعمدة</span></div>
               </button>
 
-              {/* Simple transaction filters - Original implementation */}
-              <input
-                placeholder="بحث..."
-                value={searchTerm}
-                onChange={e => { setSearchTerm(e.target.value); setPage(1) }}
-                className="filter-input filter-input--search"
-                style={{ minWidth: '150px' }}
-              />
-
-              <input
-                type="date"
-                value={filters.dateFrom}
-                onChange={e => { setFilters({ ...filters, dateFrom: e.target.value }); setPage(1) }}
-                className="filter-input filter-input--date"
-              />
-              <input
-                type="date"
-                value={filters.dateTo}
-                onChange={e => { setFilters({ ...filters, dateTo: e.target.value }); setPage(1) }}
-                className="filter-input filter-input--date"
-              />
-
-              <select
-                value={approvalFilter === 'all' ? '' : approvalFilter}
-                onChange={e => { const v = e.target.value || 'all'; setApprovalFilter(v as any); setPage(1) }}
-                className="filter-select filter-select--approval"
-                title="تصفية حسب حالة الاعتماد"
-              >
-                <option value="">حالة الاعتماد</option>
-                <option value="approved">معتمدة</option>
-                <option value="posted">مرحلة</option>
-                <option value="submitted">مُرسلة</option>
-                <option value="revision_requested">طلب تعديل</option>
-                <option value="draft">مسودة</option>
-                <option value="rejected">مرفوضة</option>
-                <option value="cancelled">ملغاة</option>
-              </select>
-
-              <select
-                value={orgFilterId}
-                onChange={e => { setOrgFilterId(e.target.value); setPage(1) }}
-                className="filter-select filter-select--org"
-              >
-                <option value="">جميع المؤسسات</option>
-                {organizations.map(o => (
-                  <option key={o.id} value={o.id}>
-                    {`${o.code} - ${o.name}`.substring(0, 40)}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={projectFilterId}
-                onChange={e => { setProjectFilterId(e.target.value); setPage(1) }}
-                className="filter-select filter-select--project"
-              >
-                <option value="">جميع المشاريع</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {`${p.code} - ${p.name}`.substring(0, 40)}
-                  </option>
-                ))}
-              </select>
-
-              {/* Clear filters button */}
-              <button
-                onClick={() => {
-                  setSearchTerm('')
-                  setFilters({ dateFrom: '', dateTo: '', amountFrom: '', amountTo: '' })
-                  setOrgFilterId('')
-                  setProjectFilterId('')
-                  setApprovalFilter('all')
-                  setPage(1)
-                }}
-                className="ultimate-btn ultimate-btn-warning"
-                title="مسح الفلاتر"
-                style={{ flexShrink: 0 }}
-              >
-                <div className="btn-content"><span className="btn-text">🔄</span></div>
-              </button>
             </div>
+
+            {/* Unified Filter Bar */}
+            <UnifiedFilterBar
+              values={unifiedFilters}
+              onChange={updateFilter}
+              onApply={handleApplyFilters}
+              onReset={handleResetFilters}
+              isDirty={filtersDirty}
+              storageKey="transactions_filters"
+            />
 
             <div className="transactions-pagination">
               <button className="ultimate-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}><div className="btn-content"><span className="btn-text">السابق</span></div></button>
@@ -1871,7 +1709,9 @@ const TransactionsPage: React.FC = () => {
                 setAudit(rows)
               } catch { }
               try {
-                const hist = await getApprovalHistoryByTransactionId(tx.id)
+                const { getLineReviewsForTransaction } = await import('../../services/lineReviewService')
+                const lines = await getLineReviewsForTransaction(tx.id)
+                const hist = lines.flatMap(line => line.approval_history || [])
                 setApprovalHistory(hist)
               } catch { }
               setDetailsOpen(true)
@@ -1974,317 +1814,42 @@ const TransactionsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Complete Filters Row - Now beside title */}
-            <div className="transactions-filters-row" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', flex: 1 }}>
-              {/* Filter Width Control Button */}
-              <button
-                className="ultimate-btn ultimate-btn-edit"
-                onClick={() => setFilterWidthModalOpen(true)}
-                title="تخصيص عرض الفلاتر"
-                style={{ minHeight: '32px', padding: '6px 12px' }}
-              >
-                <div className="btn-content"><span className="btn-text">⚙️ عرض الفلاتر</span></div>
-              </button>
+          </div>
 
-              {/* Search */}
-              {filterVisibility.search && (
-                <input
-                  placeholder="بحث..."
-                  value={searchTerm}
-                  onChange={e => { setSearchTerm(e.target.value); setPage(1) }}
-                  className="filter-input filter-input--search"
-                  style={{ width: `${filterWidths.search}px` }}
-                />
-              )}
-
-              {/* Date range */}
-              {filterVisibility.dateFrom && (
-                <input
-                  type="date"
-                  value={filters.dateFrom}
-                  onChange={e => { setFilters({ ...filters, dateFrom: e.target.value }); setPage(1) }}
-                  className="filter-input filter-input--date"
-                  style={{ width: `${filterWidths.dateFrom}px` }}
-                />
-              )}
-              {filterVisibility.dateTo && (
-                <input
-                  type="date"
-                  value={filters.dateTo}
-                  onChange={e => { setFilters({ ...filters, dateTo: e.target.value }); setPage(1) }}
-                  className="filter-input filter-input--date"
-                  style={{ width: `${filterWidths.dateTo}px` }}
-                />
-              )}
-
-              {/* Quick approval status chips */}
-              {filterVisibility.approval && (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  {/* Indicator for auto-post policy */}
-                  <span className={`ultimate-btn ${autoPostOnApprove ? 'ultimate-btn-success' : 'ultimate-btn-neutral'}`} title={autoPostOnApprove ? 'اعتماد = ترحيل تلقائي مفعّل' : 'اعتماد = ترحيل تلقائي غير مفعّل'} style={{ minHeight: 28, padding: '4px 8px' }}>
-                    <span className="btn-text">{autoPostOnApprove ? 'Auto-post: On' : 'Auto-post: Off'}</span>
-                  </span>
-                  <div style={{ width: `${filterWidths.approval}px`, maxWidth: '100%', flexShrink: 0 }}>
-                    <SearchableSelect
-                      id="transactions.filter.approval"
-                      value={approvalFilter === 'all' ? '' : approvalFilter}
-                      options={[
-                        { value: '', label: 'حالة الاعتماد', searchText: '' },
-                        { value: 'approved', label: 'معتمدة', searchText: 'معتمدة' },
-                        { value: 'posted', label: 'مرحلة', searchText: 'مرحلة' },
-                        { value: 'submitted', label: 'مُرسلة', searchText: 'مُرسلة' },
-                        { value: 'revision_requested', label: 'طلب تعديل', searchText: 'طلب تعديل' },
-                        { value: 'draft', label: 'مسودة', searchText: 'مسودة' },
-                        { value: 'rejected', label: 'مرفوضة', searchText: 'مرفوضة' },
-                        { value: 'cancelled', label: 'ملغاة', searchText: 'ملغاة' }
-                      ]}
-                      onChange={(v) => { const val = v || 'all'; setApprovalFilter(val as any); setPage(1) }}
-                      placeholder="حالة الاعتماد"
-                      clearable={true}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Organization filter */}
-              {filterVisibility.org && (
-                <div style={{ width: `${filterWidths.org}px`, maxWidth: '100%', flexShrink: 0 }}>
-                  <SearchableSelect
-                    id="transactions.filter.org"
-                    value={orgFilterId}
-                    options={[
-                      { value: '', label: 'جميع المؤسسات', searchText: '' },
-                      ...organizations.map(o => ({
-                        value: o.id,
-                        label: `${o.code} - ${o.name}`.substring(0, 40),
-                        searchText: `${o.code} ${o.name}`
-                      }))
-                    ]}
-                    onChange={(v) => { setOrgFilterId(v); setPage(1) }}
-                    placeholder="جميع المؤسسات"
-                    clearable={true}
-                  />
-                </div>
-              )}
-
-              {/* Project filter */}
-              {filterVisibility.project && (
-                <div style={{ width: `${filterWidths.project}px`, maxWidth: '100%', flexShrink: 0 }}>
-                  <SearchableSelect
-                    id="transactions.filter.project"
-                    value={projectFilterId}
-                    options={[
-                      { value: '', label: 'جميع المشاريع', searchText: '' },
-                      ...projects.map(p => ({
-                        value: p.id,
-                        label: `${p.code} - ${p.name}`.substring(0, 40),
-                        searchText: `${p.code} ${p.name}`
-                      }))
-                    ]}
-                    onChange={(v) => { setProjectFilterId(v); setPage(1) }}
-                    placeholder="جميع المشاريع"
-                    clearable={true}
-                  />
-                </div>
-              )}
-
-              {/* Debit account filter */}
-              {filterVisibility.debit && (
-                <div style={{ width: `${filterWidths.debit}px`, maxWidth: '100%', flexShrink: 0 }}>
-                  <SearchableSelect
-                    id="transactions.filter.debit"
-                    value={debitFilterId}
-                    options={[{ value: '', label: 'جميع الحسابات المدينة', searchText: '' }, ...accountFlatAllOptions]}
-                    onChange={(v) => { setDebitFilterId(v); setPage(1) }}
-                    placeholder="جميع الحسابات المدينة"
-                    clearable={true}
-                    showDrilldownModal={true}
-                    treeOptions={accountTreeOptionsAll}
-                  />
-                </div>
-              )}
-
-              {/* Credit account filter */}
-              {filterVisibility.credit && (
-                <div style={{ width: `${filterWidths.credit}px`, maxWidth: '100%', flexShrink: 0 }}>
-                  <SearchableSelect
-                    id="transactions.filter.credit"
-                    value={creditFilterId}
-                    options={[{ value: '', label: 'جميع الحسابات الدائنة', searchText: '' }, ...accountFlatAllOptions]}
-                    onChange={(v) => { setCreditFilterId(v); setPage(1) }}
-                    placeholder="جميع الحسابات الدائنة"
-                    clearable={true}
-                    showDrilldownModal={true}
-                    treeOptions={accountTreeOptionsAll}
-                  />
-                </div>
-              )}
-
-              {/* Classification filter */}
-              {filterVisibility.classification && (
-                <div style={{ width: `${filterWidths.classification}px`, maxWidth: '100%', flexShrink: 0 }}>
-                  <SearchableSelect
-                    id="transactions.filter.classification"
-                    value={classificationFilterId}
-                    options={[
-                      { value: '', label: 'جميع التصنيفات', searchText: '' },
-                      ...classifications.map(c => ({
-                        value: c.id,
-                        label: `${c.code} - ${c.name}`.substring(0, 40),
-                        searchText: `${c.code} ${c.name}`
-                      }))
-                    ]}
-                    onChange={(v) => { setClassificationFilterId(v); setPage(1) }}
-                    placeholder="جميع التصنيفات"
-                    clearable={true}
-                  />
-                </div>
-              )}
-
-              {/* Expenses category filter */}
-              {filterVisibility.expenses && (
-                <div style={{ width: `${filterWidths.expenses}px`, maxWidth: '100%', flexShrink: 0 }}>
-                  <SearchableSelect
-                    id="transactions.filter.expenses"
-                    value={expensesCategoryFilterId}
-                    options={[
-                      { value: '', label: 'جميع الشجرة الفرعية', searchText: '' },
-                      ...categories
-                        .slice()
-                        .sort((a, b) => `${a.code} - ${a.description}`.localeCompare(`${b.code} - ${b.description}`))
-                        .map(cat => ({
-                          value: cat.id,
-                          label: `${cat.code} - ${cat.description}`.substring(0, 52),
-                          searchText: `${cat.code} ${cat.description}`
-                        }))
-                    ]}
-                    onChange={(v) => { setExpensesCategoryFilterId(v); setPage(1) }}
-                    placeholder="جميع الشجرة الفرعية"
-                    clearable={true}
-                  />
-                </div>
-              )}
-
-              {/* Work Item filter */}
-              {filterVisibility.workitem && (
-                <div style={{ width: `${filterWidths.workitem}px`, maxWidth: '100%', flexShrink: 0 }}>
-                  <SearchableSelect
-                    id="transactions.filter.workitem"
-                    value={workItemFilterId}
-                    options={[
-                      { value: '', label: 'جميع عناصر العمل', searchText: '' },
-                      ...workItems
-                        .slice()
-                        .sort((a, b) => `${a.code} - ${a.name}`.localeCompare(`${b.code} - ${b.name}`))
-                        .map(w => ({
-                          value: w.id,
-                          label: `${w.code} - ${w.name}`.substring(0, 52),
-                          searchText: `${w.code} ${w.name}`
-                        }))
-                    ]}
-                    onChange={(v) => { setWorkItemFilterId(v); setPage(1) }}
-                    placeholder="جميع عناصر العمل"
-                    clearable={true}
-                  />
-                </div>
-              )}
-
-              {/* Analysis Work Item filter */}
-              {filterVisibility.analysisworkitem && (
-                <div style={{ width: `${filterWidths.analysisworkitem}px`, maxWidth: '100%', flexShrink: 0 }}>
-                  <SearchableSelect
-                    id="transactions.filter.analysisworkitem"
-                    value={(filters as any).analysis_work_item_id || ''}
-                    options={[
-                      { value: '', label: 'جميع بنود التحليل', searchText: '' },
-                      ...Object.entries(analysisItemsMap)
-                        .sort((a, b) => `${a[1].code} - ${a[1].name}`.localeCompare(`${b[1].code} - ${b[1].name}`))
-                        .map(([id, a]) => ({
-                          value: id,
-                          label: `${a.code} - ${a.name}`.substring(0, 52),
-                          searchText: `${a.code} ${a.name}`
-                        }))
-                    ]}
-                    onChange={(v) => { (setFilters as any)({ ...filters, analysis_work_item_id: v }); setPage(1) }}
-                    placeholder="جميع بنود التحليل"
-                    clearable={true}
-                  />
-                </div>
-              )}
-
-              {/* Cost Center filter - Fixed width */}
-              {filterVisibility.costcenter && (
-                <div style={{ width: '180px', maxWidth: '100%', flexShrink: 0 }}>
-                  <SearchableSelect
-                    id="transactions.filter.costcenter"
-                    value={costCenterFilterId}
-                    options={[
-                      { value: '', label: 'جميع مراكز التكلفة', searchText: '' },
-                      ...costCenters
-                        .slice()
-                        .sort((a, b) => `${a.code} - ${a.name}`.localeCompare(`${b.code} - ${b.name}`))
-                        .map(cc => ({
-                          value: cc.id,
-                          label: `${cc.code} - ${cc.name}`.substring(0, 52),
-                          searchText: `${cc.code} ${cc.name}`
-                        }))
-                    ]}
-                    onChange={(v) => { setCostCenterFilterId(v); setPage(1) }}
-                    placeholder="جميع مراكز التكلفة"
-                    clearable={true}
-                  />
-                </div>
-              )}
-
-              {/* Amount range filters - separate container */}
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                {filterVisibility.amountFrom && (
-                  <input
-                    type="number"
-                    placeholder="من مبلغ"
-                    value={filters.amountFrom}
-                    onChange={e => { setFilters({ ...filters, amountFrom: e.target.value }); setPage(1) }}
-                    className="filter-input filter-input--amount"
-                    style={{ width: `${filterWidths.amountFrom}px` }}
-                  />
-                )}
-                {filterVisibility.amountTo && (
-                  <input
-                    type="number"
-                    placeholder="إلى مبلغ"
-                    value={filters.amountTo}
-                    onChange={e => { setFilters({ ...filters, amountTo: e.target.value }); setPage(1) }}
-                    className="filter-input filter-input--amount"
-                    style={{ width: `${filterWidths.amountTo}px` }}
-                  />
-                )}
-              </div>
-
-              {/* Clear filters button */}
-              <button
-                onClick={() => {
-                  setSearchTerm('')
-                  setFilters({ dateFrom: '', dateTo: '', amountFrom: '', amountTo: '' })
-                  setDebitFilterId('')
-                  setCreditFilterId('')
-                  setOrgFilterId('')
-                  setProjectFilterId('')
-                  setClassificationFilterId('')
-                  setExpensesCategoryFilterId('')
-                  setCostCenterFilterId('')
-                  setPage(1)
-                }}
-                className="ultimate-btn ultimate-btn-warning filter-clear-btn"
-                title="مسح جميع الفلاتر"
-              >
-                🔄
-              </button>
+          {/* Lines Filter Bar - Using UnifiedFilterBar */}
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>فلاتر السطور</span>
+              <span style={{ fontSize: '12px', color: 'var(--muted_text)' }}>
+                ({filteredTransactionLines.length} / {transactionLines.length} سطر)
+              </span>
             </div>
+            <UnifiedFilterBar
+              values={linesUnifiedFilters}
+              onChange={updateLinesFilter}
+              onReset={resetLinesFilters}
+              preferencesKey="transactions_lines_filters"
+              config={{
+                showSearch: true,
+                showDateRange: false,
+                showAmountRange: true,
+                showOrg: false,
+                showProject: true,
+                showDebitAccount: true,
+                showCreditAccount: true,
+                showClassification: true,
+                showExpensesCategory: true,
+                showWorkItem: true,
+                showAnalysisWorkItem: true,
+                showCostCenter: true,
+                showApprovalStatus: false,
+              }}
+            />
           </div>
 
           {/* Lines table (T2) */}
           <TransactionLinesTable
-            lines={transactionLines}
+            lines={filteredTransactionLines}
             accounts={accounts}
             projects={projects}
             categories={categories}
@@ -2418,7 +1983,9 @@ const TransactionsPage: React.FC = () => {
                         setAudit(rows)
                       } catch { }
                       try {
-                        const hist = await getApprovalHistoryByTransactionId(row.original.id)
+                        const { getLineReviewsForTransaction } = await import('../../services/lineReviewService')
+                        const lines = await getLineReviewsForTransaction(row.original.id)
+                        const hist = lines.flatMap(line => line.approval_history || [])
                         setApprovalHistory(hist)
                       } catch { }
                       setDetailsOpen(true)
@@ -3312,74 +2879,6 @@ const TransactionsPage: React.FC = () => {
             projectId={documentsFor?.project_id || undefined}
           />
         </DraggableResizablePanel>
-      )}
-
-      {/* Filter Width Configuration Modal */}
-      {filterWidthModalOpen && (
-        <div className="transaction-modal" onClick={() => setFilterWidthModalOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
-          <div className="config-modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '1200px', width: '95vw', maxHeight: '95vh', overflowY: 'auto', zIndex: 10000 }}>
-            <div className="modal-header-row">
-              <h3 className="modal-title">تخصيص عرض الفلاتر</h3>
-              <button className="ultimate-btn ultimate-btn-delete" onClick={() => setFilterWidthModalOpen(false)}>
-                <div className="btn-content"><span className="btn-text">إغلاق</span></div>
-              </button>
-            </div>
-
-            <div className="config-modal-body" style={{ padding: '1.5rem' }}>
-              <h4 style={{ marginTop: 0 }}>تخصيص الفلاتر</h4>
-
-              {/* Filter Controls - Multi-column grid for better space usage */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-                {[
-                  { id: 'search', label: 'بحث', min: 80, max: 200 },
-                  { id: 'dateFrom', label: 'من التاريخ', min: 80, max: 200 },
-                  { id: 'dateTo', label: 'إلى التاريخ', min: 80, max: 200 },
-                  { id: 'approval', label: 'حالة الاعتماد', min: 100, max: 250 },
-                  { id: 'org', label: 'المؤسسة', min: 100, max: 250 },
-                  { id: 'project', label: 'المشروع', min: 100, max: 250 },
-                  { id: 'debit', label: 'الحساب المدين', min: 100, max: 300 },
-                  { id: 'credit', label: 'الحساب الدائن', min: 100, max: 300 },
-                  { id: 'classification', label: 'التصنيف', min: 100, max: 250 },
-                  { id: 'expenses', label: 'الشجرة الفرعية', min: 100, max: 250 },
-                  { id: 'workitem', label: 'عنصر العمل', min: 100, max: 250 },
-                  { id: 'analysisworkitem', label: 'بند التحليل', min: 100, max: 250 },
-                  { id: 'amountFrom', label: 'من المبلغ', min: 80, max: 150 },
-                  { id: 'amountTo', label: 'إلى المبلغ', min: 80, max: 150 }
-                ].map((filter) => (
-                  <div key={filter.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <input type="checkbox" checked={filterVisibility[filter.id] ?? true} onChange={() => toggleFilterVisibility(filter.id)} style={{ cursor: 'pointer', accentColor: 'var(--accent)' }} />
-                      <label style={{ fontWeight: 500, color: 'var(--text)', flex: 1 }}>{filter.label}</label>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <input type="range" min={filter.min} max={filter.max} value={filterWidths[filter.id]} onChange={(e) => updateFilterWidth(filter.id, parseInt(e.target.value))} style={{ flex: 1, accentColor: 'var(--accent)' }} />
-                      <span style={{ minWidth: '50px', textAlign: 'right', fontSize: '12px', color: 'var(--muted_text)', fontWeight: 500 }}>{filterWidths[filter.id]}px</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="modal-actions">
-              <button
-                className="ultimate-btn ultimate-btn-warning"
-                onClick={() => {
-                  setFilterWidths(defaultFilterWidths)
-                  showToast('تم إعادة تعيين عرض الفلاتر', { severity: 'success' })
-                }}
-              >
-                <div className="btn-content"><span className="btn-text">إعادة تعيين الافتراضي</span></div>
-              </button>
-
-              <button
-                className="ultimate-btn ultimate-btn-success"
-                onClick={() => setFilterWidthModalOpen(false)}
-              >
-                <div className="btn-content"><span className="btn-text">تم</span></div>
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Simple Transaction Wizard */}

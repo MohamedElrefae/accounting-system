@@ -1,0 +1,232 @@
+/* Transaction Line Card - Expandable view for transaction lines */
+
+.transaction-line-card {
+    background: var(--surface-elevated, rgba(255, 255, 255, 0.05));
+    border: 1px solid var(--border-light, rgba(255, 255, 255, 0.1));
+    border-radius: 8px;
+    margin-bottom: 12px;
+    transition: all 0.2s ease;
+}
+
+.transaction-line-card:hover {
+    background: var(--surface-elevated-hover, rgba(255, 255, 255, 0.08));
+    border-color: var(--border, rgba(255, 255, 255, 0.2));
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Header Row */
+.line-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    gap: 16px;
+}
+
+.line-card-header-main {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex: 1;
+    flex-wrap: wrap;
+}
+
+.line-number {
+    font-size: 18px !important;
+    font-weight: 700;
+    color: var(--primary, #3b82f6);
+    min-width: 45px;
+}
+
+.line-account {
+    font-size: 20px !important;
+    font-weight: 600;
+    color: var(--text-primary, #eaeaea);
+    flex: 1;
+    min-width: 220px;
+}
+
+.line-amounts {
+    display: flex;
+    gap: 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 20px !important;
+    font-weight: 700;
+}
+
+.amount-debit {
+    color: #ef4444;
+    padding: 6px 10px;
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: 6px;
+}
+
+.amount-credit {
+    color: #10b981;
+    padding: 6px 10px;
+    background: rgba(16, 185, 129, 0.1);
+    border-radius: 6px;
+}
+
+.line-description {
+    font-size: 18px !important;
+    color: var(--text-secondary, #a3a3a3);
+    flex: 1;
+    min-width: 200px;
+    font-style: normal;
+    font-weight: 500;
+}
+
+.line-status {
+    display: flex;
+    align-items: center;
+}
+
+.line-status-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.status-draft {
+    background: linear-gradient(135deg, #6b7280, #4b5563);
+    color: #fff;
+}
+
+.status-pending {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: #fff;
+}
+
+.status-approved {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+}
+
+.status-rejected {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: #fff;
+}
+
+.status-active {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+}
+
+/* Footer Actions */
+.line-card-footer {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 20px 16px 20px;
+}
+
+.action-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: transparent;
+    border: 1px solid var(--border, rgba(255, 255, 255, 0.2));
+    border-radius: 6px;
+    color: var(--text-primary, #eaeaea);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.action-toggle:hover {
+    background: var(--surface-elevated, rgba(255, 255, 255, 0.1));
+    border-color: var(--primary, #3b82f6);
+}
+
+.attachments-count {
+    background: var(--primary, #3b82f6);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+/* Expanded Panels */
+.line-card-panel {
+    padding: 16px;
+    border-top: 1px solid var(--border-light, rgba(255, 255, 255, 0.1));
+    background: var(--surface, rgba(0, 0, 0, 0.2));
+    animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+    }
+
+    to {
+        opacity: 1;
+        max-height: 500px;
+    }
+}
+
+.dimensions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+}
+
+.dimension-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.dimension-item label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary, #a3a3a3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.dimension-value {
+    font-size: 15px;
+    color: var(--text-primary, #eaeaea);
+    font-weight: 500;
+    padding: 8px 12px;
+    background: var(--surface-elevated, rgba(255, 255, 255, 0.05));
+    border-radius: 6px;
+    border: 1px solid var(--border-light, rgba(255, 255, 255, 0.1));
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .line-card-header-main {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .line-account,
+    .line-description {
+        min-width: 100%;
+    }
+
+    .dimensions-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .line-card-footer {
+        flex-wrap: wrap;
+    }
+
+    .action-toggle {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
