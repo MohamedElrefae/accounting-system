@@ -44,8 +44,12 @@ import {
   useTheme,
   TextField,
   Autocomplete,
-  Menu
+  Menu,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails
 } from '@mui/material'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { alpha } from '@mui/material/styles'
 import SearchableSelect, { type SearchableSelectOption } from '@/components/Common/SearchableSelect'
 
@@ -75,12 +79,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useArabicLanguage, ArabicLanguageService } from '@/services/ArabicLanguageService'
 import { OpeningBalanceImportService } from '@/services/OpeningBalanceImportService'
 import { FiscalYearSelector } from '@/components/Fiscal/FiscalYearSelector'
-import { FiscalYearManagementService } from '@/services/FiscalYearManagementService'
+import { FiscalYearService } from '@/services/fiscal'
 import { getActiveOrgId, getActiveProjectId } from '@/utils/org'
 import useAppStore from '@/store/useAppStore'
 import { tokens } from '@/theme/tokens'
 import { getOrganization, getOrganizations } from '@/services/organization'
 import { getProject } from '@/services/projects'
+import './FiscalPages.css'
 
 // Enhanced Professional Container
 const ProfessionalContainer = ({ children, title, subtitle, actions }: {
@@ -96,44 +101,61 @@ const ProfessionalContainer = ({ children, title, subtitle, actions }: {
     <Box sx={{
       minHeight: '100vh',
       background: tokens.palette.background.default,
-      py: 0
+      py: tokens.spacing(2)
     }}>
-      <Container maxWidth={false} disableGutters sx={{ height: '100%' }}>
+      <Container maxWidth="xl">
         <Paper 
           elevation={0} 
           sx={{ 
-            height: '100vh',
-            borderRadius: 0,
+            minHeight: 'calc(100vh - 32px)',
+            borderRadius: tokens.radius.md,
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            background: tokens.palette.background.paper
+            background: tokens.palette.background.paper,
+            border: `1px solid ${tokens.palette.divider}`,
+            boxShadow: tokens.shadows.panel
           }}
         >
           {/* Header */}
           <Box sx={{
             background: tokens.palette.primary.main,
             color: tokens.palette.primary.contrastText,
-            p: 3,
+            p: tokens.spacing(3),
+            position: 'relative',
+            overflow: 'hidden',
             ...getDirectionalStyle()
           }}>
+            {/* Background Pattern */}
+            <Box sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              opacity: 0.1,
+              backgroundImage: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.4"%3E%3Ccircle cx="7" cy="7" r="7"/%3E%3Ccircle cx="53" cy="7" r="7"/%3E%3Ccircle cx="30" cy="30" r="7"/%3E%3Ccircle cx="7" cy="53" r="7"/%3E%3Ccircle cx="53" cy="53" r="7"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
+            }} />
+            
             <Stack 
               direction={isRTL ? 'row-reverse' : 'row'} 
               justifyContent="space-between" 
               alignItems="center"
+              sx={{ position: 'relative', zIndex: 1 }}
+              spacing={tokens.spacing(2)}
             >
               <Box>
-                <Typography variant="h4" fontWeight="bold" sx={{ mb: 0.5 }}>
+                <Typography variant="h3" fontWeight="bold" sx={{ mb: tokens.spacing(0.5) }}>
                   {title}
                 </Typography>
                 {subtitle && (
-                  <Typography variant="body1" sx={{ opacity: 0.9 }}>
+                  <Typography variant="h6" sx={{ opacity: 0.9 }}>
                     {subtitle}
                   </Typography>
                 )}
               </Box>
               {actions && (
-                <Box sx={{ display: 'flex', gap: 1 }}>
+                <Box sx={{ display: 'flex', gap: tokens.spacing(1), flexWrap: 'wrap' }}>
                   {actions}
                 </Box>
               )}
@@ -141,7 +163,11 @@ const ProfessionalContainer = ({ children, title, subtitle, actions }: {
           </Box>
 
           {/* Content */}
-          <Box sx={{ flex: 1, overflow: 'auto', p: 0 }}>
+          <Box sx={{ 
+            flex: 1, 
+            overflow: 'auto', 
+            p: tokens.spacing(3)
+          }}>
             {children}
           </Box>
         </Paper>
@@ -2363,7 +2389,7 @@ export default function EnhancedOpeningBalanceImport() {
             if (!orgId) { try { (window as any)?.toast?.error?.(isRTL ? 'يرجى اختيار المؤسسة أولاً' : 'Select organization first') } catch {}; return }
             setCreatingFY(true)
             try {
-              const id = await FiscalYearManagementService.createFiscalYear({ orgId, yearNumber: newYearNumber, startDate: newStartDate, endDate: newEndDate, createMonthlyPeriods: true, nameEn: `FY ${newYearNumber}` })
+              const id = await FiscalYearService.create({ orgId, yearNumber: newYearNumber, startDate: newStartDate, endDate: newEndDate, createMonthlyPeriods: true, nameEn: `FY ${newYearNumber}` })
               setFiscalYearId(id)
               setShowCreateFY(false)
               try { (window as any)?.toast?.success?.(isRTL ? 'تم إنشاء السنة المالية' : 'Fiscal year created') } catch {}

@@ -1,0 +1,602 @@
+/* Fiscal Pages Unified Theme Styling */
+/* Aligned with AccountsTree.css and global theme tokens */
+
+.fiscal-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--background, #181A20);
+  color: var(--text, #EDEDED);
+}
+
+.fiscal-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  /* Use global accent gradient */
+  background: linear-gradient(135deg, var(--accent-primary, #2076FF), var(--accent-primary-hover, #4A90FF));
+  color: var(--on-accent, #FFFFFF);
+  border-bottom: 1px solid var(--border-light, #393C43);
+  box-shadow: var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, 0.05));
+}
+
+.fiscal-page-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.fiscal-page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--on-accent, #FFFFFF);
+}
+
+.fiscal-page-subtitle {
+  font-size: 0.95rem;
+  opacity: 0.9;
+  margin: 0.25rem 0 0 0;
+  color: var(--on-accent, #FFFFFF);
+}
+
+.fiscal-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.fiscal-page-content {
+  flex-grow: 1;
+  overflow: auto;
+  padding: 2rem;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Ultimate Button Styles - Exact match with AccountsTree.css */
+/* These classes should now rely on global .ultimate-btn defined in shared styles or duplicated here for safety if not global */
+.ultimate-btn {
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 40px !important;
+  padding: 8px 16px !important;
+  border: none !important;
+  border-radius: 8px !important;
+  /* Changed from 20px to 8px to match AccountsTree */
+  font-weight: 600 !important;
+  font-size: 0.9rem !important;
+  color: var(--on-accent, #FFFFFF) !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  white-space: nowrap !important;
+}
+
+.ultimate-btn .btn-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ultimate-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.ultimate-btn:active {
+  transform: translateY(0);
+}
+
+.ultimate-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.ultimate-btn:disabled:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Button Variants */
+.ultimate-btn-primary {
+  background: linear-gradient(135deg, var(--accent-primary, #2076FF), var(--accent-primary-hover, #4A90FF)) !important;
+}
+
+.ultimate-btn-primary:hover {
+  background: linear-gradient(135deg, var(--accent-primary-hover, #4A90FF), var(--accent-primary, #2076FF)) !important;
+}
+
+.ultimate-btn-add {
+  background: linear-gradient(135deg, var(--success, #21C197), var(--success-strong, #16A085)) !important;
+}
+
+.ultimate-btn-add:hover {
+  filter: brightness(1.1);
+}
+
+.ultimate-btn-edit {
+  background: linear-gradient(135deg, var(--info, #2076FF), var(--info-strong, #4A90FF)) !important;
+}
+
+.ultimate-btn-edit:hover {
+  filter: brightness(1.1);
+}
+
+.ultimate-btn-delete {
+  background: linear-gradient(135deg, var(--error, #DE3F3F), var(--error-strong, #C53030)) !important;
+}
+
+.ultimate-btn-delete:hover {
+  filter: brightness(1.1);
+}
+
+.ultimate-btn-warning {
+  background: linear-gradient(135deg, var(--warning, #FFC048), var(--warning-strong, #F6A000)) !important;
+  color: var(--on-warning, #111111) !important;
+}
+
+.ultimate-btn-warning:hover {
+  filter: brightness(1.1);
+}
+
+.ultimate-btn-success {
+  background: linear-gradient(135deg, var(--success, #21C197), var(--success-strong, #16A085)) !important;
+}
+
+.ultimate-btn-info {
+  background: linear-gradient(135deg, var(--info, #2076FF), var(--info-strong, #4A90FF)) !important;
+}
+
+
+/* Controls Container */
+.fiscal-controls-container {
+  padding: 1.5rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 1px solid var(--border-light, #393C43);
+  background: var(--surface, #23272F);
+  flex-wrap: wrap;
+}
+
+.fiscal-search-and-filters {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.fiscal-search-input {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-color, #393C43);
+  background: var(--field_bg, #23272F);
+  color: var(--text, #EDEDED);
+  border-radius: 8px;
+  width: 300px;
+  font-size: 0.9rem;
+}
+
+.fiscal-filter-select {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-color, #393C43);
+  background: var(--field_bg, #23272F);
+  color: var(--text, #EDEDED);
+  border-radius: 8px;
+  min-width: 150px;
+  font-size: 0.9rem;
+}
+
+/* Table Styles - Matching AccountsTree .accounts-table */
+.fiscal-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface, #23272F);
+  color: var(--text, #EDEDED);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, 0.05));
+  border: 1px solid var(--border-light, #393C43);
+}
+
+.fiscal-table thead {
+  background: linear-gradient(135deg, var(--accent-primary, #2076FF), var(--accent-primary-hover, #4A90FF));
+  color: var(--on-accent, #FFFFFF);
+}
+
+.fiscal-table th {
+  padding: 1rem;
+  text-align: right;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-light, #393C43);
+}
+
+.fiscal-table td {
+  padding: 1rem;
+  text-align: right;
+  border-bottom: 1px solid var(--border-light, #393C43);
+}
+
+.fiscal-table tbody tr:hover {
+  background: var(--hover-bg, rgba(255, 255, 255, 0.08));
+}
+
+.fiscal-table tbody tr:nth-child(odd) {
+  background: var(--row-alt-bg, rgba(255, 255, 255, 0.03));
+}
+
+.fiscal-table tbody tr:nth-child(even) {
+  background: var(--surface, #23272F);
+}
+
+/* Card Styles */
+.fiscal-card {
+  background: var(--surface, #23272F);
+  border-radius: 8px;
+  border: 1px solid var(--border-light, #393C43);
+  box-shadow: var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, 0.05));
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  color: var(--text, #EDEDED);
+}
+
+.fiscal-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-light, #393C43);
+}
+
+.fiscal-card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--heading, #FAFAFA);
+  margin: 0;
+}
+
+.fiscal-card-content {
+  color: var(--text-secondary, #8D94A2);
+  line-height: 1.6;
+}
+
+/* Status Badge */
+.fiscal-status-badge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.fiscal-status-draft {
+  background: rgba(32, 118, 255, 0.2);
+  color: #5E92F3;
+  border: 1px solid rgba(32, 118, 255, 0.3);
+}
+
+.fiscal-status-active {
+  background: rgba(33, 193, 151, 0.2);
+  color: var(--success, #21C197);
+  border: 1px solid rgba(33, 193, 151, 0.3);
+}
+
+.fiscal-status-closed {
+  background: rgba(222, 63, 63, 0.2);
+  color: var(--error, #DE3F3F);
+  border: 1px solid rgba(222, 63, 63, 0.3);
+}
+
+.fiscal-status-locked {
+  background: rgba(255, 192, 72, 0.2);
+  color: var(--warning, #FFC048);
+  border: 1px solid rgba(255, 192, 72, 0.3);
+}
+
+/* Grid Layout */
+.fiscal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.fiscal-grid-item {
+  background: var(--surface, #23272F);
+  border-radius: 8px;
+  border: 1px solid var(--border-light, #393C43);
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.fiscal-grid-item-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #8D94A2);
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.fiscal-grid-item-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--heading, #FAFAFA);
+}
+
+.fiscal-grid-item-value.positive {
+  color: var(--success, #21C197);
+}
+
+.fiscal-grid-item-value.negative {
+  color: var(--error, #DE3F3F);
+}
+
+/* Dialog/Modal Styles */
+.fiscal-dialog-header {
+  background: linear-gradient(135deg, var(--accent-primary, #2076FF), var(--accent-primary-hover, #4A90FF));
+  color: var(--on-accent, #FFFFFF);
+  padding: 1.5rem 2rem;
+  border-radius: 8px 8px 0 0;
+  margin-bottom: 1.5rem;
+}
+
+.fiscal-dialog-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.fiscal-dialog-content {
+  padding: 2rem;
+}
+
+.fiscal-dialog-footer {
+  padding: 1.5rem 2rem;
+  border-top: 1px solid var(--border-light, #393C43);
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+/* Table Row Selection */
+.fiscal-table-row-selected {
+  background-color: var(--selected_bg, #343940) !important;
+  cursor: pointer;
+}
+
+.fiscal-table-row-clickable {
+  cursor: pointer;
+}
+
+/* Financial Summary Grid */
+.fiscal-financial-summary {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border-light, #393C43);
+}
+
+.fiscal-financial-summary h4 {
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--heading, #FAFAFA);
+}
+
+.fiscal-financial-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.fiscal-financial-card {
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-light, #393C43);
+}
+
+.fiscal-financial-card-revenue {
+  background-color: rgba(33, 193, 151, 0.1);
+  border-color: rgba(33, 193, 151, 0.3);
+}
+
+.fiscal-financial-card-expenses {
+  background-color: rgba(222, 63, 63, 0.1);
+  border-color: rgba(222, 63, 63, 0.3);
+}
+
+.fiscal-financial-card-income {
+  background-color: rgba(32, 118, 255, 0.1);
+  border-color: rgba(32, 118, 255, 0.3);
+}
+
+.fiscal-financial-card-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #8D94A2);
+  margin-bottom: 0.5rem;
+}
+
+.fiscal-financial-card-value {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: var(--text, #EDEDED);
+}
+
+.fiscal-financial-card-value.positive {
+  color: var(--success, #21C197);
+}
+
+.fiscal-financial-card-value.negative {
+  color: var(--error, #DE3F3F);
+}
+
+/* Details Grid */
+.fiscal-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+}
+
+.fiscal-details-item {
+  margin-bottom: 1rem;
+}
+
+.fiscal-details-item strong {
+  font-weight: 600;
+  color: var(--heading, #FAFAFA);
+}
+
+.fiscal-details-item-value {
+  color: var(--text-secondary, #8D94A2);
+}
+
+/* Import Page Styles */
+.fiscal-import-card {
+  margin-bottom: 24px;
+}
+
+.fiscal-import-table {
+  margin-bottom: 2rem;
+}
+
+.fiscal-import-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color, #393C43);
+  background: var(--field_bg, #23272F);
+  color: var(--text, #EDEDED);
+  border-radius: 4px;
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+
+.fiscal-import-input:focus {
+  outline: none;
+  border-color: var(--accent-primary, #2076FF);
+  box-shadow: 0 0 0 2px rgba(32, 118, 255, 0.2);
+}
+
+.fiscal-import-select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color, #393C43);
+  background: var(--field_bg, #23272F);
+  color: var(--text, #EDEDED);
+  border-radius: 4px;
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+
+.fiscal-import-select:focus {
+  outline: none;
+  border-color: var(--accent-primary, #2076FF);
+  box-shadow: 0 0 0 2px rgba(32, 118, 255, 0.2);
+}
+
+.fiscal-import-totals-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.fiscal-import-status-message {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 8px;
+  font-weight: bold;
+}
+
+.fiscal-import-status-balanced {
+  background-color: rgba(33, 193, 151, 0.2);
+  color: var(--success, #21C197);
+}
+
+.fiscal-import-status-unbalanced {
+  background-color: rgba(255, 192, 72, 0.2);
+  color: var(--warning, #FFC048);
+}
+
+.fiscal-import-file-upload {
+  padding: 2rem;
+  border: 2px dashed var(--border-color, #393C43);
+  border-radius: 8px;
+  text-align: center;
+  background-color: var(--surface, #23272F);
+  color: var(--text, #EDEDED);
+}
+
+.fiscal-import-file-upload-icon {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.fiscal-import-file-upload-text {
+  margin-bottom: 1rem;
+}
+
+.fiscal-import-file-input {
+  display: none;
+}
+
+.fiscal-import-select-max-width {
+  max-width: 400px;
+}
+
+.fiscal-searchable-select-wrapper {
+  position: relative;
+  width: 100%;
+  min-width: 250px;
+}
+
+.fiscal-import-table td {
+  padding: 12px;
+  vertical-align: middle;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .fiscal-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .fiscal-page-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .fiscal-search-input {
+    width: 100%;
+  }
+
+  .fiscal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ultimate-btn {
+    min-width: 100%;
+  }
+
+  .fiscal-financial-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fiscal-details-grid {
+    grid-template-columns: 1fr;
+  }
+}

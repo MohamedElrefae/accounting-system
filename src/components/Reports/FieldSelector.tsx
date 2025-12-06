@@ -65,10 +65,12 @@ const FieldSelector: React.FC<FieldSelectorProps> = ({
     new Set(['text', 'number', 'date', 'boolean'])
   );
 
-  const filteredFields = availableFields.filter(field =>
-    field.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    field.label.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredFields = availableFields.filter(field => {
+    if (!field || !field.name || !field.label) return false;
+    const search = searchTerm.toLowerCase();
+    return field.name.toLowerCase().includes(search) ||
+           field.label.toLowerCase().includes(search);
+  });
 
   const groupedFields = filteredFields.reduce((groups, field) => {
     const type = field.type;

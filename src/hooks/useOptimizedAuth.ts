@@ -19,6 +19,63 @@ interface OptimizedAuthState {
   resolvedPermissions: ResolvedRole | null;
 }
 
+// Auth cache configuration
+const AUTH_CACHE_KEY = 'auth_data_cache';
+const AUTH_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+interface AuthCacheEntry {
+  profile: Profile | null;
+  roles: RoleSlug[];
+  timestamp: number;
+  userId: string;
+}
+
+// Get cached auth data from localStorage
+function getCachedAuthData(userId: string): { profile: Profile | null; roles: RoleSlug[] } | null {
+  try {
+    const cached = localStorage.getItem(AUTH_CACHE_KEY);
+    if (!cached) return null;
+    
+    const entry: AuthCacheEntry = JSON.parse(cached);
+    
+    // Check if cache is for the same user and not expired
+    if (entry.userId !== userId) return null;
+    if (Date.now() - entry.timestamp > AUTH_CACHE_DURATION) {
+      localStorage.removeItem(AUTH_CACHE_KEY);
+      return null;
+    }
+    
+    console.log('[Auth] Using cached auth data');
+    return { profile: entry.profile, roles: entry.roles };
+  } catch {
+    return null;
+  }
+}
+
+// Save auth data to localStorage cache
+function setCachedAuthData(userId: string, profile: Profile | null, roles: RoleSlug[]): void {
+  try {
+    const entry: AuthCacheEntry = {
+      profile,
+      roles,
+      timestamp: Date.now(),
+      userId
+    };
+    localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(entry));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+// Clear auth cache (call on logout)
+export function clearAuthCache(): void {
+  try {
+    localStorage.removeItem(AUTH_CACHE_KEY);
+  } catch {
+    // Ignore
+  }
+}
+
 // Singleton auth state for better performance
 let authState: OptimizedAuthState = {
   user: null,
@@ -109,7 +166,7 @@ const initializeAuth = async () => {
           
           console.warn('Auth data load failed, using fallback:', loadError);
           // Fallback to superadmin for safety
-          const fallbackRoles = ['super_admin'];
+          const fallbackRoles: RoleSlug[] = ['super_admin'];
           authState.roles = fallbackRoles;
           authState.resolvedPermissions = flattenPermissions(fallbackRoles);
           clearCaches();
@@ -119,7 +176,7 @@ const initializeAuth = async () => {
         // Handle timeout case
         if (isTimedOut) {
           console.warn('Auth data load timed out, using fallback');
-          const timeoutRoles = ['super_admin'];
+          const timeoutRoles: RoleSlug[] = ['super_admin'];
           authState.roles = timeoutRoles;
           authState.resolvedPermissions = flattenPermissions(timeoutRoles);
           clearCaches();
@@ -142,7 +199,7 @@ const initializeAuth = async () => {
       authState.loading = false;
       if (authSession?.user) {
         authState.user = authSession.user;
-        const emergencyRoles = ['super_admin'];
+        const emergencyRoles: RoleSlug[] = ['super_admin'];
         authState.roles = emergencyRoles;
         authState.resolvedPermissions = flattenPermissions(emergencyRoles);
       }
@@ -151,29 +208,97 @@ const initializeAuth = async () => {
   });
 };
 
-// Load user profile and roles - rewritten to avoid minification issues
+// Load user profile and roles - optimized with caching and single RPC call
 const loadAuthData = async (userId: string) => {
   if (!userId) {
     console.error('No user ID provided to loadAuthData');
     return;
   }
 
-  // Initialize variables at the top to avoid hoisting issues
+  const startTime = performance.now();
   const defaultRoles: RoleSlug[] = ['super_admin'];
   const defaultPermissions = flattenPermissions(defaultRoles);
   
+  // Check localStorage cache first for instant load
+  const cachedData = getCachedAuthData(userId);
+  if (cachedData) {
+    authState.profile = cachedData.profile;
+    authState.roles = cachedData.roles;
+    authState.resolvedPermissions = flattenPermissions(cachedData.roles);
+    clearCaches();
+    notifyListeners();
+    console.log(`[Auth] Loaded from cache in ${(performance.now() - startTime).toFixed(0)}ms`);
+    
+    // Still fetch fresh data in background to update cache
+    fetchAndCacheAuthData(userId, defaultRoles).catch(console.warn);
+    return;
+  }
+  
   try {
-    // Query profile first with explicit error handling
+    // Try optimized single RPC call first
+    const { data: authData, error: rpcError } = await supabase.rpc('get_user_auth_data', { p_user_id: userId });
+    
+    if (!rpcError && authData) {
+      console.log(`[Auth] RPC get_user_auth_data took ${(performance.now() - startTime).toFixed(0)}ms`);
+      
+      // Process profile
+      if (authData.profile) {
+        authState.profile = authData.profile as Profile;
+      }
+      
+      // Process roles
+      const roleNames = authData.roles || [];
+      const roleMapping: { [key: string]: RoleSlug } = {
+        'super_admin': 'super_admin',
+        'admin': 'admin',
+        'manager': 'manager',
+        'accountant': 'accountant',
+        'auditor': 'auditor',
+        'viewer': 'viewer',
+      };
+      
+      const extractedRoles: RoleSlug[] = (roleNames as string[])
+        .map((name: string) => roleMapping[name.toLowerCase().replace(/\s+/g, '_')])
+        .filter((r): r is RoleSlug => r !== undefined);
+      
+      // Determine if superadmin
+      const currentEmail = authState.profile?.email || authState.user?.email || '';
+      const isProfileSuperAdmin = authState.profile?.is_super_admin === true;
+      const shouldBeSuperAdmin = isProfileSuperAdmin || extractedRoles.includes('super_admin');
+      
+      const finalRoles: RoleSlug[] = shouldBeSuperAdmin || extractedRoles.length === 0 ? defaultRoles : extractedRoles;
+      
+      if (shouldBeSuperAdmin || extractedRoles.length === 0) {
+        console.log('🔧 Granting superadmin or fallback roles due to:', {
+          noRoles: extractedRoles.length === 0,
+          isSuperAdmin: shouldBeSuperAdmin,
+          email: currentEmail,
+        });
+      }
+      
+      authState.roles = finalRoles;
+      authState.resolvedPermissions = flattenPermissions(finalRoles);
+      
+      // Cache the auth data for next time
+      setCachedAuthData(userId, authState.profile, finalRoles);
+      
+      clearCaches();
+      notifyListeners();
+      return;
+    }
+    
+    // Fallback to separate queries if RPC fails
+    console.warn('[Auth] RPC failed, falling back to separate queries:', rpcError?.message);
+    
+    // Query profile
     let profileData = null;
     try {
-      const profileQuery = supabase.from('user_profiles').select('*').eq('id', userId).single();
-      const profileResult = await profileQuery;
+      const profileResult = await supabase.from('user_profiles').select('*').eq('id', userId).single();
       profileData = profileResult.data;
     } catch (profileError) {
       console.warn('Profile query failed:', profileError);
     }
 
-    // Process profile data
     if (profileData) {
       authState.profile = profileData as Profile;
     }
@@ -181,21 +306,18 @@ const loadAuthData = async (userId: string) => {
     // Determine if user should be superadmin
     const currentEmail = authState.profile?.email || authState.user?.email || '';
     const isProfileSuperAdmin = authState.profile?.is_super_admin === true;
-    const isEmailAdmin = currentEmail === 'admin@example.com' || currentEmail.includes('admin');
-    const shouldBeSuperAdmin = isProfileSuperAdmin || isEmailAdmin;
+    const shouldBeSuperAdmin = isProfileSuperAdmin;
 
-    // Fetch roles using shared safe helper (handles joins and fallbacks)
+    // Fetch roles using shared safe helper
     let extractedRoles: RoleSlug[] = [];
     try {
       extractedRoles = await fetchUserRolesSafely(userId, authState.user);
     } catch (rolesFetchError) {
-      console.warn('Roles fetch via fetchUserRolesSafely failed:', rolesFetchError);
+      console.warn('Roles fetch failed:', rolesFetchError);
       extractedRoles = [];
     }
 
-    // Determine final roles
-    const shouldUseDefaultRoles = extractedRoles.length === 0 || shouldBeSuperAdmin;
-    const finalRoles = shouldUseDefaultRoles ? defaultRoles : extractedRoles;
+    const finalRoles = shouldBeSuperAdmin || extractedRoles.length === 0 ? defaultRoles : extractedRoles;
 
     if (shouldBeSuperAdmin || extractedRoles.length === 0) {
       console.log('🔧 Granting superadmin or fallback roles due to:', {
@@ -205,22 +327,57 @@ const loadAuthData = async (userId: string) => {
       });
     }
 
-// Update auth state
     authState.roles = finalRoles;
     authState.resolvedPermissions = flattenPermissions(finalRoles);
-
-    // Clear caches and notify
+    
+    // Cache the auth data
+    setCachedAuthData(userId, authState.profile, finalRoles);
+    
     clearCaches();
     notifyListeners();
+    
+    console.log(`[Auth] Fallback queries took ${(performance.now() - startTime).toFixed(0)}ms`);
 
   } catch (error) {
     console.error('Failed to load auth data:', error);
-    // Emergency fallback
     console.log('🔧 Emergency fallback: Granting superadmin access');
     authState.roles = defaultRoles;
     authState.resolvedPermissions = defaultPermissions;
     clearCaches();
     notifyListeners();
+  }
+};
+
+// Background fetch to update cache without blocking UI
+const fetchAndCacheAuthData = async (userId: string, defaultRoles: RoleSlug[]) => {
+  try {
+    const { data: authData, error } = await supabase.rpc('get_user_auth_data', { p_user_id: userId });
+    
+    if (!error && authData) {
+      const roleMapping: { [key: string]: RoleSlug } = {
+        'super_admin': 'super_admin',
+        'admin': 'admin',
+        'manager': 'manager',
+        'accountant': 'accountant',
+        'auditor': 'auditor',
+        'viewer': 'viewer',
+      };
+      
+      const roleNames = authData.roles || [];
+      const extractedRoles: RoleSlug[] = (roleNames as string[])
+        .map((name: string) => roleMapping[name.toLowerCase().replace(/\s+/g, '_')])
+        .filter((r): r is RoleSlug => r !== undefined);
+      
+      const profile = authData.profile as Profile | null;
+      const isProfileSuperAdmin = profile?.is_super_admin === true;
+      const finalRoles = isProfileSuperAdmin || extractedRoles.length === 0 ? defaultRoles : extractedRoles;
+      
+      // Update cache silently
+      setCachedAuthData(userId, profile, finalRoles);
+      console.log('[Auth] Background cache updated');
+    }
+  } catch (e) {
+    console.warn('[Auth] Background cache update failed:', e);
   }
 };
 
@@ -351,6 +508,7 @@ const signOut = async () => {
     resolvedPermissions: null,
   };
   clearCaches();
+  clearAuthCache(); // Clear localStorage auth cache
   notifyListeners();
 };
 

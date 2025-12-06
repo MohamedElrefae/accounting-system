@@ -19,7 +19,7 @@ export const SAMPLE_DATASETS: SampleDataset[] = [
   {
     name: 'المعاملات المالية',
     description: 'جميع المعاملات المالية مع تفاصيل الحسابات والمشاريع وبنود العمل ومراكز التكلفة',
-    table_name: 'v_transactions_enriched',
+    table_name: 'transactions_enriched',
     allowed_fields: [
       'id', 'entry_number', 'entry_date', 'description', 'amount', 'debit_account_id',
       'debit_account_code', 'debit_account_name', 'credit_account_id', 'credit_account_code', 
@@ -464,7 +464,17 @@ export async function populateSampleDatasets(): Promise<void> {
         continue;
       }
 
-      // Insert the dataset
+      // Insert the dataset with fields JSONB
+      const fieldsJson = dataset.sample_fields.map(f => ({
+        key: f.name,
+        name: f.name,
+        label: f.label,
+        type: f.type,
+        filterable: f.filterable,
+        sortable: f.sortable,
+        groupable: f.groupable
+      }));
+
       const { data: _, error: datasetError } = await supabase
         .from('report_datasets')
         .insert({
@@ -472,6 +482,7 @@ export async function populateSampleDatasets(): Promise<void> {
           description: dataset.description,
           table_name: dataset.table_name,
           allowed_fields: dataset.allowed_fields,
+          fields: fieldsJson,
           is_active: true
         })
         .select()

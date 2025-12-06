@@ -30,7 +30,7 @@ const EnhancedFiscalQuickLaunch: React.FC = () => {
   const isRTL = language === 'ar'
 
   const handleLaunch = () => {
-    navigate('/fiscal/enhanced')
+    navigate('/fiscal/dashboard')
   }
 
   return (

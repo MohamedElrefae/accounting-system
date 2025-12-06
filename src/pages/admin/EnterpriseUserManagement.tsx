@@ -117,7 +117,7 @@ export default function EnterpriseUserManagement() {
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>('active');
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [filterRole, setFilterRole] = useState<FilterRole>('all');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
 
@@ -161,50 +161,59 @@ export default function EnterpriseUserManagement() {
 
   const loadUsers = async () => {
     try {
-      // Skip table check and try direct query with minimal data
+      console.log('[EnterpriseUserManagement] Loading users...');
+      
+      // Query user_profiles with all necessary fields
       const { data: usersData, error: usersError } = await supabase
         .from('user_profiles')
-        .select('id, email')
+        .select('id, email, first_name, last_name, full_name_ar, department, job_title, phone, is_active, last_login, created_at')
         .order('email')
-        .limit(20); // Very small limit to prevent stack issues
+        .limit(100);
+
+      console.log('[EnterpriseUserManagement] Query result:', { usersData, usersError, count: usersData?.length });
 
       if (usersError) {
-        console.error('Error loading users:', usersError);
+        console.error('[EnterpriseUserManagement] Error loading users:', usersError);
         // If user_profiles fails, show message and return empty
         setUsers([]);
         return;
       }
 
       if (!usersData || usersData.length === 0) {
+        console.log('[EnterpriseUserManagement] No users found in user_profiles table');
         setUsers([]);
         return;
       }
+      
+      console.log('[EnterpriseUserManagement] Found', usersData.length, 'users');
 
       // Load user roles with correct schema (user_roles -> roles join)
       const userIds = usersData.map(u => u.id);
       let userRolesData: any[] = [];
 
       try {
+        // Try without is_active filter first (column may not exist)
         const { data: rolesData, error: userRolesError } = await supabase
           .from('user_roles')
           .select(`
             user_id,
             role_id,
-            roles!inner (
+            roles (
               id,
               name,
               name_ar
             )
           `)
           .in('user_id', userIds)
-          .eq('is_active', true)
-          .limit(200); // Prevent large queries
+          .limit(200);
+
+        console.log('[EnterpriseUserManagement] User roles query result:', { rolesData, userRolesError });
 
         if (!userRolesError && rolesData) {
           userRolesData = rolesData;
         }
       } catch (error) {
-        console.warn('Could not load user roles, continuing without them:', error);
+        console.warn('[EnterpriseUserManagement] Could not load user roles, continuing without them:', error);
       }
 
       // Create a map of user roles using correct schema
@@ -226,7 +235,9 @@ export default function EnterpriseUserManagement() {
       // Combine users with their roles
       const formattedUsers = usersData.map(user => ({
         ...user,
-        role: roleMap[user.id] || null,
+        is_active: user.is_active ?? true, // Default to true if not set
+        role: roleMap[user.id]?.[0] || null, // Get first role
+        user_roles: roleMap[user.id] ? roleMap[user.id].map(r => ({ roles: r })) : [],
         permission_count: 0 // Will be calculated later if needed
       }));
 

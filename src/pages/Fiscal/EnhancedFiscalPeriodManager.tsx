@@ -69,24 +69,24 @@ import ErrorIcon from '@mui/icons-material/Error'
 import WarningIcon from '@mui/icons-material/Warning'
 import InfoIcon from '@mui/icons-material/Info'
 import AssignmentIcon from '@mui/icons-material/Assignment'
-import ConstructionIcon from '@mui/icons-material/Construction'
-import AttachMoneyIcon from '@mui/icons-material/AttachMoney'
 import BusinessIcon from '@mui/icons-material/Business'
+import { AttachMoneyIcon } from '@/components/icons/SimpleIcons'
 import SaveIcon from '@mui/icons-material/Save'
 import CancelIcon from '@mui/icons-material/Cancel'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import SearchIcon from '@mui/icons-material/Search'
-import ImportExportIcon from '@mui/icons-material/ImportExport'
 import PrintIcon from '@mui/icons-material/Print'
+import { ImportExportIcon } from '@/components/icons/SimpleIcons'
 
 // Services and Utils
 import { useArabicLanguage, ArabicLanguageService } from '@/services/ArabicLanguageService'
-import { FiscalPeriodService } from '@/services/FiscalPeriodService'
+import { FiscalPeriodService, useFiscalPeriods } from '@/services/fiscal'
 import { constructionThemeUtils } from '@/themes/rtlTheme'
 import { getActiveOrgId } from '@/utils/org'
 import useAppStore from '@/store/useAppStore'
 import { tokens } from '@/theme/tokens'
+import './FiscalPages.css'
 
 // Professional Manager Container
 const ManagerContainer = ({ children, title, subtitle, actions }: {
@@ -102,43 +102,40 @@ const ManagerContainer = ({ children, title, subtitle, actions }: {
     <Box sx={{
       minHeight: '100vh',
       background: tokens.palette.background.default,
-      py: 2
+      py: tokens.spacing(2)
     }}>
-      <Container maxWidth="xl" sx={{ height: '100%' }}>
+      <Container maxWidth="xl">
         <Paper 
           elevation={0} 
           sx={{ 
             minHeight: 'calc(100vh - 32px)',
-            borderRadius: 0,
+            borderRadius: tokens.radius.md,
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
             background: tokens.palette.background.paper,
-            border: `1px solid ${tokens.palette.divider}`
+            border: `1px solid ${tokens.palette.divider}`,
+            boxShadow: tokens.shadows.panel
           }}
         >
           {/* Header */}
           <Box sx={{
             background: tokens.palette.primary.main,
             color: 'white',
-            p: 3,
+            p: tokens.spacing(3),
             position: 'relative',
             overflow: 'hidden',
             ...getDirectionalStyle()
           }}>
-            {/* Geometric Background Pattern */}
+            {/* Background Pattern */}
             <Box sx={{
               position: 'absolute',
               top: 0,
               left: 0,
               right: 0,
               bottom: 0,
-              opacity: 0.08,
-              backgroundImage: `
-                linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%),
-                linear-gradient(-45deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%)
-              `,
-              backgroundSize: '20px 20px'
+              opacity: 0.1,
+              backgroundImage: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.4"%3E%3Ccircle cx="7" cy="7" r="7"/%3E%3Ccircle cx="53" cy="7" r="7"/%3E%3Ccircle cx="30" cy="30" r="7"/%3E%3Ccircle cx="7" cy="53" r="7"/%3E%3Ccircle cx="53" cy="53" r="7"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
             }} />
             
             <Stack 
@@ -146,40 +143,31 @@ const ManagerContainer = ({ children, title, subtitle, actions }: {
               justifyContent="space-between" 
               alignItems="center"
               sx={{ position: 'relative', zIndex: 1 }}
+              spacing={tokens.spacing(2)}
             >
               <Box>
-                <Stack direction={isRTL ? 'row-reverse' : 'row'} alignItems="center" spacing={2}>
-                  <Avatar sx={{
-                    bgcolor: 'rgba(255, 255, 255, 0.25)',
-                    width: 60,
-                    height: 60,
-                    border: '2px solid rgba(255, 255, 255, 0.3)'
-                  }}>
-                    <TimelineIcon sx={{ fontSize: 36 }} />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h3" fontWeight="bold" sx={{ mb: 0.5 }}>
-                      {title}
-                    </Typography>
-                    {subtitle && (
-                      <Typography variant="h6" sx={{ opacity: 0.9 }}>
-                        {subtitle}
-                      </Typography>
-                    )}
-                  </Box>
-                </Stack>
+                <Typography variant="h3" fontWeight="bold" sx={{ mb: tokens.spacing(0.5) }}>
+                  {title}
+                </Typography>
+                {subtitle && (
+                  <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                    {subtitle}
+                  </Typography>
+                )}
               </Box>
               
-              {actions && (
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  {actions}
-                </Box>
-              )}
+              <Box sx={{ display: 'flex', gap: tokens.spacing(1), flexWrap: 'wrap' }}>
+                {actions}
+              </Box>
             </Stack>
           </Box>
 
           {/* Content */}
-          <Box sx={{ flex: 1, overflow: 'auto', p: 0 }}>
+          <Box sx={{
+            flex: 1,
+            p: tokens.spacing(3),
+            overflow: 'auto'
+          }}>
             {children}
           </Box>
         </Paper>
@@ -611,10 +599,11 @@ export default function EnhancedFiscalPeriodManager() {
           endDate: '2024-03-31',
           status: 'closed',
           totalTransactions: 245,
-          currentBalance: 125000,
-          revenue: 280000,
-          expenses: 155000,
-          budgetLimit: 300000,
+          currentBalance: 125000.00,
+          revenue: 280000.00,
+          expenses: 155000.00,
+          budgetLimit: 300000.00,
+          currency: 'EGP',
           fiscalYearId: '1'
         },
         {
@@ -624,10 +613,11 @@ export default function EnhancedFiscalPeriodManager() {
           endDate: '2024-06-30',
           status: 'active',
           totalTransactions: 189,
-          currentBalance: 78500,
-          revenue: 220000,
-          expenses: 141500,
-          budgetLimit: 250000,
+          currentBalance: 78500.00,
+          revenue: 220000.00,
+          expenses: 141500.00,
+          budgetLimit: 250000.00,
+          currency: 'EGP',
           fiscalYearId: '1'
         },
         {
@@ -637,10 +627,11 @@ export default function EnhancedFiscalPeriodManager() {
           endDate: '2024-09-30',
           status: 'draft',
           totalTransactions: 0,
-          currentBalance: 0,
-          revenue: 0,
-          expenses: 0,
-          budgetLimit: 275000,
+          currentBalance: 0.00,
+          revenue: 0.00,
+          expenses: 0.00,
+          budgetLimit: 275000.00,
+          currency: 'EGP',
           fiscalYearId: '1'
         },
         {
@@ -650,10 +641,11 @@ export default function EnhancedFiscalPeriodManager() {
           endDate: '2024-12-31',
           status: 'draft',
           totalTransactions: 0,
-          currentBalance: 0,
-          revenue: 0,
-          expenses: 0,
-          budgetLimit: 250000,
+          currentBalance: 0.00,
+          revenue: 0.00,
+          expenses: 0.00,
+          budgetLimit: 250000.00,
+          currency: 'EGP',
           fiscalYearId: '1'
         }
       ]

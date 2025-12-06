@@ -21,6 +21,7 @@ const ReportRoutes = React.lazy(() => import('./routes/ReportRoutes'));
 const InventoryRoutes = React.lazy(() => import('./routes/InventoryRoutes'));
 const FiscalRoutes = React.lazy(() => import('./routes/FiscalRoutes'));
 const AdminRoutes = React.lazy(() => import('./routes/AdminRoutes'));
+const SettingsRoutes = React.lazy(() => import('./routes/SettingsRoutes'));
 
 // Auth components (keep these separate as they're needed immediately)
 import { LoginForm } from './components/auth/LoginForm';
@@ -155,7 +156,7 @@ const OptimizedApp: React.FC = () => {
           
           <Route path="settings/*" element={
             <OptimizedSuspense>
-              <AdminRoutes />
+              <SettingsRoutes />
             </OptimizedSuspense>
           } />
           

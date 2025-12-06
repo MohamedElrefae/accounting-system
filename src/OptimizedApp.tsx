@@ -21,6 +21,7 @@ const ReportRoutes = React.lazy(() => import('./routes/ReportRoutes'));
 const InventoryRoutes = React.lazy(() => import('./routes/InventoryRoutes'));
 const FiscalRoutes = React.lazy(() => import('./routes/FiscalRoutes'));
 const AdminRoutes = React.lazy(() => import('./routes/AdminRoutes'));
+const SettingsRoutes = React.lazy(() => import('./routes/SettingsRoutes'));
 
 // Documents page (modern document management)
 const DocumentsPage = React.lazy(() => import('./pages/Documents/Documents'));
@@ -168,7 +169,7 @@ const OptimizedApp: React.FC = () => {
           
           <Route path="settings/*" element={
             <OptimizedSuspense>
-              <AdminRoutes />
+              <SettingsRoutes />
             </OptimizedSuspense>
           } />
           

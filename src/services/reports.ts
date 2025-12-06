@@ -130,24 +130,37 @@ export async function getReportDatasets(): Promise<ReportDataset[]> {
  * Get a specific report dataset by ID
  */
 export async function getReportDataset(idOrKey: string): Promise<ReportDataset | null> {
-  // Prefer lookup by key first (most deployments only have `key` column)
+  console.log('🔍 getReportDataset called with:', idOrKey);
+  
+  // Try by id first (UUID format)
   let res = await supabase
-    .from('report_datasets')
-    .select('*')
-    .eq('key', idOrKey)
-    .maybeSingle();
-  if (!res.error && res.data) return res.data as ReportDataset;
-
-  // Fallback to id if present
-  res = await supabase
     .from('report_datasets')
     .select('*')
     .eq('id', idOrKey)
     .maybeSingle();
-  if (!res.error && res.data) return res.data as ReportDataset;
-  if (res.error && res.error.code !== 'PGRST116') {
-    console.warn('getReportDataset fallback error:', res.error);
+  
+  if (!res.error && res.data) {
+    console.log('🔍 Found by id:', res.data);
+    return normalizeDatasetRow(res.data);
   }
+
+  // Fallback to key lookup
+  res = await supabase
+    .from('report_datasets')
+    .select('*')
+    .eq('key', idOrKey)
+    .maybeSingle();
+  
+  if (!res.error && res.data) {
+    console.log('🔍 Found by key:', res.data);
+    return normalizeDatasetRow(res.data);
+  }
+  
+  if (res.error && res.error.code !== 'PGRST116') {
+    console.warn('getReportDataset error:', res.error);
+  }
+  
+  console.warn('🔍 Dataset not found:', idOrKey);
   return null;
 }
 
@@ -161,19 +174,74 @@ export async function getDatasetFields(datasetId: string): Promise<ReportField[]
     return getMockReportFields(dsId);
   }
 
-  // Preferred: read fields JSON from report_datasets (no RPC dependency)
+  // Try to get dataset with fields - first by id, then by key
   try {
-    const { data } = await supabase
+    // Try by id first (UUID)
+    let result = await supabase
       .from('report_datasets')
-      .select('fields')
-      .eq('key', dsId)
+      .select('fields, allowed_fields')
+      .eq('id', dsId)
       .maybeSingle();
-    const f = (data as any)?.fields as Array<any> | null | undefined;
-    if (Array.isArray(f)) {
+    
+    // If not found by id, try by key
+    if (!result.data) {
+      result = await supabase
+        .from('report_datasets')
+        .select('fields, allowed_fields')
+        .eq('key', dsId)
+        .maybeSingle();
+    }
+
+    const data = result.data as any;
+    
+    // First try to use the fields JSONB column
+    const f = data?.fields as Array<any> | null | undefined;
+    if (Array.isArray(f) && f.length > 0) {
       return f.map((x) => ({
         name: x.key ?? x.name,
         label: x.label ?? (x.key ?? x.name),
         type: (x.type ?? 'text') as any,
+        filterable: x.filterable !== false,
+        sortable: x.sortable !== false,
+        groupable: x.groupable !== false,
+      }));
+    }
+
+    // Fallback to allowed_fields array if fields JSONB is empty
+    const allowedFields = data?.allowed_fields as string[] | null | undefined;
+    if (Array.isArray(allowedFields) && allowedFields.length > 0) {
+      return allowedFields.map((fieldName) => ({
+        name: fieldName,
+        label: fieldName,
+        type: 'text' as any,
+        filterable: true,
+        sortable: true,
+        groupable: true,
+      }));
+    }
+  } catch (err) {
+    console.error('Error fetching dataset fields:', err);
+  }
+
+  // Fallback: RPC if available
+  try {
+    const { data, error } = await supabase.rpc('get_dataset_fields', {
+      p_dataset_id: dsId
+    });
+    if (!error && data && Array.isArray(data) && data.length > 0) {
+      return (data as ReportField[]);
+    }
+  } catch {/* ignore */}
+
+  // Last resort: try to get the full dataset and use allowed_fields
+  try {
+    const dataset = await getReportDataset(dsId);
+    if (dataset && Array.isArray(dataset.allowed_fields) && dataset.allowed_fields.length > 0) {
+      console.log('Using allowed_fields from dataset:', dataset.allowed_fields);
+      return dataset.allowed_fields.map((fieldName) => ({
+        name: fieldName,
+        label: fieldName,
+        type: 'text' as any,
         filterable: true,
         sortable: true,
         groupable: true,
@@ -181,22 +249,63 @@ export async function getDatasetFields(datasetId: string): Promise<ReportField[]
     }
   } catch {/* ignore */}
 
-  // Fallback: RPC if available
-  try {
-    const { data, error } = await supabase.rpc('get_dataset_fields', {
-      p_dataset_id: dsId
-    });
-    if (!error && data) return (data as ReportField[]) || [];
-  } catch {/* ignore */}
-
-  // Last resort: empty (UI prevents next steps) or mock if you prefer
+  console.warn('No fields found for dataset:', dsId);
   return [];
+}
+
+/**
+ * Refresh dataset fields from the database schema (calls RPC to re-read table columns)
+ */
+export async function refreshDatasetFields(datasetId: string): Promise<ReportField[]> {
+  try {
+    // Call the RPC function to refresh fields from table schema
+    const { error } = await supabase.rpc('refresh_dataset_fields', {
+      p_dataset_id: datasetId
+    });
+    
+    if (error) {
+      console.error('Error refreshing dataset fields:', error);
+      // Fall back to getting fields normally
+      return getDatasetFields(datasetId);
+    }
+    
+    // Now fetch the updated fields
+    return getDatasetFields(datasetId);
+  } catch (err) {
+    console.error('Error in refreshDatasetFields:', err);
+    return getDatasetFields(datasetId);
+  }
+}
+
+/**
+ * Refresh all dataset fields from their table schemas
+ */
+export async function refreshAllDatasetFields(): Promise<{ dataset_name: string; field_count: number }[]> {
+  try {
+    const { data, error } = await supabase.rpc('refresh_all_dataset_fields');
+    
+    if (error) {
+      console.error('Error refreshing all dataset fields:', error);
+      return [];
+    }
+    
+    return (data as { dataset_name: string; field_count: number }[]) || [];
+  } catch (err) {
+    console.error('Error in refreshAllDatasetFields:', err);
+    return [];
+  }
 }
 
 /**
  * Execute a custom report using the secure RPC function
  */
 export async function runCustomReport(params: RunReportParams): Promise<ReportResult> {
+  console.log('🚀 runCustomReport called with:', { 
+    dataset_id: params.dataset_id, 
+    fields: params.selected_fields?.length,
+    filters: params.filters?.length 
+  });
+  
   const datasetId = params.dataset_id ?? '';
   // If it's a mock dataset ID, return mock data
   if (datasetId && datasetId.startsWith('mock_')) {
@@ -220,10 +329,13 @@ export async function runCustomReport(params: RunReportParams): Promise<ReportRe
   }
 
   // Query the dataset base view directly (avoid RPC dependency)
+  console.log('📊 Fetching dataset:', datasetId);
   const dataset = await getReportDataset(params.dataset_id);
-  if (!dataset) throw new Error('Dataset not found');
-  const viewRaw = dataset.base_view || dataset.table_name;
+  console.log('📊 Dataset result:', dataset);
+  if (!dataset) throw new Error('Dataset not found: ' + datasetId);
+  const viewRaw = dataset.table_name;
   const view = (viewRaw || '').replace(/^public\./, '');
+  console.log('📊 Querying view/table:', view);
   // Filter requested fields to those defined in dataset.fields (if provided)
   const dsFieldsMeta = Array.isArray((dataset as any).fields) ? (dataset as any).fields as any[] : [];
   const allowedKeys = dsFieldsMeta.map((x) => (x.key ?? x.name)).filter(Boolean) as string[];
@@ -266,10 +378,13 @@ export async function runCustomReport(params: RunReportParams): Promise<ReportRe
   // Limit
   if (params.limit && params.limit > 0) q = q.limit(params.limit);
 
+  console.log('📊 Executing query with fields:', selectStr);
   const t0 = performance.now();
   const { data, error, count } = await q;
   const t1 = performance.now();
+  console.log('📊 Query result:', { error, rowCount: data?.length, totalCount: count, timeMs: t1 - t0 });
   if (error) {
+    console.error('📊 Query error:', error);
     // If columns are invalid, retry with select '*'
     try {
       if (selectStr !== '*') {

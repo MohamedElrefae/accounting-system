@@ -35,6 +35,7 @@ import { useUniversalReportSync } from '../hooks/useUniversalReportSync';
 import {
   getReportDatasets,
   getDatasetFields,
+  refreshDatasetFields,
   runCustomReport,
   previewReport,
   saveReportDefinition,
@@ -180,9 +181,30 @@ const CustomReports: React.FC = () => {
     }
   }, []);
 
-  const loadDatasetFields = useCallback(async (datasetId: string) => {
+  const loadDatasetFields = useCallback(async (datasetId: string, forceRefresh = false) => {
     try {
-      const fields = await getDatasetFields(datasetId);
+      // If forceRefresh, call the refresh function to re-read from database schema
+      const fields = forceRefresh 
+        ? await refreshDatasetFields(datasetId)
+        : await getDatasetFields(datasetId);
+      
+      if (fields.length === 0 && !forceRefresh) {
+        // If no fields found, try refreshing from schema
+        console.log('No fields found, attempting to refresh from schema...');
+        const refreshedFields = await refreshDatasetFields(datasetId);
+        setBuilderState(prev => ({
+          ...prev,
+          availableFields: refreshedFields,
+          selectedFields: [],
+          filters: [],
+          sorts: [],
+          groupBy: [],
+          previewData: null,
+          error: refreshedFields.length === 0 ? 'لم يتم العثور على حقول لهذا المصدر' : null,
+        }));
+        return;
+      }
+      
       setBuilderState(prev => ({
         ...prev,
         availableFields: fields,
@@ -191,13 +213,20 @@ const CustomReports: React.FC = () => {
         sorts: [], // Reset sorts when dataset changes
         groupBy: [], // Reset group by when dataset changes
         previewData: null,
-        error: null,
+        error: fields.length === 0 ? 'لم يتم العثور على حقول لهذا المصدر' : null,
       }));
     } catch (error: any) {
       showToast(error.message || 'Failed to load dataset fields', { severity: 'error' });
       setBuilderState(prev => ({ ...prev, error: error.message || 'Failed to load dataset fields' }));
     }
   }, [showToast]);
+
+  const handleRefreshFields = useCallback(async () => {
+    if (!builderState.selectedDataset) return;
+    showToast('جاري تحديث الحقول من قاعدة البيانات...', { severity: 'info' });
+    await loadDatasetFields(builderState.selectedDataset.id, true);
+    showToast('تم تحديث الحقول بنجاح', { severity: 'success' });
+  }, [builderState.selectedDataset, loadDatasetFields, showToast]);
 
   const handleDatasetSelect = useCallback((dataset: ReportDataset | null) => {
     setBuilderState(prev => ({ ...prev, selectedDataset: dataset }));
@@ -477,12 +506,29 @@ const CustomReports: React.FC = () => {
                 )}
 
                 {activeStep === 1 && (
-                  <FieldSelector
-                    availableFields={builderState.availableFields}
-                    selectedFields={builderState.selectedFields}
-                    onFieldsChange={handleFieldsChange}
-                    disabled={!builderState.selectedDataset}
-                  />
+                  <>
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        {builderState.availableFields.length === 0 
+                          ? 'لا توجد حقول متاحة - جرب تحديث الحقول'
+                          : `${builderState.availableFields.length} حقل متاح`}
+                      </Typography>
+                      <Button
+                        size="small"
+                        startIcon={<RefreshIcon />}
+                        onClick={handleRefreshFields}
+                        disabled={!builderState.selectedDataset}
+                      >
+                        تحديث الحقول
+                      </Button>
+                    </Box>
+                    <FieldSelector
+                      availableFields={builderState.availableFields}
+                      selectedFields={builderState.selectedFields}
+                      onFieldsChange={handleFieldsChange}
+                      disabled={!builderState.selectedDataset}
+                    />
+                  </>
                 )}
 
                 {activeStep === 2 && (
@@ -491,6 +537,7 @@ const CustomReports: React.FC = () => {
                     filters={builderState.filters}
                     onFiltersChange={handleFiltersChange}
                     disabled={builderState.selectedFields.length === 0}
+                    datasetTableName={builderState.selectedDataset?.table_name}
                   />
                 )}
 

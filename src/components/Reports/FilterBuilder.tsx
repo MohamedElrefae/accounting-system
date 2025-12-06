@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -20,12 +20,22 @@ import {
   ListItemSecondaryAction,
   IconButton,
   Chip,
+  CircularProgress,
+  Autocomplete,
+  Checkbox,
+  ListItemButton,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import FilterIcon from '@mui/icons-material/FilterAlt';
+import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
+import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import type { FilterBuilderProps, ReportFilter } from '../../types/reports';
+import { supabase } from '../../utils/supabase';
+
+const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
+const checkedIcon = <CheckBoxIcon fontSize="small" />;
 
 const operatorLabels: Record<string, string> = {
   eq: 'يساوي',
@@ -45,7 +55,7 @@ const operatorLabels: Record<string, string> = {
 const getOperatorsByFieldType = (fieldType: string): string[] => {
   switch (fieldType) {
     case 'number':
-      return ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'is_null', 'not_null'];
+      return ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'is_null', 'not_null'];
     case 'date':
       return ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'is_null', 'not_null'];
     case 'boolean':
@@ -55,11 +65,16 @@ const getOperatorsByFieldType = (fieldType: string): string[] => {
   }
 };
 
-const FilterBuilder: React.FC<FilterBuilderProps> = ({
+interface FilterBuilderPropsExtended extends FilterBuilderProps {
+  datasetTableName?: string;
+}
+
+const FilterBuilder: React.FC<FilterBuilderPropsExtended> = ({
   availableFields,
   filters,
   onFiltersChange,
   disabled = false,
+  datasetTableName,
 }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -68,8 +83,59 @@ const FilterBuilder: React.FC<FilterBuilderProps> = ({
     operator: 'eq',
     value: '',
   });
+  const [fieldValues, setFieldValues] = useState<Record<string, string[]>>({});
+  const [loadingValues, setLoadingValues] = useState(false);
+  const [selectedMultiValues, setSelectedMultiValues] = useState<string[]>([]);
 
   const filterableFields = availableFields.filter(field => field.filterable);
+
+  // Fetch distinct values for a field from the database
+  const fetchFieldValues = useCallback(async (fieldName: string, tableName?: string) => {
+    if (!tableName || !fieldName) return;
+    
+    // Check cache first
+    if (fieldValues[fieldName]) return;
+    
+    setLoadingValues(true);
+    try {
+      const cleanTableName = tableName.replace(/^public\./, '');
+      
+      // Query distinct values (limit to 100 for performance)
+      const { data, error } = await supabase
+        .from(cleanTableName)
+        .select(fieldName)
+        .not(fieldName, 'is', null)
+        .limit(100);
+      
+      if (error) {
+        console.error('Error fetching field values:', error);
+        return;
+      }
+      
+      // Extract unique values
+      const uniqueValues = [...new Set(
+        (data as Array<Record<string, unknown>>)
+          ?.map((row) => String(row[fieldName]))
+          .filter(v => v && v !== 'null' && v !== 'undefined')
+      )].sort();
+      
+      setFieldValues(prev => ({
+        ...prev,
+        [fieldName]: uniqueValues
+      }));
+    } catch (err) {
+      console.error('Error fetching field values:', err);
+    } finally {
+      setLoadingValues(false);
+    }
+  }, [fieldValues]);
+
+  // Fetch values when field changes
+  useEffect(() => {
+    if (currentFilter.field && datasetTableName) {
+      fetchFieldValues(currentFilter.field, datasetTableName);
+    }
+  }, [currentFilter.field, datasetTableName, fetchFieldValues]);
 
   const handleAddFilter = () => {
     setEditingIndex(null);
@@ -78,12 +144,24 @@ const FilterBuilder: React.FC<FilterBuilderProps> = ({
       operator: 'eq',
       value: '',
     });
+    setSelectedMultiValues([]);
     setDialogOpen(true);
   };
 
   const handleEditFilter = (index: number) => {
     setEditingIndex(index);
-    setCurrentFilter(filters[index]);
+    const filter = filters[index];
+    setCurrentFilter(filter);
+    
+    // Handle multi-select values
+    if (['in', 'not_in'].includes(filter.operator)) {
+      const values = typeof filter.value === 'string' 
+        ? filter.value.split(',').map(v => v.trim())
+        : Array.isArray(filter.value) ? filter.value : [];
+      setSelectedMultiValues(values);
+    } else {
+      setSelectedMultiValues([]);
+    }
     setDialogOpen(true);
   };
 
@@ -95,8 +173,14 @@ const FilterBuilder: React.FC<FilterBuilderProps> = ({
   const handleSaveFilter = () => {
     if (!currentFilter.field || !currentFilter.operator) return;
 
+    // Get value based on operator type
+    let filterValue = currentFilter.value;
+    if (['in', 'not_in'].includes(currentFilter.operator)) {
+      filterValue = selectedMultiValues.join(',');
+    }
+
     // Validate value for operators that require it
-    if (!['is_null', 'not_null'].includes(currentFilter.operator) && !currentFilter.value) {
+    if (!['is_null', 'not_null'].includes(currentFilter.operator) && !filterValue) {
       return;
     }
 
@@ -104,7 +188,7 @@ const FilterBuilder: React.FC<FilterBuilderProps> = ({
     const newFilter: ReportFilter = {
       field: currentFilter.field,
       operator: currentFilter.operator as ReportFilter['operator'],
-      value: currentFilter.value,
+      value: filterValue,
       label: field?.label,
     };
 
@@ -131,20 +215,74 @@ const FilterBuilder: React.FC<FilterBuilderProps> = ({
     }
 
     const fieldType = getFieldType(currentFilter.field || '');
+    const fieldName = currentFilter.field || '';
+    const availableValues = fieldValues[fieldName] || [];
+    const hasDropdownValues = availableValues.length > 0;
 
+    // Multi-select for 'in' and 'not_in' operators
     if (['in', 'not_in'].includes(currentFilter.operator || '')) {
+      if (loadingValues) {
+        return (
+          <Box display="flex" alignItems="center" gap={2}>
+            <CircularProgress size={20} />
+            <Typography variant="body2">جاري تحميل القيم...</Typography>
+          </Box>
+        );
+      }
+
+      if (hasDropdownValues) {
+        return (
+          <Autocomplete
+            multiple
+            options={availableValues}
+            disableCloseOnSelect
+            value={selectedMultiValues}
+            onChange={(_, newValue) => setSelectedMultiValues(newValue)}
+            renderOption={(props, option, { selected }) => (
+              <li {...props}>
+                <Checkbox
+                  icon={icon}
+                  checkedIcon={checkedIcon}
+                  style={{ marginRight: 8 }}
+                  checked={selected}
+                />
+                {option}
+              </li>
+            )}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="اختر القيم"
+                placeholder="ابحث واختر..."
+              />
+            )}
+            renderTags={(value, getTagProps) =>
+              value.map((option, index) => (
+                <Chip
+                  variant="outlined"
+                  label={option}
+                  size="small"
+                  {...getTagProps({ index })}
+                />
+              ))
+            }
+          />
+        );
+      }
+
       return (
         <TextField
           fullWidth
           label="القيم (مفصولة بفواصل)"
           placeholder="قيمة1, قيمة2, قيمة3"
-          value={currentFilter.value || ''}
-          onChange={(e) => setCurrentFilter(prev => ({ ...prev, value: e.target.value }))}
+          value={selectedMultiValues.join(', ')}
+          onChange={(e) => setSelectedMultiValues(e.target.value.split(',').map(v => v.trim()))}
           helperText="أدخل القيم مفصولة بفواصل"
         />
       );
     }
 
+    // Date picker
     if (fieldType === 'date') {
       return (
         <TextField
@@ -160,6 +298,7 @@ const FilterBuilder: React.FC<FilterBuilderProps> = ({
       );
     }
 
+    // Number input
     if (fieldType === 'number') {
       return (
         <TextField
@@ -172,6 +311,7 @@ const FilterBuilder: React.FC<FilterBuilderProps> = ({
       );
     }
 
+    // Boolean dropdown
     if (fieldType === 'boolean') {
       return (
         <FormControl fullWidth>
@@ -188,6 +328,40 @@ const FilterBuilder: React.FC<FilterBuilderProps> = ({
       );
     }
 
+    // Text field with dropdown if values available
+    if (loadingValues) {
+      return (
+        <Box display="flex" alignItems="center" gap={2}>
+          <CircularProgress size={20} />
+          <Typography variant="body2">جاري تحميل القيم...</Typography>
+        </Box>
+      );
+    }
+
+    if (hasDropdownValues) {
+      return (
+        <Autocomplete
+          freeSolo
+          options={availableValues}
+          value={currentFilter.value || ''}
+          onChange={(_, newValue) => setCurrentFilter(prev => ({ ...prev, value: newValue || '' }))}
+          onInputChange={(_, newValue) => setCurrentFilter(prev => ({ ...prev, value: newValue }))}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="اختر أو أدخل قيمة"
+              placeholder="ابحث أو اكتب..."
+            />
+          )}
+          renderOption={(props, option) => (
+            <ListItemButton {...props} component="li">
+              <ListItemText primary={option} />
+            </ListItemButton>
+          )}
+        />
+      );
+    }
+
     return (
       <TextField
         fullWidth
@@ -196,18 +370,6 @@ const FilterBuilder: React.FC<FilterBuilderProps> = ({
         onChange={(e) => setCurrentFilter(prev => ({ ...prev, value: e.target.value }))}
       />
     );
-  };
-
-  const getFilterDescription = (filter: ReportFilter): string => {
-    const field = availableFields.find(f => f.name === filter.field);
-    const fieldLabel = field?.label || filter.field;
-    const operatorLabel = operatorLabels[filter.operator];
-    
-    if (['is_null', 'not_null'].includes(filter.operator)) {
-      return `${fieldLabel} ${operatorLabel}`;
-    }
-    
-    return `${fieldLabel} ${operatorLabel} ${filter.value}`;
   };
 
   if (filterableFields.length === 0) {
@@ -258,16 +420,26 @@ const FilterBuilder: React.FC<FilterBuilderProps> = ({
               <ListItem key={index} divider>
                 <ListItemText
                   primary={
-                    <Box display="flex" alignItems="center" gap={1}>
+                    <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
                       <Chip
                         size="small"
                         label={filter.label || filter.field}
                         variant="outlined"
                         color="primary"
                       />
-                      <Typography variant="body2">
-                        {getFilterDescription(filter)}
-                      </Typography>
+                      <Chip
+                        size="small"
+                        label={operatorLabels[filter.operator]}
+                        variant="filled"
+                        color="secondary"
+                      />
+                      {!['is_null', 'not_null'].includes(filter.operator) && (
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {String(filter.value).length > 30 
+                            ? String(filter.value).substring(0, 30) + '...'
+                            : filter.value}
+                        </Typography>
+                      )}
                     </Box>
                   }
                 />
@@ -308,15 +480,19 @@ const FilterBuilder: React.FC<FilterBuilderProps> = ({
                   setCurrentFilter(prev => ({
                     ...prev,
                     field: e.target.value,
-                    operator: 'eq', // Reset operator when field changes
-                    value: '', // Reset value when field changes
+                    operator: 'eq',
+                    value: '',
                   }));
+                  setSelectedMultiValues([]);
                 }}
                 label="الحقل"
               >
                 {filterableFields.map((field) => (
                   <MenuItem key={field.name} value={field.name}>
-                    {field.label}
+                    <Box display="flex" justifyContent="space-between" width="100%">
+                      <span>{field.label}</span>
+                      <Chip size="small" label={field.type} variant="outlined" sx={{ ml: 1 }} />
+                    </Box>
                   </MenuItem>
                 ))}
               </Select>
@@ -327,11 +503,14 @@ const FilterBuilder: React.FC<FilterBuilderProps> = ({
                 <InputLabel>نوع المرشح</InputLabel>
                 <Select
                   value={currentFilter.operator || 'eq'}
-                  onChange={(e) => setCurrentFilter(prev => ({ 
-                    ...prev, 
-                    operator: e.target.value as ReportFilter['operator'],
-                    value: '', // Reset value when operator changes
-                  }))}
+                  onChange={(e) => {
+                    setCurrentFilter(prev => ({ 
+                      ...prev, 
+                      operator: e.target.value as ReportFilter['operator'],
+                      value: '',
+                    }));
+                    setSelectedMultiValues([]);
+                  }}
                   label="نوع المرشح"
                 >
                   {getOperatorsByFieldType(getFieldType(currentFilter.field)).map((op) => (
@@ -356,7 +535,9 @@ const FilterBuilder: React.FC<FilterBuilderProps> = ({
             disabled={
               !currentFilter.field ||
               !currentFilter.operator ||
-              (!['is_null', 'not_null'].includes(currentFilter.operator) && !currentFilter.value)
+              (!['is_null', 'not_null'].includes(currentFilter.operator) && 
+               !currentFilter.value && 
+               selectedMultiValues.length === 0)
             }
           >
             {editingIndex !== null ? 'تحديث' : 'إضافة'}

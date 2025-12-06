@@ -233,24 +233,16 @@ const baseNavigation: NavigationItem[] = [
     id: "fiscal",
     label: "Fiscal",
     titleEn: "Fiscal Management",
-    titleAr: "الإدارة المالية السنوية",
+    titleAr: "الإدارة المالية",
     icon: "AccountBalance",
     children: [
       {
         id: "fiscal-dashboard",
         label: "Fiscal Dashboard",
-        titleEn: "Fiscal Dashboard",
+        titleEn: "Fiscal Year Dashboard",
         titleAr: "لوحة السنة المالية",
         icon: "BarChart",
         path: "/fiscal/dashboard"
-      },
-      {
-        id: "opening-balance-import",
-        label: "Opening Balance Import",
-        titleEn: "Opening Balance Import",
-        titleAr: "استيراد الأرصدة الافتتاحية",
-        icon: "Summarize",
-        path: "/fiscal/opening-balance-import"
       },
       {
         id: "fiscal-periods",
@@ -261,101 +253,12 @@ const baseNavigation: NavigationItem[] = [
         path: "/fiscal/periods"
       },
       {
-        id: "construction-dashboard",
-        label: "Construction",
-        titleEn: "Construction Dashboard",
-        titleAr: "لوحة الإنشاءات",
-        icon: "TrendingUp",
-        path: "/fiscal/construction"
-      },
-      {
-        id: "approval-workflow",
-        label: "Approval Workflow",
-        titleEn: "Approval Workflow",
-        titleAr: "مسار الموافقات",
-        icon: "Assignment",
-        path: "/fiscal/approval-workflow"
-      },
-      {
-        id: "validation-rules",
-        label: "Validation Rules",
-        titleEn: "Validation Rules",
-        titleAr: "قواعد التحقق",
-        icon: "Tune",
-        path: "/fiscal/validation-rules"
-      },
-      {
-        id: "reconciliation",
-        label: "Reconciliation",
-        titleEn: "Reconciliation",
-        titleAr: "التسوية",
-        icon: "Balance",
-        path: "/fiscal/reconciliation"
-      },
-      {
-        id: "audit-trail",
-        label: "Audit Trail",
-        titleEn: "Audit Trail",
-        titleAr: "سجل التدقيق",
-        icon: "Security",
-        path: "/fiscal/audit-trail"
-      },
-      {
-        id: "approvals-center",
-        label: "Approvals Center",
-        titleEn: "Approvals Center",
-        titleAr: "مركز الموافقات",
-        icon: "Assignment",
-        path: "/fiscal/approvals"
-      },
-      {
-        id: "fiscal-year-dashboard",
-        label: "Fiscal Year Dashboard",
-        titleEn: "Fiscal Year Dashboard",
-        titleAr: "لوحة السنة المالية",
-        icon: "Dashboard",
-        path: "/fiscal/dashboard"
-      },
-      {
-        id: "enhanced-fiscal",
-        label: "Enhanced Fiscal (Arabic/RTL)",
-        titleEn: "Enhanced Fiscal Management",
-        titleAr: "الإدارة المالية المحسّنة",
-        icon: "AccountBalance",
-        children: [
-          {
-            id: "enhanced-fiscal-hub",
-            label: "Enhanced Hub",
-            titleEn: "Enhanced Hub",
-            titleAr: "المركز المحسّن",
-            icon: "Dashboard",
-            path: "/fiscal/enhanced"
-          },
-          {
-            id: "enhanced-fiscal-dashboard",
-            label: "Enhanced Dashboard",
-            titleEn: "Enhanced Fiscal Dashboard",
-            titleAr: "لوحة التحكم المحسّنة",
-            icon: "BarChart",
-            path: "/fiscal/enhanced/dashboard"
-          },
-          {
-            id: "enhanced-opening-balance",
-            label: "Enhanced Opening Balance",
-            titleEn: "Enhanced Opening Balance Import",
-            titleAr: "استيراد الأرصدة المحسّن",
-            icon: "Summarize",
-            path: "/fiscal/enhanced/opening-balance-import"
-          },
-          {
-            id: "enhanced-period-manager",
-            label: "Enhanced Period Manager",
-            titleEn: "Enhanced Period Manager",
-            titleAr: "إدارة الفترات المحسّنة",
-            icon: "List",
-            path: "/fiscal/enhanced/periods"
-          }
-        ]
+        id: "opening-balance-import",
+        label: "Opening Balance Import",
+        titleEn: "Opening Balance Import",
+        titleAr: "استيراد الأرصدة الافتتاحية",
+        icon: "Upload",
+        path: "/fiscal/opening-balance"
       }
     ]
   },

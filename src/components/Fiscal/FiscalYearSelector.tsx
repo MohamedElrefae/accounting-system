@@ -1,19 +1,11 @@
-import React from 'react'
-import { MenuItem, TextField } from '@mui/material'
-import { supabase } from '@/utils/supabase'
-import { getActiveOrgId } from '@/utils/org'
+// ============================================
+// FISCAL YEAR SELECTOR - Updated to use unified hooks
+// ============================================
 
-export interface FiscalYear {
-  id: string
-  org_id: string
-  year_number: number
-  name_en: string
-  name_ar?: string | null
-  start_date: string
-  end_date: string
-  status: 'draft' | 'active' | 'closed' | 'archived'
-  is_current: boolean
-}
+import React from 'react'
+import { MenuItem, TextField, Skeleton, Alert } from '@mui/material'
+import { useFiscalYears } from '@/services/fiscal'
+import { getActiveOrgId } from '@/utils/org'
 
 export interface FiscalYearSelectorProps {
   orgId?: string | null
@@ -22,8 +14,9 @@ export interface FiscalYearSelectorProps {
   label?: string
   helperText?: string
   size?: 'small' | 'medium'
-  persistKey?: string // localStorage key, default 'fiscal_year_id'
+  persistKey?: string
   sx?: any
+  disabled?: boolean
 }
 
 export const FiscalYearSelector: React.FC<FiscalYearSelectorProps> = ({
@@ -35,61 +28,74 @@ export const FiscalYearSelector: React.FC<FiscalYearSelectorProps> = ({
   size = 'small',
   persistKey = 'fiscal_year_id',
   sx,
+  disabled = false,
 }) => {
-  const [years, setYears] = React.useState<FiscalYear[]>([])
-  const [selected, setSelected] = React.useState<string | ''>(() => {
+  const effectiveOrgId = orgId ?? getActiveOrgId()
+
+  // Use the new unified hook instead of direct Supabase calls
+  const { data: years, isLoading, error } = useFiscalYears(effectiveOrgId)
+
+  const [selected, setSelected] = React.useState<string>(() => {
+    if (value) return value
     try {
-      return (value ?? localStorage.getItem(persistKey) ?? '') as string
+      return localStorage.getItem(persistKey) ?? ''
     } catch {
-      return (value ?? '') as string
+      return ''
     }
   })
-  const effectiveOrg = React.useMemo(() => orgId ?? getActiveOrgId(), [orgId])
 
-  React.useEffect(() => { if (value !== undefined) setSelected(value || '') }, [value])
-
+  // Auto-select current year if none selected
   React.useEffect(() => {
-    (async () => {
-      if (!effectiveOrg) { setYears([]); return }
-      const { data, error } = await supabase
-        .from('fiscal_years')
-        .select('*')
-        .eq('org_id', effectiveOrg)
-        .order('year_number', { ascending: true })
-      if (error) { setYears([]); return }
-      setYears(data as unknown as FiscalYear[])
-      // If no selection and there is a current year, preselect it
-      if ((!selected || selected === '') && data && data.length > 0) {
-        const current = (data as any[]).find(y => y.is_current) || data[data.length - 1]
-        if (current?.id) {
-          setSelected(current.id)
-          try { localStorage.setItem(persistKey, current.id) } catch {}
-          onChange?.(current.id)
-        }
+    if (!selected && years?.length) {
+      const current = years.find(y => y.isCurrent) || years[0]
+      if (current) {
+        setSelected(current.id)
+        try { localStorage.setItem(persistKey, current.id) } catch {}
+        onChange?.(current.id)
       }
-    })()
-  }, [effectiveOrg])
+    }
+  }, [years, selected, persistKey, onChange])
 
-  const handleChange = (id: string) => {
+  // Sync with external value
+  React.useEffect(() => {
+    if (value !== undefined && value !== selected) {
+      setSelected(value || '')
+    }
+  }, [value])
+
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const id = event.target.value
     setSelected(id)
     try { localStorage.setItem(persistKey, id) } catch {}
     onChange?.(id)
   }
 
+  if (isLoading) {
+    return <Skeleton variant="rectangular" width={200} height={40} sx={sx} />
+  }
+
+  if (error) {
+    return <Alert severity="error" sx={{ maxWidth: 300, ...sx }}>Failed to load fiscal years</Alert>
+  }
+
   return (
     <TextField
       select
-      size={size}
       label={label}
       value={selected}
-      onChange={(e) => handleChange(e.target.value)}
+      onChange={handleChange}
+      size={size}
       helperText={helperText}
-      sx={sx}
-      disabled={!effectiveOrg}
+      disabled={disabled || !years?.length || !effectiveOrgId}
+      sx={{ minWidth: 200, ...sx }}
     >
-      {years.map((y) => (
-        <MenuItem key={y.id} value={y.id}>{y.year_number} - {y.name_en}</MenuItem>
+      {years?.map((year) => (
+        <MenuItem key={year.id} value={year.id}>
+          {year.yearNumber} - {year.nameEn} {year.isCurrent && '(Current)'}
+        </MenuItem>
       ))}
     </TextField>
   )
 }
+
+export default FiscalYearSelector

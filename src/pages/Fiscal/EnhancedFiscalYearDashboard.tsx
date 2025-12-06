@@ -1,9 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Box, Container, Paper, Typography, Button, Stack, List, ListItem, ListItemText, Dialog, DialogTitle, DialogContent, DialogActions, TextField, LinearProgress, Alert } from '@mui/material'
+import { Box, Container, Paper, Typography, Button, Stack, List, ListItem, ListItemText, Dialog, DialogTitle, DialogContent, DialogActions, TextField, LinearProgress, Alert, Tooltip, IconButton, useTheme, Avatar, Chip, Grid, Card, CardContent, Grow, Divider, Fade, alpha } from '@mui/material'
+import LanguageIcon from '@mui/icons-material/Language'
+import SettingsIcon from '@mui/icons-material/Settings'
+import RefreshIcon from '@mui/icons-material/Refresh'
+import DashboardIcon from '@mui/icons-material/Dashboard'
+import TrendingUpIcon from '@mui/icons-material/TrendingUp'
+import TrendingDownIcon from '@mui/icons-material/TrendingDown'
+import AddIcon from '@mui/icons-material/Add'
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance'
+import AssignmentIcon from '@mui/icons-material/Assignment'
 import { useArabicLanguage, ArabicLanguageService } from '@/services/ArabicLanguageService'
-import { FiscalYearManagementService } from '@/services/FiscalYearManagementService'
+import { FiscalYearService, useFiscalYears, useCreateFiscalYear } from '@/services/fiscal'
 import { getActiveOrgId } from '@/utils/org'
 import { tokens } from '@/theme/tokens'
+import { constructionThemeUtils } from '@/themes/rtlTheme'
+import './FiscalPages.css'
 
 // Minimal enhanced dashboard (stabilized)
 const DashboardContainer = ({ children, title, subtitle, actions }: {
@@ -19,26 +30,27 @@ const DashboardContainer = ({ children, title, subtitle, actions }: {
     <Box sx={{
       minHeight: '100vh',
       background: tokens.palette.background.default,
-      py: 2
+      py: tokens.spacing(2)
     }}>
-      <Container maxWidth="xl" sx={{ height: '100%' }}>
+      <Container maxWidth="xl">
         <Paper 
           elevation={0} 
           sx={{ 
             minHeight: 'calc(100vh - 32px)',
-            borderRadius: 0,
+            borderRadius: tokens.radius.md,
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
             background: tokens.palette.background.paper,
-            border: `1px solid ${tokens.palette.divider}`
+            border: `1px solid ${tokens.palette.divider}`,
+            boxShadow: tokens.shadows.panel
           }}
         >
           {/* Header */}
           <Box sx={{
             background: tokens.palette.primary.main,
             color: 'white',
-            p: 3,
+            p: tokens.spacing(3),
             position: 'relative',
             overflow: 'hidden',
             ...getDirectionalStyle()
@@ -59,9 +71,10 @@ const DashboardContainer = ({ children, title, subtitle, actions }: {
               justifyContent="space-between" 
               alignItems="center"
               sx={{ position: 'relative', zIndex: 1 }}
+              spacing={tokens.spacing(2)}
             >
               <Box>
-                <Stack direction={isRTL ? 'row-reverse' : 'row'} alignItems="center" spacing={2}>
+                <Stack direction={isRTL ? 'row-reverse' : 'row'} alignItems="center" spacing={tokens.spacing(2)}>
                   <Avatar sx={{
                     bgcolor: 'rgba(255, 255, 255, 0.2)',
                     width: 56,
@@ -70,7 +83,7 @@ const DashboardContainer = ({ children, title, subtitle, actions }: {
                     <DashboardIcon sx={{ fontSize: 32 }} />
                   </Avatar>
                   <Box>
-                    <Typography variant="h3" fontWeight="bold" sx={{ mb: 0.5 }}>
+                    <Typography variant="h3" fontWeight="bold" sx={{ mb: tokens.spacing(0.5) }}>
                       {title}
                     </Typography>
                     {subtitle && (
@@ -82,14 +95,18 @@ const DashboardContainer = ({ children, title, subtitle, actions }: {
                 </Stack>
               </Box>
               
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <Box sx={{ display: 'flex', gap: tokens.spacing(1), flexWrap: 'wrap' }}>
                 {actions}
               </Box>
             </Stack>
           </Box>
 
           {/* Content */}
-          <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>
+          <Box sx={{ 
+            flex: 1, 
+            overflow: 'auto', 
+            p: tokens.spacing(3)
+          }}>
             {children}
           </Box>
         </Paper>
@@ -391,7 +408,7 @@ export default function EnhancedFiscalYearDashboard() {
   const loadDashboardData = useCallback(async () => {
     setLoading(true)
     try {
-      const years = orgId ? await FiscalYearManagementService.getFiscalYears(orgId) : []
+      const years = orgId ? await FiscalYearService.getAll(orgId) : []
       const list = years.map((y:any)=>({ id: y.id, name: y.name_ar || y.name_en || `FY ${y.year_number}`, range: `${y.start_date} — ${y.end_date}`, status: y.status }))
       setFiscalYears(list)
     } catch (e) {
@@ -463,19 +480,13 @@ export default function EnhancedFiscalYearDashboard() {
       label: isRTL ? 'التقارير المالية' : 'Financial Reports',
       onClick: () => console.log('Reports'),
       color: 'info' as const
-    },
-    {
-      icon: ConstructionIcon,
-      label: isRTL ? 'مشاريع الإنشاء' : 'Construction Projects',
-      onClick: () => console.log('Projects'),
-      color: 'success' as const
     }
   ]
 
   return (
     <DashboardContainer
       title={t(texts.fiscalYearManagement)}
-      subtitle={isRTL ? 'لوحة تحكم السنوات المالية للمشاريع الإنشائية' : 'Construction Fiscal Year Management Dashboard'}
+      subtitle={isRTL ? 'لوحة تحكم السنوات المالية' : 'Fiscal Year Management Dashboard'}
       actions={headerActions}
     >
       <Box sx={{ p: 3, ...getDirectionalStyle() }}>
@@ -515,7 +526,7 @@ export default function EnhancedFiscalYearDashboard() {
             if (!orgId) return
             setCreating(true)
             try {
-              await FiscalYearManagementService.createFiscalYear({ orgId, yearNumber: newYearNumber, startDate: newStartDate, endDate: newEndDate, createMonthlyPeriods: true, nameEn: `FY ${newYearNumber}` })
+              await FiscalYearService.create({ orgId, yearNumber: newYearNumber, startDate: newStartDate, endDate: newEndDate, createMonthlyPeriods: true, nameEn: `FY ${newYearNumber}` })
               setShowCreateDialog(false)
               await loadDashboardData()
             } catch {}

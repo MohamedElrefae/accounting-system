@@ -1,0 +1,141 @@
+/* Fiscal Period Manager Styles */
+
+.fiscal-period-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.fiscal-period-modal {
+  background-color: white;
+  border-radius: 8px;
+  padding: 2rem;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.fiscal-period-modal h2 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  color: #1F2937;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.fiscal-period-form-group {
+  margin-bottom: 1rem;
+}
+
+.fiscal-period-form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #1F2937;
+  font-size: 0.9rem;
+}
+
+.fiscal-period-form-group input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1rem;
+  box-sizing: border-box;
+  color: #1F2937;
+}
+
+.fiscal-period-form-group input:focus {
+  outline: none;
+  border-color: #2E7D32;
+  box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.1);
+}
+
+.fiscal-period-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.fiscal-period-modal-footer {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 2rem;
+}
+
+.fiscal-period-table-cell-balance {
+  color: #2E7D32;
+  font-weight: 500;
+}
+
+.fiscal-period-table-cell-balance.negative {
+  color: #D32F2F;
+}
+
+.fiscal-period-table-cell-revenue {
+  color: #2E7D32;
+  font-weight: 500;
+}
+
+.fiscal-period-table-cell-expenses {
+  color: #D32F2F;
+  font-weight: 500;
+}
+
+.fiscal-period-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.fiscal-period-action-btn {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fiscal-period-action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.fiscal-period-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Modal Cancel Button */
+.fiscal-period-modal-cancel-btn {
+  background: red !important;
+  color: white !important;
+  border: none !important;
+  padding: 0.75rem 1.5rem !important;
+  border-radius: 20px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  font-size: 0.9rem !important;
+}
+
+.fiscal-period-modal-cancel-btn:hover {
+  background: linear-gradient(135deg, #B4B9C1 0%, #9CA3AF 100%) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15) !important;
+}
+
+.fiscal-period-modal-cancel-btn:active {
+  transform: translateY(0) !important;
+}
