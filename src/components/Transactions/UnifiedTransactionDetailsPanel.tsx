@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import DraggableResizablePanel from '../Common/DraggableResizablePanel'
 import { TabsContainer } from '../Common/TabsContainer'
 import { ExpandableSection } from '../Common/ExpandableSection'
 import { InfoField } from '../Common/InfoField'
 import { InfoGrid } from '../Common/InfoGrid'
-import UnifiedCRUDForm, { type UnifiedCRUDFormHandle } from '../Common/UnifiedCRUDForm'
-import { createTransactionFormConfig } from './TransactionFormConfig'
+// import UnifiedCRUDForm, { type UnifiedCRUDFormHandle } from '../Common/UnifiedCRUDForm'
+// import { createTransactionFormConfig } from './TransactionFormConfig'
 import { type TransactionRecord, type TransactionAudit, type Account, type Project } from '../../services/transactions'
 import { TransactionLineCard } from './TransactionLineCard'
 // Approval history type - moved to local definition
@@ -23,9 +23,8 @@ import type { TransactionClassification } from '../../services/transaction-class
 import type { ExpensesCategoryRow } from '../../types/sub-tree'
 import type { WorkItemRow } from '../../types/work-items'
 import './UnifiedTransactionDetailsPanel.css'
-import { TransactionLineItemsSection } from '../line-items/TransactionLineItemsSection'
+// import { TransactionLineItemsSection } from '../line-items/TransactionLineItemsSection'
 import AttachDocumentsPanel from '../documents/AttachDocumentsPanel'
-import { getTransactionLines } from '../../services/transaction-lines'
 import { useToast } from '../../contexts/ToastContext'
 import MultiLineEditor from './MultiLineEditor'
 import { TransactionSettingsPanel } from './TransactionSettingsPanel'
@@ -87,7 +86,7 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
   audit,
   approvalHistory,
   userNames,
-  categoryLabel,
+  categoryLabel: _categoryLabel,
   transactionLines: propsTransactionLines,
   accounts,
   projects,
@@ -98,8 +97,8 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
   costCenters,
   analysisItemsMap,
   onClose,
-  onUpdate,
-  onDelete,
+  onUpdate: _onUpdate,
+  onDelete: _onDelete,
   onSubmitForReview,
   onApprove,
   onReject,
@@ -120,13 +119,6 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
   const [error, setError] = useState<string | null>(null)
   const [fetchedTransaction, setFetchedTransaction] = useState<TransactionRecord | null>(null)
   const [txLines, setTxLines] = useState<any[]>(propsTransactionLines || [])
-  const [linesState, setLinesState] = useState<{ totalDebits: number; totalCredits: number; isBalanced: boolean; linesCount: number }>({
-    totalDebits: 0,
-    totalCredits: 0,
-    isBalanced: false,
-    linesCount: 0
-  })
-
   // Active tab state with persistence
   const [activeTab, setActiveTab] = useState<string>(() => {
     try {
@@ -332,7 +324,7 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
     const fieldMap: Record<string, any> = {
       step: idx + 1,
       action: actionMap[approval.action] || 'ملاحظة',
-      user: userNames[approval.actor_user_id] || approval.actor_user_id.substring(0, 8),
+      user: userNames[approval.actor_user_id] || (approval.actor_user_id ? approval.actor_user_id.substring(0, 8) : '—'),
       date: approval.created_at ? formatDateTime(approval.created_at) : '—',
       reason: approval.reason || '—',
       status: approval.action,
@@ -1056,7 +1048,6 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
                     setViewMode('view')
                     showToast('تم حفظ التعديلات بنجاح', { severity: 'success' })
                   }}
-                  onLinesStateChange={(s) => setLinesState(s)}
                 />
               </div>
             </div>
