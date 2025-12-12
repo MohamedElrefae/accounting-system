@@ -105,7 +105,7 @@ export class OpeningBalanceImportService {
     orgId: string,
     fiscalYearId: string,
     file: File,
-    userId?: string,
+    _userId?: string,
   ): Promise<ImportResult> {
     const data = await file.arrayBuffer()
     const workbook = XLSX.read(data, { type: 'array' })
@@ -134,7 +134,7 @@ export class OpeningBalanceImportService {
       let credit = creditRaw !== null ? Number(creditRaw) : NaN
 
       const amountRaw = get('amount', 'Amount', 'المبلغ')
-      let amount = amountRaw !== null ? Number(amountRaw) : NaN
+      const amount = amountRaw !== null ? Number(amountRaw) : NaN
 
       // Clean negatives and NaNs for debit/credit
       if (!isFinite(debit)) debit = NaN
@@ -407,7 +407,7 @@ export class OpeningBalanceImportService {
     for (const r of items) {
       let d = r.opening_balance_debit != null ? Number(r.opening_balance_debit) : NaN
       let c = r.opening_balance_credit != null ? Number(r.opening_balance_credit) : NaN
-      let a = r.amount != null ? Number(r.amount) : NaN
+      const a = r.amount != null ? Number(r.amount) : NaN
       if (!isFinite(d)) d = NaN
       if (!isFinite(c)) c = NaN
       if (isFinite(d) || isFinite(c)) { usedDC = true; sumDebit += isFinite(d)?d:0; sumCredit += isFinite(c)?c:0 }
@@ -704,7 +704,7 @@ export class OpeningBalanceImportService {
       data = res.data as any[]
       if (res.error) throw res.error
       data = (data || []).map(a => ({ ...a, name_en: a.name }))
-    } catch (e: any) {
+    } catch {
       const res2 = await supabase
         .from('accounts')
         .select('id, org_id, code, name, name_ar, parent_id, level')
@@ -861,24 +861,24 @@ export class OpeningBalanceImportService {
   }
 
   // RPC-based enrichment for environments where parent_id/level are not available to the client
-  private static async enrichAccountsWithAncestors(orgId: string, accounts: AccountRow[], cap: number = 1000): Promise<{ parentCodeById: Map<string,string>, parentPathById: Map<string,string> }> {
-    const parentCodeById = new Map<string, string>()
-    const parentPathById = new Map<string, string>()
-    const ids = accounts.map(a => a.id).slice(0, cap)
-    for (const id of ids) {
-      try {
-        const { data, error } = await supabase.rpc('get_account_ancestors', { p_org_id: orgId, p_account_id: id })
-        if (!error && Array.isArray(data) && data.length) {
-          // data is root → node, last row is self
-          const path = (data as any[]).map(r => r.code)
-          const parentCode = path.length >= 2 ? path[path.length-2] : undefined
-          if (parentCode) parentCodeById.set(id, parentCode)
-          parentPathById.set(id, path.slice(0, -1).join(' / '))
-        }
-      } catch {}
-    }
-    return { parentCodeById, parentPathById }
-  }
+  // private static async _enrichAccountsWithAncestors(orgId: string, accounts: AccountRow[], cap: number = 1000): Promise<{ parentCodeById: Map<string,string>, parentPathById: Map<string,string> }> {
+  //   const parentCodeById = new Map<string, string>()
+  //   const parentPathById = new Map<string, string>()
+  //   const ids = accounts.map(a => a.id).slice(0, cap)
+  //   for (const id of ids) {
+  //     try {
+  //       const { data, error } = await supabase.rpc('get_account_ancestors', { p_org_id: orgId, p_account_id: id })
+  //       if (!error && Array.isArray(data) && data.length) {
+  //         // data is root → node, last row is self
+  //         const path = (data as any[]).map(r => r.code)
+  //         const parentCode = path.length >= 2 ? path[path.length-2] : undefined
+  //         if (parentCode) parentCodeById.set(id, parentCode)
+  //         parentPathById.set(id, path.slice(0, -1).join(' / '))
+  //       }
+  //     } catch {}
+  //   }
+  //   return { parentCodeById, parentPathById }
+  // }
 
 
   // 6) Import history for a fiscal year

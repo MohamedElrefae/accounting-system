@@ -71,7 +71,7 @@ export async function listLineItems(transactionId: string, transactionLineId?: s
       }
     })
     
-    let catalogMap = new Map<string, any>()
+    const catalogMap = new Map<string, any>()
     if (missingCatalogIds.size > 0) {
       try {
         const { data: catalogItems } = await supabase
@@ -157,7 +157,7 @@ export async function listLineItems(transactionId: string, transactionLineId?: s
       }
     })
     
-    let catalogMap = new Map<string, any>()
+    const catalogMap = new Map<string, any>()
     if (missingCatalogIds.size > 0) {
       try {
         const { data: catalogItems } = await supabase

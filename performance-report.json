@@ -1,11 +1,11 @@
 {
-  "timestamp": "2025-11-10T20:27:10.172Z",
+  "timestamp": "2025-12-09T19:39:43.163Z",
   "tests": [
     {
       "name": "Initial Load",
       "metrics": {
-        "totalLoadTime": 3197,
-        "domContentLoaded": 0.2999999998137355,
+        "totalLoadTime": 1575,
+        "domContentLoaded": 0.20000000298023224,
         "loadComplete": 0,
         "firstPaint": 0,
         "firstContentfulPaint": 0
@@ -14,36 +14,36 @@
         "totalLoadTime": 3000,
         "firstContentfulPaint": 2000
       },
-      "passed": false
+      "passed": true
     },
     {
       "name": "Route Navigation",
       "metrics": {
-        "averageNavigationTime": 1446.6,
+        "averageNavigationTime": 1568.4,
         "routes": [
           {
             "route": "/transactions",
-            "time": 1086,
+            "time": 1612,
             "passed": false
           },
           {
             "route": "/reports/general-ledger",
-            "time": 1003,
+            "time": 2060,
             "passed": false
           },
           {
             "route": "/main-data/accounts-tree",
-            "time": 2015,
+            "time": 1419,
             "passed": false
           },
           {
             "route": "/inventory",
-            "time": 2077,
+            "time": 1476,
             "passed": false
           },
           {
             "route": "/fiscal/dashboard",
-            "time": 1052,
+            "time": 1275,
             "passed": false
           }
         ]
@@ -56,8 +56,8 @@
     {
       "name": "Memory Usage",
       "metrics": {
-        "usedJSHeapSize": 36.236623764038086,
-        "totalJSHeapSize": 37.0978946685791,
+        "usedJSHeapSize": 47.294941902160645,
+        "totalJSHeapSize": 56.533928871154785,
         "jsHeapSizeLimit": 2144
       },
       "thresholds": {
@@ -68,10 +68,10 @@
     {
       "name": "Bundle Size",
       "metrics": {
-        "totalSize": 0.02734375,
+        "totalSize": 0,
         "jsSize": 0,
-        "cssSize": 0.02734375,
-        "fileCount": 7
+        "cssSize": 0,
+        "fileCount": 5
       },
       "thresholds": {
         "totalSize": 1500
@@ -80,8 +80,8 @@
     }
   ],
   "summary": {
-    "passed": 2,
-    "failed": 2,
+    "passed": 3,
+    "failed": 1,
     "warnings": 0
   }
 }

@@ -1,7 +1,7 @@
 import { supabase } from '@/utils/supabase'
 
 export class PeriodClosingService {
-  static async initiatePeriodClosing(periodId: string) {
+  static async initiatePeriodClosing(_periodId: string) {
     // Placeholder: could create checklist items here in the future
     return { ok: true }
   }

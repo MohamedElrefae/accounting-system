@@ -139,7 +139,7 @@ export async function createProject(input: Omit<Project, 'id' | 'created_at' | '
   // Check if project code already exists
   const existingProject = await getProjectByCode(input.code)
   if (existingProject) {
-    throw new Error(`كود المشروع \"${input.code}\" موجود مسبقاً`)
+    throw new Error(`كود المشروع "${input.code}" موجود مسبقاً`)
   }
 
   // Build sanitized payload (avoid sending generated or aliased columns)
@@ -173,7 +173,7 @@ export async function updateProject(id: string, updates: Partial<Omit<Project, '
   if (updates.code) {
     const existingProject = await getProjectByCode(updates.code)
     if (existingProject && existingProject.id !== id) {
-      throw new Error(`كود المشروع \"${updates.code}\" موجود مسبقاً`)
+      throw new Error(`كود المشروع "${updates.code}" موجود مسبقاً`)
     }
   }
 

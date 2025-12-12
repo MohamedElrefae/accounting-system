@@ -6,12 +6,10 @@ import { createStandardColumns } from '../../hooks/useUniversalExport'
 import type { UniversalTableData } from '../../utils/UniversalExportManager'
 import { listLineItems, upsertLineItems, computeLineTotal, validateItems, deleteLineItem, type TransactionLineItem } from '../../services/cost-analysis'
 import { supabase } from '../../utils/supabase'
-import { listAnalysisWorkItems } from '../../services/analysis-work-items'
 import { getCompanyConfig } from '../../services/company-config'
 import { lineItemsCatalogService, type CatalogSelectorItem } from '../../services/line-items-catalog'
-import { getExpensesCategoriesList } from '../../services/sub-tree'
-import { listWorkItemsUnion } from '../../services/work-items'
 import { SearchableDropdown } from '../Common/SearchableDropdown'
+import { useTransactionsData } from '../../contexts/TransactionsDataContext'
 
 // Types for the analysis data
 interface TransactionAnalysisDetail {
@@ -26,17 +24,17 @@ interface TransactionAnalysisDetail {
   needs_attention?: boolean
 }
 
-interface AnalysisWorkItem {
+interface _AnalysisWorkItem {
   id: string
   code: string
   name: string
 }
 
-interface ExpenseCategory {
+interface _ExpenseCategory {
   id: string
   code: string
   description: string
-}
+} // Available for future expense category functionality
 
 // Real API functions
 async function getTransactionAnalysisDetail(transactionId: string): Promise<TransactionAnalysisDetail> {
@@ -55,18 +53,30 @@ async function getTransactionAnalysisDetail(transactionId: string): Promise<Tran
       is_matched: true,
       needs_attention: false
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching transaction analysis detail:', error)
-    // Fallback: get basic transaction info
-    const { data: txData } = await supabase
-      .from('transactions')
-      .select('entry_number, description, amount')
-      .eq('id', transactionId)
-      .single()
     
-    const lineItems = await listLineItems(transactionId)
-    const lineItemsTotal = lineItems.reduce((sum, item) => sum + (item.total_amount || 0), 0)
-    const variance = (txData?.amount || 0) - lineItemsTotal
+    // Check if it's a database relation error
+    if (error?.code === '42P01' || error?.message?.includes('does not exist')) {
+      console.warn('Cost analysis views not available - using fallback mode')
+      // Return a special indicator to the component to set the error message
+      return {
+        ...null,
+        _error: 'تحليل التكلفة غير متاح حالياً - يتم عرض البيانات الأساسية فقط'
+      }
+    }
+    
+    // Fallback: get basic transaction info
+    try {
+      const { data: txData } = await supabase
+        .from('transactions')
+        .select('entry_number, description, amount')
+        .eq('id', transactionId)
+        .single()
+      
+      const lineItems = await listLineItems(transactionId).catch(() => [])
+      const lineItemsTotal = lineItems.reduce((sum, item) => sum + (item.total_amount || 0), 0)
+      const variance = (txData?.amount || 0) - lineItemsTotal
     
     return {
       entry_number: txData?.entry_number || '',
@@ -78,6 +88,14 @@ async function getTransactionAnalysisDetail(transactionId: string): Promise<Tran
       variance_pct: txData?.amount ? (variance / txData.amount) * 100 : 0,
       is_matched: Math.abs(variance) < 1,
       needs_attention: Math.abs(variance) >= 1
+    }
+    } catch (fallbackError: any) {
+      console.error('Fallback also failed:', fallbackError)
+      // Return a special indicator to the component to set the error message
+      return {
+        ...(null as any),
+        _error: 'فشل في تحميل بيانات التحليل'
+      }
     }
   }
 }
@@ -148,6 +166,25 @@ const TransactionAnalysisModal: React.FC<Props> = ({
   orgId,
   workItems = [],
 }) => {
+  // Unit of measure options for SearchableDropdown
+  const unitOfMeasureOptions = [
+    { id: 'piece', code: 'piece', name: 'قطعة' },
+    { id: 'meter', code: 'meter', name: 'متر' },
+    { id: 'kg', code: 'kg', name: 'كيلو' },
+    { id: 'liter', code: 'liter', name: 'لتر' },
+    { id: 'hour', code: 'hour', name: 'ساعة' },
+    { id: 'day', code: 'day', name: 'يوم' },
+    { id: 'bag', code: 'bag', name: 'شكارة' },
+    { id: 'box', code: 'box', name: 'صندوق' }
+  ];
+
+  // Use the TransactionsDataContext to get pre-loaded dimension data
+  const { 
+    getWorkItemsForOrg,
+    getCategoriesForOrg,
+    analysisItemsMap
+  } = useTransactionsData()
+  
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>('')
@@ -172,11 +209,11 @@ const TransactionAnalysisModal: React.FC<Props> = ({
 
   const [tab, setTab] = useState<'header' | 'line_items' | 'by_item' | 'by_cost_center' | 'by_category'>(loadConfig().defaultTab)
   const [lineItems, setLineItems] = useState<TransactionLineItem[]>([])
-  const [analysisWorkItems, setAnalysisWorkItems] = useState<AnalysisWorkItem[]>([])
   const [loadedWorkItems, setLoadedWorkItems] = useState<WorkItem[]>([])
   const [loadedSubTree, setLoadedSubTree] = useState<any[]>([])
   const [currency, setCurrency] = useState<string>('SAR')
   const [selectedForDelete, setSelectedForDelete] = useState<Set<number>>(new Set())
+  const [selectedItemIndex, setSelectedItemIndex] = useState<number>(-1)
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
   // State for cost dimension editing
   const lastLoadKeyRef = useRef<string>('')
@@ -204,22 +241,29 @@ const TransactionAnalysisModal: React.FC<Props> = ({
           effectiveOrg = tx?.org_id || ''
         }
 
-        // Load all data (skip org-scoped lists if we still lack org)
-        const [analysisDetail, lineItemsData, analysisItemsList, workItemsList, subTreeData, companyConfig] = await Promise.all([
+        // Load analysis detail and line items, use context for dimensions
+        const [analysisDetail, lineItemsData, companyConfig] = await Promise.all([
           getTransactionAnalysisDetail(transactionId),
           listLineItems(transactionId, transactionLineId || undefined).catch(() => []),
-          effectiveOrg ? listAnalysisWorkItems({ orgId: effectiveOrg, includeInactive: false }).catch(() => []) : Promise.resolve([]),
-          effectiveOrg ? listWorkItemsUnion(effectiveOrg, null, true).catch(() => []) : Promise.resolve([]),
-          effectiveOrg ? getExpensesCategoriesList(effectiveOrg, false).catch(() => []) : Promise.resolve([]),
           getCompanyConfig().catch(() => ({ currency_code: 'SAR' }))
         ])
         
+        // Get dimension data from context (already loaded)
+        const orgWorkItems = effectiveOrg ? getWorkItemsForOrg(effectiveOrg) : []
+        const orgCategories = effectiveOrg ? getCategoriesForOrg(effectiveOrg) : []
+        
         if (!cancelled) {
-          setData(analysisDetail)
+          // Check if analysisDetail has an error property
+          if (analysisDetail && (analysisDetail as any)._error) {
+            setError((analysisDetail as any)._error)
+            setData(null)
+          } else {
+            setData(analysisDetail)
+          }
           setLineItems(lineItemsData || [])
-          setAnalysisWorkItems(analysisItemsList.map(w => ({ id: w.id, code: w.code, name: w.name })))
-          setLoadedWorkItems(workItemsList || [])
-          setLoadedSubTree(subTreeData || [])
+          // analysisWorkItems comes from context, no local state needed
+          setLoadedWorkItems(orgWorkItems || [])
+          setLoadedSubTree(orgCategories || [])
           setCurrency(companyConfig.currency_code || 'SAR')
         }
       } catch (e: unknown) {
@@ -240,7 +284,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({
     }
     window.addEventListener('keydown', onKey)
     return () => { cancelled = true; window.removeEventListener('keydown', onKey) }
-  }, [open, transactionId, transactionLineId, orgId, onClose])
+  }, [open, transactionId, transactionLineId, orgId, getWorkItemsForOrg, getCategoriesForOrg, analysisItemsMap, onClose])
 
   // Keyboard shortcuts for size presets
   useEffect(() => {
@@ -1030,7 +1074,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({
   }
 
   // Function to save cost dimensions for a single line item
-  const saveCostDimension = async (lineItemId: string, updatedItem: TransactionLineItem) => {
+  const _saveCostDimension = async (lineItemId: string, updatedItem: TransactionLineItem) => {
     // Only save if the item has a valid ID (was already saved to DB)
     if (!lineItemId || lineItemId === 'undefined' || typeof lineItemId !== 'string' || lineItemId.trim() === '') {
       console.warn('Skipping cost dimension save for unsaved item (no ID)')
@@ -1834,27 +1878,13 @@ const TransactionAnalysisModal: React.FC<Props> = ({
                             />
                           </td>
                           <td style={{ padding: '8px' }}>
-                            <select
+                            <SearchableDropdown
+                              items={unitOfMeasureOptions}
                               value={item.unit_of_measure || 'piece'}
-                              onChange={(e) => updateLineItem(index, { unit_of_measure: e.target.value })}
-                              style={{
-                                width: '100px',
-                                padding: '6px 8px',
-                                border: '1px solid var(--border, rgba(255,255,255,0.12))',
-                                borderRadius: '4px',
-                                backgroundColor: 'var(--surface, #0f0f0f)',
-                                color: 'var(--text, #eaeaea)'
-                              }}
-                            >
-                              <option value="piece">قطعة</option>
-                              <option value="meter">متر</option>
-                              <option value="kg">كيلو</option>
-                              <option value="liter">لتر</option>
-                              <option value="hour">ساعة</option>
-                              <option value="day">يوم</option>
-                              <option value="bag">شكارة</option>
-                              <option value="box">صندوق</option>
-                            </select>
+                              onChange={(id) => updateLineItem(index, { unit_of_measure: id || 'piece' })}
+                              placeholder="— اختر —"
+                              style={{ width: '120px' }}
+                            />
                           </td>
                           <td style={{ 
                             padding: '8px', 
@@ -1876,7 +1906,7 @@ const TransactionAnalysisModal: React.FC<Props> = ({
                           </td>
                           <td style={{ padding: '8px' }}>
                             <SearchableDropdown
-                              items={analysisWorkItems.map(a => ({
+                              items={Object.values(analysisItemsMap || {}).map(a => ({
                                 id: a.id,
                                 code: a.code,
                                 name: a.name

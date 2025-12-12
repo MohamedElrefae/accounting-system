@@ -95,6 +95,7 @@ const TransactionsPage: React.FC = () => {
     console.log('🔍 Details panel state changed:', _detailsOpen);
   }, [_detailsOpen]);
   const [detailsFor, setDetailsFor] = useState<TransactionRecord | null>(null)
+  const [autoOpenDeleteModal, setAutoOpenDeleteModal] = useState(false)
   const [createdTxId, setCreatedTxId] = useState<string | null>(null)
 
   // Debug: track which form is open
@@ -105,6 +106,7 @@ const TransactionsPage: React.FC = () => {
   // Define onClose function with useCallback to ensure it's stable across re-renders
   const handleDetailsPanelClose = useCallback(() => {
     _setDetailsOpen(false);
+    setAutoOpenDeleteModal(false);
   }, []);
   
   // Keep create-mode title even after header insert until user saves draft/post
@@ -510,6 +512,56 @@ const TransactionsPage: React.FC = () => {
       return (e?.message || 'خطأ غير متوقع') as string
     }
   }
+
+  const openDetails = useCallback(async (tx: TransactionRecord, options?: { openDeleteModal?: boolean }) => {
+    setDetailsFor(tx)
+    setSelectedTransactionId(tx.id)
+    _setSelectedLineId(null)
+
+    // Load dimensions for this transaction's organization on-demand
+    if (tx.org_id) {
+      console.log(`🔄 Loading dimensions for transaction details org ${tx.org_id}`)
+      await loadDimensionsForOrg(tx.org_id)
+    }
+
+    // Fetch audit data
+    try {
+      console.log('🔄 Fetching transaction audit data...')
+      const rows = await getTransactionAudit(tx.id)
+      setAudit(rows)
+      console.log(`✅ Loaded ${rows.length} audit records`)
+    } catch (error) {
+      console.error('❌ Failed to fetch audit data:', error)
+      setAudit([])
+    }
+
+    // Fetch approval history
+    try {
+      console.log('🔄 Fetching approval history...')
+      const { getLineReviewsForTransaction } = await import('../../services/lineReviewService')
+      const lines = await getLineReviewsForTransaction(tx.id)
+      const hist = lines.flatMap(line => line.approval_history || [])
+      setApprovalHistory(hist)
+      console.log(`✅ Loaded ${hist.length} approval history records`)
+    } catch (error) {
+      console.error('❌ Failed to fetch approval history:', error)
+      setApprovalHistory([])
+    }
+
+    // Fetch transaction lines
+    try {
+      console.log('🔄 Fetching transaction lines...')
+      const { getTransactionLines } = await import('../../services/transaction-lines')
+      const lines = await getTransactionLines(tx.id)
+      console.log(`✅ Loaded ${lines.length} transaction lines`)
+      setDetailsFor(prev => prev ? { ...prev, lines } : null)
+    } catch (error) {
+      console.error('❌ Failed to fetch transaction lines:', error)
+    }
+
+    _setDetailsOpen(true)
+    if (options?.openDeleteModal) setAutoOpenDeleteModal(true)
+  }, [loadDimensionsForOrg, setSelectedTransactionId])
 
   // Helper: small retry wrapper for flaky RPCs (e.g., 400 from transient state)
   const withRetry = async <T,>(fn: () => Promise<T>, attempts = 2, delayMs = 400): Promise<T> => {
@@ -1594,11 +1646,12 @@ const TransactionsPage: React.FC = () => {
                 _setSelectedLineId(null)
                 
                 // Load dimensions for this transaction's organization on-demand
-                if (tx.organization_id) {
-                  console.log(`🔄 Loading dimensions for transaction org ${tx.organization_id}`)
-                  await loadDimensionsForOrg(tx.organization_id)
+                if (tx.org_id) {
+                  console.log(`🔄 Loading dimensions for transaction org ${tx.org_id}`)
+                  await loadDimensionsForOrg(tx.org_id)
                 }
               }}
+              onOpenDetails={(tx: TransactionRecord) => openDetails(tx)}
               selectedTransactionId={selectedTransactionId ?? undefined}
               onEdit={(tx: TransactionRecord) => {
                 _setKeepCreateTitle(false)
@@ -1607,89 +1660,12 @@ const TransactionsPage: React.FC = () => {
                 setWizardOpen(true)  // Open TransactionWizard instead of form
                 setFormOpen(false)   // Ensure form is closed
               }}
-              onDelete={handleDelete}
-              onOpenDetails={async (tx: TransactionRecord) => {
-                setDetailsFor(tx)
-                
-                // Load dimensions for this transaction's organization on-demand
-                if (tx.organization_id) {
-                  console.log(`🔄 Loading dimensions for transaction details org ${tx.organization_id}`)
-                  await loadDimensionsForOrg(tx.organization_id)
-                }
-                
-                // Fetch audit data
-                try {
-                  console.log('🔄 Fetching transaction audit data...')
-                  const rows = await getTransactionAudit(tx.id)
-                  setAudit(rows)
-                  console.log(`✅ Loaded ${rows.length} audit records`)
-                } catch (error) {
-                  console.error('❌ Failed to fetch audit data:', error)
-                  setAudit([])
-                }
-                
-                // Fetch approval history
-                try {
-                  console.log('🔄 Fetching approval history...')
-                  const { getLineReviewsForTransaction } = await import('../../services/lineReviewService')
-                  const lines = await getLineReviewsForTransaction(tx.id)
-                  const hist = lines.flatMap(line => line.approval_history || [])
-                  setApprovalHistory(hist)
-                  console.log(`✅ Loaded ${hist.length} approval history records`)
-                } catch (error) {
-                  console.error('❌ Failed to fetch approval history:', error)
-                  setApprovalHistory([])
-                }
-                
-                // Fetch transaction lines
-                try {
-                  console.log('🔄 Fetching transaction lines...')
-                  const { getTransactionLines } = await import('../../services/transaction-lines')
-                  const lines = await getTransactionLines(tx.id)
-                  console.log(`✅ Loaded ${lines.length} transaction lines`)
-                  // Store lines in detailsFor or pass them directly to the panel
-                  setDetailsFor(prev => prev ? { ...prev, lines } : null)
-                } catch (error) {
-                  console.error('❌ Failed to fetch transaction lines:', error)
-                }
-                
-                _setDetailsOpen(true)
-              }}
+              onDelete={(tx: TransactionRecord) => openDetails(tx, { openDeleteModal: true })}
               onOpenDocuments={(tx: TransactionRecord) => {
                 setDocumentsFor(tx)
                 setDocumentsOpen(true)
               }}
-              onSubmit={(id: string) => {
-                setSubmitTargetId(id)
-                setSubmitNote('')
-                setSubmitOpen(true)
-              }}
-              onApprove={(id: string) => openReview('approve', id)}
-              onRevise={(id: string) => openReview('revise', id)}
-              onReject={(id: string) => openReview('reject', id)}
-              onResubmit={(id: string) => {
-                setSubmitTargetId(id)
-                setSubmitNote('')
-                setSubmitOpen(true)
-              }}
-              onPost={async (id: string) => {
-                try {
-                  await withRetry(() => postTransaction(id))
-                  showToast('تم الترحيل', { severity: 'success' })
-                  await reload()
-                } catch (e: any) {
-                  showToast(formatSupabaseError(e) || 'فشل ترحيل المعاملة', { severity: 'error' })
-                }
-              }}
-              onCancelSubmission={async (id: string) => {
-                try {
-                  await withRetry(() => cancelSubmission(id))
-                  showToast('تم إلغاء الإرسال', { severity: 'success' })
-                  await reload()
-                } catch (e: any) {
-                  showToast(formatSupabaseError(e) || 'تعذر إلغاء الإرسال', { severity: 'error' })
-                }
-              }}
+              onOpenApprovalWorkflow={(tx: TransactionRecord) => openReview('approve', tx.id)}
               mode={mode}
               currentUserId={currentUserId || undefined}
               hasPerm={hasPerm}
@@ -2448,6 +2424,8 @@ const TransactionsPage: React.FC = () => {
           canReview={hasPerm('transactions.review')}
           canPost={hasPerm('transactions.post')}
           canManage={hasPerm('transactions.manage')}
+          autoOpenDeleteModal={autoOpenDeleteModal}
+          onDeleteModalHandled={() => setAutoOpenDeleteModal(false)}
           onClose={handleDetailsPanelClose}
           onUpdate={async (updatedTransaction: TransactionRecord) => {
             try {

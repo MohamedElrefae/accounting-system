@@ -442,7 +442,7 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
         
       // 2. Fetch approval stats for pending transactions
       const pendingIds = rows.filter(r => !r.is_posted).map(r => r.id)
-      let approvalStatsMap = new Map<string, { total: number; approved: number }>()
+      const approvalStatsMap = new Map<string, { total: number; approved: number }>()
       
       if (pendingIds.length > 0) {
         const { data: approvalStats } = await supabase
@@ -837,7 +837,7 @@ export async function rejectTransaction(id: string, reason: string): Promise<voi
   if (error) throw error
 }
 
-export async function submitTransaction(id: string, note?: string | null): Promise<void> {
+export async function submitTransaction(id: string, _note?: string | null): Promise<void> {
   // Get current user ID
   const userId = await getCurrentUserId()
   if (!userId) throw new Error('User not authenticated')

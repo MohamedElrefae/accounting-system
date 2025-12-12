@@ -124,7 +124,7 @@ export async function getTransactionsEnrichedView(filters: EnrichedViewFilters, 
   if (ids.length === 0) return { rows: [], total }
 
   // Fetch the enriched rows by ids, ordered by entry_date desc for stable display
-  let q = supabase
+  const q = supabase
     .from('transactions_enriched_v2')
     .select('*')
     .in('transaction_id', ids)

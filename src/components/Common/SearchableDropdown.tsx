@@ -104,7 +104,11 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
         <>
           {/* Overlay to close dropdown */}
           <div
-            onClick={() => setIsOpen(false)}
+            onClick={(e) => {
+              // Prevent immediate closing if clicking on menu area
+              e.preventDefault();
+              setTimeout(() => setIsOpen(false), 10);
+            }}
             style={{ position: 'fixed', inset: 0, zIndex: 1000 }}
           />
 
@@ -115,12 +119,13 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
               top: `${menuRect.top}px`,
               left: `${menuRect.left}px`,
               width: `${menuRect.width}px`,
-              zIndex: 1001,
-              backgroundColor: 'var(--surface, #0f0f0f)',
-              border: '1px solid var(--border, rgba(255,255,255,0.12))',
-              borderRadius: '6px',
-              boxShadow: '0 8px 18px rgba(0,0,0,0.4)',
-              overflow: 'hidden'
+              zIndex: 10000, // Increased z-index to ensure it's above modal
+              backgroundColor: 'var(--surface, #1a1a1a)',
+              border: '1px solid var(--border, rgba(255,255,255,0.2))',
+              borderRadius: '8px',
+              boxShadow: '0 12px 24px rgba(0,0,0,0.6)',
+              overflow: 'hidden',
+              maxHeight: '400px'
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -148,17 +153,24 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
             <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
               {/* Clear Option */}
               <div
-                onClick={() => { onChange(null); setIsOpen(false); setSearchTerm('') }}
-                style={{
-                  padding: '10px 12px',
-                  borderBottom: '1px solid var(--border, rgba(255,255,255,0.08))',
-                  cursor: 'pointer',
-                  backgroundColor: value === null ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-                  color: 'var(--text, #eaeaea)',
-                  fontSize: '12px'
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange(null);
+                  setIsOpen(false);
+                  setSearchTerm('');
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.15)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = value === null ? 'rgba(59, 130, 246, 0.2)' : 'transparent' }}
+                style={{
+                  padding: '12px 16px',
+                  borderBottom: '1px solid var(--border, rgba(255,255,255,0.1))',
+                  cursor: 'pointer',
+                  backgroundColor: value === null ? 'rgba(59, 130, 246, 0.5)' : 'transparent',
+                  color: 'var(--text, #ffffff)',
+                  fontSize: '13px',
+                  fontWeight: value === null ? '600' : '400',
+                  transition: 'background-color 0.15s ease'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.3)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = value === null ? 'rgba(59, 130, 246, 0.5)' : 'transparent' }}
               >
                 — بلا —
               </div>
@@ -172,20 +184,28 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                 filteredItems.map(item => (
                   <div
                     key={item.id}
-                    onClick={() => { onChange(item.id); setIsOpen(false); setSearchTerm('') }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onChange(item.id);
+                      setIsOpen(false);
+                      setSearchTerm('');
+                    }}
                     style={{
-                      padding: '10px 12px',
-                      borderBottom: '1px solid var(--border, rgba(255,255,255,0.08))',
+                      padding: '12px 16px',
+                      borderBottom: '1px solid var(--border, rgba(255,255,255,0.1))',
                       cursor: 'pointer',
-                      backgroundColor: value === item.id ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-                      color: 'var(--text, #eaeaea)',
-                      fontSize: '12px',
+                      backgroundColor: value === item.id ? 'rgba(59, 130, 246, 0.5)' : 'transparent',
+                      color: 'var(--text, #ffffff)',
+                      fontSize: '13px',
+                      fontWeight: value === item.id ? '600' : '400',
                       display: 'flex',
                       justifyContent: 'space-between',
-                      gap: '8px'
+                      gap: '8px',
+                      transition: 'background-color 0.15s ease',
+                      alignItems: 'center'
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = value === item.id ? 'rgba(59, 130, 246, 0.2)' : 'transparent' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.3)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = value === item.id ? 'rgba(59, 130, 246, 0.5)' : 'transparent' }}
                   >
                     <span style={{ flex: 1, textAlign: 'right' }}>
                       {item.code} - {item.name}

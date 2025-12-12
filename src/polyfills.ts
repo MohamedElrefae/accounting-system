@@ -90,7 +90,7 @@ declare global {
     if (prop !== 'length' && prop !== 'name' && prop !== 'prototype') {
       try {
         (window.Error as any)[prop] = (originalError as any)[prop];
-      } catch (e) {
+      } catch {
         // Ignore non-configurable properties
       }
     }

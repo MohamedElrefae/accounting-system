@@ -272,7 +272,7 @@ export class ArabicLanguageService {
       // Default format based on language
       const defaultFormat = this.currentLanguage === 'ar' ? 'dd/MM/yyyy' : 'MM/dd/yyyy'
       return format(dateObj, defaultFormat, { locale })
-    } catch (error) {
+    } catch {
       // If format still fails, return a fallback
       return '--/--/----'
     }
@@ -299,7 +299,7 @@ export class ArabicLanguageService {
         : 'MM/dd/yyyy - HH:mm'
       
       return format(dateObj, formatStr, { locale })
-    } catch (error) {
+    } catch {
       return '--/--/---- - --:--'
     }
   }

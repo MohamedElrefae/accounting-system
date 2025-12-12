@@ -50,7 +50,7 @@ export async function debugOrganizations() {
     
     // Test 3: Check table schema
     console.log('\n📋 Test 3: Checking table schema...')
-    const { data: schemaData, error: schemaError } = await supabase
+    const { data: schemaData, error: _schemaError } = await supabase
       .from('organizations')
       .select('*')
       .limit(1)

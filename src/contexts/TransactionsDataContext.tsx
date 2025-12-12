@@ -74,6 +74,10 @@ export interface TransactionsDataContextValue {
   getWorkItemsForOrg: (orgId: string) => WorkItemRow[]
   getCategoriesForOrg: (orgId: string) => ExpensesCategoryRow[]
   
+  // On-demand loading functions
+  loadDimensionsForOrg: (orgId: string) => Promise<void>
+  ensureDimensionsLoaded: (orgIds: string[]) => Promise<void>
+  
   // Refresh functions
   refreshAll: () => Promise<void>
   refreshDimensions: (orgId: string, projectId?: string | null) => Promise<void>
@@ -262,7 +266,69 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
   }, [])
 
   /**
-   * Initial data load on mount
+   * Load dimensions for a specific organization on-demand
+   */
+  const loadDimensionsForOrg = useCallback(async (orgId: string) => {
+    if (loadedDimensionsRef.current.has(orgId)) {
+      console.log(`📦 Dimensions for org ${orgId} already loaded`)
+      return
+    }
+    
+    console.log(`📦 Loading dimensions for org ${orgId} on-demand...`)
+    
+    try {
+      const [categories, costCenters, workItems] = await Promise.all([
+        getExpensesCategoriesList(orgId).catch(() => []),
+        getCostCentersForSelector(orgId)
+          .then(list => list.map(cc => ({ ...cc, org_id: orgId })))
+          .catch(() => []),
+        listWorkItemsAll(orgId).catch(() => []),
+      ])
+      
+      // Merge with existing data
+      setCategories(prev => {
+        const existing = new Set(prev.map(cat => cat.id))
+        const newCategories = categories.filter(cat => !existing.has(cat.id))
+        return [...prev, ...newCategories]
+      })
+      
+      setCostCenters(prev => {
+        const existing = new Set(prev.map(cc => cc.id))
+        const newCenters = costCenters.filter(cc => !existing.has(cc.id))
+        return [...prev, ...newCenters]
+      })
+      
+      setWorkItems(prev => {
+        const existing = new Set(prev.map(wi => wi.id))
+        const newItems = workItems.filter(wi => !existing.has(wi.id))
+        return [...prev, ...newItems]
+      })
+      
+      loadedDimensionsRef.current.add(orgId)
+      console.log(`✅ Dimensions loaded for org ${orgId}`)
+    } catch (err) {
+      console.warn(`Failed to load dimensions for org ${orgId}`, err)
+    }
+  }, [])
+
+  /**
+   * Ensure dimensions are loaded for given organizations
+   */
+  const ensureDimensionsLoaded = useCallback(async (orgIds: string[]) => {
+    const unloadedOrgs = orgIds.filter(id => !loadedDimensionsRef.current.has(id))
+    if (unloadedOrgs.length === 0) return
+    
+    console.log(`📦 Loading dimensions for ${unloadedOrgs.length} organizations...`)
+    // Load dimensions in batches of 3 to avoid overwhelming the API
+    const batchSize = 3
+    for (let i = 0; i < unloadedOrgs.length; i += batchSize) {
+      const batch = unloadedOrgs.slice(i, i + batchSize)
+      await Promise.all(batch.map(orgId => loadDimensionsForOrg(orgId)))
+    }
+  }, [loadDimensionsForOrg])
+
+  /**
+   * Initial data load on mount - Load all data as it was originally working
    */
   useEffect(() => {
     if (initialLoadCompleteRef.current) return
@@ -274,18 +340,23 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
       setError(null)
       
       try {
+        // Load core data first
         const orgs = await loadCoreData()
         if (cancelled) return
         
+        // Load all dimensions as originally working - this is required for cost analysis
         await loadAllDimensions(orgs)
         if (cancelled) return
         
-        // Load analysis items for all orgs
+        // Load analysis items
         await loadAnalysisItems(orgs)
+        if (cancelled) return
         
         initialLoadCompleteRef.current = true
-      } catch {
-        // Error already set in loadCoreData
+        console.log('🚀 TransactionsDataProvider: Initial load complete - original functionality restored')
+      } catch (err) {
+        console.error('❌ Initial load failed', err)
+        setError('فشل تحميل البيانات')
       } finally {
         if (!cancelled) {
           setIsLoading(false)
@@ -415,6 +486,10 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
     getWorkItemsForOrg,
     getCategoriesForOrg,
     
+    // On-demand loading functions
+    loadDimensionsForOrg,
+    ensureDimensionsLoaded,
+    
     // Refresh functions
     refreshAll,
     refreshDimensions,
@@ -435,6 +510,8 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
     getCostCentersForOrg,
     getWorkItemsForOrg,
     getCategoriesForOrg,
+    loadDimensionsForOrg,
+    ensureDimensionsLoaded,
     refreshAll,
     refreshDimensions,
     refreshAnalysisItems,

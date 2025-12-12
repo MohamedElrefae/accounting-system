@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import DraggableResizablePanel from '../Common/DraggableResizablePanel'
 import { TabsContainer } from '../Common/TabsContainer'
 import { ExpandableSection } from '../Common/ExpandableSection'
@@ -73,6 +73,8 @@ export interface UnifiedTransactionDetailsPanelProps {
   canReview?: boolean
   canPost?: boolean
   canManage?: boolean
+  autoOpenDeleteModal?: boolean
+  onDeleteModalHandled?: () => void
 
   // UI state
   currentUserId?: string | null
@@ -110,6 +112,8 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
   canReview = false,
   canPost = false,
   canManage = false,
+  autoOpenDeleteModal = false,
+  onDeleteModalHandled,
   currentUserId,
   mode = 'all'
 }) => {
@@ -253,7 +257,13 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
     loadFieldConfig('audit') || getDefaultFieldConfig('audit')
   )
 
-  const formRef = useRef<UnifiedCRUDFormHandle>(null)
+  // Auto-open delete modal when requested by parent (used to reuse cascade delete UX)
+  useEffect(() => {
+    if (autoOpenDeleteModal) {
+      setDeleteModalOpen(true)
+      onDeleteModalHandled?.()
+    }
+  }, [autoOpenDeleteModal, onDeleteModalHandled])
 
   // Helper function to filter visible fields (order is preserved from array)
   const getVisibleFields = (fields: ColumnConfig[]) => {

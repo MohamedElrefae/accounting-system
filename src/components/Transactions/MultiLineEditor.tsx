@@ -1,4 +1,5 @@
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState, useEffect, useRef } from 'react'
+
 import { getTransactionLines, replaceTransactionLines, type TxLineInput } from '@/services/transaction-lines'
 import type { Account } from '@/services/transactions'
 
@@ -12,10 +13,12 @@ export interface MultiLineEditorProps {
   onLinesStateChange?: (state: { totalDebits: number; totalCredits: number; isBalanced: boolean; linesCount: number }) => void
 }
 
-export const MultiLineEditor: React.FC<MultiLineEditorProps> = ({ transactionId, accounts, orgId, disabled = false, onSaved, onLinesStateChange }) => {
+export const MultiLineEditor: React.FC<MultiLineEditorProps> = ({ transactionId, accounts, orgId: _orgId, disabled = false, onSaved, onLinesStateChange }) => {
+
   const [lines, setLines] = useState<TxLineInput[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const prevStateRef = useRef<{ totalDebits: number; totalCredits: number; isBalanced: boolean; linesCount: number } | null>(null)
 
   const postableAccounts = useMemo(() => accounts.filter(a => a.is_postable).sort((x, y) => x.code.localeCompare(y.code)), [accounts])
 
@@ -29,12 +32,23 @@ export const MultiLineEditor: React.FC<MultiLineEditorProps> = ({ transactionId,
   // Notify parent about current state
   useEffect(() => {
     if (onLinesStateChange) {
-      onLinesStateChange({
+      const next = {
         totalDebits: totals.totalDebits,
         totalCredits: totals.totalCredits,
         isBalanced: totals.isBalanced,
         linesCount: lines.length,
-      })
+      }
+      const prev = prevStateRef.current
+      if (
+        !prev ||
+        prev.totalDebits !== next.totalDebits ||
+        prev.totalCredits !== next.totalCredits ||
+        prev.isBalanced !== next.isBalanced ||
+        prev.linesCount !== next.linesCount
+      ) {
+        prevStateRef.current = next
+        onLinesStateChange(next)
+      }
     }
   }, [onLinesStateChange, totals.totalDebits, totals.totalCredits, totals.isBalanced, lines.length])
 

@@ -64,8 +64,8 @@ const ClientErrorLogs: React.FC = () => {
       if (error) throw error
       setLogs((data as ClientErrorLog[]) || [])
       setTotal(count || 0)
-    } catch (e: any) {
-      setError(e.message || 'Failed to load logs')
+    } catch {
+      setError('Failed to load logs')
     } finally {
       setLoading(false)
     }
@@ -126,7 +126,7 @@ const ClientErrorLogs: React.FC = () => {
       }
       await navigator.clipboard.writeText(text)
       alert(copyFormat === 'md' ? 'تم نسخ Markdown إلى الحافظة.' : 'تم نسخ JSON إلى الحافظة.')
-    } catch (e: any) {
+    } catch {
       // Clipboard blocked or failed — fallback to automatic JSON download
       downloadJSON(payload ?? { items: selectedLogs })
       alert('تم تنزيل JSON تلقائيًا لأن النسخ إلى الحافظة فشل.')

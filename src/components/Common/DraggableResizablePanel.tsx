@@ -37,7 +37,7 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
   headerActions,
   headerGradient,
   isOpen,
-  onClose,
+  onClose = () => {}, // default no-op to avoid undefined during transient renders
   position,
   size,
   isMaximized,
@@ -58,6 +58,25 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
   const panelRef = useRef<HTMLDivElement>(null);
   // When starting a drag while docked/maximized, we temporarily allow free drag
   const freeDragRef = useRef(false);
+  // Keep the latest valid onClose so transient undefined renders don't break the handler
+  const onCloseRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    if (typeof onClose === 'function') {
+      onCloseRef.current = onClose;
+    }
+    // If no valid handler ever came through, keep a no-op to avoid runtime errors
+    if (!onCloseRef.current) {
+      onCloseRef.current = () => {};
+    }
+  }, [onClose]);
+  const safeOnClose = useCallback(() => {
+    const handler = typeof onClose === 'function' ? onClose : onCloseRef.current;
+    try {
+      handler?.();
+    } catch (err) {
+      console.error('❌ onClose handler threw an error', err);
+    }
+  }, [onClose]);
 
   // Handle dragging
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -174,8 +193,8 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
     const touch = e.touches[0];
     if (!touch) return;
     e.preventDefault();
-    let nextX = touch.clientX - dragStart.x;
-    let nextY = touch.clientY - dragStart.y;
+    const nextX = touch.clientX - dragStart.x;
+    const nextY = touch.clientY - dragStart.y;
     const visibleMargin = 32;
     const minX = Math.min(0, window.innerWidth - size.width + visibleMargin);
     const maxX = Math.max(0, window.innerWidth - visibleMargin);
@@ -387,9 +406,15 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
 
             {/* Close */}
             <button
-              onClick={onClose}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                safeOnClose();
+              }}
               title="إغلاق"
               className={styles.closeBtn}
+              type="button"
             >
               <X size={16} />
             </button>

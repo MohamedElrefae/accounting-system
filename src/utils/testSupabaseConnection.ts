@@ -30,7 +30,7 @@ export async function testSupabaseConnection() {
     // Test 3: Try to fetch from Supabase (test with a simple query)
     console.log('🔄 Testing database connection...')
     
-    const { data, error } = await supabase
+    const { data: _data, error } = await supabase
       .from('accounts')
       .select('count')
       .limit(1)

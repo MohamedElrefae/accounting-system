@@ -91,6 +91,9 @@
 .closeBtn {
   background: rgba(220, 38, 38, 0.8);
   padding: 6px;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  z-index: 10 !important;
 }
 
 .content {

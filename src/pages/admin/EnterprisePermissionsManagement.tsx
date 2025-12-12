@@ -134,6 +134,7 @@ export default function EnterprisePermissionsManagement() {
 
   useEffect(() => {
     loadPermissions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadPermissions = async () => {
@@ -183,8 +184,8 @@ export default function EnterprisePermissionsManagement() {
       }));
 
       setPermissions(formattedPermissions);
-    } catch (error) {
-      console.error('Error loading permissions:', error);
+    } catch {
+      console.error('Error loading permissions:');
     } finally {
       setLoading(false);
     }
@@ -385,8 +386,8 @@ export default function EnterprisePermissionsManagement() {
       }
 
       setTestResults(results);
-    } catch (error) {
-      console.error('Error testing permissions:', error);
+    } catch {
+      console.error('Error testing permissions:');
       alert('فشل اختبار الصلاحيات');
     } finally {
       setTesting(false);
@@ -406,7 +407,7 @@ export default function EnterprisePermissionsManagement() {
       }
 
       return { has_permission: data || false, reason: data ? 'الصلاحية متاحة' : 'الصلاحية غير متاحة' };
-    } catch (error) {
+    } catch {
       return { has_permission: false, reason: 'خطأ في الاختبار' };
     }
   };

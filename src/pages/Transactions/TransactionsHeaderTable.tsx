@@ -22,7 +22,7 @@ interface TransactionsHeaderTableProps {
   selectedTransactionId?: string
   // All the action handlers
   onEdit: (tx: TransactionRecord) => void
-  onDelete: (id: string) => void
+  onDelete: (tx: TransactionRecord) => void
   onOpenDetails: (tx: TransactionRecord) => Promise<void>
   onOpenDocuments: (tx: TransactionRecord) => void
   onOpenApprovalWorkflow: (tx: TransactionRecord) => void
@@ -207,7 +207,7 @@ const TransactionsHeaderTable: React.FC<TransactionsHeaderTableProps> = ({
               {mode === 'my' && !row.original.is_posted && !isApproved && hasPerm('transactions.delete') && row.original.created_by === currentUserId && (
                 <button
                   className="ultimate-btn ultimate-btn-delete"
-                  onClick={() => onDelete(row.original.id)}
+                  onClick={() => onDelete(row.original)}
                   title="حذف المعاملة (لا يمكن التراجع)"
                 >
                   <div className="btn-content"><span className="btn-text">حذف</span></div>

@@ -210,7 +210,7 @@ function classifyAccountByCode(code: string): AccountCategory {
 /**
  * Checks if account is a Balance Sheet account (1, 2, 3)
  */
-function isBalanceSheetAccount(code: string): boolean {
+export function isBalanceSheetAccount(code: string): boolean {
   const category = classifyAccountByCode(code)
   return category === 'assets' || category === 'liabilities' || category === 'equity'
 }
@@ -218,7 +218,7 @@ function isBalanceSheetAccount(code: string): boolean {
 /**
  * Checks if account is a P&L account (4, 5)
  */
-function isProfitLossAccount(code: string): boolean {
+export function isProfitLossAccount(code: string): boolean {
   const category = classifyAccountByCode(code)
   return category === 'revenue' || category === 'expenses'
 }

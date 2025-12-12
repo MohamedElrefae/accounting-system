@@ -143,20 +143,13 @@ export async function getLineReviewsForTransaction(
 
     if (reviewsError) throw reviewsError
 
-    // Fetch user emails for reviewers
+    // Build a lightweight user map without calling auth.users (avoids 404 with anon key)
+    // UI will prefer userNames map passed from UserProfile context; fallback to ID
     const reviewerIds = [...new Set((reviews || []).map((r: any) => r.reviewer_user_id))]
-    let userEmails: Record<string, string> = {}
-
-    if (reviewerIds.length > 0) {
-      const { data: users, error: usersError } = await supabase
-        .from('auth.users')
-        .select('id, email')
-        .in('id', reviewerIds)
-
-      if (!usersError && users) {
-        userEmails = Object.fromEntries(users.map((u: any) => [u.id, u.email]))
-      }
-    }
+    const userEmails: Record<string, string> = reviewerIds.reduce((acc, id) => {
+      acc[id] = id // fallback placeholder; actual display name comes from userNames map in UI
+      return acc
+    }, {} as Record<string, string>)
 
     // Transform to LineReview format with approval history
     return (lines || []).map((line: any) => {
@@ -185,6 +178,7 @@ export async function getLineReviewsForTransaction(
           id: r.id,
           action: r.review_type,
           status: r.review_type === 'approve' ? 'completed' : r.review_type === 'request_change' ? 'pending' : 'completed',
+          actor_user_id: r.reviewer_user_id,
           user_email: userEmails[r.reviewer_user_id] || 'Unknown',
           created_at: r.created_at,
           comment: r.comment

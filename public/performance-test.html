@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transactions Page Performance Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px;
+            margin: 10px 0;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid #007bff;
+        }
+        .metric.good {
+            border-left-color: #28a745;
+        }
+        .metric.warning {
+            border-left-color: #ffc107;
+        }
+        .metric.bad {
+            border-left-color: #dc3545;
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .test-button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .results {
+            margin-top: 30px;
+        }
+        .hidden {
+            display: none;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .iframe-container {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 20px 0;
+            height: 600px;
+        }
+        .iframe-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .summary {
+            background: #e7f3ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .chunk-list {
+            font-family: monospace;
+            font-size: 12px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🚀 Transactions Page Performance Test</h1>
+        <p>This test measures the performance of the code splitting optimization for the Transactions page.</p>
+        
+        <div class="summary">
+            <h3>📋 Test Details</h3>
+            <p><strong>Goal:</strong> Reduce load time from ~1.6s to under 500ms</p>
+            <p><strong>Method:</strong> Code splitting with React.lazy() and OptimizedSuspense</p>
+            <p><strong>Components Split:</strong> TransactionsHeaderTable, TransactionLinesTable, UnifiedCRUDForm</p>
+        </div>
+
+        <button class="test-button" onclick="startPerformanceTest()">
+            🧪 Start Performance Test
+        </button>
+        
+        <button class="test-button" onclick="openTransactionsPage()">
+            📄 Open Transactions Page
+        </button>
+
+        <div id="loading" class="loading hidden">
+            <p>⏳ Running performance test... Please wait.</p>
+        </div>
+
+        <div id="results" class="results hidden">
+            <h2>📊 Test Results</h2>
+            
+            <div class="metric" id="tti-metric">
+                <span>⏱️ Time to Interactive</span>
+                <span id="tti-value">-</span>
+            </div>
+            
+            <div class="metric" id="fcp-metric">
+                <span>🎨 First Contentful Paint</span>
+                <span id="fcp-value">-</span>
+            </div>
+            
+            <div class="metric" id="load-metric">
+                <span>📦 Page Load Complete</span>
+                <span id="load-value">-</span>
+            </div>
+            
+            <div class="metric" id="chunks-metric">
+                <span>🔢 JavaScript Chunks Loaded</span>
+                <span id="chunks-value">-</span>
+            </div>
+            
+            <div class="metric" id="size-metric">
+                <span>💾 Total JS Size</span>
+                <span id="size-value">-</span>
+            </div>
+
+            <div id="analysis">
+                <h3>🎯 Optimization Analysis</h3>
+                <div id="goal-status"></div>
+                <div id="improvement"></div>
+            </div>
+
+            <div id="chunks-details">
+                <h3>📦 Code Splitting Details</h3>
+                <div id="chunk-list" class="chunk-list"></div>
+            </div>
+        </div>
+
+        <div id="iframe-container" class="iframe-container hidden">
+            <iframe src="/transactions" id="test-frame"></iframe>
+        </div>
+    </div>
+
+    <script>
+        let testStartTime;
+        let performanceObserver;
+
+        function startPerformanceTest() {
+            console.log('🧪 Starting performance test...');
+            
+            // Show loading state
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('results').classList.add('hidden');
+            
+            // Clear previous results
+            clearResults();
+            
+            // Open transactions page in iframe for testing
+            const iframe = document.getElementById('test-frame');
+            const iframeContainer = document.getElementById('iframe-container');
+            iframeContainer.classList.remove('hidden');
+            
+            // Start timing when iframe starts loading
+            testStartTime = performance.now();
+            
+            // Set up performance monitoring for the iframe
+            iframe.onload = function() {
+                console.log('📡 Transactions page loaded, measuring performance...');
+                
+                // Wait a bit for everything to settle
+                setTimeout(() => {
+                    measurePerformance();
+                }, 2000);
+            };
+            
+            // Reload the iframe to start fresh
+            iframe.src = '/transactions';
+        }
+
+        function measurePerformance() {
+            try {
+                const iframe = document.getElementById('test-frame');
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                
+                // Get performance metrics from the iframe
+                const timing = iframe.contentWindow.performance.timing;
+                const navigation = iframe.contentWindow.performance.navigation;
+                
+                // Calculate key metrics
+                const metrics = {
+                    domContentLoaded: timing.domContentLoadedEventEnd - timing.navigationStart,
+                    loadComplete: timing.loadEventEnd - timing.navigationStart,
+                    timeToInteractive: timing.domInteractive - timing.navigationStart,
+                    firstPaint: 0,
+                    firstContentfulPaint: 0
+                };
+                
+                // Get paint metrics
+                const paintEntries = iframe.contentWindow.performance.getEntriesByType('paint');
+                if (paintEntries.length >= 1) {
+                    metrics.firstPaint = paintEntries[0].startTime;
+                }
+                if (paintEntries.length >= 2) {
+                    metrics.firstContentfulPaint = paintEntries[1].startTime;
+                }
+                
+                // Get resource information
+                const resources = iframe.contentWindow.performance.getEntriesByType('resource');
+                const jsChunks = resources.filter(r => r.name.includes('.js') || r.name.includes('.chunk'));
+                
+                const totalSize = jsChunks.reduce((sum, r) => sum + (r.transferSize || 0), 0);
+                const lazyChunks = jsChunks.filter(r => 
+                    r.name.includes('HeaderTable') || 
+                    r.name.includes('LinesTable') || 
+                    r.name.includes('UnifiedCRUDForm')
+                );
+                
+                // Display results
+                displayResults(metrics, jsChunks, lazyChunks, totalSize);
+                
+            } catch (error) {
+                console.error('❌ Error measuring performance:', error);
+                alert('Error measuring performance. Check console for details.');
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+
+        function displayResults(metrics, jsChunks, lazyChunks, totalSize) {
+            // Update metric displays
+            document.getElementById('tti-value').textContent = `${metrics.timeToInteractive.toFixed(0)}ms`;
+            document.getElementById('fcp-value').textContent = `${metrics.firstContentfulPaint.toFixed(0)}ms`;
+            document.getElementById('load-value').textContent = `${metrics.loadComplete.toFixed(0)}ms`;
+            document.getElementById('chunks-value').textContent = jsChunks.length;
+            document.getElementById('size-value').textContent = `${(totalSize / 1024).toFixed(1)}KB`;
+            
+            // Color code metrics based on performance
+            updateMetricStatus('tti-metric', metrics.timeToInteractive, 500, 1000);
+            updateMetricStatus('fcp-metric', metrics.firstContentfulPaint, 300, 600);
+            updateMetricStatus('load-metric', metrics.loadComplete, 800, 1500);
+            
+            // Show optimization analysis
+            const goalMet = metrics.timeToInteractive < 500;
+            const improvement = ((1600 - metrics.timeToInteractive) / 1600 * 100).toFixed(1);
+            
+            document.getElementById('goal-status').innerHTML = goalMet 
+                ? `<div class="metric good">✅ SUCCESS: Load time is under 500ms!</div>`
+                : `<div class="metric warning">⚠️ Load time is ${metrics.timeToInteractive.toFixed(0)}ms (target: <500ms)</div>`;
+            
+            document.getElementById('improvement').innerHTML = `
+                <div class="metric ${improvement > 50 ? 'good' : improvement > 20 ? 'warning' : 'bad'}">
+                    🚀 Improvement: ${improvement}% faster than baseline (1.6s)
+                </div>
+            `;
+            
+            // Show chunk details
+            const chunkList = document.getElementById('chunk-list');
+            chunkList.innerHTML = `
+                <strong>JavaScript Chunks (${jsChunks.length}):</strong><br>
+                ${jsChunks.map(chunk => {
+                    const name = chunk.name.split('/').pop();
+                    const size = (chunk.transferSize || 0) / 1024;
+                    const isLazy = name.includes('HeaderTable') || name.includes('LinesTable') || name.includes('UnifiedCRUDForm');
+                    return `${isLazy ? '🔄' : '📦'} ${name}: ${size.toFixed(1)}KB`;
+                }).join('<br>')}
+                <br><br>
+                <strong>Lazy-loaded Components (${lazyChunks.length}):</strong><br>
+                ${lazyChunks.length > 0 
+                    ? '✅ Code splitting is working - components loaded as separate chunks'
+                    : '⚠️ No lazy-loaded chunks detected'
+                }
+            `;
+            
+            // Show results section
+            document.getElementById('results').classList.remove('hidden');
+        }
+
+        function updateMetricStatus(elementId, value, goodThreshold, warningThreshold) {
+            const element = document.getElementById(elementId);
+            element.classList.remove('good', 'warning', 'bad');
+            
+            if (value < goodThreshold) {
+                element.classList.add('good');
+            } else if (value < warningThreshold) {
+                element.classList.add('warning');
+            } else {
+                element.classList.add('bad');
+            }
+        }
+
+        function clearResults() {
+            document.getElementById('tti-value').textContent = '-';
+            document.getElementById('fcp-value').textContent = '-';
+            document.getElementById('load-value').textContent = '-';
+            document.getElementById('chunks-value').textContent = '-';
+            document.getElementById('size-value').textContent = '-';
+        }
+
+        function openTransactionsPage() {
+            window.open('/transactions', '_blank');
+        }
+
+        // Check if we're on the right domain
+        if (window.location.hostname === 'localhost' && window.location.port === '5173') {
+            console.log('✅ Running on development server - ready for testing');
+        } else {
+            console.log('⚠️ This test should be run on the development server (localhost:5173)');
+            document.querySelector('.test-container').insertAdjacentHTML('afterbegin', 
+                '<div class="metric bad">⚠️ Please run this test on the development server (npm run dev)</div>'
+            );
+        }
+    </script>
+</body>
+</html>

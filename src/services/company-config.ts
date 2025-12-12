@@ -105,7 +105,7 @@ export async function getCompanyConfig(): Promise<CompanyConfig> {
 /**
  * Create default company configuration
  */
-async function createDefaultConfig(): Promise<CompanyConfig> {
+export async function createDefaultConfig(): Promise<CompanyConfig> {
   // Do not attempt to write a row automatically; return in-memory defaults.
   // This avoids 400 errors when optional columns differ per environment and respects RLS.
   const fallback = {

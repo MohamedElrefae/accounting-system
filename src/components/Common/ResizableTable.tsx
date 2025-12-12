@@ -57,7 +57,7 @@ function ResizableTable<T extends RowRecord>({
   const resizeRef = useRef<{ column: string; startX: number; startWidth: number } | null>(null)
 
   // Filter visible columns and sort by pin priority
-  const visibleColumns = columns
+  const visibleColumns = (columns || [])
     .filter(col => col.visible)
     .sort((a, b) => {
       // First sort by frozen status and pin priority

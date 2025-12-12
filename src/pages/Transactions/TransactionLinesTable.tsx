@@ -73,11 +73,17 @@ const TransactionLinesTable: React.FC<TransactionLinesTableProps> = ({
   onOpenDocuments,
   onOpenCostAnalysis,
   onOpenLineReview,
-  onApproveLine,
-  onRejectLine
+  _onApproveLine, // Available for future line approval functionality
+  _onRejectLine,  // Available for future line rejection functionality
 }) => {
   // Prepare table data
   const tableData = useMemo(() => {
+    // Safety check - if lines is undefined or not an array, return empty array
+    if (!lines || !Array.isArray(lines)) {
+      console.warn('TransactionLinesTable: lines prop is undefined or not an array', lines)
+      return []
+    }
+    
     const accLabel = (line: any) => {
       // Use enriched data from v_transaction_lines_enriched view
       // which includes account_code, account_name, and account_name_ar
@@ -123,7 +129,7 @@ const TransactionLinesTable: React.FC<TransactionLinesTableProps> = ({
 
   return (
     <ResizableTable
-      columns={columns}
+      columns={columns || []}
       data={tableData}
       onColumnResize={onColumnResize}
       className={`transaction-lines-resizable-table ${wrapMode ? 'wrap' : 'nowrap'}`}
@@ -260,7 +266,7 @@ const TransactionLinesTable: React.FC<TransactionLinesTableProps> = ({
 
         return _value
       }}
-      onRowClick={(row) => onSelectLine(row.original)}
+      onRowClick={(row) => onSelectLine && onSelectLine(row.original)}
     />
   )
 }
