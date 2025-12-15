@@ -8,17 +8,6 @@ import './Transactions.css'
 import { useTransactionsData } from '../../contexts/TransactionsDataContext'
 import ExportButtons from '../../components/Common/ExportButtons'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
-
-// Approval history type - moved to local definition
-type ApprovalHistoryRow = {
-  id: string
-  request_id: string
-  step_order: number
-  action: 'approve' | 'reject' | 'request_changes' | 'comment'
-  reason: string | null
-  actor_user_id: string
-  created_at: string
-}
 import PermissionBadge from '../../components/Common/PermissionBadge'
 import { WithPermission } from '../../components/Common/withPermission'
 import ResizableTable from '../../components/Common/ResizableTable'
@@ -27,7 +16,7 @@ import type { ColumnConfig } from '../../components/Common/ColumnConfiguration'
 import useColumnPreferences from '../../hooks/useColumnPreferences'
 import { supabase } from '../../utils/supabase'
 import { getTransactionsEnrichedView } from '../../services/transactions-enriched'
-import { useFilterState } from '../../hooks/useFilterState'
+import { useFilterState, type FilterState } from '../../hooks/useFilterState'
 import UnifiedFilterBar from '../../components/Common/UnifiedFilterBar'
 
 const TransactionsEnrichedPage: React.FC = () => {
@@ -61,8 +50,10 @@ const TransactionsEnrichedPage: React.FC = () => {
 
   const defaultFilterValues = useMemo<FilterState>(() => ({
     approvalStatus: '',
-    projectId: (() => { try { return (localStorage.getItem('project_id') || '') as string } catch { return '' } })(),
+    projectId: '',
   }), [])
+
+  const globalProjectSyncRef = useRef(false)
 
   const {
     filters: unifiedFilters,
@@ -84,14 +75,31 @@ const TransactionsEnrichedPage: React.FC = () => {
   const hasPerm = useHasPermission()
 
   useEffect(() => {
+    // Optional one-time sync with global active project.
+    // Never override user selection and do not re-apply after reset/clear.
+    const useGlobal = (() => {
+      try { return localStorage.getItem('transactions:useGlobalProject') === '1' } catch { return false }
+    })()
+
+    if (!useGlobal) {
+      globalProjectSyncRef.current = false
+      return
+    }
+
+    if (unifiedFilters.projectId) {
+      globalProjectSyncRef.current = true
+      return
+    }
+
+    if (globalProjectSyncRef.current) return
+
     try {
       const pid = getActiveProjectId() || ''
-      if (pid && pid !== unifiedFilters.projectId) {
-        updateFilter('projectId', pid)
-      }
+      if (pid) updateFilter('projectId', pid)
     } catch { }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+
+    globalProjectSyncRef.current = true
+  }, [unifiedFilters.projectId, updateFilter])
 
   useEffect(() => {
     if (!hasInitializedAppliedFilters.current) {
@@ -238,11 +246,11 @@ const TransactionsEnrichedPage: React.FC = () => {
   const [columnsConfigOpen, setColumnsConfigOpen] = useState(false)
 
   // Helpers for label mapping
-  const accountLabel = (id?: string | null) => {
+  const accountLabel = useCallback((id?: string | null) => {
     if (!id) return ''
     const a = accounts.find(x => x.id === id)
     return a ? `${a.code} - ${a.name_ar || a.name}` : id || ''
-  }
+  }, [accounts])
 
   // Prepare data for table renderers similar to original page
   const paged = rows
@@ -395,7 +403,7 @@ const TransactionsEnrichedPage: React.FC = () => {
         original: t,
       }
     })
-  }, [paged, accounts, userNames, categories, workItems, analysisItemsMap, organizations, projects, classifications])
+  }, [paged, accounts, userNames, categories, workItems, analysisItemsMap, organizations, projects, classifications, costCenters, dimLists, accountLabel])
 
   // Build export data from current columns and table rows (include all configured columns)
   const exportData = useMemo(() => {

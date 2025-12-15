@@ -15,7 +15,6 @@ import {
   type TransactionRecord,
   type TransactionAudit,
 } from '../../services/transactions'
-import { getActiveProjectId } from '../../utils/org'
 import { useHasPermission } from '../../hooks/useHasPermission'
 import './Transactions.css'
 import { useToast } from '../../contexts/ToastContext'
@@ -167,7 +166,6 @@ const TransactionsPage: React.FC = () => {
     updateHeaderFilter,
     applyHeaderFilters,
     resetHeaderFilters,
-    useGlobalProjectTx,
     lineFilters,
     updateLineFilter,
     // _resetLineFilters, // Available for future filter reset functionality
@@ -220,21 +218,6 @@ const TransactionsPage: React.FC = () => {
       return raw ? raw === '1' : false
     } catch { return false }
   })
-
-  // Sync project filter with global when enabled
-  useEffect(() => {
-    if (!useGlobalProjectTx) return
-    try {
-      const pid = getActiveProjectId() || ''
-      if (pid && pid !== headerFilters.projectId) {
-        updateHeaderFilter('projectId', pid)
-      }
-    } catch { }
-  }, [useGlobalProjectTx, headerFilters.projectId, updateHeaderFilter])
-
-  useEffect(() => {
-    try { localStorage.setItem('transactions:useGlobalProject', useGlobalProjectTx ? '1' : '0') } catch { }
-  }, [useGlobalProjectTx])
 
   // Persist wrapMode to server when available
   useEffect(() => {

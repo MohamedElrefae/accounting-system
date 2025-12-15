@@ -397,8 +397,6 @@ const Dashboard: React.FC = () => {
       // 1) Recent 10 transactions
       const { getReadMode } = await import('../config/featureFlags');
       const readMode = getReadMode();
-
-      if (false) {
       let rows: any[] = [];
       if (readMode !== 'legacy') {
         // Use enriched multi-line journals view
@@ -450,7 +448,6 @@ const Dashboard: React.FC = () => {
           category: null,
         }));
         setRecent(recentDerived);
-      }
       }
 
       // 2) Window for charts: last 6 months

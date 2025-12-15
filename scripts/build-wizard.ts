@@ -4,8 +4,9 @@
  */
 
 import { execSync } from 'child_process'
-import { existsSync, mkdirSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, writeFileSync, readFileSync, statSync } from 'fs'
 import { join } from 'path'
+import { pathToFileURL } from 'url'
 
 // ============================================================================
 // Configuration
@@ -91,7 +92,8 @@ const checkDependencies = (): BuildResult => {
       '@mui/material'
     ]
     
-    const packageJson = require(join(PROJECT_ROOT, 'package.json'))
+    const packageJsonPath = join(PROJECT_ROOT, 'package.json')
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
     const missingDeps = criticalDeps.filter(dep => !packageJson.dependencies?.[dep])
     
     if (missingDeps.length > 0) {
@@ -188,7 +190,7 @@ const checkFiles = (): BuildResult => {
     requiredFiles.forEach(file => {
       const filePath = join(PROJECT_ROOT, file)
       if (existsSync(filePath)) {
-        const stats = require('fs').statSync(filePath)
+        const stats = statSync(filePath)
         const sizeKB = Math.round(stats.size / 1024)
         if (sizeKB > 100) {
           largeFiles.push(`${file} (${sizeKB}KB)`)
@@ -230,14 +232,13 @@ const checkImports = (): BuildResult => {
     ]
     
     testFiles.forEach(file => {
-      try {
-        // This will throw if there are syntax errors
-        require(join(PROJECT_ROOT, file))
-        log(`✓ ${file} imports correctly`)
-      } catch (error) {
-        result.errors.push(`Import error in ${file}: ${error}`)
+      const filePath = join(PROJECT_ROOT, file)
+      if (!existsSync(filePath)) {
+        result.errors.push(`Missing import target: ${file}`)
         result.success = false
+        return
       }
+      log(`✓ ${file} exists (syntax verified by TypeScript step)`)
     })
     
   } catch (error) {
@@ -389,7 +390,7 @@ const main = async () => {
 }
 
 // Run the build process
-if (require.main === module) {
+if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   main().catch(error => {
     log(`Build process crashed: ${error}`, 'error')
     process.exit(1)

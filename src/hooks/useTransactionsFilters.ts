@@ -71,6 +71,8 @@ export const useTransactionsFilters = () => {
     }
   })
 
+  const globalProjectSyncRef = useRef(false)
+
   const applyHeaderFilters = useCallback(() => {
     setHeaderAppliedFilters({ ...headerFilters })
     setHeaderFiltersDirty(false)
@@ -94,17 +96,32 @@ export const useTransactionsFilters = () => {
   }, [headerFilters, headerAppliedFilters])
 
   useEffect(() => {
-    // Only sync with global project if explicitly enabled AND user hasn't manually cleared the filter
-    if (!useGlobalProjectTx) return
+    // Only sync with global project if explicitly enabled.
+    // Run at most once per enable-toggle and never override a user-selected project.
+    if (!useGlobalProjectTx) {
+      globalProjectSyncRef.current = false
+      return
+    }
+
+    // If a project is already selected (from storage or user selection), treat it as user intent
+    // and never override it.
+    if (headerFilters.projectId) {
+      globalProjectSyncRef.current = true
+      return
+    }
+
+    // Prevent re-applying the global project after the user clears/resets the project filter.
+    if (globalProjectSyncRef.current) return
     try {
       const pid = getActiveProjectId() || ''
-      // Only update if there's a global project AND current filter is empty (not manually cleared)
-      if (pid && !headerFilters.projectId) {
+      // Only update if there's a global project AND the filter is empty.
+      if (pid) {
         updateHeaderFilter('projectId', pid)
       }
     } catch {
       // ignore
     }
+    globalProjectSyncRef.current = true
   }, [useGlobalProjectTx, headerFilters.projectId, updateHeaderFilter])
 
   useEffect(() => {

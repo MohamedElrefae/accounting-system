@@ -66,12 +66,8 @@ export function useLineReviews(approvalRequestId: string | null | undefined, tra
       // We allow comments without approvalRequestId (direct transaction review)
       // if (!approvalRequestId) throw new Error('No approval request ID')
 
-      try {
-        await addLineReviewComment(approvalRequestId || null, lineId, comment, reviewType)
-        await loadLineReviews() // Refresh
-      } catch (err) {
-        throw err
-      }
+      await addLineReviewComment(approvalRequestId || null, lineId, comment, reviewType)
+      await loadLineReviews() // Refresh
     },
     [approvalRequestId, loadLineReviews]
   )
