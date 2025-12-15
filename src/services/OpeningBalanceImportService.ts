@@ -101,11 +101,39 @@ export class OpeningBalanceImportService {
   }
 
   // 1) Parse Excel -> rows (supports debit/credit or single amount)
+  static async extractAccountCodesFromExcel(file: File): Promise<string[]> {
+    const data = await file.arrayBuffer()
+    const workbook = XLSX.read(data, { type: 'array' })
+    const firstSheetName = workbook.SheetNames[0]
+    const worksheet = workbook.Sheets[firstSheetName]
+    const rows = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet, { defval: null })
+
+    const out = new Set<string>()
+    for (const r of rows) {
+      const get = (...keys: string[]) => {
+        for (const k of keys) {
+          if (r[k] !== undefined && r[k] !== null && String(r[k]).trim() !== '') return r[k]
+        }
+        return null
+      }
+      const code = get('account_code', 'AccountCode', 'كود الحساب')
+      if (code !== null) {
+        const v = String(code).trim()
+        if (v) out.add(v)
+      }
+    }
+    return Array.from(out)
+  }
+
   static async importFromExcel(
     orgId: string,
     fiscalYearId: string,
     file: File,
     _userId?: string,
+    opts?: {
+      overrideProjectCode?: string | null
+      overrideCostCenterCode?: string | null
+    },
   ): Promise<ImportResult> {
     const data = await file.arrayBuffer()
     const workbook = XLSX.read(data, { type: 'array' })
@@ -163,9 +191,9 @@ export class OpeningBalanceImportService {
         account_id: get('account_id', 'AccountId') ?? undefined,
         account_code: get('account_code', 'AccountCode', 'كود الحساب') ?? undefined,
         project_id: get('project_id', 'ProjectId') ?? undefined,
-        project_code: get('project_code', 'ProjectCode', 'كود المشروع') ?? undefined,
+        project_code: (opts?.overrideProjectCode !== undefined ? opts.overrideProjectCode : (get('project_code', 'ProjectCode', 'كود المشروع') ?? undefined)) as any,
         cost_center_id: get('cost_center_id', 'CostCenterId') ?? undefined,
-        cost_center_code: get('cost_center_code', 'CostCenterCode', 'كود مركز التكلفة') ?? undefined,
+        cost_center_code: (opts?.overrideCostCenterCode !== undefined ? opts.overrideCostCenterCode : (get('cost_center_code', 'CostCenterCode', 'كود مركز التكلفة') ?? undefined)) as any,
         amount: Number(computedAmount),
         currency_code: get('currency_code', 'Currency', 'العملة') ?? undefined,
       }
@@ -297,13 +325,12 @@ export class OpeningBalanceImportService {
     try {
       const { data, error } = await supabase
         .from('projects')
-        .select('code, name, parent_id, id')
+        .select('id, code, name')
         .or(`org_id.eq.${orgId},org_id.is.null`)
         .order('code', { ascending: true })
         .limit(limit)
       if (error) throw error
-      // Many setups have flat projects; parent_id may be null
-      return ((data as any[]) || []).map(r => ({ value: r.code, label: r.name ? `${r.code} - ${r.name}` : r.code, searchText: `${r.code} ${r.name||''}`, parent: r.parent_id || undefined }))
+      return ((data as any[]) || []).map(r => ({ value: r.code, label: r.name ? `${r.code} - ${r.name}` : r.code, searchText: `${r.code} ${r.name||''}`, parent: undefined }))
     } catch { return [] }
   }
 
@@ -324,12 +351,12 @@ export class OpeningBalanceImportService {
     try {
       const { data, error } = await supabase
         .from('cost_centers')
-        .select('id, code, name, parent_id, level')
+        .select('id, code, name')
         .eq('org_id', orgId)
         .order('code', { ascending: true })
         .limit(limit)
       if (error) throw error
-      return ((data as any[]) || []).map(r => ({ value: r.code, label: r.name ? `${r.code} - ${r.name}` : r.code, searchText: `${r.code} ${r.name||''}`, parent: r.parent_id || undefined }))
+      return ((data as any[]) || []).map(r => ({ value: r.code, label: r.name ? `${r.code} - ${r.name}` : r.code, searchText: `${r.code} ${r.name||''}`, parent: undefined }))
     } catch { return [] }
   }
 

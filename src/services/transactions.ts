@@ -93,10 +93,13 @@ export interface Account {
   id: string
   code: string
   name: string
+  name_ar?: string
   is_postable: boolean
+  allow_transactions?: boolean
   category?: string
   parent_id?: string | null
   level?: number
+  org_id?: string
 }
 
 export interface Project {
@@ -320,10 +323,12 @@ export async function getAccounts(): Promise<Account[]> {
     code: row.code, 
     name: row.name, 
     name_ar: row.name_ar,
-    is_postable: (row.is_postable ?? row.allow_transactions ?? false), 
+    is_postable: (row.is_postable ?? row.allow_transactions ?? false),
+    allow_transactions: row.allow_transactions ?? undefined,
     category: row.category, 
     parent_id: row.parent_id, 
-    level: row.level 
+    level: row.level,
+    org_id: row.org_id,
   })) as Account[]
 }
 
@@ -375,7 +380,9 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
   // Build query on transactions table directly
   let query = supabase
     .from('transactions')
-    .select('*', { count: 'exact' })
+    // Using 'planned' count is significantly faster than 'exact' on large tables.
+    // This impacts only pagination totals; row data remains exact.
+    .select('*', { count: 'planned' })
     // Exclude wizard drafts - these are temporary records for document attachment
     .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
 
@@ -433,32 +440,33 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
   try {
     if (rows.length > 0) {
       const ids = rows.map(r => r.id)
-      
-      // 1. Fetch line items aggregates
-      const { data: aggs, error: aggErr } = await supabase
-        .from('v_tx_line_items_agg')
-        .select('transaction_id, line_items_count, line_items_total')
-        .in('transaction_id', ids)
-        
-      // 2. Fetch approval stats for pending transactions
+
+      // Fetch page-level aggregates in parallel to reduce RTT cost.
       const pendingIds = rows.filter(r => !r.is_posted).map(r => r.id)
+
+      const [aggsResult, approvalStatsResult] = await Promise.all([
+        supabase
+          .from('v_tx_line_items_agg')
+          .select('transaction_id, line_items_count, line_items_total')
+          .in('transaction_id', ids),
+        pendingIds.length > 0
+          ? supabase
+              .from('transaction_lines')
+              .select('transaction_id, line_status')
+              .in('transaction_id', pendingIds)
+          : Promise.resolve({ data: null as any, error: null as any }),
+      ])
+
+      const { data: aggs, error: aggErr } = aggsResult as any
+      const { data: approvalStats } = approvalStatsResult as any
+
       const approvalStatsMap = new Map<string, { total: number; approved: number }>()
-      
-      if (pendingIds.length > 0) {
-        const { data: approvalStats } = await supabase
-          .from('transaction_lines')
-          .select('transaction_id, line_status')
-          .in('transaction_id', pendingIds)
-          
-        if (approvalStats) {
-          for (const stat of approvalStats) {
-            const current = approvalStatsMap.get(stat.transaction_id) || { total: 0, approved: 0 }
-            current.total++
-            if (stat.line_status === 'approved') {
-              current.approved++
-            }
-            approvalStatsMap.set(stat.transaction_id, current)
-          }
+      if (approvalStats) {
+        for (const stat of approvalStats) {
+          const current = approvalStatsMap.get(stat.transaction_id) || { total: 0, approved: 0 }
+          current.total++
+          if (stat.line_status === 'approved') current.approved++
+          approvalStatsMap.set(stat.transaction_id, current)
         }
       }
 
@@ -472,13 +480,13 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
             ;(r as any).line_items_total = m.t
             ;(r as any).has_line_items = m.c > 0
           }
-          
+
           // Patch approval stats
           const stats = approvalStatsMap.get(r.id)
           if (stats) {
             ;(r as any).lines_total_count = stats.total
             ;(r as any).lines_approved_count = stats.approved
-            
+
             // Patch approval status if all lines are approved but header status is lagging
             if (stats.total > 0 && stats.approved === stats.total && (r.approval_status === 'draft' || r.approval_status === 'submitted' || r.approval_status === 'pending')) {
               r.approval_status = 'approved'

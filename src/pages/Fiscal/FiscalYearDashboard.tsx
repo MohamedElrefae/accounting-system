@@ -517,6 +517,18 @@ export default function FiscalYearDashboard() {
   // Queries and mutations
   const { data: fiscalYears = [], isLoading, error, refetch } = useFiscalYears(orgId)
   const { data: canManage = false } = useCanManageFiscal(orgId)
+
+  // Debug logging
+  React.useEffect(() => {
+    console.log('FiscalYearDashboard: Component mounted/updated', {
+      orgId,
+      fiscalYearsCount: fiscalYears.length,
+      fiscalYears,
+      isLoading,
+      error,
+      canManage
+    })
+  }, [orgId, fiscalYears, isLoading, error, canManage])
   const deleteMutation = useDeleteFiscalYear(orgId)
   const setCurrentMutation = useSetCurrentFiscalYear(orgId)
   const activateMutation = useActivateFiscalYear(orgId)

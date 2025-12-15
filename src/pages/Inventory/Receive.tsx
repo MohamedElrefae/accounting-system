@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, Suspense, lazy } from 'react'
-import { Card, CardContent, Typography, Grid, TextField, MenuItem, Button, Divider } from '@mui/material'
+import { Card, CardContent, Typography, Grid, TextField, MenuItem, Button, Divider, Box } from '@mui/material'
 import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/hooks/useAuth'
 import { listMaterials, type MaterialRow } from '@/services/inventory/materials'
@@ -10,6 +10,9 @@ import { z } from 'zod'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import AsyncAutocomplete, { type AsyncOption } from '@/components/Common/AsyncAutocomplete'
+import { useArabicLanguage } from '@/services/ArabicLanguageService'
+import { INVENTORY_TEXTS } from '@/i18n/inventory'
+import { getDisplayName } from '@/utils/inventoryDisplay'
 
 const DocumentActionsBar = lazy(() => import('@/components/Inventory/DocumentActionsBar'))
 
@@ -18,6 +21,7 @@ function getActiveOrgIdSafe(): string | null { try { return localStorage.getItem
 const ReceiveMaterialsPage: React.FC = () => {
   const { showToast } = useToast()
   const { user } = useAuth()
+  const { t, isRTL } = useArabicLanguage()
 
   const [orgId, setOrgId] = useState<string>('')
   const [materials, setMaterials] = useState<MaterialRow[]>([])
@@ -187,8 +191,10 @@ const ReceiveMaterialsPage: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: 16 }}>
-<Typography variant="h6" gutterBottom>Receive Materials / توريد مواد</Typography>
+    <Box sx={{ padding: 2, direction: isRTL ? 'rtl' : 'ltr' }}>
+      <Typography variant="h4" gutterBottom>
+        {t(INVENTORY_TEXTS.receiveMaterials)}
+      </Typography>
           {/* Actions bar for quick approve/post/void by ID */}
           <Suspense fallback={null}>
             <DocumentActionsBar />
@@ -199,7 +205,7 @@ const ReceiveMaterialsPage: React.FC = () => {
             <Grid container spacing={2}>
               <Grid item xs={12} md={4}>
                 <AsyncAutocomplete
-                  label="Location (to) / موقع"
+                  label={t(INVENTORY_TEXTS.locationTo)}
                   value={locationId || ''}
 onChange={(v) => { setValue('locationId', v || '', { shouldValidate: true, shouldDirty: true, shouldTouch: true }) }}
                   loader={locationLoader}
@@ -209,7 +215,7 @@ onChange={(v) => { setValue('locationId', v || '', { shouldValidate: true, shoul
               </Grid>
               <Grid item xs={12} md={4}>
                 <AsyncAutocomplete
-                  label="Material / مادة"
+                  label={t(INVENTORY_TEXTS.material)}
                   value={materialId || ''}
 onChange={(v) => { setValue('materialId', v || '', { shouldValidate: true, shouldDirty: true, shouldTouch: true }) }}
                   loader={materialLoader}
@@ -225,7 +231,7 @@ onChange={(v) => { setValue('materialId', v || '', { shouldValidate: true, shoul
                     <TextField
                       select
                       fullWidth
-                      label="UOM / وحدة"
+                      label={t(INVENTORY_TEXTS.uom)}
                       value={field.value ?? ''}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
@@ -235,16 +241,16 @@ onChange={(v) => { setValue('materialId', v || '', { shouldValidate: true, shoul
                       SelectProps={{ displayEmpty: true }}
                     >
                       <MenuItem value="" disabled>—</MenuItem>
-                      {uoms.map(u => (<MenuItem key={u.id} value={u.id}>{u.code} - {u.name}</MenuItem>))}
+                      {uoms.map(u => (<MenuItem key={u.id} value={u.id}>{u.code} - {getDisplayName(u)}</MenuItem>))}
                     </TextField>
                   )}
                 />
               </Grid>
               <Grid item xs={12} md={3}>
-                <TextField type="number" fullWidth label="Quantity / الكمية" {...register('quantity', { valueAsNumber: true })} error={!!errors.quantity} helperText={errors.quantity?.message} />
+                <TextField type="number" fullWidth label={t(INVENTORY_TEXTS.quantity)} {...register('quantity', { valueAsNumber: true })} error={!!errors.quantity} helperText={errors.quantity?.message} />
               </Grid>
               <Grid item xs={12} md={3}>
-                <TextField type="number" fullWidth label="Unit Cost / سعر الوحدة" {...register('unitCost', { valueAsNumber: true })} error={!!errors.unitCost} helperText={errors.unitCost?.message} />
+                <TextField type="number" fullWidth label={t(INVENTORY_TEXTS.unitCost)} {...register('unitCost', { valueAsNumber: true })} error={!!errors.unitCost} helperText={errors.unitCost?.message} />
               </Grid>
               <Grid item xs={12} md={3}>
                 <Controller
@@ -254,7 +260,7 @@ onChange={(v) => { setValue('materialId', v || '', { shouldValidate: true, shoul
                     <TextField
                       select
                       fullWidth
-                      label="Price Source / طريقة التسعير"
+                      label={t({ en: 'Price Source', ar: 'طريقة التسعير' })}
                       value={field.value ?? ''}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
@@ -264,45 +270,49 @@ onChange={(v) => { setValue('materialId', v || '', { shouldValidate: true, shoul
                       SelectProps={{ displayEmpty: true }}
                     >
                       <MenuItem value="" disabled>—</MenuItem>
-                      <MenuItem value="moving_average">Moving Average</MenuItem>
-                      <MenuItem value="last_purchase">Last Purchase</MenuItem>
-                      <MenuItem value="manual">Manual</MenuItem>
+                      <MenuItem value="moving_average">{t(INVENTORY_TEXTS.movingAverage)}</MenuItem>
+                      <MenuItem value="last_purchase">{t(INVENTORY_TEXTS.lastPurchase)}</MenuItem>
+                      <MenuItem value="manual">{t(INVENTORY_TEXTS.manual)}</MenuItem>
                     </TextField>
                   )}
                 />
               </Grid>
               <Grid item xs={12}>
-                <TextField fullWidth label="Notes / ملاحظات" {...register('notes')} error={!!errors.notes} helperText={errors.notes?.message} />
+                <TextField fullWidth label={t(INVENTORY_TEXTS.notes)} {...register('notes')} error={!!errors.notes} helperText={errors.notes?.message} />
               </Grid>
             </Grid>
             <Divider sx={{ my: 2 }} />
             <Grid container spacing={1} alignItems="center">
               <Grid item>
-                <Button variant="outlined" onClick={addLine} disabled={loading || isSubmitting}>Add Line / إضافة سطر</Button>
+                <Button variant="outlined" onClick={addLine} disabled={loading || isSubmitting}>
+                  {t(INVENTORY_TEXTS.addLine)}
+                </Button>
               </Grid>
               <Grid item>
-                <Button type="submit" variant="contained" color="primary" disabled={loading || isSubmitting}>Create, Approve & Post / إنشاء واعتماد وترحيل</Button>
+                <Button type="submit" variant="contained" color="primary" disabled={loading || isSubmitting}>
+                  {t({ en: 'Create, Approve & Post', ar: 'إنشاء واعتماد وترحيل' })}
+                </Button>
               </Grid>
             </Grid>
           </form>
           {!!lines.length && (
-            <div style={{ marginTop: 12 }}>
-              <Typography variant="subtitle1">Pending Lines / الأسطر المضافة</Typography>
+            <Box sx={{ marginTop: 2 }}>
+              <Typography variant="subtitle1">{t({ en: 'Pending Lines', ar: 'الأسطر المضافة' })}</Typography>
               {lines.map((ln, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '4px 0' }}>
+                <Box key={idx} sx={{ display: 'flex', gap: 1, alignItems: 'center', margin: '4px 0' }}>
                   <span>{idx+1}.</span>
-                  <span>Mat: {materials.find(m=>m.id===ln.materialId)?.material_code}</span>
-                  <span>UOM: {uoms.find(u=>u.id===ln.uomId)?.code}</span>
-                  <span>Qty: {ln.quantity}</span>
-                  <span>Cost: {ln.unitCost}</span>
-                  <Button size="small" onClick={() => removeLine(idx)}>Remove</Button>
-                </div>
+                  <span>{t(INVENTORY_TEXTS.material)}: {materials.find(m=>m.id===ln.materialId)?.material_code}</span>
+                  <span>{t(INVENTORY_TEXTS.uom)}: {uoms.find(u=>u.id===ln.uomId)?.code}</span>
+                  <span>{t(INVENTORY_TEXTS.quantity)}: {ln.quantity}</span>
+                  <span>{t(INVENTORY_TEXTS.unitCost)}: {ln.unitCost}</span>
+                  <Button size="small" onClick={() => removeLine(idx)}>{t(INVENTORY_TEXTS.removeLine)}</Button>
+                </Box>
               ))}
-            </div>
+            </Box>
           )}
         </CardContent>
       </Card>
-    </div>
+    </Box>
   )
 }
 

@@ -41,19 +41,22 @@ export default function InventoryKPIDashboardPage() {
       const ageingQty = (ageing || []).reduce((a: number, r: any) => a + Number(r.on_hand_qty || 0), 0)
 
       // 3) Last month movements (In/Out) from project-month summary
-      // Compute YYYY-MM for last calendar month
+      // Compute YYYY-MM-DD for last calendar month (first and last day)
       const now = new Date()
       const lastMonthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1))
       const yyyy = lastMonthDate.getUTCFullYear()
       const mm = String(lastMonthDate.getUTCMonth() + 1).padStart(2, '0')
-      const lastMonthKey = `${yyyy}-${mm}-01` // period_month compares lexically as date-like
+      // Calculate actual last day of the month
+      const lastDayOfMonth = new Date(Date.UTC(yyyy, lastMonthDate.getUTCMonth() + 1, 0)).getUTCDate()
+      const lastMonthStart = `${yyyy}-${mm}-01`
+      const lastMonthEnd = `${yyyy}-${mm}-${String(lastDayOfMonth).padStart(2, '0')}`
 
       const { data: mv, error: mvErr } = await supabase
         .from('v_inv_movement_summary_project_month')
         .select('period_month, qty_in, qty_out')
         .eq('org_id', orgId)
-        .gte('period_month', `${yyyy}-${mm}`)
-        .lte('period_month', `${yyyy}-${mm}`)
+        .gte('period_month', lastMonthStart)
+        .lte('period_month', lastMonthEnd)
       if (mvErr) throw mvErr
       const inSum = (mv || []).reduce((a: number, r: any) => a + Number(r.qty_in || 0), 0)
       const outSum = (mv || []).reduce((a: number, r: any) => a + Number(r.qty_out || 0), 0)

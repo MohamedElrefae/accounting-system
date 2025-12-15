@@ -57,3 +57,11 @@ export async function updateMaterial(id: string, updates: Partial<MaterialRow>):
   if (error) throw error
   return data as MaterialRow
 }
+
+export async function deleteMaterial(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('materials')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}

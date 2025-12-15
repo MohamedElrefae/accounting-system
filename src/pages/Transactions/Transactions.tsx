@@ -12,8 +12,6 @@ import {
   cancelSubmission,
   postTransaction,
   getUserDisplayMap,
-  getAccounts,
-  getProjects,
   type TransactionRecord,
   type TransactionAudit,
 } from '../../services/transactions'
@@ -53,9 +51,6 @@ import UnifiedTransactionDetailsPanel from '../../components/Transactions/Unifie
 // import FormLayoutControls from '../../components/Common/FormLayoutControls'
 import { Star } from 'lucide-react'
 import SearchableSelect from '../../components/Common/SearchableSelect'
-import { getOrganizations } from '../../services/organization'
-import { getAllTransactionClassifications } from '../../services/transaction-classification'
-import { getCurrentUserId } from '../../services/transactions'
 import { ApplicationPerformanceMonitor } from '../../services/ApplicationPerformanceMonitor'
 import { PerformanceMonitor } from '../../utils/performanceMonitor'
 import { OptimizedSuspense } from '../../components/Common/PerformanceOptimizer'
@@ -74,6 +69,7 @@ const TransactionsPage: React.FC = () => {
     analysisItemsMap,
     currentUserId,
     isLoading: dataLoading,
+    error: contextError,
     loadDimensionsForOrg,
     // _ensureDimensionsLoaded, // Available for future batch loading
     refreshAnalysisItems,
@@ -280,7 +276,7 @@ const TransactionsPage: React.FC = () => {
       if (f.search) {
         const searchLower = f.search.toLowerCase()
         const desc = (line.description || '').toLowerCase()
-        const accName = (line.account_name || line.account_name_ar || '').toLowerCase()
+        const accName = (line.account_name_ar || line.account_name || '').toLowerCase()
         const accCode = (line.account_code || '').toLowerCase()
         if (!desc.includes(searchLower) && !accName.includes(searchLower) && !accCode.includes(searchLower)) {
           return false
@@ -737,14 +733,17 @@ const TransactionsPage: React.FC = () => {
   const reload = useCallback(async () => {
     await measurePerformance('transactions.reload', async () => {
       const effectiveFilters = headerAppliedFilters
-      console.log('🚀 Reload triggered with filters:', {
-        mode,
-        approvalStatus: effectiveFilters.approvalStatus || 'none',
-        orgId: effectiveFilters.orgId || 'none',
-        projectId: effectiveFilters.projectId || 'none',
-        page,
-        pageSize
-      });
+      const txDebug = Boolean((window as any).__TX_DEBUG)
+      if (import.meta.env.DEV && txDebug) {
+        console.log('🚀 Reload triggered with filters:', {
+          mode,
+          approvalStatus: effectiveFilters.approvalStatus || 'none',
+          orgId: effectiveFilters.orgId || 'none',
+          projectId: effectiveFilters.projectId || 'none',
+          page,
+          pageSize
+        });
+      }
 
       const filtersToUse = {
         scope: (mode === 'my' ? 'my' : 'all') as 'all' | 'my',
@@ -765,7 +764,7 @@ const TransactionsPage: React.FC = () => {
         analysisWorkItemId: effectiveFilters.analysisWorkItemId || undefined,
         approvalStatus: effectiveFilters.approvalStatus ? (effectiveFilters.approvalStatus as 'submitted' | 'approved' | 'draft' | 'rejected' | 'revision_requested' | 'cancelled' | 'posted') : undefined,
       };
-      console.log('🔍 Calling getTransactions with filters:', filtersToUse);
+      if (import.meta.env.DEV && txDebug) console.log('🔍 Calling getTransactions with filters:', filtersToUse);
 
       const { rows, total } = await getTransactions({
         filters: filtersToUse,
@@ -773,14 +772,19 @@ const TransactionsPage: React.FC = () => {
         pageSize,
       })
 
-      console.log('📊 Response from getTransactions:', {
-        rowCount: rows?.length || 0,
-        totalCount: total,
-        statuses: rows?.map((r: any) => r.approval_status).filter((v: any, i: number, a: any[]) => a.indexOf(v) === i),
-        hasContent: rows && rows.length > 0
-      });
-      console.log('🗂️ Full transaction list:', rows);
-      console.log('🐛 DEBUG: Setting transactions state with', rows?.length || 0, 'rows');
+      if (import.meta.env.DEV) {
+        const uniqueStatuses = (rows || [])
+          .map((r: any) => r.approval_status)
+          .filter((v: any, i: number, a: any[]) => a.indexOf(v) === i)
+        console.log('📊 getTransactions result:', {
+          rowCount: rows?.length || 0,
+          totalCount: total,
+          statuses: uniqueStatuses,
+        })
+        if (txDebug) {
+          console.log('🗂️ Full transaction list:', rows)
+        }
+      }
 
       setTransactions(rows || [])
       setTotalCount(total)
@@ -797,57 +801,6 @@ const TransactionsPage: React.FC = () => {
       } catch { }
     })
   }, [headerAppliedFilters, mode, page, pageSize, measurePerformance])
-
-  useEffect(() => {
-    async function load() {
-      setLoading(true)
-      try {
-        await measurePerformance('transactions.bootstrap', async () => {
-          const [accs, projectsList, orgsList, classificationsList, uid] = await Promise.all([
-            getAccounts(),
-            getProjects().catch(() => []), // Don't fail if projects service isn't available
-            getOrganizations().catch(() => []), // Don't fail if organizations service isn't available
-            getAllTransactionClassifications().catch(() => []), // Don't fail if classifications service isn't available
-            getCurrentUserId(),
-          ])
-          // analysisItemsMap now comes from TransactionsDataContext, no need to fetch here
-          // Reference data (accounts, projects, orgs, classifications) also comes from context
-          // We only need to wait for context to load, then reload transactions
-          void accs; void projectsList; void orgsList; void classificationsList; void uid;
-
-          // Load server preferences (wrapMode + columns + frozenCount) when user is known
-          try {
-            if (uid) {
-              const mod = await import('../../services/column-preferences')
-              if (!mod.isColumnPreferencesRpcDisabled()) {
-                const res = await mod.getUserColumnPreferences('transactions_table')
-                if (res && res.column_config) {
-                  // Apply wrapMode if provided
-                  if (typeof res.column_config.wrapMode === 'boolean') {
-                    setWrapMode(!!res.column_config.wrapMode)
-                    try { localStorage.setItem('transactions_table_wrap', res.column_config.wrapMode ? '1' : '0') } catch { }
-                  }
-                  // Apply columns if present by updating via hook handler
-                  if (Array.isArray(res.column_config.columns) && res.column_config.columns.length > 0) {
-                    try {
-                      // useColumnPreferences hook will merge and persist locally when it loads server columns
-                    } catch { }
-                  }
-                }
-              }
-            }
-          } catch { }
-
-          await reload()
-        })
-      } catch (e: any) {
-        setError(e.message || 'فشل تحميل البيانات')
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [location.pathname, measurePerformance, reload])
 
   // When opening the CRUD form, log for debugging
   // Note: accounts, categories, costCenters now come from TransactionsDataContext
@@ -1560,9 +1513,18 @@ const TransactionsPage: React.FC = () => {
   }
 
   // Reload transactions when appliedFilters, pagination, or mode changes
-  useEffect(() => { reload().catch(() => { }) }, [reload])
+  useEffect(() => {
+    if (dataLoading) return
+    setLoading(true)
+    reload()
+      .catch(() => { })
+      .finally(() => setLoading(false))
+  }, [dataLoading, reload])
 
-  if (dataLoading) return <div className="loading-container"><div className="loading-spinner" />جاري تحميل البيانات الأساسية...</div>
+  if (dataLoading) {
+    if (contextError) return <div className="error-container">خطأ: {contextError}</div>
+    return <div className="loading-container"><div className="loading-spinner" />جاري تحميل البيانات الأساسية...</div>
+  }
   if (error) return <div className="error-container">خطأ: {error}</div>
 
   return (

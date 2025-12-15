@@ -1,8 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useArabicLanguage } from '@/services/ArabicLanguageService'
+import { OpeningBalanceImportService } from '@/services/OpeningBalanceImportService'
 import { getAccounts, type Account } from '../../services/transactions'
 import { getCompanyConfig } from '../../services/company-config'
 import SearchableSelect from '../../components/Common/SearchableSelect'
+import { FiscalYearSelector } from '../../components/Fiscal/FiscalYearSelector'
+import { getActiveOrgId } from '@/utils/org'
 import './FiscalPages.css'
 
 interface ImportRow {
@@ -128,13 +131,33 @@ export default function OpeningBalanceImportRefactored() {
   const isBalanced = totalDebit === totalCredit && totalDebit > 0
   const canImport = isBalanced && selectedFiscalYear !== '' && !loading
 
-  const handleImport = () => {
+  const handleImport = async () => {
     if (!canImport) return
+    const orgId = getActiveOrgId()
+    if (!orgId) {
+      alert(isRTL ? 'يرجى اختيار المؤسسة أولاً' : 'Please select organization first')
+      return
+    }
     setLoading(true)
-    setTimeout(() => {
+    try {
+      await OpeningBalanceImportService.importFromManualRows(
+        orgId,
+        selectedFiscalYear,
+        importRows.map(r => ({
+          account_id: r.accountId || undefined,
+          account_code: r.accountCode || undefined,
+          opening_balance_debit: r.debit,
+          opening_balance_credit: r.credit,
+          currency_code: r.currency || undefined,
+        }))
+      )
+
       alert(isRTL ? 'تم استيراد البيانات بنجاح' : 'Data imported successfully')
+    } catch (e: any) {
+      alert(e?.message || (isRTL ? 'فشل الاستيراد' : 'Import failed'))
+    } finally {
       setLoading(false)
-    }, 1000)
+    }
   }
 
   return (
@@ -187,21 +210,19 @@ export default function OpeningBalanceImportRefactored() {
             <h3 className="fiscal-card-title">{isRTL ? 'اختر السنة المالية' : 'Select Fiscal Year'}</h3>
           </div>
           <div className="fiscal-card-content">
-            <select
-              className={`fiscal-filter-select fiscal-import-select-max-width ${!selectedFiscalYear ? 'border-red-300' : ''}`}
+            <FiscalYearSelector
+              orgId={getActiveOrgId()}
               value={selectedFiscalYear}
-              onChange={(e) => setSelectedFiscalYear(e.target.value)}
-              style={!selectedFiscalYear ? { borderColor: 'var(--error)' } : {}}
-            >
-              <option value="">{isRTL ? '-- اختر سنة مالية --' : '-- Select Fiscal Year --'}</option>
-              <option value="2024">{isRTL ? 'السنة المالية 2024' : 'Fiscal Year 2024'}</option>
-              <option value="2023">{isRTL ? 'السنة المالية 2023' : 'Fiscal Year 2023'}</option>
-            </select>
-            {!selectedFiscalYear && (
-              <div style={{ color: 'var(--error)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
-                {isRTL ? '* مطلوب اختيار السنة المالية' : '* Fiscal year is required'}
-              </div>
-            )}
+              onChange={(fiscalYearId) => {
+                console.log('📅 Fiscal year selected:', fiscalYearId)
+                setSelectedFiscalYear(fiscalYearId)
+              }}
+              label={isRTL ? 'السنة المالية' : 'Fiscal Year'}
+              helperText={!selectedFiscalYear ? (isRTL ? '* مطلوب اختيار السنة المالية' : '* Fiscal year is required') : ''}
+              size="medium"
+              persistKey="opening_balance_fiscal_year"
+              sx={{ width: '100%', maxWidth: '500px' }}
+            />
           </div>
         </div>
 

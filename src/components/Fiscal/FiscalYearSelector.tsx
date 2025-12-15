@@ -35,6 +35,17 @@ export const FiscalYearSelector: React.FC<FiscalYearSelectorProps> = ({
   // Use the new unified hook instead of direct Supabase calls
   const { data: years, isLoading, error } = useFiscalYears(effectiveOrgId)
 
+  // Debug logging
+  React.useEffect(() => {
+    console.log('FiscalYearSelector: Data loaded', {
+      effectiveOrgId,
+      yearsCount: years?.length || 0,
+      years,
+      isLoading,
+      error
+    })
+  }, [effectiveOrgId, years, isLoading, error])
+
   const [selected, setSelected] = React.useState<string>(() => {
     if (value) return value
     try {

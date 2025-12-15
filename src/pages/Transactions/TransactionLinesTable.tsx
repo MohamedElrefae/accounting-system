@@ -93,7 +93,7 @@ const TransactionLinesTable: React.FC<TransactionLinesTableProps> = ({
       // Fallback to looking up from accounts array if enriched data not available
       if (line.account_id) {
         const a = accounts.find(x => x.id === line.account_id)
-        return a ? `${a.code} - ${a.name}` : line.account_id
+        return a ? `${a.code} - ${a.name_ar || a.name}` : line.account_id
       }
       return ''
     }

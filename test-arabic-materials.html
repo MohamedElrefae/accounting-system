@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Arabic Materials Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1976d2;
+            border-bottom: 3px solid #1976d2;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #333;
+            margin-top: 30px;
+        }
+        .test-section {
+            background: #f9f9f9;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #1976d2;
+            border-radius: 4px;
+        }
+        .button {
+            background: #1976d2;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 10px 10px 0;
+        }
+        .button:hover {
+            background: #1565c0;
+        }
+        .button.success {
+            background: #4caf50;
+        }
+        .button.danger {
+            background: #f44336;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #4caf50;
+        }
+        .status.info {
+            background: #e3f2fd;
+            color: #1565c0;
+            border: 1px solid #2196f3;
+        }
+        .status.warning {
+            background: #fff3e0;
+            color: #e65100;
+            border: 1px solid #ff9800;
+        }
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+        .checklist li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .checklist li:before {
+            content: "☐ ";
+            color: #1976d2;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #d32f2f;
+        }
+        .code-block {
+            background: #263238;
+            color: #aed581;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .expected-result {
+            background: #fff;
+            border: 2px solid #4caf50;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .expected-result h4 {
+            margin-top: 0;
+            color: #4caf50;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #1976d2;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        .rtl {
+            direction: rtl;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Arabic Materials Page - Testing Guide</h1>
+        
+        <div class="status info">
+            <strong>📍 Current Status:</strong> Dev server is running at <a href="http://localhost:3000" target="_blank">http://localhost:3000</a>
+        </div>
+
+        <div class="test-section">
+            <h2>🎯 Quick Test Actions</h2>
+            <button class="button" onclick="switchToArabic()">Switch to Arabic (العربية)</button>
+            <button class="button" onclick="switchToEnglish()">Switch to English</button>
+            <button class="button success" onclick="openMaterialsPage()">Open Materials Page</button>
+            <button class="button danger" onclick="clearCache()">Clear Cache & Reload</button>
+            
+            <div id="currentLanguage" class="status info" style="margin-top: 15px;">
+                <strong>Current Language:</strong> <span id="langDisplay">Checking...</span>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>📋 Testing Checklist</h2>
+            <ul class="checklist">
+                <li>Navigate to Inventory → Materials</li>
+                <li>Page loads without errors</li>
+                <li>Page title shows "Materials" (English) or "المواد" (Arabic)</li>
+                <li>Button shows "Create Document" or "إنشاء مستند"</li>
+                <li>Table headers are translated correctly</li>
+                <li>Material names display in correct language</li>
+                <li>Status chips show translated text</li>
+                <li>Layout direction is correct (LTR/RTL)</li>
+                <li>Click "Edit" button - dialog opens in correct language</li>
+                <li>Form labels are translated</li>
+                <li>Success/error messages in correct language</li>
+                <li>Can switch between languages seamlessly</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>🔍 Expected Results</h2>
+            
+            <div class="expected-result">
+                <h4>English Mode</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Material Code</th>
+                            <th>Material Name</th>
+                            <th>UOM</th>
+                            <th>Active</th>
+                            <th>Trackable</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>M001</td>
+                            <td>Steel</td>
+                            <td>KG</td>
+                            <td><span style="background: #4caf50; color: white; padding: 4px 8px; border-radius: 12px;">Active</span></td>
+                            <td><span style="background: #2196f3; color: white; padding: 4px 8px; border-radius: 12px;">Yes</span></td>
+                            <td><button style="padding: 4px 12px;">Edit</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="expected-result rtl">
+                <h4>Arabic Mode (وضع العربية)</h4>
+                <table class="rtl">
+                    <thead>
+                        <tr>
+                            <th>الإجراءات</th>
+                            <th>قابل للتتبع</th>
+                            <th>نشط</th>
+                            <th>وحدة القياس</th>
+                            <th>اسم المادة</th>
+                            <th>رمز المادة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><button style="padding: 4px 12px;">تعديل</button></td>
+                            <td><span style="background: #2196f3; color: white; padding: 4px 8px; border-radius: 12px;">نعم</span></td>
+                            <td><span style="background: #4caf50; color: white; padding: 4px 8px; border-radius: 12px;">نشط</span></td>
+                            <td>كجم</td>
+                            <td>حديد</td>
+                            <td>M001</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>💻 Manual Console Commands</h2>
+            
+            <p><strong>Switch to Arabic:</strong></p>
+            <div class="code-block">
+localStorage.setItem('language', 'ar')<br>
+location.reload()
+            </div>
+
+            <p><strong>Switch to English:</strong></p>
+            <div class="code-block">
+localStorage.setItem('language', 'en')<br>
+location.reload()
+            </div>
+
+            <p><strong>Check Current Language:</strong></p>
+            <div class="code-block">
+localStorage.getItem('language')
+            </div>
+
+            <p><strong>Check RTL Status:</strong></p>
+            <div class="code-block">
+document.documentElement.dir
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🎨 Key Features to Verify</h2>
+            
+            <h3>1. Translation Function</h3>
+            <p>Labels should automatically translate based on language setting</p>
+            <ul>
+                <li><code>Materials</code> → <code>المواد</code></li>
+                <li><code>Create Document</code> → <code>إنشاء مستند</code></li>
+                <li><code>Material Code</code> → <code>رمز المادة</code></li>
+            </ul>
+
+            <h3>2. Display Helper</h3>
+            <p>Data should show from correct database field:</p>
+            <ul>
+                <li>English: Uses <code>material_name</code></li>
+                <li>Arabic: Uses <code>material_name_ar</code> (if available)</li>
+            </ul>
+
+            <h3>3. RTL Layout</h3>
+            <p>In Arabic mode:</p>
+            <ul>
+                <li>Text aligns to the right</li>
+                <li>Table columns reverse order</li>
+                <li>Buttons align to the right</li>
+                <li>Dialogs open from right</li>
+            </ul>
+
+            <h3>4. Status Chips</h3>
+            <ul>
+                <li><code>Active</code> → <code>نشط</code></li>
+                <li><code>Inactive</code> → <code>غير نشط</code></li>
+                <li><code>Yes</code> → <code>نعم</code></li>
+                <li><code>No</code> → <code>لا</code></li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>🐛 Troubleshooting</h2>
+            
+            <div class="status warning">
+                <strong>Issue:</strong> Page shows in English even after switching to Arabic<br>
+                <strong>Solution:</strong> Clear browser cache and hard refresh (Ctrl+Shift+R)
+            </div>
+
+            <div class="status warning">
+                <strong>Issue:</strong> Material names don't show in Arabic<br>
+                <strong>Reason:</strong> Database doesn't have Arabic names yet<br>
+                <strong>Solution:</strong> Edit materials and add Arabic names using the form
+            </div>
+
+            <div class="status warning">
+                <strong>Issue:</strong> Layout is not RTL<br>
+                <strong>Solution:</strong> Check if <code>document.documentElement.dir</code> is set to 'rtl'
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>✅ Success Criteria</h2>
+            <div class="status success">
+                <strong>Test passes if:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li>Page loads without errors in both languages</li>
+                    <li>All UI labels translate correctly</li>
+                    <li>Material names show in correct language (when available)</li>
+                    <li>Layout direction changes appropriately</li>
+                    <li>Dialogs and forms work in both languages</li>
+                    <li>Messages and toasts display in correct language</li>
+                    <li>Can switch between languages without issues</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="status info" style="margin-top: 30px;">
+            <strong>📝 Note:</strong> This is a proof of concept for the Materials page. Once verified, the same pattern will be applied to all 24 remaining inventory pages.
+        </div>
+    </div>
+
+    <script>
+        // Check current language on load
+        function updateLanguageDisplay() {
+            const lang = localStorage.getItem('language') || 'en';
+            const display = lang === 'ar' ? 'Arabic (العربية)' : 'English';
+            document.getElementById('langDisplay').textContent = display;
+        }
+
+        function switchToArabic() {
+            localStorage.setItem('language', 'ar');
+            alert('Language switched to Arabic! The page will reload.');
+            setTimeout(() => {
+                if (window.opener) {
+                    window.opener.location.reload();
+                }
+                updateLanguageDisplay();
+            }, 500);
+        }
+
+        function switchToEnglish() {
+            localStorage.setItem('language', 'en');
+            alert('Language switched to English! The page will reload.');
+            setTimeout(() => {
+                if (window.opener) {
+                    window.opener.location.reload();
+                }
+                updateLanguageDisplay();
+            }, 500);
+        }
+
+        function openMaterialsPage() {
+            window.open('http://localhost:3000/inventory/materials', '_blank');
+        }
+
+        function clearCache() {
+            if (confirm('This will clear the cache and reload. Continue?')) {
+                localStorage.clear();
+                sessionStorage.clear();
+                location.reload(true);
+            }
+        }
+
+        // Update display on load
+        updateLanguageDisplay();
+    </script>
+</body>
+</html>

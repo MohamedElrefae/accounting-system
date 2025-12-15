@@ -50,3 +50,11 @@ export async function updateInventoryLocation(id: string, updates: Partial<Inven
   if (error) throw error
   return data as InventoryLocationRow
 }
+
+export async function deleteInventoryLocation(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('inventory_locations')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}

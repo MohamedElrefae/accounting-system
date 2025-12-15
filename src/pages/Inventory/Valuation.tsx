@@ -47,14 +47,21 @@ useEffect(() => {
         // Fetch detailed last purchase metadata
         let metaMap: Record<string, { currency: string | null, vendor_id: string | null, at: string | null }> = {}
         if (orgId) {
-          const { data: detailed } = await (await import('@/utils/supabase')).supabase
-            .from('inventory.v_material_costing_snapshot_detailed')
-            .select('org_id,material_id,location_id,project_id,last_purchase_currency_code,last_purchase_vendor_id,last_purchase_at')
-            .eq('org_id', orgId)
-          ;(detailed || []).forEach((r: any) => {
-            const key = `${r.org_id}-${r.material_id}-${r.location_id}-${r.project_id ?? 'none'}`
-            metaMap[key] = { currency: r.last_purchase_currency_code ?? null, vendor_id: r.last_purchase_vendor_id ?? null, at: r.last_purchase_at ?? null }
-          })
+          try {
+            const { data: detailed, error: detailedErr } = await supabase
+              .from('v_material_costing_snapshot_detailed')
+              .select('org_id,material_id,location_id,project_id,last_purchase_currency_code,last_purchase_vendor_id,last_purchase_at')
+              .eq('org_id', orgId)
+            if (!detailedErr && detailed) {
+              detailed.forEach((r: any) => {
+                const key = `${r.org_id}-${r.material_id}-${r.location_id}-${r.project_id ?? 'none'}`
+                metaMap[key] = { currency: r.last_purchase_currency_code ?? null, vendor_id: r.last_purchase_vendor_id ?? null, at: r.last_purchase_at ?? null }
+              })
+            }
+          } catch {
+            // Costing snapshot view not available
+            console.warn('Costing snapshot view not available')
+          }
         }
         if (mounted) {
           setRows(data)

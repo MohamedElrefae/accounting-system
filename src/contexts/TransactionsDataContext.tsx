@@ -86,6 +86,20 @@ export interface TransactionsDataContextValue {
 
 const TransactionsDataContext = createContext<TransactionsDataContextValue | null>(null)
 
+let sharedInitPromise: Promise<void> | null = null
+let sharedSnapshot: {
+  organizations: Organization[]
+  projects: Project[]
+  accounts: Account[]
+  costCenters: CostCenterOption[]
+  workItems: WorkItemRow[]
+  categories: ExpensesCategoryRow[]
+  classifications: TransactionClassification[]
+  analysisItemsMap: Record<string, AnalysisWorkItemLabel>
+  currentUserId: string | null
+  loadedOrgIds: string[]
+} | null = null
+
 export const useTransactionsData = (): TransactionsDataContextValue => {
   const context = useContext(TransactionsDataContext)
   if (!context) {
@@ -100,33 +114,36 @@ interface TransactionsDataProviderProps {
 
 export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> = ({ children }) => {
   // Core reference data
-  const [organizations, setOrganizations] = useState<Organization[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
-  const [accounts, setAccounts] = useState<Account[]>([])
-  const [costCenters, setCostCenters] = useState<CostCenterOption[]>([])
-  const [workItems, setWorkItems] = useState<WorkItemRow[]>([])
-  const [categories, setCategories] = useState<ExpensesCategoryRow[]>([])
-  const [classifications, setClassifications] = useState<TransactionClassification[]>([])
-  const [analysisItemsMap, setAnalysisItemsMap] = useState<Record<string, AnalysisWorkItemLabel>>({})
+  const [organizations, setOrganizations] = useState<Organization[]>(() => sharedSnapshot?.organizations ?? [])
+  const [projects, setProjects] = useState<Project[]>(() => sharedSnapshot?.projects ?? [])
+  const [accounts, setAccounts] = useState<Account[]>(() => sharedSnapshot?.accounts ?? [])
+  const [costCenters, setCostCenters] = useState<CostCenterOption[]>(() => sharedSnapshot?.costCenters ?? [])
+  const [workItems, setWorkItems] = useState<WorkItemRow[]>(() => sharedSnapshot?.workItems ?? [])
+  const [categories, setCategories] = useState<ExpensesCategoryRow[]>(() => sharedSnapshot?.categories ?? [])
+  const [classifications, setClassifications] = useState<TransactionClassification[]>(() => sharedSnapshot?.classifications ?? [])
+  const [analysisItemsMap, setAnalysisItemsMap] = useState<Record<string, AnalysisWorkItemLabel>>(
+    () => sharedSnapshot?.analysisItemsMap ?? {}
+  )
   
   // User state
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(() => sharedSnapshot?.currentUserId ?? null)
   
   // Loading states
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(() => !sharedSnapshot)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
   // Track loaded dimensions to avoid redundant fetches
-  const loadedDimensionsRef = useRef<Set<string>>(new Set())
-  const initialLoadCompleteRef = useRef(false)
+  const loadedDimensionsRef = useRef<Set<string>>(new Set(sharedSnapshot?.loadedOrgIds ?? []))
+  const initialLoadCompleteRef = useRef(!!sharedSnapshot)
 
   /**
    * Load core reference data (organizations, projects, accounts, classifications, user)
    * This is called once on mount
    */
-  const loadCoreData = useCallback(async () => {
+  const loadCoreData = useCallback(async (opts?: { applyState?: boolean }) => {
     console.log('📦 TransactionsDataProvider: Loading core reference data...')
+    const applyState = opts?.applyState ?? true
     
     try {
       const [accs, projectsList, orgsList, classificationsList, uid] = await Promise.all([
@@ -137,11 +154,13 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
         getCurrentUserId(),
       ])
       
-      setAccounts(accs)
-      setProjects(projectsList)
-      setOrganizations(orgsList)
-      setClassifications(classificationsList)
-      setCurrentUserId(uid)
+      if (applyState) {
+        setAccounts(accs)
+        setProjects(projectsList)
+        setOrganizations(orgsList)
+        setClassifications(classificationsList)
+        setCurrentUserId(uid)
+      }
       
       console.log('✅ TransactionsDataProvider: Core data loaded', {
         accounts: accs.length,
@@ -151,10 +170,18 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
         userId: uid
       })
       
-      return orgsList
+      return {
+        accs,
+        projectsList,
+        orgsList,
+        classificationsList,
+        uid,
+      }
     } catch (err: any) {
       console.error('❌ TransactionsDataProvider: Failed to load core data', err)
-      setError(err.message || 'فشل تحميل البيانات الأساسية')
+      if (applyState) {
+        setError(err.message || 'فشل تحميل البيانات الأساسية')
+      }
       throw err
     }
   }, [])
@@ -163,11 +190,13 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
    * Load dimension data (cost centers, work items, categories) for all organizations
    * This is called after core data is loaded
    */
-  const loadAllDimensions = useCallback(async (orgs: Organization[]) => {
+  const loadAllDimensions = useCallback(async (orgs: Organization[], opts?: { applyState?: boolean }) => {
     if (!orgs.length) {
       console.log('📦 TransactionsDataProvider: No organizations, skipping dimension load')
-      return
+      return { categories: [], costCenters: [], workItems: [] }
     }
+
+    const applyState = opts?.applyState ?? true
     
     console.log('📦 TransactionsDataProvider: Loading dimensions for', orgs.length, 'organizations...')
     
@@ -211,28 +240,39 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
         list.forEach(item => { mergedWorkItems[item.id] = item })
       })
       
-      setCategories(Object.values(mergedCategories))
-      setCostCenters(Object.values(mergedCostCenters))
-      setWorkItems(Object.values(mergedWorkItems))
-      
-      // Mark all orgs as loaded
-      orgs.forEach(org => loadedDimensionsRef.current.add(org.id))
+      if (applyState) {
+        setCategories(Object.values(mergedCategories))
+        setCostCenters(Object.values(mergedCostCenters))
+        setWorkItems(Object.values(mergedWorkItems))
+
+        // Mark all orgs as loaded
+        orgs.forEach(org => loadedDimensionsRef.current.add(org.id))
+      }
       
       console.log('✅ TransactionsDataProvider: Dimensions loaded', {
         categories: Object.keys(mergedCategories).length,
         costCenters: Object.keys(mergedCostCenters).length,
         workItems: Object.keys(mergedWorkItems).length
       })
+
+      return {
+        categories: Object.values(mergedCategories),
+        costCenters: Object.values(mergedCostCenters),
+        workItems: Object.values(mergedWorkItems),
+      }
     } catch (err) {
       console.error('❌ TransactionsDataProvider: Failed to load dimensions', err)
+      return { categories: [], costCenters: [], workItems: [] }
     }
   }, [])
 
   /**
    * Load analysis work items for label lookups - loads for ALL organizations
    */
-  const loadAnalysisItems = useCallback(async (orgs: Organization[]) => {
-    if (!orgs.length) return
+  const loadAnalysisItems = useCallback(async (orgs: Organization[], opts?: { applyState?: boolean }) => {
+    if (!orgs.length) return {}
+
+    const applyState = opts?.applyState ?? true
     
     try {
       console.log('📦 TransactionsDataProvider: Loading analysis items for', orgs.length, 'organizations...')
@@ -258,10 +298,14 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
         }
       }
       
-      setAnalysisItemsMap(map)
+      if (applyState) {
+        setAnalysisItemsMap(map)
+      }
       console.log('✅ TransactionsDataProvider: Analysis items loaded', Object.keys(map).length)
+      return map
     } catch (err) {
       console.warn('Failed to load analysis items', err)
+      return {}
     }
   }, [])
 
@@ -334,6 +378,43 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
     if (initialLoadCompleteRef.current) return
     
     let cancelled = false
+
+    const applyShared = () => {
+      if (!sharedSnapshot) return
+      setOrganizations(sharedSnapshot.organizations)
+      setProjects(sharedSnapshot.projects)
+      setAccounts(sharedSnapshot.accounts)
+      setClassifications(sharedSnapshot.classifications)
+      setCurrentUserId(sharedSnapshot.currentUserId)
+      setCategories(sharedSnapshot.categories)
+      setCostCenters(sharedSnapshot.costCenters)
+      setWorkItems(sharedSnapshot.workItems)
+      setAnalysisItemsMap(sharedSnapshot.analysisItemsMap)
+      loadedDimensionsRef.current = new Set(sharedSnapshot.loadedOrgIds)
+      initialLoadCompleteRef.current = true
+      setIsLoading(false)
+    }
+
+    if (sharedSnapshot) {
+      applyShared()
+      return () => {
+        cancelled = true
+      }
+    }
+
+    if (sharedInitPromise) {
+      sharedInitPromise
+        .then(() => {
+          if (!cancelled) applyShared()
+        })
+        .catch(() => {
+          // ignore
+        })
+
+      return () => {
+        cancelled = true
+      }
+    }
     
     const init = async () => {
       setIsLoading(true)
@@ -341,30 +422,73 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
       
       try {
         // Load core data first
-        const orgs = await loadCoreData()
-        if (cancelled) return
+        const core = await loadCoreData({ applyState: false })
+        const orgs = core.orgsList
+
+        // Publish core snapshot ASAP so UI can render while heavy dimensions load in background
+        sharedSnapshot = {
+          organizations: orgs,
+          projects: core.projectsList,
+          accounts: core.accs,
+          costCenters: [],
+          workItems: [],
+          categories: [],
+          classifications: core.classificationsList,
+          analysisItemsMap: {},
+          currentUserId: core.uid,
+          loadedOrgIds: [],
+        }
+
+        if (!cancelled) {
+          applyShared()
+        }
         
         // Load all dimensions as originally working - this is required for cost analysis
-        await loadAllDimensions(orgs)
-        if (cancelled) return
+        const dims = await loadAllDimensions(orgs, { applyState: false })
         
         // Load analysis items
-        await loadAnalysisItems(orgs)
-        if (cancelled) return
-        
-        initialLoadCompleteRef.current = true
-        console.log('🚀 TransactionsDataProvider: Initial load complete - original functionality restored')
+        const analysisMap = await loadAnalysisItems(orgs, { applyState: false })
+
+        // Hydrate full snapshot once heavy dimensions are ready
+        if (sharedSnapshot) {
+          sharedSnapshot = {
+            ...sharedSnapshot,
+            costCenters: dims.costCenters,
+            workItems: dims.workItems,
+            categories: dims.categories,
+            analysisItemsMap: analysisMap,
+            loadedOrgIds: orgs.map(o => o.id),
+          }
+        }
+
+        if (!cancelled) {
+          applyShared()
+          console.log('🚀 TransactionsDataProvider: Initial load complete - original functionality restored')
+        }
       } catch (err) {
         console.error('❌ Initial load failed', err)
-        setError('فشل تحميل البيانات')
+        if (!cancelled) setError('فشل تحميل البيانات')
       } finally {
         if (!cancelled) {
           setIsLoading(false)
         }
       }
     }
-    
-    init()
+
+    const run = async () => {
+      if (!sharedInitPromise) {
+        sharedInitPromise = init().catch((e) => {
+          sharedInitPromise = null
+          throw e
+        })
+      }
+
+      await sharedInitPromise
+    }
+
+    run().catch(() => {
+      // ignore
+    })
     
     return () => { cancelled = true }
   }, [loadCoreData, loadAllDimensions, loadAnalysisItems])
@@ -377,7 +501,8 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
     loadedDimensionsRef.current.clear()
     
     try {
-      const orgs = await loadCoreData()
+      const core = await loadCoreData()
+      const orgs = core.orgsList
       await loadAllDimensions(orgs)
       await loadAnalysisItems(orgs)
     } finally {

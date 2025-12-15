@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
+import { useSmartRoutePreloading } from '../../routes/RouteGroups';
 
 interface OptimizedNavItemProps {
   to: string;
@@ -19,10 +20,16 @@ const OptimizedNavItem: React.FC<OptimizedNavItemProps> = ({
 }) => {
   const location = useLocation();
   const isActive = location.pathname === to || location.pathname.startsWith(to + '/');
+  const { preloadOnHover, enabled } = useSmartRoutePreloading();
 
   // Preload route on hover for instant navigation
   const handleMouseEnter = useCallback(() => {
     if (!routeGroup) return;
+
+    if (enabled) {
+      preloadOnHover(routeGroup);
+      return;
+    }
 
     // Preload the route group
     switch (routeGroup) {
@@ -45,7 +52,7 @@ const OptimizedNavItem: React.FC<OptimizedNavItemProps> = ({
         import('../../routes/MainDataRoutes');
         break;
     }
-  }, [routeGroup]);
+  }, [enabled, preloadOnHover, routeGroup]);
 
   // Preload on focus as well (keyboard navigation)
   const handleFocus = useCallback(() => {

@@ -66,16 +66,36 @@ export async function getExpensesCategoriesTree(orgId: string, force = false): P
 export async function getExpensesCategoriesList(orgId: string, force = false): Promise<SubTreeRow[]> {
   if (!force && cache.list.has(orgId)) return cache.list.get(orgId)!
   
-  // Try the view first
-  let { data, error } = await supabase
-    .from('sub_tree_full')
-    .select('*')
-    .eq('org_id', orgId)
-    .order('path', { ascending: true })
-  
-  // If view fails, try direct table query
-  if (error || !data || data.length === 0) {
-    console.warn('sub_tree_full view failed, trying direct table query:', error)
+  const viewCandidates = ['sub_tree_full_v2', 'sub_tree_full'] as const
+  let data: any[] | null = null
+  let lastError: any = null
+
+  for (const viewName of viewCandidates) {
+    const result = await supabase
+      .from(viewName)
+      .select('*')
+      .eq('org_id', orgId)
+      .order('path', { ascending: true })
+
+    if (result.error) {
+      lastError = result.error
+      continue
+    }
+
+    if (result.data && result.data.length > 0) {
+      data = result.data
+      lastError = null
+      break
+    }
+
+    data = result.data
+  }
+
+  if (!data || data.length === 0) {
+    if (lastError) {
+      console.warn('sub_tree_full view failed, trying direct table query:', lastError)
+    }
+
     const directResult = await supabase
       .from('sub_tree')
       .select(`

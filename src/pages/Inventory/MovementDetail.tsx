@@ -28,19 +28,29 @@ const [movementTypes, setMovementTypes] = useState<string[]>([])
     try {
       const data = await InventoryMovementService.getDetail({ org_id: orgId, material_id: materialId || undefined, location_id: locationId || undefined, from: from || undefined, to: to || undefined, movement_types: movementTypes.length ? movementTypes : undefined })
       setRows(data)
-      const { data: snap } = await supabase
-        .from('inventory.v_material_costing_snapshot_detailed')
-        .select('org_id,material_id,location_id,project_id,method_used,last_purchase_unit_cost,effective_unit_cost,last_purchase_currency_code,last_purchase_vendor_id,last_purchase_at')
-        .eq('org_id', orgId)
-      const map: Record<string, { method_used: string | null, last_purchase_unit_cost: number | null, effective_unit_cost: number | null }> = {}
-      const meta: Record<string, { currency: string | null, vendor_id: string | null, at: string | null }> = {}
-      ;(snap || []).forEach((r: any) => {
-        const key = `${r.org_id}-${r.material_id}-${r.location_id}-${r.project_id ?? 'none'}`
-        map[key] = { method_used: r.method_used ?? null, last_purchase_unit_cost: r.last_purchase_unit_cost ?? null, effective_unit_cost: r.effective_unit_cost ?? null }
-        meta[key] = { currency: r.last_purchase_currency_code ?? null, vendor_id: r.last_purchase_vendor_id ?? null, at: r.last_purchase_at ?? null }
-      })
-      setCostingMap(map)
-      setLppMetaMap(meta)
+      
+      // Try to fetch costing snapshot - this view may not exist in all environments
+      try {
+        const { data: snap, error: snapErr } = await supabase
+          .from('v_material_costing_snapshot_detailed')
+          .select('org_id,material_id,location_id,project_id,method_used,last_purchase_unit_cost,effective_unit_cost,last_purchase_currency_code,last_purchase_vendor_id,last_purchase_at')
+          .eq('org_id', orgId)
+        
+        if (!snapErr && snap) {
+          const map: Record<string, { method_used: string | null, last_purchase_unit_cost: number | null, effective_unit_cost: number | null }> = {}
+          const meta: Record<string, { currency: string | null, vendor_id: string | null, at: string | null }> = {}
+          snap.forEach((r: any) => {
+            const key = `${r.org_id}-${r.material_id}-${r.location_id}-${r.project_id ?? 'none'}`
+            map[key] = { method_used: r.method_used ?? null, last_purchase_unit_cost: r.last_purchase_unit_cost ?? null, effective_unit_cost: r.effective_unit_cost ?? null }
+            meta[key] = { currency: r.last_purchase_currency_code ?? null, vendor_id: r.last_purchase_vendor_id ?? null, at: r.last_purchase_at ?? null }
+          })
+          setCostingMap(map)
+          setLppMetaMap(meta)
+        }
+      } catch {
+        // Costing snapshot view not available - continue without costing data
+        console.warn('Costing snapshot view not available')
+      }
     } finally {
       setLoading(false)
     }
@@ -73,7 +83,7 @@ const [movementTypes, setMovementTypes] = useState<string[]>([])
     { field: 'quantity', headerName: 'Qty', width: 120, type: 'number' },
     { field: 'unit_cost', headerName: 'Unit Cost', width: 120, type: 'number' },
     { field: 'total_cost', headerName: 'Total Cost', width: 140, type: 'number' },
-    { field: 'method_used_ref', headerName: 'Cost Method', width: 140, valueGetter: (p) => costingMap[`${p.row.org_id}-${p.row.material_id}-${p.row.location_id}-${p.row.project_id ?? 'none'}`]?.method_used || '' },
+    { field: 'method_used_ref', headerName: 'Cost Method', width: 140, valueGetter: (p) => p?.row ? (costingMap[`${p.row.org_id}-${p.row.material_id}-${p.row.location_id}-${p.row.project_id ?? 'none'}`]?.method_used || '') : '' },
     { field: 'last_purchase_unit_cost_ref', headerName: 'Last Purchase', width: 160, type: 'number', renderCell: (params) => {
       const r: any = params.row
       const key = `${r.org_id}-${r.material_id}-${r.location_id}-${r.project_id ?? 'none'}`

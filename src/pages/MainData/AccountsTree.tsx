@@ -853,7 +853,7 @@ const AccountsTreePage: React.FC = () => {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
 {breadcrumbs.map((b, i) => (
               <span key={b.id} style={{ background: 'var(--chip-bg)', padding: '4px 8px', borderRadius: 8 }}>
-                {b.code} - {b.name}
+                {b.code} - {b.name_ar || b.name}
                 {i < breadcrumbs.length - 1 ? ' / ' : ''}
               </span>
             ))}

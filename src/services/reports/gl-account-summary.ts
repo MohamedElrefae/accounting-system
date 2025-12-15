@@ -12,6 +12,7 @@ export interface GLAccountSummaryFilters {
   dateTo?: string | null
   orgId?: string | null
   projectId?: string | null
+  costCenterId?: string | null
   postedOnly?: boolean
   limit?: number | null
   offset?: number | null
@@ -44,6 +45,7 @@ export async function fetchGLAccountSummary(filters: GLAccountSummaryFilters): P
     dateTo: filters.dateTo,
     orgId: filters.orgId,
     projectId: filters.projectId,
+    costCenterId: filters.costCenterId,
     postedOnly: filters.postedOnly ?? true,
     limit: filters.limit,
     offset: filters.offset,

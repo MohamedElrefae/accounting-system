@@ -61,7 +61,8 @@ const OptimizedApp: React.FC = () => {
         v7_relativeSplatPath: true,
       }}
     >
-      <Routes>
+      <PerformanceOptimizer>
+        <Routes>
         {/* Auth Routes */}
         <Route path="/login" element={<LoginForm />} />
         <Route path="/register" element={<RegisterForm />} />
@@ -176,6 +177,7 @@ const OptimizedApp: React.FC = () => {
           } />
         </Route>
       </Routes>
+      </PerformanceOptimizer>
     </Router>
   );
 };

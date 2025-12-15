@@ -125,7 +125,7 @@ const renderNode = (node: ReportTreeNode, depth = 0): React.ReactNode => {
           <div className="tree-node-spacer" />
           <div className={`tree-node-code contrast-code-${document.documentElement.getAttribute('data-theme') || 'light'}`}>{node.code}</div>
           <div className="tree-node-name" onClick={() => onSelect && onSelect(node)} style={{ cursor: onSelect ? 'pointer' : 'default' }}>
-            {node.name_ar}
+            {node.name_ar || node.name}
             {!node.is_active && <span className={`status-inactive-text ${ui.inactiveText}`}>(معطل)</span>}
             {mayHaveChildren && (
               <span className={ui.textSecondarySmall} style={{ marginRight: 8 }}>

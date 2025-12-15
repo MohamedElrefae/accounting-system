@@ -159,7 +159,7 @@ const TreeView = <T extends TreeNode = TreeNode>({
           </div>
           
           <div className="tree-node-name" onClick={() => onSelect && onSelect(node)} style={{ cursor: onSelect ? 'pointer' : 'default' }}>
-            {node.name_ar}
+            {node.name_ar || node.name}
             {!node.is_active && <span className={`status-inactive-text ${ui.inactiveText}`}>(معطل)</span>}
             {mayHaveChildren && (
               <span className={ui.textSecondarySmall} style={{ marginRight: 8 }}>

@@ -241,7 +241,7 @@ const TransactionsEnrichedPage: React.FC = () => {
   const accountLabel = (id?: string | null) => {
     if (!id) return ''
     const a = accounts.find(x => x.id === id)
-    return a ? `${a.code} - ${a.name}` : id || ''
+    return a ? `${a.code} - ${a.name_ar || a.name}` : id || ''
   }
 
   // Prepare data for table renderers similar to original page
@@ -256,13 +256,24 @@ const TransactionsEnrichedPage: React.FC = () => {
       const txId = (t.transaction_id || t.id) as string | undefined
       const agg = (txId && dimLists[txId]) ? dimLists[txId]! : { projects: [], subTrees: [], workItems: [], analysis: [], costCenters: [] }
 
-      // Accounts lists (for tooltip)
+      // Accounts lists (for tooltip) - use Arabic names from accounts data
       const dCodes: string[] = Array.isArray(t.debit_accounts_codes) ? t.debit_accounts_codes : []
       const dNames: string[] = Array.isArray(t.debit_accounts_names) ? t.debit_accounts_names : []
       const cCodes: string[] = Array.isArray(t.credit_accounts_codes) ? t.credit_accounts_codes : []
       const cNames: string[] = Array.isArray(t.credit_accounts_names) ? t.credit_accounts_names : []
-      const debitList = dCodes.map((code, i) => `${code} - ${dNames[i] || ''}`.trim())
-      const creditList = cCodes.map((code, i) => `${code} - ${cNames[i] || ''}`.trim())
+      
+      // Transform names to use Arabic where available
+      const debitList = dCodes.map((code, i) => {
+        const account = accounts.find(a => a.code === code)
+        const name = account ? (account.name_ar || account.name || dNames[i] || '') : (dNames[i] || '')
+        return `${code} - ${name}`.trim()
+      })
+      
+      const creditList = cCodes.map((code, i) => {
+        const account = accounts.find(a => a.code === code)
+        const name = account ? (account.name_ar || account.name || cNames[i] || '') : (cNames[i] || '')
+        return `${code} - ${name}`.trim()
+      })
 
       // Project list (from aggregated lines if present, else from view array)
       const aggProjIds: string[] = Array.isArray(agg.projects) && agg.projects.length ? (agg.projects as string[]) : []
@@ -275,14 +286,14 @@ const TransactionsEnrichedPage: React.FC = () => {
         .filter(Boolean)
 
       const debitLabel = (() => {
-        if (t.debit_account_code) return `${t.debit_account_code} - ${t.debit_account_name || ''}`.trim()
+        if (t.debit_account_code) return `${t.debit_account_code} - ${t.debit_account_name_ar || t.debit_account_name || ''}`.trim()
         if (debitList.length > 1) return 'متعدد'
         if (debitList.length === 1) return debitList[0]
         return accountLabel(t.debit_account_id) || '—'
       })()
 
       const creditLabel = (() => {
-        if (t.credit_account_code) return `${t.credit_account_code} - ${t.credit_account_name || ''}`.trim()
+        if (t.credit_account_code) return `${t.credit_account_code} - ${t.credit_account_name_ar || t.credit_account_name || ''}`.trim()
         if (creditList.length > 1) return 'متعدد'
         if (creditList.length === 1) return creditList[0]
         return accountLabel(t.credit_account_id) || '—'

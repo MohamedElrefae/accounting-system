@@ -188,7 +188,7 @@ export default function TrialBalanceOriginal() {
       let out: TBRow[] = (glSummaryData || []).map((row: any) => ({
         account_id: row.account_id,
         code: row.account_code,
-        name: row.account_name_en || row.account_name_ar || 'Unknown',
+        name: row.account_name_ar || row.account_name_en || 'Unknown',
         debit: Number(row.closing_debit || 0),
         credit: Number(row.closing_credit || 0),
         account_type: classifyAccountByCode(row.account_code),

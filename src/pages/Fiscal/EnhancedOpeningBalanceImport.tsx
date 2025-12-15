@@ -449,6 +449,8 @@ export default function EnhancedOpeningBalanceImport() {
   const { t, isRTL, texts, getDirectionalStyle, formatNumber, formatCurrency } = useArabicLanguage()
   const theme = useTheme()
   const navigate = useNavigate()
+
+  const enableManual = false
   const [searchParams] = useSearchParams()
 
   // State
@@ -714,7 +716,7 @@ export default function EnhancedOpeningBalanceImport() {
 
   // Prefetch unified select options when opening manual entry
   useEffect(() => {
-    if (!showManual || !orgId) return
+    if (!enableManual || !showManual || !orgId) return
     ;(async () => {
       try {
         const [acc, prj, cc] = await Promise.all([
@@ -750,7 +752,7 @@ export default function EnhancedOpeningBalanceImport() {
         setCcFlatOptions(toFlat(cc))
       } catch {}
     })()
-  }, [showManual, orgId])
+  }, [enableManual, showManual, orgId])
 
   // Persist prefs
   useEffect(()=>{
@@ -1000,9 +1002,10 @@ export default function EnhancedOpeningBalanceImport() {
       }
     } catch (error: any) {
       console.error('Import error:', error)
-      setImportStatus({ status: 'failed', error: error?.message ?? String(error) })
+      const msg = error?.message ?? String(error)
+      setImportStatus({ status: 'failed', error: msg })
       setLoading(false)
-      try { (window as any)?.toast?.error?.(isRTL ? 'فشل الاستيراد' : 'Import failed') } catch {}
+      try { (window as any)?.toast?.error?.(msg || (isRTL ? 'فشل الاستيراد' : 'Import failed')) } catch {}
     }
   }, [file, orgId, fiscalYearId, waitForTerminalAndShow])
 
@@ -1022,13 +1025,16 @@ export default function EnhancedOpeningBalanceImport() {
 
       <Chip size="small" color="secondary" label={isRTL ? 'الواجهة المحسّنة' : 'Enhanced UI'} sx={{ mr: 1 }} />
 
-      {/* Manual Entry Button */}
-      <UltimateButton kind="success" onClick={() => setShowManual(true)} sx={{ mr: 1 }}>
-        {isRTL ? 'إدخال يدوي' : 'Manual Entry'}
-      </UltimateButton>
-      <UltimateButton kind="ghost" onClick={()=> setShowColSettings(true)} sx={{ mr: 1 }}>
-        {isRTL ? 'الإعدادات' : 'Settings'}
-      </UltimateButton>
+      {enableManual && (
+        <UltimateButton kind="success" onClick={() => setShowManual(true)} sx={{ mr: 1 }}>
+          {isRTL ? 'إدخال يدوي' : 'Manual Entry'}
+        </UltimateButton>
+      )}
+      {enableManual && (
+        <UltimateButton kind="ghost" onClick={()=> setShowColSettings(true)} sx={{ mr: 1 }}>
+          {isRTL ? 'الإعدادات' : 'Settings'}
+        </UltimateButton>
+      )}
 
       {/* Download: prefilled Excel */}
       <UltimateButton kind="ghost" startIcon={<DownloadIcon />} onClick={async () => {
@@ -1721,9 +1727,11 @@ export default function EnhancedOpeningBalanceImport() {
             )}
             <Button size="small" variant="outlined" onClick={()=>{
               // Export current manual rows to CSV
-              const { toCsv, downloadCsv } = require('@/utils/csvExport')
-              const csv = toCsv(manualRows as any)
-              downloadCsv(csv, 'manual_opening_balances.csv')
+              ;(async () => {
+                const { toCsv, downloadCsv } = await import('@/utils/csvExport')
+                const csv = toCsv(manualRows as any)
+                downloadCsv(csv, 'manual_opening_balances.csv')
+              })()
             }}>{isRTL ? 'تصدير CSV' : 'Export CSV'}</Button>
           </Stack>
 
@@ -2330,7 +2338,8 @@ export default function EnhancedOpeningBalanceImport() {
                 setActiveStep(5)
               }
             } catch (e:any) {
-              try { (window as any)?.toast?.error?.(e?.message || (isRTL ? 'فشل الإدخال اليدوي' : 'Manual entry failed')) } catch {}
+              const msg = e?.message ?? String(e)
+              try { (window as any)?.toast?.error?.(msg || (isRTL ? 'فشل الإدخال اليدوي' : 'Manual entry failed')) } catch {}
             } finally { setLoading(false) }
           }}>{isRTL ? 'تأكيد وإرسال' : 'Confirm & Submit'}</Button>
         </DialogActions>

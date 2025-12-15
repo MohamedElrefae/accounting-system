@@ -438,175 +438,224 @@ const inventorySection: NavigationItem | null = FEATURE_INVENTORY ? {
   titleAr: 'إدارة المخزون',
   icon: 'inventory',
   children: [
-      {
-        id: 'inventory-dashboard',
-        label: 'Dashboard',
-        titleEn: 'Inventory Dashboard',
-        titleAr: 'لوحة المخزون',
-        icon: 'dashboard',
-        path: '/inventory'
-      },
-      {
-        id: 'inventory-kpis',
-        label: 'KPIs',
-        titleEn: 'Inventory KPIs',
-        titleAr: 'مؤشرات المخزون',
-        icon: 'bar-chart',
-        path: '/inventory/kpis'
-      },
     {
-      id: 'inventory-materials',
-      label: 'Materials',
-      titleEn: 'Materials',
-      titleAr: 'المواد',
-      icon: 'list',
-      path: '/inventory/materials',
-      requiredPermission: 'inventory.view'
+      id: 'inventory-dashboard',
+      label: 'Dashboard',
+      titleEn: 'Inventory Dashboard',
+      titleAr: 'لوحة المخزون',
+      icon: 'dashboard',
+      path: '/inventory'
     },
     {
-      id: 'inventory-locations',
-      label: 'Locations',
-      titleEn: 'Locations',
-      titleAr: 'المواقع',
-      icon: 'location',
-      path: '/inventory/locations',
-      requiredPermission: 'inventory.manage'
+      id: 'inventory-kpis',
+      label: 'KPIs',
+      titleEn: 'Inventory KPIs',
+      titleAr: 'مؤشرات المخزون',
+      icon: 'bar-chart',
+      path: '/inventory/kpis'
     },
+    // Master Data Group
     {
-      id: 'inventory-on-hand',
-      label: 'On Hand',
-      titleEn: 'On Hand',
-      titleAr: 'الرصيد المتاح',
-      icon: 'boxes',
-      path: '/inventory/on-hand',
-      requiredPermission: 'inventory.view'
+      id: 'inventory-master-data',
+      label: 'Master Data',
+      titleEn: 'Master Data',
+      titleAr: 'البيانات الأساسية',
+      icon: 'database',
+      children: [
+        {
+          id: 'inventory-materials',
+          label: 'Materials',
+          titleEn: 'Materials',
+          titleAr: 'المواد',
+          icon: 'list',
+          path: '/inventory/materials',
+          requiredPermission: 'inventory.view'
+        },
+        {
+          id: 'inventory-locations',
+          label: 'Locations',
+          titleEn: 'Locations',
+          titleAr: 'المواقع',
+          icon: 'location',
+          path: '/inventory/locations',
+          requiredPermission: 'inventory.manage'
+        },
+        {
+          id: 'inventory-uoms',
+          label: 'UOMs',
+          titleEn: 'Units of Measure',
+          titleAr: 'وحدات القياس',
+          icon: 'ruler',
+          path: '/inventory/uoms',
+          requiredPermission: 'inventory.manage'
+        }
+      ]
     },
-      {
-        id: 'inventory-movements',
-        label: 'Movements',
-        titleEn: 'Movements',
-        titleAr: 'حركة المخزون',
-        icon: 'activity',
-        path: '/inventory/movements',
-        requiredPermission: 'inventory.view'
-      },
-      {
-        id: 'inventory-valuation',
-        label: 'Valuation',
-        titleEn: 'Valuation',
-        titleAr: 'تقييم المخزون',
-        icon: 'trending-up',
-        path: '/inventory/valuation',
-        requiredPermission: 'inventory.view'
-      },
-      {
-        id: 'inventory-ageing',
-        label: 'Ageing',
-        titleEn: 'Stock Ageing',
-        titleAr: 'تقادم المخزون',
-        icon: 'clock',
-        path: '/inventory/ageing',
-        requiredPermission: 'inventory.view'
-      },
-      {
-        id: 'inventory-movement-summary',
-        label: 'Movement Summary',
-        titleEn: 'Movement Summary',
-        titleAr: 'ملخص الحركة',
-        icon: 'activity',
-        path: '/inventory/movement-summary',
-        requiredPermission: 'inventory.view'
-      },
-      {
-        id: 'inventory-movement-detail',
-        label: 'Movement Detail',
-        titleEn: 'Movement Detail',
-        titleAr: 'تفاصيل الحركة',
-        icon: 'list',
-        path: '/inventory/movement-detail',
-        requiredPermission: 'inventory.view'
-      },
-      {
-        id: 'inventory-project-movement-summary',
-        label: 'Project Movement Summary',
-        titleEn: 'Project Movement Summary',
-        titleAr: 'ملخص الحركة حسب المشروع',
-        icon: 'bar-chart',
-        path: '/inventory/project-movement-summary',
-        requiredPermission: 'inventory.view'
-      },
-      {
-        id: 'inventory-valuation-by-project',
-        label: 'Valuation by Project',
-        titleEn: 'Valuation by Project',
-        titleAr: 'قيمة المخزون حسب المشروع',
-        icon: 'trending-up',
-        path: '/inventory/valuation-by-project',
-        requiredPermission: 'inventory.view'
-      },
+    // Operations Group
     {
-      id: 'inventory-receive',
-      label: 'Receive',
-      titleEn: 'Receive Materials',
-      titleAr: 'توريد مواد',
-      icon: 'download',
-      path: '/inventory/receive',
-      requiredPermission: 'inventory.manage'
+      id: 'inventory-operations',
+      label: 'Operations',
+      titleEn: 'Operations',
+      titleAr: 'العمليات',
+      icon: 'activity',
+      children: [
+        {
+          id: 'inventory-receive',
+          label: 'Receive',
+          titleEn: 'Receive Materials',
+          titleAr: 'توريد مواد',
+          icon: 'download',
+          path: '/inventory/receive',
+          requiredPermission: 'inventory.manage'
+        },
+        {
+          id: 'inventory-issue',
+          label: 'Issue',
+          titleEn: 'Issue to Project',
+          titleAr: 'صرف للمشروع',
+          icon: 'upload',
+          path: '/inventory/issue',
+          requiredPermission: 'inventory.manage'
+        },
+        {
+          id: 'inventory-transfer',
+          label: 'Transfer',
+          titleEn: 'Transfer',
+          titleAr: 'نقل',
+          icon: 'shuffle',
+          path: '/inventory/transfer',
+          requiredPermission: 'inventory.transfer'
+        },
+        {
+          id: 'inventory-adjust',
+          label: 'Adjust',
+          titleEn: 'Adjust',
+          titleAr: 'تسوية',
+          icon: 'tune',
+          path: '/inventory/adjust',
+          requiredPermission: 'inventory.adjust'
+        },
+        {
+          id: 'inventory-returns',
+          label: 'Returns',
+          titleEn: 'Returns',
+          titleAr: 'مرتجعات',
+          icon: 'rotate-ccw',
+          path: '/inventory/returns',
+          requiredPermission: 'inventory.manage'
+        },
+        {
+          id: 'inventory-reconciliation',
+          label: 'Reconciliation',
+          titleEn: 'Reconciliation',
+          titleAr: 'التسوية',
+          icon: 'Balance',
+          path: '/inventory/reconciliation',
+          requiredPermission: 'inventory.adjust'
+        }
+      ]
     },
+    // Reports Group
     {
-      id: 'inventory-issue',
-      label: 'Issue',
-      titleEn: 'Issue to Project',
-      titleAr: 'صرف للمشروع',
-      icon: 'upload',
-      path: '/inventory/issue',
-      requiredPermission: 'inventory.manage'
+      id: 'inventory-reports',
+      label: 'Reports',
+      titleEn: 'Reports',
+      titleAr: 'التقارير',
+      icon: 'chart-line',
+      children: [
+        {
+          id: 'inventory-on-hand',
+          label: 'On Hand',
+          titleEn: 'On Hand',
+          titleAr: 'الرصيد المتاح',
+          icon: 'boxes',
+          path: '/inventory/on-hand',
+          requiredPermission: 'inventory.view'
+        },
+        {
+          id: 'inventory-movements',
+          label: 'Movements',
+          titleEn: 'Movements',
+          titleAr: 'حركة المخزون',
+          icon: 'activity',
+          path: '/inventory/movements',
+          requiredPermission: 'inventory.view'
+        },
+        {
+          id: 'inventory-movement-summary',
+          label: 'Movement Summary',
+          titleEn: 'Movement Summary',
+          titleAr: 'ملخص الحركة',
+          icon: 'activity',
+          path: '/inventory/movement-summary',
+          requiredPermission: 'inventory.view'
+        },
+        {
+          id: 'inventory-movement-detail',
+          label: 'Movement Detail',
+          titleEn: 'Movement Detail',
+          titleAr: 'تفاصيل الحركة',
+          icon: 'list',
+          path: '/inventory/movement-detail',
+          requiredPermission: 'inventory.view'
+        },
+        {
+          id: 'inventory-project-movement-summary',
+          label: 'Project Movement Summary',
+          titleEn: 'Project Movement Summary',
+          titleAr: 'ملخص الحركة حسب المشروع',
+          icon: 'bar-chart',
+          path: '/inventory/project-movement-summary',
+          requiredPermission: 'inventory.view'
+        },
+        {
+          id: 'inventory-valuation',
+          label: 'Valuation',
+          titleEn: 'Valuation',
+          titleAr: 'تقييم المخزون',
+          icon: 'trending-up',
+          path: '/inventory/valuation',
+          requiredPermission: 'inventory.view'
+        },
+        {
+          id: 'inventory-valuation-by-project',
+          label: 'Valuation by Project',
+          titleEn: 'Valuation by Project',
+          titleAr: 'قيمة المخزون حسب المشروع',
+          icon: 'trending-up',
+          path: '/inventory/valuation-by-project',
+          requiredPermission: 'inventory.view'
+        },
+        {
+          id: 'inventory-ageing',
+          label: 'Ageing',
+          titleEn: 'Stock Ageing',
+          titleAr: 'تقادم المخزون',
+          icon: 'clock',
+          path: '/inventory/ageing',
+          requiredPermission: 'inventory.view'
+        }
+      ]
     },
+    // Settings Group
     {
-      id: 'inventory-transfer',
-      label: 'Transfer',
-      titleEn: 'Transfer',
-      titleAr: 'نقل',
-      icon: 'shuffle',
-      path: '/inventory/transfer',
-      requiredPermission: 'inventory.transfer'
-    },
-    {
-      id: 'inventory-adjust',
-      label: 'Adjust',
-      titleEn: 'Adjust',
-      titleAr: 'تسوية',
-      icon: 'tune',
-      path: '/inventory/adjust',
-      requiredPermission: 'inventory.adjust'
-    },
-    {
-      id: 'inventory-returns',
-      label: 'Returns',
-      titleEn: 'Returns',
-      titleAr: 'مرتجعات',
-      icon: 'rotate-ccw',
-      path: '/inventory/returns',
-      requiredPermission: 'inventory.manage'
-    },
-      {
-        id: 'inventory-settings',
-        label: 'Settings',
-        titleEn: 'Inventory Settings',
-        titleAr: 'إعدادات المخزون',
-        icon: 'settings',
-        path: '/inventory/settings',
-        requiredPermission: 'inventory.manage'
-      },
-      {
-        id: 'inventory-reconciliation',
-        label: 'Reconciliation',
-        titleEn: 'Reconciliation',
-        titleAr: 'التسوية',
-        icon: 'Balance',
-        path: '/inventory/reconciliation',
-        requiredPermission: 'inventory.adjust'
-      }
+      id: 'inventory-settings',
+      label: 'Settings',
+      titleEn: 'Settings',
+      titleAr: 'الإعدادات',
+      icon: 'settings',
+      children: [
+        {
+          id: 'inventory-settings-page',
+          label: 'Inventory Settings',
+          titleEn: 'Inventory Settings',
+          titleAr: 'إعدادات المخزون',
+          icon: 'settings',
+          path: '/inventory/settings',
+          requiredPermission: 'inventory.manage'
+        }
+      ]
+    }
   ]
 } : null;
 export const navigationItems: NavigationItem[] = inventorySection

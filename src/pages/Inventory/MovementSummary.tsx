@@ -49,21 +49,26 @@ useEffect(() => {
   let mounted = true
   ;(async () => {
     if (!orgId) return
-    const { data, error } = await supabase
-      .from('inventory.v_material_costing_snapshot_detailed')
-      .select('org_id,material_id,location_id,project_id,method_used,last_purchase_unit_cost,effective_unit_cost,last_purchase_currency_code,last_purchase_vendor_id,last_purchase_at')
-      .eq('org_id', orgId)
-    if (!mounted) return
-    if (!error) {
-      const map: Record<string, { method_used: string | null, last_purchase_unit_cost: number | null, effective_unit_cost: number | null }> = {}
-      const meta: Record<string, { currency: string | null, vendor_id: string | null, at: string | null }> = {}
-      ;(data || []).forEach((r: any) => {
-        const key = `${r.org_id}-${r.material_id}-${r.location_id}-${r.project_id ?? 'none'}`
-        map[key] = { method_used: r.method_used ?? null, last_purchase_unit_cost: r.last_purchase_unit_cost ?? null, effective_unit_cost: r.effective_unit_cost ?? null }
-        meta[key] = { currency: r.last_purchase_currency_code ?? null, vendor_id: r.last_purchase_vendor_id ?? null, at: r.last_purchase_at ?? null }
-      })
-      setCostingMap(map)
-      setLppMetaMap(meta)
+    try {
+      const { data, error } = await supabase
+        .from('v_material_costing_snapshot_detailed')
+        .select('org_id,material_id,location_id,project_id,method_used,last_purchase_unit_cost,effective_unit_cost,last_purchase_currency_code,last_purchase_vendor_id,last_purchase_at')
+        .eq('org_id', orgId)
+      if (!mounted) return
+      if (!error && data) {
+        const map: Record<string, { method_used: string | null, last_purchase_unit_cost: number | null, effective_unit_cost: number | null }> = {}
+        const meta: Record<string, { currency: string | null, vendor_id: string | null, at: string | null }> = {}
+        data.forEach((r: any) => {
+          const key = `${r.org_id}-${r.material_id}-${r.location_id}-${r.project_id ?? 'none'}`
+          map[key] = { method_used: r.method_used ?? null, last_purchase_unit_cost: r.last_purchase_unit_cost ?? null, effective_unit_cost: r.effective_unit_cost ?? null }
+          meta[key] = { currency: r.last_purchase_currency_code ?? null, vendor_id: r.last_purchase_vendor_id ?? null, at: r.last_purchase_at ?? null }
+        })
+        setCostingMap(map)
+        setLppMetaMap(meta)
+      }
+    } catch {
+      // Costing snapshot view not available
+      console.warn('Costing snapshot view not available')
     }
   })()
   return () => { mounted = false }
@@ -79,7 +84,7 @@ const columns = useMemo<GridColDef[]>(() => [
     { field: 'period_month', headerName: 'Month', width: 160 },
     { field: 'qty_in', headerName: 'Qty In', width: 120, type: 'number' },
   { field: 'qty_out', headerName: 'Qty Out', width: 120, type: 'number' },
-    { field: 'method_used_ref', headerName: 'Cost Method', width: 160, valueGetter: (p) => costingMap[`${p.row.org_id}-${p.row.material_id}-${p.row.location_id}-${p.row.project_id ?? 'none'}`]?.method_used || '' },
+    { field: 'method_used_ref', headerName: 'Cost Method', width: 160, valueGetter: (p) => p?.row ? (costingMap[`${p.row.org_id}-${p.row.material_id}-${p.row.location_id}-${p.row.project_id ?? 'none'}`]?.method_used || '') : '' },
     { field: 'last_purchase_unit_cost_ref', headerName: 'Last Purchase', width: 160, type: 'number', renderCell: (params) => {
       const r: any = params.row
       const key = `${r.org_id}-${r.material_id}-${r.location_id}-${r.project_id ?? 'none'}`
@@ -92,7 +97,7 @@ const columns = useMemo<GridColDef[]>(() => [
         </Tooltip>
       )
     } },
-    { field: 'effective_unit_cost_ref', headerName: 'Unit Cost (Eff.)', width: 160, type: 'number', valueGetter: (p) => costingMap[`${p.row.org_id}-${p.row.material_id}-${p.row.location_id}-${p.row.project_id ?? 'none'}`]?.effective_unit_cost ?? null },
+    { field: 'effective_unit_cost_ref', headerName: 'Unit Cost (Eff.)', width: 160, type: 'number', valueGetter: (p) => p?.row ? (costingMap[`${p.row.org_id}-${p.row.material_id}-${p.row.location_id}-${p.row.project_id ?? 'none'}`]?.effective_unit_cost ?? null) : null },
   {
       field: 'actions', headerName: 'Actions', width: 160, sortable: false, renderCell: (params) => {
         const r = params.row as any

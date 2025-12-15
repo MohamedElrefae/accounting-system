@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Box, Container, Paper, Typography, Button, Stack, List, ListItem, ListItemText, Dialog, DialogTitle, DialogContent, DialogActions, TextField, LinearProgress, Alert, Tooltip, IconButton, useTheme, Avatar, Chip, Grid, Card, CardContent, Grow, Divider, Fade, alpha } from '@mui/material'
+import { Box, Container, Paper, Typography, Button, Stack, Dialog, DialogTitle, DialogContent, DialogActions, TextField, LinearProgress, Alert, Tooltip, IconButton, useTheme, Avatar, Chip, Grid, Card, CardContent, Grow, Divider, Fade, alpha } from '@mui/material'
 import LanguageIcon from '@mui/icons-material/Language'
 import SettingsIcon from '@mui/icons-material/Settings'
 import RefreshIcon from '@mui/icons-material/Refresh'
@@ -387,8 +387,13 @@ const QuickActionButton = ({
 // Main Enhanced Dashboard Component
 export default function EnhancedFiscalYearDashboard() {
   const { isRTL, getDirectionalStyle, t, texts } = useArabicLanguage()
+  const theme = useTheme()
 
-  const [orgId] = useState(() => getActiveOrgId() || '')
+  const [orgId] = useState(() => {
+    const id = getActiveOrgId() || ''
+    console.log('Dashboard: Initialized with orgId:', id)
+    return id
+  })
   const [fiscalYears, setFiscalYears] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -396,6 +401,7 @@ export default function EnhancedFiscalYearDashboard() {
   const [newStartDate, setNewStartDate] = useState<string>(`${new Date().getFullYear()}-01-01`)
   const [newEndDate, setNewEndDate] = useState<string>(`${new Date().getFullYear()}-12-31`)
   const [creating, setCreating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Language Toggle
   const toggleLanguage = useCallback(() => {
@@ -406,17 +412,41 @@ export default function EnhancedFiscalYearDashboard() {
 
   // Load dashboard data
   const loadDashboardData = useCallback(async () => {
+    console.log('Dashboard: loadDashboardData called with orgId:', orgId)
+    
+    if (!orgId) {
+      console.warn('Dashboard: No orgId available')
+      setError(isRTL ? 'لم يتم العثور على معرف المؤسسة' : 'No organization ID found')
+      setLoading(false)
+      return
+    }
+    
     setLoading(true)
+    setError(null)
+    
     try {
-      const years = orgId ? await FiscalYearService.getAll(orgId) : []
-      const list = years.map((y:any)=>({ id: y.id, name: y.name_ar || y.name_en || `FY ${y.year_number}`, range: `${y.start_date} — ${y.end_date}`, status: y.status }))
+      console.log('Dashboard: Fetching fiscal years for orgId:', orgId)
+      const years = await FiscalYearService.getAll(orgId)
+      console.log('Dashboard: Loaded fiscal years', { count: years.length, years })
+      
+      const list = years.map((y:any)=>({ 
+        id: y.id, 
+        name: y.nameAr || y.nameEn || `FY ${y.yearNumber}`, 
+        range: `${y.startDate} — ${y.endDate}`, 
+        status: y.status,
+        yearNumber: y.yearNumber,
+        isCurrent: y.isCurrent
+      }))
+      console.log('Dashboard: Mapped fiscal years', { list })
       setFiscalYears(list)
-    } catch (e) {
+    } catch (e: any) {
+      console.error('Dashboard: Failed to load fiscal years', e)
+      setError(e?.message || (isRTL ? 'فشل تحميل السنوات المالية' : 'Failed to load fiscal years'))
       setFiscalYears([])
     } finally {
       setLoading(false)
     }
-  }, [orgId])
+  }, [orgId, isRTL])
 
   useEffect(() => {
     loadDashboardData()
@@ -490,24 +520,72 @@ export default function EnhancedFiscalYearDashboard() {
       actions={headerActions}
     >
       <Box sx={{ p: 3, ...getDirectionalStyle() }}>
-        <Stack spacing={2}>
+        <Stack spacing={3}>
           <Stack direction={{ xs:'column', sm:'row' }} justifyContent="space-between" alignItems={{ xs:'stretch', sm:'center' }}>
             <Typography variant="h5" fontWeight="bold">{isRTL ? 'السنوات المالية' : 'Fiscal Years'}</Typography>
             <Button variant="contained" onClick={()=> setShowCreateDialog(true)}>{isRTL ? 'سنة مالية جديدة' : 'New Fiscal Year'}</Button>
           </Stack>
+          
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+          
+          {!orgId && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              {isRTL ? 'يرجى تحديد مؤسسة أولاً' : 'Please select an organization first'}
+            </Alert>
+          )}
+          
           {loading ? (
             <LinearProgress />
           ) : fiscalYears.length ? (
-            <List>
+            <Grid container spacing={2}>
               {fiscalYears.map((fy:any)=> (
-                <ListItem key={fy.id} divider>
-                  <ListItemText primary={fy.name} secondary={`${fy.range} • ${fy.status}`} />
-                </ListItem>
+                <Grid item xs={12} sm={6} md={4} key={fy.id}>
+                  <Card elevation={0} sx={{
+                    border: `2px solid ${fy.isCurrent ? theme.palette.primary.main : theme.palette.divider}`,
+                    borderRadius: 2,
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: theme.shadows[4]
+                    }
+                  }}>
+                    <CardContent>
+                      <Stack spacing={1}>
+                        <Stack direction={isRTL ? 'row-reverse' : 'row'} justifyContent="space-between" alignItems="center">
+                          <Typography variant="h6" fontWeight="bold">
+                            {fy.name}
+                          </Typography>
+                          {fy.isCurrent && (
+                            <Chip 
+                              label={isRTL ? 'نشط' : 'Active'} 
+                              color="primary" 
+                              size="small" 
+                            />
+                          )}
+                        </Stack>
+                        <Typography variant="body2" color="text.secondary">
+                          {fy.range}
+                        </Typography>
+                        <Chip 
+                          label={fy.status} 
+                          size="small" 
+                          sx={{ alignSelf: 'flex-start' }}
+                        />
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
               ))}
-            </List>
-          ) : (
-            <Alert severity="info">{isRTL ? 'لا توجد سنوات مالية.' : 'No fiscal years found.'}</Alert>
-          )}
+            </Grid>
+          ) : !loading && orgId ? (
+            <Alert severity="info">
+              {isRTL ? 'لا توجد سنوات مالية. انقر على "سنة مالية جديدة" لإنشاء واحدة.' : 'No fiscal years found. Click "New Fiscal Year" to create one.'}
+            </Alert>
+          ) : null}
         </Stack>
       </Box>
 

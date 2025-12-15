@@ -181,7 +181,7 @@ const AccountExplorerReport: React.FC = () => {
           setExpensesCategories(cats || [])
           setWorkItems(wItems || [])
           setCostCenters((ccs || []).map((c: any) => ({ id: String(c.id), code: String(c.code), name: String(c.name) })))
-          const accOpts: SearchableSelectOption[] = (accs || []).map((a: any) => ({ value: String(a.id), label: `${String(a.code)} - ${String(a.name)}`, searchText: `${String(a.code)} ${String(a.name)}` }))
+          const accOpts: SearchableSelectOption[] = (accs || []).map((a: any) => ({ value: String(a.id), label: `${String(a.code)} - ${String(a.name_ar || a.name)}`, searchText: `${String(a.code)} ${String(a.name_ar || a.name)}` }))
           setAccountsOptions([{ value: '', label: uiLang === 'ar' ? 'كل الحسابات' : 'All Accounts', searchText: '' }, ...accOpts])
         }
       } catch { /* noop */ }

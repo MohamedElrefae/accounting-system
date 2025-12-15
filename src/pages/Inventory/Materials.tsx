@@ -1,8 +1,18 @@
-import React, { useEffect, useState } from 'react'
-import { Card, CardContent, Typography, Table, TableHead, TableRow, TableCell, TableBody, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem } from '@mui/material'
-import { listMaterials, type MaterialRow, createMaterial, updateMaterial } from '@/services/inventory/materials'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
+import { Card, CardContent, Typography, Dialog, DialogContent, Box } from '@mui/material'
+import UnifiedCRUDForm, { type FormConfig, type UnifiedCRUDFormHandle } from '@/components/Common/UnifiedCRUDForm'
+import { listMaterials, type MaterialRow, createMaterial, updateMaterial, deleteMaterial } from '@/services/inventory/materials'
 import { listUOMs, type UomRow } from '@/services/inventory/uoms'
 import { useToast } from '@/contexts/ToastContext'
+import { useArabicLanguage } from '@/services/ArabicLanguageService'
+import { INVENTORY_TEXTS } from '@/i18n/inventory'
+import { getDisplayName } from '@/utils/inventoryDisplay'
+import ResizableTable from '@/components/Common/ResizableTable'
+import ColumnConfiguration from '@/components/Common/ColumnConfiguration'
+import type { ColumnConfig } from '@/components/Common/ColumnConfiguration'
+import useColumnPreferences from '@/hooks/useColumnPreferences'
+import '../MainData/AccountsTree.css'
 
 function getActiveOrgIdSafe(): string | null {
   try { return localStorage.getItem('org_id') } catch { return null }
@@ -10,118 +20,392 @@ function getActiveOrgIdSafe(): string | null {
 
 const MaterialsPage: React.FC = () => {
   const { showToast } = useToast()
+  const { t, isRTL } = useArabicLanguage()
   const [rows, setRows] = useState<MaterialRow[]>([])
   const [loading, setLoading] = useState(false)
   const [uoms, setUoms] = useState<UomRow[]>([])
-  const [open, setOpen] = useState(false)
-  const [form, setForm] = useState<{ code: string; name: string; nameAr: string; baseUomId: string }>({ code: '', name: '', nameAr: '', baseUomId: '' })
-  const [editId, setEditId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState<{ code: string; name: string; nameAr: string; baseUomId: string; isActive: boolean; isTrackable: boolean }>({ code: '', name: '', nameAr: '', baseUomId: '', isActive: true, isTrackable: true })
+  const formRef = useRef<UnifiedCRUDFormHandle>(null)
+  const [panelOpen, setPanelOpen] = useState(false)
+  const [editingRow, setEditingRow] = useState<MaterialRow | null>(null)
+  const [formSubmitting, setFormSubmitting] = useState(false)
+  const [columnsConfigOpen, setColumnsConfigOpen] = useState(false)
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string>('')
+
+  const uomOptions = useMemo(() => {
+    return uoms.map(u => ({
+      value: u.id,
+      label: `${u.code} - ${getDisplayName(u)}`,
+    }))
+  }, [uoms])
+
+  const formConfig: FormConfig = useMemo(() => ({
+    title: isRTL ? 'مادة' : 'Material',
+    fields: [
+      {
+        id: 'material_code',
+        type: 'text',
+        label: isRTL ? 'كود المادة' : 'Material Code',
+        required: true,
+      },
+      {
+        id: 'material_name',
+        type: 'text',
+        label: isRTL ? 'اسم المادة' : 'Material Name',
+        required: true,
+      },
+      {
+        id: 'material_name_ar',
+        type: 'text',
+        label: isRTL ? 'اسم المادة (عربي)' : 'Material Name (Arabic)',
+        required: false,
+      },
+      {
+        id: 'base_uom_id',
+        type: 'searchable-select',
+        label: isRTL ? 'وحدة القياس' : 'UOM',
+        placeholder: isRTL ? 'اختر وحدة القياس' : 'Select UOM',
+        required: true,
+        options: uomOptions,
+      },
+      {
+        id: 'is_active',
+        type: 'checkbox',
+        label: isRTL ? 'فعال' : 'Active',
+        defaultValue: true,
+      },
+      {
+        id: 'is_trackable',
+        type: 'checkbox',
+        label: isRTL ? 'قابل للتتبع' : 'Trackable',
+        defaultValue: true,
+      },
+    ],
+    submitLabel: isRTL ? 'حفظ' : 'Save',
+    cancelLabel: isRTL ? 'إلغاء' : 'Cancel',
+  }), [isRTL, uomOptions])
+
+  const fetchData = useCallback(async () => {
+    const orgId = getActiveOrgIdSafe()
+    if (!orgId) {
+      showToast(isRTL ? 'الرجاء اختيار مؤسسة أولاً' : 'Please select an organization first', { severity: 'warning' })
+      return
+    }
+
+    setLoading(true)
+    try {
+      const [materials, uomsList] = await Promise.all([listMaterials(orgId), listUOMs(orgId)])
+      setRows(materials)
+      setUoms(uomsList)
+    } catch (error) {
+      console.error('Error loading materials:', error)
+      showToast(isRTL ? 'خطأ في تحميل المواد' : 'Error loading materials', { severity: 'error' })
+    } finally {
+      setLoading(false)
+    }
+  }, [showToast, isRTL])
 
   useEffect(() => {
+    fetchData().catch(() => {})
+  }, [fetchData])
+
+  const openCreate = () => {
+    setEditingRow(null)
+    setPanelOpen(true)
+  }
+
+  const openEdit = (row: MaterialRow) => {
+    setEditingRow(row)
+    setPanelOpen(true)
+  }
+
+  const getSelectedMaterial = () => {
+    if (!selectedMaterialId) return null
+    return rows.find(r => r.id === selectedMaterialId) || null
+  }
+
+  const openEditSelected = () => {
+    const selected = getSelectedMaterial()
+    if (!selected) {
+      showToast(isRTL ? 'يرجى اختيار مادة أولاً' : 'Please select a material first', { severity: 'warning' })
+      return
+    }
+    openEdit(selected)
+  }
+
+  const handleDelete = async (row: MaterialRow) => {
+    const name = getDisplayName(row)
+    const ok = window.confirm(isRTL ? `هل أنت متأكد من حذف المادة "${name}"؟` : `Delete material "${name}"?`)
+    if (!ok) return
+
+    try {
+      await deleteMaterial(row.id)
+      showToast(isRTL ? 'تم حذف المادة' : 'Material deleted', { severity: 'success' })
+      if (selectedMaterialId === row.id) setSelectedMaterialId('')
+      await fetchData()
+    } catch (e: any) {
+      showToast(e?.message || (isRTL ? 'فشل الحذف' : 'Delete failed'), { severity: 'error' })
+    }
+  }
+
+  const handleDeleteSelected = async () => {
+    const selected = getSelectedMaterial()
+    if (!selected) {
+      showToast(isRTL ? 'يرجى اختيار مادة أولاً' : 'Please select a material first', { severity: 'warning' })
+      return
+    }
+    await handleDelete(selected)
+  }
+
+  const defaultColumns: ColumnConfig[] = useMemo(() => {
+    return [
+      { key: 'material_code', label: isRTL ? 'كود المادة' : 'Material Code', visible: true, width: 140, type: 'text', resizable: true, sortable: true, frozen: true, pinPriority: 3 },
+      { key: 'material_name', label: isRTL ? 'اسم المادة' : 'Material Name', visible: true, width: 280, type: 'text', resizable: true, sortable: true },
+      { key: 'uom_label', label: isRTL ? 'وحدة القياس' : 'UOM', visible: true, width: 180, type: 'text', resizable: true, sortable: true },
+      { key: 'is_active', label: isRTL ? 'فعال' : 'Active', visible: true, width: 140, type: 'badge', resizable: true },
+      { key: 'is_trackable', label: isRTL ? 'قابل للتتبع' : 'Trackable', visible: true, width: 140, type: 'badge', resizable: true },
+      { key: 'actions', label: isRTL ? 'الإجراءات' : 'Actions', visible: true, width: 220, type: 'actions', resizable: true, frozen: true, pinPriority: 2 },
+    ]
+  }, [isRTL])
+
+  const {
+    columns,
+    handleColumnResize,
+    handleColumnConfigChange,
+    resetToDefaults,
+  } = useColumnPreferences({
+    storageKey: 'materials_table',
+    defaultColumns,
+  })
+
+  const tableData = useMemo(() => {
+    return rows.map(r => {
+      const uom = uoms.find(u => u.id === r.base_uom_id)
+      return {
+        material_code: r.material_code,
+        material_name: getDisplayName(r),
+        uom_label: uom ? `${uom.code} - ${getDisplayName(uom)}` : '-',
+        is_active: !!r.is_active,
+        is_trackable: !!r.is_trackable,
+        actions: null,
+        original: r,
+      }
+    })
+  }, [rows, uoms])
+
+  const formInitialData = useMemo(() => {
+    return editingRow ? {
+      material_code: editingRow.material_code,
+      material_name: editingRow.material_name,
+      material_name_ar: editingRow.material_name_ar || '',
+      base_uom_id: editingRow.base_uom_id,
+      is_active: !!editingRow.is_active,
+      is_trackable: !!editingRow.is_trackable,
+    } : {
+      material_code: '',
+      material_name: '',
+      material_name_ar: '',
+      base_uom_id: '',
+      is_active: true,
+      is_trackable: true,
+    }
+  }, [editingRow])
+
+  const handleFormSubmit = async (data: Record<string, unknown>) => {
     const orgId = getActiveOrgIdSafe()
-    if (!orgId) return
-    setLoading(true)
-    Promise.all([listMaterials(orgId), listUOMs(orgId)])
-      .then(([materials, uomsList]) => { setRows(materials); setUoms(uomsList) })
-      .finally(() => setLoading(false))
-  }, [])
+    if (!orgId) {
+      showToast(t({ en: 'Please select an organization first', ar: 'الرجاء اختيار مؤسسة أولاً' }), { severity: 'warning' })
+      return
+    }
+
+    const material_code = String(data.material_code || '').trim()
+    const material_name = String(data.material_name || '').trim()
+    const base_uom_id = String(data.base_uom_id || '').trim()
+    const material_name_ar = String(data.material_name_ar || '').trim()
+    const is_active = Boolean(data.is_active)
+    const is_trackable = Boolean(data.is_trackable)
+
+    if (!material_code || !material_name || !base_uom_id) {
+      showToast(t({ en: 'Code, Name, and UOM are required', ar: 'الكود والاسم ووحدة القياس مطلوبة' }), { severity: 'warning' })
+      return
+    }
+
+    setFormSubmitting(true)
+    try {
+      if (editingRow) {
+        await updateMaterial(editingRow.id, {
+          material_code,
+          material_name,
+          material_name_ar: material_name_ar || null,
+          base_uom_id,
+          is_active,
+          is_trackable,
+        })
+        showToast(t({ en: 'Material updated successfully', ar: 'تم تحديث المادة بنجاح' }), { severity: 'success' })
+      } else {
+        await createMaterial({
+          org_id: orgId,
+          material_code,
+          material_name,
+          material_name_ar: material_name_ar || null,
+          base_uom_id,
+          is_active,
+          is_trackable,
+          material_type: 'material',
+          is_material_for_analysis: false,
+          valuation_method: 'moving_average',
+        })
+        showToast(t({ en: 'Material created successfully', ar: 'تم إنشاء المادة بنجاح' }), { severity: 'success' })
+      }
+
+      setPanelOpen(false)
+      await fetchData()
+    } catch (e: any) {
+      showToast(e?.message || t({ en: 'Save failed', ar: 'فشل الحفظ' }), { severity: 'error' })
+    } finally {
+      setFormSubmitting(false)
+    }
+  }
 
   return (
-    <div style={{ padding: 16 }}>
-      <Typography variant="h6" gutterBottom>Materials / المواد</Typography>
-      <div style={{ marginBottom: 8 }}>
-        <Button variant="contained" onClick={() => setOpen(true)}>Add Material / إضافة مادة</Button>
+    <div className="accounts-page" dir={isRTL ? 'rtl' : 'ltr'}>
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1 className="page-title">{t(INVENTORY_TEXTS.materials)}</h1>
+        </div>
+        <div className="page-actions">
+          <button className="ultimate-btn ultimate-btn-primary" title={t({ en: 'Columns', ar: 'الأعمدة' })} onClick={() => setColumnsConfigOpen(true)}>
+            <div className="btn-content"><span className="btn-text">⚙️ {t({ en: 'Columns', ar: 'الأعمدة' })}</span></div>
+          </button>
+          <button className="ultimate-btn ultimate-btn-add" title={t({ en: 'Add Material', ar: 'إضافة مادة' })} onClick={openCreate}>
+            <div className="btn-content"><span className="btn-text">{t({ en: 'Add Material', ar: 'إضافة مادة' })}</span></div>
+          </button>
+          <button className="ultimate-btn ultimate-btn-edit" title={t({ en: 'Edit Selected', ar: 'تعديل المحدد' })} onClick={openEditSelected} disabled={!selectedMaterialId}>
+            <div className="btn-content"><span className="btn-text">{t({ en: 'Edit Selected', ar: 'تعديل المحدد' })}</span></div>
+          </button>
+          <button className="ultimate-btn ultimate-btn-delete" title={t({ en: 'Delete Selected', ar: 'حذف المحدد' })} onClick={handleDeleteSelected} disabled={!selectedMaterialId}>
+            <div className="btn-content"><span className="btn-text">{t({ en: 'Delete Selected', ar: 'حذف المحدد' })}</span></div>
+          </button>
+        </div>
       </div>
-      <Card>
-        <CardContent>
-          {loading ? 'Loading…' : (
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Code</TableCell>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Arabic</TableCell>
-                  <TableCell>Active</TableCell>
-                  <TableCell>Trackable</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {rows.map(r => (
-                  <TableRow key={r.id}>
-                    <TableCell>{r.material_code}</TableCell>
-                    <TableCell>{r.material_name}</TableCell>
-                    <TableCell>{r.material_name_ar || ''}</TableCell>
-                    <TableCell>{r.is_active ? 'Yes' : 'No'}</TableCell>
-                    <TableCell>{r.is_trackable ? 'Yes' : 'No'}</TableCell>
-                    <TableCell>
-                      <Button size="small" onClick={() => { setEditId(r.id); setEditForm({ code: r.material_code, name: r.material_name, nameAr: r.material_name_ar || '', baseUomId: r.base_uom_id, isActive: !!r.is_active, isTrackable: !!r.is_trackable }) }}>Edit</Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+
+      <div className="content-area" style={{ padding: 16 }}>
+        <Card>
+          <CardContent>
+            {loading ? (
+              <Typography>{t({ en: 'Loading...', ar: 'جاري التحميل...' })}</Typography>
+            ) : rows.length === 0 ? (
+              <Box sx={{ textAlign: 'center', padding: 4 }}>
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                  {t({ en: 'No materials found', ar: 'لا توجد مواد' })}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  {t({ en: 'Click "Add Material" to add your first material', ar: 'انقر على "إضافة مادة" لإضافة أول مادة' })}
+                </Typography>
+                <button className="ultimate-btn ultimate-btn-add" title={t({ en: 'Add Material', ar: 'إضافة مادة' })} onClick={openCreate}>
+                  <div className="btn-content"><span className="btn-text">{t({ en: 'Add First Material', ar: 'إضافة أول مادة' })}</span></div>
+                </button>
+              </Box>
+            ) : (
+              <ResizableTable
+                columns={columns}
+                data={tableData as any}
+                onColumnResize={handleColumnResize}
+                className="transactions-resizable-table"
+                isLoading={loading}
+                emptyMessage={t({ en: 'No materials', ar: 'لا توجد مواد' })}
+                highlightRowId={selectedMaterialId}
+                getRowId={(row) => (row as any)?.original?.id ?? (row as any)?.id ?? ''}
+                onRowClick={(row) => {
+                  const id = String((row as any)?.original?.id || '')
+                  setSelectedMaterialId(id)
+                }}
+                renderCell={(_value, column, row) => {
+                  const original = (row as any)?.original
+
+                  if (!original) {
+                    return _value as any
+                  }
+
+                  if (column.key === 'is_active') {
+                    const active = !!original.is_active
+                    return (
+                      <span
+                        className={`ultimate-btn ${active ? 'ultimate-btn-success' : 'ultimate-btn-neutral'}`}
+                        style={{ cursor: 'default', padding: '6px 12px', minHeight: 32, fontSize: '13px' }}
+                        title={active ? t(INVENTORY_TEXTS.active) : t(INVENTORY_TEXTS.inactive)}
+                      >
+                        <span className="btn-text">{active ? t(INVENTORY_TEXTS.active) : t(INVENTORY_TEXTS.inactive)}</span>
+                      </span>
+                    )
+                  }
+
+                  if (column.key === 'is_trackable') {
+                    const track = !!original.is_trackable
+                    return (
+                      <span
+                        className={`ultimate-btn ${track ? 'ultimate-btn-primary' : 'ultimate-btn-neutral'}`}
+                        style={{ cursor: 'default', padding: '6px 12px', minHeight: 32, fontSize: '13px' }}
+                        title={track ? t({ en: 'Yes', ar: 'نعم' }) : t({ en: 'No', ar: 'لا' })}
+                      >
+                        <span className="btn-text">{track ? t({ en: 'Yes', ar: 'نعم' }) : t({ en: 'No', ar: 'لا' })}</span>
+                      </span>
+                    )
+                  }
+
+                  if (column.key === 'actions') {
+                    return (
+                      <div className="tree-node-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        <button
+                          className="ultimate-btn ultimate-btn-edit"
+                          title={t({ en: 'Edit', ar: 'تعديل' })}
+                          onClick={() => openEdit(original)}
+                          style={{ minHeight: 32, padding: '6px 10px' }}
+                        >
+                          <div className="btn-content"><span className="btn-text">{t({ en: 'Edit', ar: 'تعديل' })}</span></div>
+                        </button>
+                        <button
+                          className="ultimate-btn ultimate-btn-delete"
+                          title={t({ en: 'Delete', ar: 'حذف' })}
+                          onClick={() => void handleDelete(original)}
+                          style={{ minHeight: 32, padding: '6px 10px' }}
+                        >
+                          <div className="btn-content"><span className="btn-text">{t({ en: 'Delete', ar: 'حذف' })}</span></div>
+                        </button>
+                      </div>
+                    )
+                  }
+
+                  return _value as any
+                }}
+              />
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <ColumnConfiguration
+        columns={columns}
+        onConfigChange={handleColumnConfigChange}
+        isOpen={columnsConfigOpen}
+        onClose={() => setColumnsConfigOpen(false)}
+        onReset={resetToDefaults}
+        sampleData={tableData as any}
+      />
 
       {/* Edit Dialog */}
-      <Dialog open={!!editId} onClose={() => setEditId(null)} fullWidth maxWidth="sm">
-        <DialogTitle>Edit Material / تعديل مادة</DialogTitle>
-        <DialogContent>
-          <TextField fullWidth margin="dense" label="Code / الكود" value={editForm.code} onChange={(e) => setEditForm({ ...editForm, code: e.target.value })} />
-          <TextField fullWidth margin="dense" label="Name / الاسم" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
-          <TextField fullWidth margin="dense" label="Arabic Name / الاسم العربي" value={editForm.nameAr} onChange={(e) => setEditForm({ ...editForm, nameAr: e.target.value })} />
-          <TextField select fullWidth margin="dense" label="Base UOM / وحدة القياس" value={editForm.baseUomId} onChange={(e) => setEditForm({ ...editForm, baseUomId: String(e.target.value) })}>
-            {uoms.map(u => (<MenuItem key={u.id} value={u.id}>{u.code} - {u.name}</MenuItem>))}
-          </TextField>
+      <Dialog open={panelOpen} onClose={() => setPanelOpen(false)} fullWidth maxWidth="sm">
+        <DialogContent sx={{ pt: 3 }}>
+          <UnifiedCRUDForm
+            key={editingRow?.id ?? 'materials-new'}
+            ref={formRef}
+            config={formConfig}
+            initialData={formInitialData}
+            resetOnInitialDataChange={false}
+            isLoading={formSubmitting}
+            onSubmit={handleFormSubmit}
+            onCancel={() => setPanelOpen(false)}
+          />
         </DialogContent>
-        <DialogContent>
-          <label style={{ display: 'block', marginTop: 8 }}>
-            <input type="checkbox" checked={editForm.isActive} onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })} /> Active / نشط
-          </label>
-          <label style={{ display: 'block', marginTop: 8 }}>
-            <input type="checkbox" checked={editForm.isTrackable} onChange={(e) => setEditForm({ ...editForm, isTrackable: e.target.checked })} /> Trackable / يتطلب تتبع
-          </label>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditId(null)}>Close</Button>
-          <Button onClick={async () => {
-            try {
-              const id = editId; if (!id) return
-              if (!editForm.code || !editForm.name || !editForm.baseUomId) { showToast('Code, Name, Base UOM required', { severity: 'warning' }); return }
-              await updateMaterial(id, { material_code: editForm.code, material_name: editForm.name, material_name_ar: editForm.nameAr || null, base_uom_id: editForm.baseUomId, is_active: editForm.isActive, is_trackable: editForm.isTrackable })
-              showToast('Material updated', { severity: 'success' })
-              setEditId(null)
-              const orgId = getActiveOrgIdSafe(); if (orgId) { setLoading(true); const list = await listMaterials(orgId); setRows(list); setLoading(false) }
-            } catch (e: any) { showToast(e?.message || 'Update failed', { severity: 'error' }) }
-          }} variant="contained">Save</Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>New Material / مادة جديدة</DialogTitle>
-        <DialogContent>
-          <TextField fullWidth margin="dense" label="Code / الكود" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
-          <TextField fullWidth margin="dense" label="Name / الاسم" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <TextField fullWidth margin="dense" label="Arabic Name / الاسم العربي" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />
-          <TextField select fullWidth margin="dense" label="Base UOM / وحدة القياس" value={form.baseUomId} onChange={(e) => setForm({ ...form, baseUomId: String(e.target.value) })}>
-            {uoms.map(u => (<MenuItem key={u.id} value={u.id}>{u.code} - {u.name}</MenuItem>))}
-          </TextField>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpen(false)}>Close</Button>
-          <Button onClick={async () => {
-            try {
-              const orgId = getActiveOrgIdSafe(); if (!orgId) { showToast('Select org first', { severity: 'warning' }); return }
-              if (!form.code || !form.name || !form.baseUomId) { showToast('Code, Name, Base UOM required', { severity: 'warning' }); return }
-              await createMaterial({ org_id: orgId, material_code: form.code, material_name: form.name, material_name_ar: form.nameAr || null, base_uom_id: form.baseUomId, is_active: true, is_trackable: true, material_type: 'material', is_material_for_analysis: false, valuation_method: 'moving_average' })
-              showToast('Material created', { severity: 'success' })
-              setOpen(false); setForm({ code: '', name: '', nameAr: '', baseUomId: '' })
-              setLoading(true); const list = await listMaterials(orgId); setRows(list); setLoading(false)
-            } catch (e: any) { showToast(e?.message || 'Create failed', { severity: 'error' }) }
-          }} variant="contained">Save</Button>
-        </DialogActions>
       </Dialog>
     </div>
   )

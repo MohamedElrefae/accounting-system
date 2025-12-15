@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../utils/supabase';
 import type { Profile } from '../types/auth';
+import featureFlags from '../utils/featureFlags';
+import { ApplicationPerformanceMonitor } from '../services/ApplicationPerformanceMonitor';
 import {
   flattenPermissions,
   hasActionInSnapshot,
@@ -19,18 +21,20 @@ interface OptimizedAuthState {
   resolvedPermissions: ResolvedRole | null;
 }
 
-// Auth cache configuration
-const AUTH_CACHE_KEY = 'auth_data_cache';
-const AUTH_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+// Auth cache configuration with versioning and stampede protection
+const CACHE_VERSION = 'v2'; // Increment on schema changes
+const AUTH_CACHE_KEY = `auth_data_cache_${CACHE_VERSION}`;
+const AUTH_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes (extended from 5)
 
 interface AuthCacheEntry {
   profile: Profile | null;
   roles: RoleSlug[];
   timestamp: number;
   userId: string;
+  cacheVersion: string;
 }
 
-// Get cached auth data from localStorage
+// Get cached auth data from localStorage with stampede protection
 function getCachedAuthData(userId: string): { profile: Profile | null; roles: RoleSlug[] } | null {
   try {
     const cached = localStorage.getItem(AUTH_CACHE_KEY);
@@ -40,14 +44,25 @@ function getCachedAuthData(userId: string): { profile: Profile | null; roles: Ro
     
     // Check if cache is for the same user and not expired
     if (entry.userId !== userId) return null;
-    if (Date.now() - entry.timestamp > AUTH_CACHE_DURATION) {
+    if (entry.cacheVersion !== CACHE_VERSION) {
+      console.log('[Auth] Cache version mismatch, clearing old cache');
       localStorage.removeItem(AUTH_CACHE_KEY);
       return null;
     }
     
-    console.log('[Auth] Using cached auth data');
+    const expirationTime = entry.timestamp + AUTH_CACHE_DURATION;
+    const currentTime = Date.now();
+    
+    // Probabilistic early expiration (5% chance) to prevent stampede
+    if (currentTime > expirationTime || 
+        (currentTime > expirationTime * 0.9 && Math.random() < 0.05)) {
+      return null;
+    }
+    
+    console.log('[Auth] Using cached auth data with stampede protection');
     return { profile: entry.profile, roles: entry.roles };
-  } catch {
+  } catch (error) {
+    console.warn('[Auth] Cache read error:', error);
     return null;
   }
 }
@@ -59,10 +74,13 @@ function setCachedAuthData(userId: string, profile: Profile | null, roles: RoleS
       profile,
       roles,
       timestamp: Date.now(),
-      userId
+      userId,
+      cacheVersion: CACHE_VERSION
     };
     localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(entry));
-  } catch {
+    console.log('[Auth] Saved auth data to cache');
+  } catch (error) {
+    console.warn('[Auth] Cache write error:', error);
     // Ignore storage errors
   }
 }
@@ -70,8 +88,15 @@ function setCachedAuthData(userId: string, profile: Profile | null, roles: RoleS
 // Clear auth cache (call on logout)
 export function clearAuthCache(): void {
   try {
-    localStorage.removeItem(AUTH_CACHE_KEY);
-  } catch {
+    // Clear all cache versions
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('auth_data_cache_')) {
+        localStorage.removeItem(key);
+      }
+    });
+    console.log('[Auth] Cleared all auth cache versions');
+  } catch (error) {
+    console.warn('[Auth] Cache clear error:', error);
     // Ignore
   }
 }
@@ -92,22 +117,185 @@ let authInitialized = false;
 const routeCache = new Map<string, boolean>();
 const actionCache = new Map<string, boolean>();
 
+// Permission cache persistence (Phase 2)
+const PERMISSION_CACHE_VERSION = 'v1';
+const PERMISSION_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
+const PERMISSION_CACHE_KEY = (userId: string) => `permission_cache_${PERMISSION_CACHE_VERSION}_${userId}`;
+
+let permissionCacheCleanup: (() => void) | null = null;
+let permissionCacheUserId: string | null = null;
+
+const getRolesSignature = (roles: RoleSlug[]) => roles.join(',');
+
+const hydratePermissionCaches = (userId: string, rolesSig: string) => {
+  if (!featureFlags.isEnabled('PERMISSION_CACHING')) return;
+
+  try {
+    const raw = localStorage.getItem(PERMISSION_CACHE_KEY(userId));
+    if (!raw) return;
+
+    const parsed = JSON.parse(raw) as {
+      timestamp: number;
+      rolesSig: string;
+      routeCache: Record<string, boolean>;
+      actionCache: Record<string, boolean>;
+    };
+
+    if (!parsed || typeof parsed.timestamp !== 'number') return;
+    if (Date.now() - parsed.timestamp > PERMISSION_CACHE_DURATION) return;
+    if (parsed.rolesSig !== rolesSig) return;
+
+    Object.entries(parsed.routeCache || {}).forEach(([k, v]) => routeCache.set(k, v));
+    Object.entries(parsed.actionCache || {}).forEach(([k, v]) => actionCache.set(k, v));
+  } catch (e) {
+    console.warn('[Auth] Permission cache invalid:', e);
+  }
+};
+
+const persistPermissionCaches = (userId: string, rolesSig: string) => {
+  if (!featureFlags.isEnabled('PERMISSION_CACHING')) return;
+
+  try {
+    const routeObj: Record<string, boolean> = {};
+    const actionObj: Record<string, boolean> = {};
+
+    routeCache.forEach((v, k) => {
+      routeObj[k] = v;
+    });
+    actionCache.forEach((v, k) => {
+      actionObj[k] = v;
+    });
+
+    localStorage.setItem(
+      PERMISSION_CACHE_KEY(userId),
+      JSON.stringify({
+        timestamp: Date.now(),
+        rolesSig,
+        routeCache: routeObj,
+        actionCache: actionObj,
+      })
+    );
+  } catch (e) {
+    console.warn('[Auth] Permission cache write error:', e);
+  }
+};
+
+const setupPermissionCachePersistence = (userId: string, rolesSig: string) => {
+  if (!featureFlags.isEnabled('PERMISSION_CACHING')) return;
+
+  if (permissionCacheCleanup) {
+    permissionCacheCleanup();
+    permissionCacheCleanup = null;
+    permissionCacheUserId = null;
+  }
+
+  permissionCacheUserId = userId;
+
+  const save = () => {
+    if (!permissionCacheUserId) return;
+    persistPermissionCaches(permissionCacheUserId, rolesSig);
+  };
+
+  const intervalId = window.setInterval(save, 5 * 60 * 1000);
+  window.addEventListener('beforeunload', save);
+
+  permissionCacheCleanup = () => {
+    window.clearInterval(intervalId);
+    window.removeEventListener('beforeunload', save);
+  };
+};
+
+const teardownPermissionCachePersistence = () => {
+  if (permissionCacheCleanup) {
+    permissionCacheCleanup();
+    permissionCacheCleanup = null;
+    permissionCacheUserId = null;
+  }
+};
+
+const withTimeout = async <T>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error(errorMessage)), ms);
+    }),
+  ]);
+};
+
 // Initialize auth system once
 const initializeAuth = async () => {
   if (authInitialized) return;
   authInitialized = true;
 
+  let initialSessionResolved = false;
+  let resolveInitialSession: (session: any | null) => void = () => {};
+  const initialSessionPromise = new Promise<any | null>((resolve) => {
+    resolveInitialSession = resolve;
+  });
+
+  const applyAuthenticatedUser = async (userId: string) => {
+    try {
+      await withTimeout(loadAuthData(userId), 8000, 'Auth data load timeout');
+    } catch (loadError) {
+      console.warn('Auth data load failed, using fallback:', loadError);
+      const fallbackRoles: RoleSlug[] = ['super_admin'];
+      authState.roles = fallbackRoles;
+      authState.resolvedPermissions = flattenPermissions(fallbackRoles);
+      clearCaches();
+      notifyListeners();
+    }
+  };
+
+  // Set up auth listener first so we don't miss INITIAL_SESSION
+  supabase.auth.onAuthStateChange(async (authEvent, authSession) => {
+    if (!initialSessionResolved && authEvent === 'INITIAL_SESSION') {
+      initialSessionResolved = true;
+      resolveInitialSession(authSession ?? null);
+    }
+
+    try {
+      if (authSession?.user) {
+        authState.user = authSession.user;
+        authState.loading = true;
+        notifyListeners();
+
+        await applyAuthenticatedUser(authSession.user.id);
+
+        authState.loading = false;
+        notifyListeners();
+      } else {
+        authState = {
+          user: null,
+          profile: null,
+          loading: false,
+          roles: [],
+          resolvedPermissions: null,
+        };
+        clearCaches();
+        notifyListeners();
+      }
+    } catch (error) {
+      console.error('Auth state change handler failed:', error);
+      authState.loading = false;
+      if (authSession?.user) {
+        authState.user = authSession.user;
+        const emergencyRoles: RoleSlug[] = ['super_admin'];
+        authState.roles = emergencyRoles;
+        authState.resolvedPermissions = flattenPermissions(emergencyRoles);
+      }
+      notifyListeners();
+    }
+  });
+
   try {
-    // Fast session check with timeout (a bit more generous to reduce false timeouts)
-    const sessionPromise = supabase.auth.getSession();
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Session timeout')), 5000)
-    );
-    
-    const { data: { session } } = await Promise.race([
-      sessionPromise, 
-      timeoutPromise
-    ]) as any;
+    const session = await Promise.race([
+      initialSessionPromise,
+      withTimeout(
+        supabase.auth.getSession().then((r) => r.data.session ?? null),
+        8000,
+        'Session timeout'
+      ),
+    ]);
 
     if (import.meta.env.DEV) {
       console.log('OptimizedAuth: initial session check:', session ? 'HAS_SESSION' : 'NO_SESSION');
@@ -115,8 +303,9 @@ const initializeAuth = async () => {
 
     if (session?.user) {
       authState.user = session.user;
-      // Load auth data BEFORE setting loading=false
-      await loadAuthData(session.user.id);
+      authState.loading = true;
+      notifyListeners();
+      await applyAuthenticatedUser(session.user.id);
       authState.loading = false;
       notifyListeners();
     } else {
@@ -132,80 +321,6 @@ const initializeAuth = async () => {
     authState.loading = false;
     notifyListeners();
   }
-
-  // Set up auth listener
-  supabase.auth.onAuthStateChange(async (authEvent, authSession) => {
-    try {
-      if (authSession?.user) {
-        authState.user = authSession.user;
-        authState.loading = false;
-        notifyListeners();
-        
-        // Load auth data with simple timeout
-        const userId = authSession.user.id;
-        let timeoutId = null;
-        let isTimedOut = false;
-        
-        try {
-          // Set timeout
-          timeoutId = setTimeout(() => {
-            isTimedOut = true;
-          }, 8000);
-          
-          // Load data
-          await loadAuthData(userId);
-          
-          // Clear timeout if successful
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-          }
-        } catch (loadError) {
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-          }
-          
-          console.warn('Auth data load failed, using fallback:', loadError);
-          // Fallback to superadmin for safety
-          const fallbackRoles: RoleSlug[] = ['super_admin'];
-          authState.roles = fallbackRoles;
-          authState.resolvedPermissions = flattenPermissions(fallbackRoles);
-          clearCaches();
-          notifyListeners();
-        }
-        
-        // Handle timeout case
-        if (isTimedOut) {
-          console.warn('Auth data load timed out, using fallback');
-          const timeoutRoles: RoleSlug[] = ['super_admin'];
-          authState.roles = timeoutRoles;
-          authState.resolvedPermissions = flattenPermissions(timeoutRoles);
-          clearCaches();
-          notifyListeners();
-        }
-      } else {
-        authState = {
-          user: null,
-          profile: null,
-          loading: false,
-          roles: [],
-          resolvedPermissions: null,
-        };
-        clearCaches();
-        notifyListeners();
-      }
-    } catch (error) {
-      console.error('Auth state change handler failed:', error);
-      // Emergency fallback - ensure app doesn't break
-      authState.loading = false;
-      if (authSession?.user) {
-        authState.user = authSession.user;
-        const emergencyRoles: RoleSlug[] = ['super_admin'];
-        authState.roles = emergencyRoles;
-        authState.resolvedPermissions = flattenPermissions(emergencyRoles);
-      }
-      notifyListeners();
-    }
-  });
 };
 
 // Load user profile and roles - optimized with caching and single RPC call
@@ -226,8 +341,24 @@ const loadAuthData = async (userId: string) => {
     authState.roles = cachedData.roles;
     authState.resolvedPermissions = flattenPermissions(cachedData.roles);
     clearCaches();
+
+    // Restore cached permission decisions (Phase 2)
+    const rolesSig = getRolesSignature(authState.roles);
+    hydratePermissionCaches(userId, rolesSig);
+    setupPermissionCachePersistence(userId, rolesSig);
     notifyListeners();
-    console.log(`[Auth] Loaded from cache in ${(performance.now() - startTime).toFixed(0)}ms`);
+    
+    const cacheLoadTime = performance.now() - startTime;
+    console.log(`[Auth] Loaded from cache in ${cacheLoadTime.toFixed(0)}ms`);
+    
+    // Log cache hit for monitoring
+    logAuthPerformance({
+      loadTime: cacheLoadTime,
+      cacheHit: true,
+      rpcSuccess: false,
+      profileSuccess: false,
+      networkType: navigator.connection?.effectiveType
+    });
     
     // Still fetch fresh data in background to update cache
     fetchAndCacheAuthData(userId, defaultRoles).catch(console.warn);
@@ -235,6 +366,117 @@ const loadAuthData = async (userId: string) => {
   }
   
   try {
+    // Phase 2: parallel auth queries (RPC + profile) with timeouts
+    if (featureFlags.isEnabled('PARALLEL_AUTH_QUERIES')) {
+      const parallelStart = performance.now();
+
+      const [profileResult, rpcResult] = await Promise.allSettled([
+        withTimeout(
+          supabase.from('user_profiles').select('*').eq('id', userId).single(),
+          3000,
+          'Profile query timeout'
+        ),
+        withTimeout(
+          supabase.rpc('get_user_auth_data', { p_user_id: userId }),
+          3000,
+          'RPC query timeout'
+        ),
+      ]);
+
+      const tryUseRpc = () => {
+        if (rpcResult.status !== 'fulfilled') return false;
+        const rpcValue = rpcResult.value as any;
+        if (!rpcValue || rpcValue.error || !rpcValue.data) return false;
+
+        const authData = rpcValue.data;
+
+        if (authData.profile) {
+          authState.profile = authData.profile as Profile;
+        }
+
+        const roleNames = authData.roles || [];
+        const roleMapping: { [key: string]: RoleSlug } = {
+          super_admin: 'super_admin',
+          admin: 'admin',
+          manager: 'manager',
+          accountant: 'accountant',
+          auditor: 'auditor',
+          viewer: 'viewer',
+        };
+
+        const extractedRoles: RoleSlug[] = (roleNames as string[])
+          .map((name: string) => roleMapping[String(name || '').toLowerCase().replace(/\s+/g, '_')])
+          .filter((r): r is RoleSlug => r !== undefined);
+
+        const isProfileSuperAdmin = authState.profile?.is_super_admin === true;
+        const shouldBeSuperAdmin = isProfileSuperAdmin || extractedRoles.includes('super_admin');
+        const finalRoles: RoleSlug[] = shouldBeSuperAdmin || extractedRoles.length === 0 ? defaultRoles : extractedRoles;
+
+        authState.roles = finalRoles;
+        authState.resolvedPermissions = flattenPermissions(finalRoles);
+        setCachedAuthData(userId, authState.profile, finalRoles);
+
+        const totalLoadTime = performance.now() - parallelStart;
+        logAuthPerformance({
+          loadTime: totalLoadTime,
+          cacheHit: false,
+          rpcSuccess: true,
+          profileSuccess: false,
+          networkType: navigator.connection?.effectiveType,
+        });
+
+        clearCaches();
+        const rolesSig = getRolesSignature(authState.roles);
+        hydratePermissionCaches(userId, rolesSig);
+        setupPermissionCachePersistence(userId, rolesSig);
+        notifyListeners();
+        return true;
+      };
+
+      const tryUseProfile = async () => {
+        if (profileResult.status !== 'fulfilled') return false;
+        const profileValue = profileResult.value as any;
+        if (!profileValue || profileValue.error || !profileValue.data) return false;
+
+        authState.profile = profileValue.data as Profile;
+
+        const isProfileSuperAdmin = authState.profile?.is_super_admin === true;
+        let extractedRoles: RoleSlug[] = [];
+        try {
+          extractedRoles = await fetchUserRolesSafely(userId, authState.user);
+        } catch {
+          extractedRoles = [];
+        }
+
+        const finalRoles: RoleSlug[] = isProfileSuperAdmin || extractedRoles.length === 0 ? defaultRoles : extractedRoles;
+        authState.roles = finalRoles;
+        authState.resolvedPermissions = flattenPermissions(finalRoles);
+        setCachedAuthData(userId, authState.profile, finalRoles);
+
+        const totalLoadTime = performance.now() - parallelStart;
+        logAuthPerformance({
+          loadTime: totalLoadTime,
+          cacheHit: false,
+          rpcSuccess: false,
+          profileSuccess: true,
+          networkType: navigator.connection?.effectiveType,
+        });
+
+        clearCaches();
+        const rolesSig = getRolesSignature(authState.roles);
+        hydratePermissionCaches(userId, rolesSig);
+        setupPermissionCachePersistence(userId, rolesSig);
+        notifyListeners();
+        return true;
+      };
+
+      // Priority: RPC (faster / more complete) then Profile
+      if (tryUseRpc()) return;
+      if (await tryUseProfile()) return;
+
+      throw new Error('Parallel auth queries failed');
+    }
+
     // Try optimized single RPC call first
     const { data: authData, error: rpcError } = await supabase.rpc('get_user_auth_data', { p_user_id: userId });
     
@@ -282,7 +524,22 @@ const loadAuthData = async (userId: string) => {
       // Cache the auth data for next time
       setCachedAuthData(userId, authState.profile, finalRoles);
       
+      const totalLoadTime = performance.now() - startTime;
+      console.log(`[Auth] RPC load completed in ${totalLoadTime.toFixed(0)}ms`);
+      
+      // Log performance metrics
+      logAuthPerformance({
+        loadTime: totalLoadTime,
+        cacheHit: false,
+        rpcSuccess: true,
+        profileSuccess: false,
+        networkType: navigator.connection?.effectiveType
+      });
+      
       clearCaches();
+      const rolesSig = getRolesSignature(authState.roles);
+      hydratePermissionCaches(userId, rolesSig);
+      setupPermissionCachePersistence(userId, rolesSig);
       notifyListeners();
       return;
     }
@@ -333,10 +590,23 @@ const loadAuthData = async (userId: string) => {
     // Cache the auth data
     setCachedAuthData(userId, authState.profile, finalRoles);
     
-    clearCaches();
-    notifyListeners();
+    const fallbackLoadTime = performance.now() - startTime;
+    console.log(`[Auth] Fallback queries took ${fallbackLoadTime.toFixed(0)}ms`);
     
-    console.log(`[Auth] Fallback queries took ${(performance.now() - startTime).toFixed(0)}ms`);
+    // Log performance metrics for fallback
+    logAuthPerformance({
+      loadTime: fallbackLoadTime,
+      cacheHit: false,
+      rpcSuccess: false,
+      profileSuccess: true,
+      networkType: navigator.connection?.effectiveType
+    });
+    
+    clearCaches();
+    const rolesSig = getRolesSignature(authState.roles);
+    hydratePermissionCaches(userId, rolesSig);
+    setupPermissionCachePersistence(userId, rolesSig);
+    notifyListeners();
 
   } catch (error) {
     console.error('Failed to load auth data:', error);
@@ -344,6 +614,9 @@ const loadAuthData = async (userId: string) => {
     authState.roles = defaultRoles;
     authState.resolvedPermissions = defaultPermissions;
     clearCaches();
+    const rolesSig = getRolesSignature(authState.roles);
+    hydratePermissionCaches(userId, rolesSig);
+    setupPermissionCachePersistence(userId, rolesSig);
     notifyListeners();
   }
 };
@@ -381,6 +654,50 @@ const fetchAndCacheAuthData = async (userId: string, defaultRoles: RoleSlug[]) =
   }
 };
 
+// Performance logging function for monitoring
+const logAuthPerformance = (data: {
+  loadTime: number;
+  cacheHit: boolean;
+  rpcSuccess: boolean;
+  profileSuccess: boolean;
+  networkType?: string;
+}) => {
+  ApplicationPerformanceMonitor.record('auth_init_duration_ms', data.loadTime);
+
+  // Log to analytics if available
+  const w = window as any;
+  if (w?.analytics?.track) {
+    w.analytics.track('AuthPerformance', {
+      loadTime: data.loadTime,
+      cacheHit: data.cacheHit,
+      rpcSuccess: data.rpcSuccess,
+      profileSuccess: data.profileSuccess,
+      networkType: data.networkType || 'unknown',
+      timestamp: Date.now(),
+    });
+  }
+  if (w?.monitoring?.send) {
+    w.monitoring.send('auth.performance', {
+      auth_init_duration_ms: data.loadTime,
+      rpc_success: data.rpcSuccess,
+      profile_fallback_used: !data.rpcSuccess && data.profileSuccess,
+      cache_hit_ratio: data.cacheHit ? 1 : 0,
+      network_type: data.networkType || 'unknown',
+      user_agent: navigator.userAgent,
+      timestamp: Date.now(),
+    });
+  }
+  
+  // Log to console in development
+  if (import.meta.env.DEV) {
+    console.log(`[PERF] Auth: ${data.loadTime.toFixed(0)}ms`, {
+      cacheHit: data.cacheHit,
+      rpcSuccess: data.rpcSuccess,
+      networkType: data.networkType
+    });
+  }
+};
+
 // Notify all listeners of state changes
 // Always send a fresh snapshot object so React hooks see reference changes
 const notifyListeners = () => {
@@ -396,9 +713,11 @@ const clearCaches = () => {
 
 // Optimized permission checking with caching
 const hasRouteAccess = (pathname: string): boolean => {
+  const cacheKey = `${pathname}|${getRolesSignature(authState.roles)}`;
+
   // Check cache first
-  if (routeCache.has(pathname)) {
-    return routeCache.get(pathname)!;
+  if (routeCache.has(cacheKey)) {
+    return routeCache.get(cacheKey)!;
   }
 
   // Super admin override - multiple checks for safety
@@ -408,31 +727,33 @@ const hasRouteAccess = (pathname: string): boolean => {
                       authState.profile?.email?.includes('admin');
 
   if (isSuperAdmin) {
-    routeCache.set(pathname, true);
+    routeCache.set(cacheKey, true);
     return true;
   }
 
   // Allow access to basic routes for any authenticated user
   const publicRoutes = ['/', '/dashboard', '/welcome', '/profile'];
   if (publicRoutes.some(route => pathname.startsWith(route))) {
-    routeCache.set(pathname, true);
+    routeCache.set(cacheKey, true);
     return true;
   }
 
   if (!authState.resolvedPermissions) {
-    routeCache.set(pathname, false);
+    routeCache.set(cacheKey, false);
     return false;
   }
 
   const result = hasRouteInSnapshot(authState.resolvedPermissions, pathname);
-  routeCache.set(pathname, result);
+  routeCache.set(cacheKey, result);
   return result;
 };
 
 const hasActionAccess = (action: PermissionCode): boolean => {
+  const cacheKey = `${String(action)}|${getRolesSignature(authState.roles)}`;
+
   // Check cache first
-  if (actionCache.has(action)) {
-    return actionCache.get(action)!;
+  if (actionCache.has(cacheKey)) {
+    return actionCache.get(cacheKey)!;
   }
 
   // Super admin override - multiple checks for safety
@@ -442,17 +763,17 @@ const hasActionAccess = (action: PermissionCode): boolean => {
                       authState.profile?.email?.includes('admin');
 
   if (isSuperAdmin) {
-    actionCache.set(action, true);
+    actionCache.set(cacheKey, true);
     return true;
   }
 
   if (!authState.resolvedPermissions) {
-    actionCache.set(action, false);
+    actionCache.set(cacheKey, false);
     return false;
   }
 
   const result = hasActionInSnapshot(authState.resolvedPermissions, action);
-  actionCache.set(action, result);
+  actionCache.set(cacheKey, result);
   return result;
 };
 
@@ -509,6 +830,7 @@ const signOut = async () => {
   };
   clearCaches();
   clearAuthCache(); // Clear localStorage auth cache
+  teardownPermissionCachePersistence();
   notifyListeners();
 };
 

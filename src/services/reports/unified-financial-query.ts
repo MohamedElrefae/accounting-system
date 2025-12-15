@@ -26,6 +26,7 @@ export interface UnifiedFilters {
   dateTo?: string | null
   orgId?: string | null
   projectId?: string | null
+  costCenterId?: string | null
   postedOnly?: boolean
   classificationId?: string | null
   analysisWorkItemId?: string | null
@@ -136,6 +137,7 @@ export async function fetchGLSummary(filters: UnifiedFilters = {}): Promise<GLSu
   // Normalize empty strings to null for date parameters
   const dateFrom = filters.dateFrom && filters.dateFrom.trim() !== '' ? filters.dateFrom : null
   const dateTo = filters.dateTo && filters.dateTo.trim() !== '' ? filters.dateTo : null
+  const costCenterId = filters.costCenterId && String(filters.costCenterId).trim() !== '' ? filters.costCenterId : null
 
   console.log('🔍 Unified Financial Query - fetchGLSummary called with:', {
     dateFrom,
@@ -145,7 +147,13 @@ export async function fetchGLSummary(filters: UnifiedFilters = {}): Promise<GLSu
     postedOnly: filters.postedOnly
   })
 
-  const { data, error } = await supabase.rpc('get_gl_account_summary_filtered', {
+  const callRpc = async (args: Record<string, any>) => {
+    const { data, error } = await supabase.rpc('get_gl_account_summary_filtered', args)
+    if (error) throw error
+    return data
+  }
+
+  const baseArgs: Record<string, any> = {
     p_date_from: dateFrom,
     p_date_to: dateTo,
     p_org_id: filters.orgId ?? null,
@@ -157,11 +165,30 @@ export async function fetchGLSummary(filters: UnifiedFilters = {}): Promise<GLSu
     p_analysis_work_item_id: filters.analysisWorkItemId ?? null,
     p_expenses_category_id: filters.expensesCategoryId ?? null,
     p_sub_tree_id: filters.subTreeId ?? null
-  })
+  }
 
-  if (error) {
-    console.error('❌ Unified Financial Query - GL Summary error:', error)
-    throw error
+  let data: any
+  try {
+    data = !costCenterId
+      ? await callRpc(baseArgs)
+      : await callRpc({
+          ...baseArgs,
+          p_cost_center_id: costCenterId,
+        })
+  } catch (error: any) {
+    const msg = String(error?.message || '')
+    // Backward-compatible: if DB function doesn't accept p_cost_center_id yet, retry without it.
+    if (costCenterId && (msg.includes('p_cost_center_id') || msg.toLowerCase().includes('function') || msg.toLowerCase().includes('candidate'))) {
+      try {
+        data = await callRpc(baseArgs)
+      } catch (e: any) {
+        console.error('❌ Unified Financial Query - GL Summary error:', e)
+        throw e
+      }
+    } else {
+      console.error('❌ Unified Financial Query - GL Summary error:', error)
+      throw error
+    }
   }
 
   console.log('✅ Unified Financial Query - GL Summary returned', data?.length || 0, 'rows')

@@ -2,21 +2,30 @@ import React from 'react';
 import Box from '@mui/material/Box';
 import CssBaseline from '@mui/material/CssBaseline';
 import Toolbar from '@mui/material/Toolbar';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import TopBar from './TopBar';
 import SidebarPortal from "./SidebarPortal";
 import useAppStore from '../../store/useAppStore';
 import { DRAWER_WIDTH, DRAWER_COLLAPSED_WIDTH } from './Sidebar';
+import { useSmartRoutePreloading } from '../../routes/RouteGroups';
 
 const DashboardLayout: React.FC = () => {
   const { sidebarCollapsed, toggleSidebar, language } = useAppStore();
   const isRtl = language === 'ar';
+  const location = useLocation();
+  const { recordNavigation, preloadBasedOnPatterns, enabled } = useSmartRoutePreloading();
   
   // Simple direction update - no remounting needed
   React.useEffect(() => {
     document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
     document.documentElement.lang = language;
   }, [language, isRtl]);
+
+  React.useEffect(() => {
+    if (!enabled) return;
+    recordNavigation(location.pathname);
+    preloadBasedOnPatterns();
+  }, [enabled, location.pathname, preloadBasedOnPatterns, recordNavigation]);
 
   const handleMenuClick = () => {
     toggleSidebar?.();
@@ -62,7 +71,9 @@ const DashboardLayout: React.FC = () => {
         >
           {/* offset for AppBar */}
           <Toolbar />
-          <Box sx={{ 
+          <Box
+            key={location.pathname}
+            sx={{ 
             flex: 1,
             p: 3,
             overflow: 'auto',

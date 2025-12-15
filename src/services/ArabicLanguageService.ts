@@ -204,9 +204,32 @@ export const ARABIC_TEXTS: LanguageTexts = {
 
 export class ArabicLanguageService {
   private static currentLanguage: 'en' | 'ar' = 'en'
+  private static initialized = false
+  
+  static initialize(): void {
+    if (this.initialized) return
+    this.initialized = true
+    
+    // Read language from localStorage
+    if (typeof localStorage !== 'undefined') {
+      const storedLang = localStorage.getItem('language')
+      if (storedLang === 'ar' || storedLang === 'en') {
+        this.currentLanguage = storedLang
+        // Update document direction
+        if (typeof document !== 'undefined') {
+          document.documentElement.dir = storedLang === 'ar' ? 'rtl' : 'ltr'
+          document.documentElement.lang = storedLang
+        }
+      }
+    }
+  }
   
   static setLanguage(language: 'en' | 'ar'): void {
     this.currentLanguage = language
+    // Save to localStorage
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('language', language)
+    }
     // Update document direction (only in browser environment)
     if (typeof document !== 'undefined') {
       document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr'
@@ -215,6 +238,10 @@ export class ArabicLanguageService {
   }
   
   static getCurrentLanguage(): 'en' | 'ar' {
+    // Auto-initialize on first access
+    if (!this.initialized) {
+      this.initialize()
+    }
     return this.currentLanguage
   }
   

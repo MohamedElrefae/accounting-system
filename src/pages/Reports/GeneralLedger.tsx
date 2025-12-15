@@ -5,6 +5,7 @@ import ExportButtons from '../../components/Common/ExportButtons'
 import PresetBar from '../../components/Common/PresetBar'
 import { fetchGLAccountSummary, type GLAccountSummaryRow } from '../../services/reports/gl-account-summary'
 import { fetchOrganizations, fetchProjects, fetchAccountsMinimal, type LookupOption } from '../../services/lookups'
+import { getCostCentersForSelector } from '../../services/cost-centers'
 import type { UniversalTableData } from '../../utils/UniversalExportManager'
 import { exportToExcel, exportToCSV } from '../../utils/UniversalExportManager'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
@@ -64,11 +65,13 @@ const GeneralLedger: React.FC = () => {
   const [accountId, setAccountId] = useState<string>('')
   const [orgId, setOrgId] = useState<string>('')
   const [projectId, setProjectId] = useState<string>(() => { try { return getActiveProjectId() || '' } catch { return '' } })
+  const [costCenterId, setCostCenterId] = useState<string>('')
   const [classificationId, setClassificationId] = useState<string>('')
   const [analysisWorkItemId, setAnalysisWorkItemId] = useState<string>('')
   const [expensesCategoryId, setExpensesCategoryId] = useState<string>('')
   const [analysisItemOptions, setAnalysisItemOptions] = useState<{ id: string, code: string, name: string, name_ar?: string | null }[]>([])
   const [expensesCategoryOptions, setExpensesCategoryOptions] = useState<{ id: string, code: string, description: string, name?: string }[]>([])
+  const [costCenterOptions, setCostCenterOptions] = useState<Array<{ id: string, code: string, name: string, name_ar?: string | null, level: number }>>([])
   
   // Debug logging for analysisItemOptions state changes
   useEffect(() => {
@@ -370,6 +373,7 @@ const GeneralLedger: React.FC = () => {
             dateTo: filters.dateTo || null,
             orgId: orgId || null,
             projectId: projectId || null,
+            costCenterId: costCenterId || null,
             postedOnly: filters.postedOnly,
             limit,
             offset,
@@ -438,6 +442,7 @@ const GeneralLedger: React.FC = () => {
           dateTo: filters.dateTo || null,
           orgId: orgId || null,
           projectId: projectId || null,
+          costCenterId: costCenterId || null,
           includeOpening: filters.includeOpening,
           postedOnly: filters.postedOnly,
           limit,
@@ -523,26 +528,24 @@ const GeneralLedger: React.FC = () => {
           e.preventDefault()
           // Reset date range filters - clear dates to show all transactions
           setFilters({ dateFrom: '', dateTo: '', includeOpening: true, postedOnly: false })
-          
           // Reset basic filters
           setAccountId(''); 
           setOrgId(''); 
           setProjectId('');
+          setCostCenterId('');
           setClassificationId(''); // Reset classification filter
           setExpensesCategoryId(''); // Reset expenses category filter
-          
+          setAnalysisWorkItemId(''); // Reset analysis work item filter
           // Reset UI state filters
           setHideZeroAccounts(true); 
           setActivityOnly(false);
           setOnlyPostable(false); 
           setOnlyNonPostable(false);
           setIncludeChildrenInDrilldown(true);
-          
           // Reset search/pagination
           setCurrentPage(1);
           setSearchTerm('');
           setJumpCode(''); // Reset jump code
-          
           // Reset advanced filters
           setAmountFilters({
             minDebit: '',
@@ -554,7 +557,6 @@ const GeneralLedger: React.FC = () => {
           });
           setAccountTypeFilter('all');
           setBalanceTypeFilter('all');
-          
           // Close any open filters or modals
           setShowAdvancedFilters(false);
           setShowAnalytics(false);
@@ -597,7 +599,7 @@ const GeneralLedger: React.FC = () => {
       }
     }
   }, [view, handleFullExport])
-  
+
   // Register keyboard shortcuts
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown)
@@ -629,6 +631,7 @@ const GeneralLedger: React.FC = () => {
       const ai = analysisItemOptions.find(a => a.id === analysisWorkItemId)
       return ai ? `${ai.code ? ai.code + ' - ' : ''}${ai.name_ar || ai.name}` : '—'
     })() : 'كل بنود التحليل'
+    const costCenterName = costCenterId ? (costCenterOptions.find(c => c.id === costCenterId)?.name_ar || costCenterOptions.find(c => c.id === costCenterId)?.name || 'غير محدد') : 'كل مراكز التكلفة'
     
     // Build professional commercial report HTML
     const reportHTML = `
@@ -893,6 +896,7 @@ const GeneralLedger: React.FC = () => {
               <span class="filter-item">الحساب: ${accountName}</span>
               <span class="filter-item">المشروع: ${projectName}</span>
               <span class="filter-item">المنظمة: ${orgName}</span>
+              <span class="filter-item">مركز التكلفة: ${costCenterName}</span>
               <span class="filter-item">بند التحليل: ${analysisItemName}</span>
               <span class="filter-item">تاريخ الطباعة: ${currentDate}</span>
               <br>
@@ -1051,19 +1055,19 @@ const GeneralLedger: React.FC = () => {
           
           switch(colKey) {
             case 'entry_number':
-              cellContent = row.entry_number || '—'
+              cellContent = row.entry_number ?? ''
               break
             case 'entry_date':
-              cellContent = row.entry_date || '—'
+              cellContent = row.entry_date
               break
             case 'account_code':
-              cellContent = row.account_code || '—'
+              cellContent = row.account_code
               break
             case 'account_name_ar':
-              cellContent = row.account_name_ar || row.account_name_en || '—'
+              cellContent = row.account_name_ar ?? row.account_name_en ?? ''
               break
             case 'description':
-              cellContent = row.description || '—'
+              cellContent = row.description ?? ''
               break
             case 'debit':
               cellContent = (Number(row.debit || 0) !== 0) ? formatPrintCurrency(Number(row.debit || 0), numbersOnly ? 'none' : 'EGP') : '—'
@@ -1200,6 +1204,7 @@ const GeneralLedger: React.FC = () => {
       const qAccountId = qp.get('accountId') || '';
       const qOrgId = qp.get('orgId') || '';
       const qProjectId = qp.get('projectId') || '';
+      const qCostCenterId = qp.get('costCenterId') || '';
       const qPostedOnly = qp.get('postedOnly');
       const qIncludeOpening = qp.get('includeOpening');
       const qDateFrom = qp.get('dateFrom');
@@ -1209,6 +1214,7 @@ const GeneralLedger: React.FC = () => {
       if (qAccountId) setAccountId(qAccountId);
       if (qOrgId) setOrgId(qOrgId);
       if (qProjectId) setProjectId(qProjectId);
+      if (qCostCenterId) setCostCenterId(qCostCenterId);
       if (qAnalysisItemId) setAnalysisWorkItemId(qAnalysisItemId);
 
       setFilters(prev => ({
@@ -1281,6 +1287,37 @@ const GeneralLedger: React.FC = () => {
     })()
   }, [])
 
+  // Load cost centers when org/project changes
+  useEffect(() => {
+    let canceled = false
+    const run = async () => {
+      if (!orgId) {
+        setCostCenterOptions([])
+        setCostCenterId('')
+        return
+      }
+      try {
+        const rows = await getCostCentersForSelector(orgId, projectId || null)
+        if (canceled) return
+        const opts = (rows || []).map(r => ({
+          id: r.id,
+          code: r.code || '',
+          name: r.name || '',
+          name_ar: (r as any).name_ar ?? null,
+          level: (r as any).level ?? 0,
+        }))
+        setCostCenterOptions(opts)
+        if (costCenterId && !opts.some(o => o.id === costCenterId)) {
+          setCostCenterId('')
+        }
+      } catch {
+        if (!canceled) setCostCenterOptions([])
+      }
+    }
+    run()
+    return () => { canceled = true }
+  }, [orgId, projectId, costCenterId])
+
   // Load analysis work item options when org/project changes
   useEffect(() => {
     (async () => {
@@ -1351,7 +1388,7 @@ const GeneralLedger: React.FC = () => {
       }
     })()
   }, [orgId, projectId])
-  
+
   // Load expenses categories when org changes
   useEffect(() => {
     (async () => {
@@ -1391,6 +1428,7 @@ const GeneralLedger: React.FC = () => {
         accountId?: string
         orgId?: string
         projectId?: string
+        costCenterId?: string
         analysisWorkItemId?: string
         hideZeroAccounts?: boolean
         activityOnly?: boolean
@@ -1401,6 +1439,7 @@ const GeneralLedger: React.FC = () => {
       setAccountId(f.accountId || '')
       setOrgId(f.orgId || '')
       setProjectId(f.projectId || '')
+      setCostCenterId(f.costCenterId || '')
       setAnalysisWorkItemId(f.analysisWorkItemId || '')
       setFilters(prev => ({
         ...prev,
@@ -1434,6 +1473,7 @@ const GeneralLedger: React.FC = () => {
           dateTo: filters.dateTo || null,
           orgId: orgId || null,
           projectId: projectId || null,
+          costCenterId: costCenterId || null,
           includeOpening: filters.includeOpening,
           postedOnly: filters.postedOnly,
           limit: pageSize,
@@ -1457,7 +1497,7 @@ const GeneralLedger: React.FC = () => {
     }
     const t = setTimeout(() => { if (!canceled && !document.hidden) void run() }, 250)
     return () => { canceled = true; clearTimeout(t) }
-  }, [filters.dateFrom, filters.dateTo, filters.includeOpening, filters.postedOnly, accountId, orgId, projectId, pageSize, currentPage, classificationId, analysisWorkItemId, expensesCategoryId])
+  }, [filters.dateFrom, filters.dateTo, filters.includeOpening, filters.postedOnly, accountId, orgId, projectId, costCenterId, pageSize, currentPage, classificationId, analysisWorkItemId, expensesCategoryId])
 
   // Load account summary when on overview - smart pagination approach
   // Removed unused summary state variables
@@ -1475,6 +1515,7 @@ const GeneralLedger: React.FC = () => {
           dateTo: filters.dateTo || null,
           orgId: orgId || null,
           projectId: projectId || null,
+          costCenterId: costCenterId || null,
           postedOnly: filters.postedOnly,
           limit: initialLimit,
           offset: 0, // Always start from beginning for smart pagination
@@ -1498,6 +1539,7 @@ const GeneralLedger: React.FC = () => {
               dateTo: filters.dateTo || null,
               orgId: orgId || null,
               projectId: projectId || null,
+              costCenterId: costCenterId || null,
               postedOnly: filters.postedOnly,
               limit: batchSize,
               offset,
@@ -1521,7 +1563,7 @@ const GeneralLedger: React.FC = () => {
     }
     const t = setTimeout(() => { if (!canceled && !document.hidden) void loadSummary() }, 300)
     return () => { canceled = true; clearTimeout(t) }
-  }, [view, filters.dateFrom, filters.dateTo, filters.postedOnly, orgId, projectId, classificationId, analysisWorkItemId, expensesCategoryId])
+  }, [view, filters.dateFrom, filters.dateTo, filters.postedOnly, orgId, projectId, costCenterId, classificationId, analysisWorkItemId, expensesCategoryId])
 
   // Helper: derive previous period range matching the current window length
   const prevRange = useMemo(() => {
@@ -1548,6 +1590,7 @@ const GeneralLedger: React.FC = () => {
             dateTo: filters.dateTo,
             orgId: orgId || null,
             projectId: projectId || null,
+            costCenterId: costCenterId || null,
             postedOnly: filters.postedOnly,
             limit: 10000, // large cap for summary
             offset: 0,
@@ -1560,6 +1603,7 @@ const GeneralLedger: React.FC = () => {
             dateTo: prevRange.prevTo,
             orgId: orgId || null,
             projectId: projectId || null,
+            costCenterId: costCenterId || null,
             postedOnly: filters.postedOnly,
             limit: 10000,
             offset: 0,
@@ -1578,7 +1622,7 @@ const GeneralLedger: React.FC = () => {
       }
     }
     run()
-  }, [compareMode, filters.dateFrom, filters.dateTo, filters.postedOnly, orgId, projectId, prevRange, analysisWorkItemId, expensesCategoryId])
+  }, [compareMode, filters.dateFrom, filters.dateTo, filters.postedOnly, orgId, projectId, costCenterId, prevRange, analysisWorkItemId, expensesCategoryId])
 
   // Tooltip text for compare period explanation
   const compareTooltip = useMemo(() => {
@@ -1587,7 +1631,6 @@ const GeneralLedger: React.FC = () => {
     }
     return `الفترة السابقة محسوبة من ${prevRange.prevFrom} إلى ${prevRange.prevTo} (بنفس طول الفترة الحالية).`
   }, [filters.dateFrom, filters.dateTo, prevRange])
-
 
   // Summary totals (from detailed rows if needed)
   const summary = useMemo(() => {
@@ -1604,15 +1647,7 @@ const GeneralLedger: React.FC = () => {
   const exportDataDetails: UniversalTableData = useMemo(() => {
     const columns = detailColumnOptions
       .filter(c => visibleColumns.includes(c.key))
-      .map(c => ({
-        key: c.key,
-        header: c.label,
-        type: (['debit','credit','running_debit','running_credit'].includes(c.key)
-          ? 'currency'
-          : (c.key === 'entry_date' ? 'date' : 'text')) as 'currency' | 'date' | 'text',
-        currency: (['debit','credit','running_debit','running_credit'].includes(c.key) ? (numbersOnly ? 'none' : 'EGP') : undefined),
-        align: 'right' as const,
-      }))
+      .map(c => ({ key: c.key, header: c.label, type: (['debit','credit','running_debit','running_credit'].includes(c.key) ? 'currency' : (c.key === 'entry_date' ? 'date' : 'text')) as 'currency' | 'date' | 'text', currency: (['debit','credit','running_debit','running_credit'].includes(c.key) ? (numbersOnly ? 'none' : 'EGP') : undefined) }))
     const rows = data.map(r => ({
       entry_number: r.entry_number ?? '',
       entry_date: r.entry_date,
@@ -1849,6 +1884,7 @@ const GeneralLedger: React.FC = () => {
             dateTo: filters.dateTo || null,
             orgId: orgId || null,
             projectId: projectId || null,
+            costCenterId: costCenterId || null,
             includeOpening: !!filters.includeOpening,
             postedOnly: filters.postedOnly,
             limit,
@@ -1869,8 +1905,7 @@ const GeneralLedger: React.FC = () => {
           const childIds = summaryRows
             .filter(s => s.account_id !== accountIdToLoad && s.account_code && parentCode && s.account_code.startsWith(parentCode))
             .filter(s => (Number(s.period_debits||0) + Number(s.period_credits||0)) > 0)
-            .sort((a,b) => (a.account_code || '').localeCompare(b.account_code || ''))
-            .map(s => s.account_id)
+            .sort((a,b) => (a.account_code || '').localeCompare(b.account_code || ''))[0]
           newState.childIds = childIds
           newState.childIndex = 0
         }
@@ -1886,6 +1921,7 @@ const GeneralLedger: React.FC = () => {
             dateTo: filters.dateTo || null,
             orgId: orgId || null,
             projectId: projectId || null,
+            costCenterId: costCenterId || null,
             includeOpening: !!filters.includeOpening,
             postedOnly: filters.postedOnly,
             limit,
@@ -1938,7 +1974,7 @@ const GeneralLedger: React.FC = () => {
   // Auto-collapse expanded row on major context changes (tab or key filters)
   useEffect(() => {
     if (expandedAccountId) setExpandedAccountId(null)
-  }, [view, filters.dateFrom, filters.dateTo, filters.includeOpening, filters.postedOnly, orgId, projectId, analysisWorkItemId, expensesCategoryId])
+  }, [view, filters.dateFrom, filters.dateTo, filters.includeOpening, filters.postedOnly, orgId, projectId, costCenterId, analysisWorkItemId, expensesCategoryId])
 
   return (
     <div className={styles.container}>
@@ -1956,7 +1992,10 @@ const GeneralLedger: React.FC = () => {
                   accountId?: string
                   orgId?: string
                   projectId?: string
+                  costCenterId?: string
                   analysisWorkItemId?: string
+                  hideZeroAccounts?: boolean
+                  activityOnly?: boolean
                 }
                 type ColumnsPreset = { details?: string[]; overview?: string[] } | string[] | undefined
 
@@ -1964,14 +2003,18 @@ const GeneralLedger: React.FC = () => {
                 setAccountId(f.accountId || '')
                 setOrgId(f.orgId || '')
                 setProjectId(f.projectId || '')
+                setCostCenterId(f.costCenterId || '')
                 setAnalysisWorkItemId(f.analysisWorkItemId || '')
                 setFilters(prev => ({
                   ...prev,
-                  dateFrom: f.dateFrom || prev.dateFrom,
-                  dateTo: f.dateTo || prev.dateTo,
+                  dateFrom: f.dateFrom !== undefined ? f.dateFrom : prev.dateFrom,
+                  dateTo: f.dateTo !== undefined ? f.dateTo : prev.dateTo,
                   includeOpening: typeof f.includeOpening === 'boolean' ? f.includeOpening : prev.includeOpening,
                   postedOnly: typeof f.postedOnly === 'boolean' ? f.postedOnly : prev.postedOnly,
                 }))
+                if (typeof f.hideZeroAccounts === 'boolean') setHideZeroAccounts(f.hideZeroAccounts)
+                if (typeof f.activityOnly === 'boolean') setActivityOnly(f.activityOnly)
+
                 const cols = (p as { columns?: ColumnsPreset }).columns
                 if (Array.isArray(cols)) setVisibleColumns(cols)
                 else if (cols && typeof cols === 'object') {
@@ -1992,6 +2035,7 @@ const GeneralLedger: React.FC = () => {
                   postedOnly: filters.postedOnly,
                   orgId,
                   projectId,
+                  costCenterId,
                   accountId,
                   analysisWorkItemId,
                   hideZeroAccounts,
@@ -2117,6 +2161,7 @@ const GeneralLedger: React.FC = () => {
                 const p = new URLSearchParams()
                 if (orgId) p.set('orgId', orgId)
                 if (projectId) p.set('projectId', projectId)
+                if (costCenterId) p.set('costCenterId', costCenterId)
                 if (filters.dateFrom) p.set('dateFrom', filters.dateFrom)
                 if (filters.dateTo) p.set('dateTo', filters.dateTo)
                 p.set('onlyWithTx', 'true')
@@ -2159,6 +2204,16 @@ const GeneralLedger: React.FC = () => {
           onChange={e => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
           style={{width: '130px', fontSize: '12px'}}
         />
+
+        {/* Cost Center filter (both views) */}
+        <select className={styles.select} value={costCenterId} onChange={e => setCostCenterId(e.target.value)} style={{maxWidth: '200px', fontSize: '12px'}}>
+          <option value=''>كل مراكز التكلفة</option>
+          {costCenterOptions.map(o => (
+            <option key={o.id} value={o.id}>
+              {`${o.code ? `${o.code} - ` : ''}${o.name_ar || o.name}`.substring(0, 60)}
+            </option>
+          ))}
+        </select>
         
         {/* Classification filter - for both views */}
         <select className={styles.select} value={classificationId} onChange={e => setClassificationId(e.target.value)} style={{maxWidth: '180px', fontSize: '12px'}}>
@@ -2279,13 +2334,14 @@ const GeneralLedger: React.FC = () => {
         <button
           className={styles.presetButton}
           onClick={() => {
-            // Reset date range (no date filter)
+            // Reset date range filters - clear dates to show all transactions
             setFilters({ dateFrom: '', dateTo: '', includeOpening: true, postedOnly: false })
 
-            // Reset basic selectors
+            // Reset basic filters
             setAccountId('');
             setOrgId('');
             setProjectId('');
+            setCostCenterId('');
             setClassificationId(''); // Reset classification filter
             setExpensesCategoryId(''); // Reset expenses category filter
 
@@ -2442,6 +2498,7 @@ const GeneralLedger: React.FC = () => {
           <span>الفترة: {filters.dateFrom || '—'} ← {filters.dateTo || '—'}</span>
           {orgId && (<span>المنظمة: {(_orgOptions.find(o=>o.id===orgId)?.name_ar || _orgOptions.find(o=>o.id===orgId)?.name || orgId)}</span>)}
           {projectId && (<span>المشروع: {(_projectOptions.find(o=>o.id===projectId)?.name_ar || _projectOptions.find(o=>o.id===projectId)?.name || projectId)}</span>)}
+          {costCenterId && (<span>مركز التكلفة: {(() => { const cc = costCenterOptions.find(c => c.id === costCenterId); return (cc?.name_ar || cc?.name || costCenterId) })()}</span>)}
           {filters.postedOnly && (<span>قيود معتمدة فقط</span>)}
         </div>
       </div>
@@ -2749,6 +2806,7 @@ const GeneralLedger: React.FC = () => {
               {filters.postedOnly && <span style={{background:'var(--field_bg)', border:'1px solid var(--border)', borderRadius: '12px', padding: '2px 8px'}}>معتمدة فقط</span>}
               {orgId && <span style={{background:'var(--field_bg)', border:'1px solid var(--border)', borderRadius: '12px', padding: '2px 8px'}}>منظمة: {(_orgOptions.find(o=>o.id===orgId)?.name_ar || _orgOptions.find(o=>o.id===orgId)?.name || orgId)}</span>}
               {projectId && <span style={{background:'var(--field_bg)', border:'1px solid var(--border)', borderRadius: '12px', padding: '2px 8px'}}>مشروع: {(_projectOptions.find(o=>o.id===projectId)?.name_ar || _projectOptions.find(o=>o.id===projectId)?.name || projectId)}</span>}
+              {costCenterId && <span style={{background:'var(--field_bg)', border:'1px solid var(--border)', borderRadius: '12px', padding: '2px 8px'}}>مركز تكلفة: {(() => { const cc = costCenterOptions.find(o => o.id === costCenterId); return cc ? `${cc.code ? cc.code+' - ' : ''}${cc.name_ar || cc.name}` : costCenterId })()}</span>}
               {accountId && <span style={{background:'var(--field_bg)', border:'1px solid var(--border)', borderRadius: '12px', padding: '2px 8px'}}>حساب: {(() => { const a = accountOptions.find(o=>o.id===accountId); return a ? `${a.code ? a.code+' - ' : ''}${a.name_ar || a.name}` : accountId })()}</span>}
               {hideZeroAccounts && <span style={{background:'var(--field_bg)', border:'1px solid var(--border)', borderRadius: '12px', padding: '2px 8px'}}>إخفاء الأصفار</span>}
               {activityOnly && <span style={{background:'var(--field_bg)', border:'1px solid var(--border)', borderRadius: '12px', padding: '2px 8px'}}>حركة فقط</span>}
@@ -3434,6 +3492,19 @@ const GeneralLedger: React.FC = () => {
                     </select>
                   </div>
                   <div className={styles.filterGroup}>
+                    <label className={styles.label}>مركز التكلفة</label>
+                    <select
+                      className={styles.select}
+                      value={costCenterId}
+                      onChange={(e) => setCostCenterId(e.target.value)}
+                    >
+                      <option value="">كل مراكز التكلفة</option>
+                      {costCenterOptions.map(o => (
+                        <option key={o.id} value={o.id}>{`${o.code ? o.code + ' - ' : ''}${o.name_ar || o.name}`}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={styles.filterGroup}>
                     <label className={styles.label}>الحساب</label>
                     <select
                       className={styles.select}
@@ -3450,7 +3521,7 @@ const GeneralLedger: React.FC = () => {
                   <div className={styles.filterGroup}>
                     <button
                       className={styles.presetButton}
-                      onClick={() => { setOrgId(''); setProjectId(''); setAccountId('') }}
+                      onClick={() => { setOrgId(''); setProjectId(''); setCostCenterId(''); setAccountId('') }}
                     >
                       إعادة تعيين النطاق
                     </button>

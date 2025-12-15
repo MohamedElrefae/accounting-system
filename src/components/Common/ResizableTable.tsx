@@ -126,7 +126,7 @@ function ResizableTable<T extends RowRecord>({
 
     const { column, startX, startWidth } = resizeRef.current
     const deltaX = e.clientX - startX
-    const newWidth = Math.max(20, Math.round(startWidth + delta))
+    const newWidth = Math.max(20, Math.round(startWidth + deltaX))
 
     onColumnResize(column, newWidth)
   }, [onColumnResize])
