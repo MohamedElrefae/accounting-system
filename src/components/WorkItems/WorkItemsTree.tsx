@@ -99,7 +99,7 @@ const WorkItemsTree: React.FC<WorkItemsTreeProps> = ({
     collect(data || [])
     if (command.action === 'expandAll') setExpanded(allIds)
     if (command.action === 'collapseAll') setExpanded(new Set())
-  }, [command?.seq, command?.action, data])
+  }, [command, command?.seq, command?.action, data])
 
   const toggleNode = useCallback((id: string) => {
     setExpanded(prev => {

@@ -11,13 +11,8 @@ export interface ClosingChecklistManagerProps {
 
 export const ClosingChecklistManager: React.FC<ClosingChecklistManagerProps> = ({ orgId, fiscalPeriodId }) => {
   const [rows, setRows] = React.useState<any[]>([])
-  const [loading, setLoading] = React.useState(false)
 
   const load = React.useCallback(async () => {
-    setLoading(true)
-    try {
-      const { data } = await (await fetch('/noop')).json().catch(()=>({})) // noop to satisfy TS in non-node
-    } catch {}
     try {
       const { data, error } = await (window as any).supabase
         ? (window as any).supabase.from('period_closing_checklists').select('*').eq('org_id', orgId).eq('fiscal_period_id', fiscalPeriodId)
@@ -29,7 +24,7 @@ export const ClosingChecklistManager: React.FC<ClosingChecklistManagerProps> = (
       const cl = await PeriodClosingService.getChecklist(orgId, fiscalPeriodId)
       setRows(cl as any[])
     } finally {
-      setLoading(false)
+      // no-op
     }
   }, [orgId, fiscalPeriodId])
 

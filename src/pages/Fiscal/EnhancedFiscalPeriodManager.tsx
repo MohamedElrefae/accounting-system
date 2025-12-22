@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Box,
+  Stack,
   Container,
   Paper,
   Typography,
@@ -10,66 +11,36 @@ import {
   CardHeader,
   Button,
   IconButton,
-  Stack,
+  Tooltip,
+  Divider,
   Chip,
-  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   TextField,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
   Avatar,
-  Tooltip,
-  Divider,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TablePagination,
-  Fab,
-  Badge,
   useTheme,
   alpha,
-  Fade,
   Grow,
-  Slide,
-  Collapse,
-  Tab,
-  Tabs,
-  Stepper,
-  Step,
-  StepLabel,
-  LinearProgress,
   CircularProgress
 } from '@mui/material'
 
 // Icons
-import AccountBalanceIcon from '@mui/icons-material/AccountBalance'
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import LockIcon from '@mui/icons-material/Lock'
-import LockOpenIcon from '@mui/icons-material/LockOpen'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
-import PauseIcon from '@mui/icons-material/Pause'
 import StopIcon from '@mui/icons-material/Stop'
 import SettingsIcon from '@mui/icons-material/Settings'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import LanguageIcon from '@mui/icons-material/Language'
-import TimelineIcon from '@mui/icons-material/Timeline'
-import CheckCircleIcon from '@mui/icons-material/CheckCircle'
-import ErrorIcon from '@mui/icons-material/Error'
-import WarningIcon from '@mui/icons-material/Warning'
-import InfoIcon from '@mui/icons-material/Info'
-import AssignmentIcon from '@mui/icons-material/Assignment'
-import BusinessIcon from '@mui/icons-material/Business'
 import { AttachMoneyIcon } from '@/components/icons/SimpleIcons'
 import SaveIcon from '@mui/icons-material/Save'
 import CancelIcon from '@mui/icons-material/Cancel'
@@ -81,10 +52,6 @@ import { ImportExportIcon } from '@/components/icons/SimpleIcons'
 
 // Services and Utils
 import { useArabicLanguage, ArabicLanguageService } from '@/services/ArabicLanguageService'
-import { FiscalPeriodService, useFiscalPeriods } from '@/services/fiscal'
-import { constructionThemeUtils } from '@/themes/rtlTheme'
-import { getActiveOrgId } from '@/utils/org'
-import useAppStore from '@/store/useAppStore'
 import { tokens } from '@/theme/tokens'
 import './FiscalPages.css'
 
@@ -96,7 +63,7 @@ const ManagerContainer = ({ children, title, subtitle, actions }: {
   actions?: React.ReactNode
 }) => {
   const { isRTL, getDirectionalStyle } = useArabicLanguage()
-  const theme = useTheme()
+  useTheme()
 
   return (
     <Box sx={{
@@ -559,14 +526,12 @@ const PeriodCreationDialog = ({
 
 // Main Enhanced Component
 export default function EnhancedFiscalPeriodManager() {
-  const { t, isRTL, texts, getDirectionalStyle, formatCurrency, formatDate } = useArabicLanguage()
+  const { t, isRTL, texts, getDirectionalStyle, formatCurrency } = useArabicLanguage()
   const theme = useTheme()
 
   // State
-  const [orgId] = useState(() => getActiveOrgId() || '')
   const [periods, setPeriods] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
-  const [selectedTab, setSelectedTab] = useState(0)
   const [filterStatus, setFilterStatus] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -866,7 +831,7 @@ export default function EnhancedFiscalPeriodManager() {
             </Box>
           ) : filteredPeriods.length > 0 ? (
             <Grid container spacing={3}>
-              {filteredPeriods.map((period, index) => (
+              {filteredPeriods.map((period) => (
                 <Grid item xs={12} md={6} lg={4} key={period.id}>
                   <PeriodStatusCard
                     period={period}

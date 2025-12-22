@@ -3,13 +3,13 @@ import { Card, CardContent, Grid, TextField, Button, Typography } from '@mui/mat
 import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/hooks/useAuth'
 import { voidInventoryDocument } from '@/services/inventory/documents'
-
-function getActiveOrgIdSafe(): string | null { try { return localStorage.getItem('org_id') } catch { return null } }
+import { useScopeOptional } from '@/contexts/ScopeContext'
 
 const QuickVoidForm: React.FC = () => {
   const { showToast } = useToast()
   const { user } = useAuth()
-  const [orgId] = useState<string>(getActiveOrgIdSafe() || '')
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
   const [documentId, setDocumentId] = useState('')
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)

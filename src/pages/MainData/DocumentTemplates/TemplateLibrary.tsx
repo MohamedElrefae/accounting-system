@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Box, Button, Divider, Stack, TextField, Typography, styled } from '@mui/material';
 import OrgSelector from '../../../components/Organizations/OrgSelector';
 import { useToast } from '../../../contexts/ToastContext';
-import { getActiveOrgId } from '../../../utils/org';
 import * as svc from '../../../services/templates';
 import { useNavigate } from 'react-router-dom';
 import { useHasPermission } from '../../../hooks/useHasPermission';
+import { useScopeOptional } from '../../../contexts/ScopeContext';
 
 const Root = styled(Box)(({ theme }) => ({
   padding: theme.spacing(2)
@@ -30,11 +30,12 @@ export default function TemplateLibrary() {
   const hasPerm = useHasPermission();
   const canManage = hasPerm('templates.manage');
   const navigate = useNavigate();
+  const scope = useScopeOptional();
   const [orgId, setOrgId] = useState('');
   const [rows, setRows] = useState<svc.DocumentTemplate[]>([]);
   const [name, setName] = useState('');
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     if (!orgId) return;
     try {
       const list = await svc.listTemplates(orgId);
@@ -42,14 +43,14 @@ export default function TemplateLibrary() {
     } catch (e:any) {
       showToast(e?.message || 'Failed to load templates', { severity: 'error' });
     }
-  };
+  }, [orgId, showToast]);
 
   useEffect(() => {
-    const id = getActiveOrgId();
-    if (id) setOrgId(id);
-  }, []);
+    const id = scope?.currentOrg?.id || '';
+    setOrgId(id);
+  }, [scope?.currentOrg?.id]);
 
-  useEffect(() => { refresh(); }, [orgId]);
+  useEffect(() => { refresh(); }, [refresh]);
 
   const create = async () => {
     if (!orgId || !name.trim()) return;

@@ -10,10 +10,10 @@ import AddIcon from '@mui/icons-material/Add'
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance'
 import AssignmentIcon from '@mui/icons-material/Assignment'
 import { useArabicLanguage, ArabicLanguageService } from '@/services/ArabicLanguageService'
-import { FiscalYearService, useFiscalYears, useCreateFiscalYear } from '@/services/fiscal'
-import { getActiveOrgId } from '@/utils/org'
+import { FiscalYearService } from '@/services/fiscal'
 import { tokens } from '@/theme/tokens'
 import { constructionThemeUtils } from '@/themes/rtlTheme'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 import './FiscalPages.css'
 
 // Minimal enhanced dashboard (stabilized)
@@ -24,7 +24,6 @@ const DashboardContainer = ({ children, title, subtitle, actions }: {
   actions?: React.ReactNode
 }) => {
   const { isRTL, getDirectionalStyle } = useArabicLanguage()
-  const theme = useTheme()
 
   return (
     <Box sx={{
@@ -251,7 +250,7 @@ const FiscalPeriodCard = ({ period, isActive = false }: {
   }
   isActive?: boolean
 }) => {
-  const { t, isRTL, texts, getDirectionalStyle, formatCurrency, formatDate, formatNumber } = useArabicLanguage()
+  const { isRTL, getDirectionalStyle, formatCurrency, formatDate, formatNumber } = useArabicLanguage()
   const theme = useTheme()
 
   const getStatusColor = (status: string) => {
@@ -352,7 +351,6 @@ const QuickActionButton = ({
   color?: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info'
   disabled?: boolean
 }) => {
-  const { isRTL } = useArabicLanguage()
   const theme = useTheme()
 
   return (
@@ -387,13 +385,9 @@ const QuickActionButton = ({
 // Main Enhanced Dashboard Component
 export default function EnhancedFiscalYearDashboard() {
   const { isRTL, getDirectionalStyle, t, texts } = useArabicLanguage()
-  const theme = useTheme()
 
-  const [orgId] = useState(() => {
-    const id = getActiveOrgId() || ''
-    console.log('Dashboard: Initialized with orgId:', id)
-    return id
-  })
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
   const [fiscalYears, setFiscalYears] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -433,9 +427,13 @@ export default function EnhancedFiscalYearDashboard() {
         id: y.id, 
         name: y.nameAr || y.nameEn || `FY ${y.yearNumber}`, 
         range: `${y.startDate} — ${y.endDate}`, 
-        status: y.status,
+        status: (y.status as any) || 'draft',
         yearNumber: y.yearNumber,
-        isCurrent: y.isCurrent
+        isCurrent: y.isCurrent,
+        startDate: y.startDate,
+        endDate: y.endDate,
+        transactions: 0,
+        balance: 0,
       }))
       console.log('Dashboard: Mapped fiscal years', { list })
       setFiscalYears(list)
@@ -521,6 +519,44 @@ export default function EnhancedFiscalYearDashboard() {
     >
       <Box sx={{ p: 3, ...getDirectionalStyle() }}>
         <Stack spacing={3}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6} md={4}>
+              <MetricCard
+                title={isRTL ? 'عدد السنوات المالية' : 'Fiscal Years'}
+                value={fiscalYears.length}
+                icon={DashboardIcon}
+                color="primary"
+                loading={loading}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={4}>
+              <MetricCard
+                title={isRTL ? 'السنة الحالية' : 'Current Year'}
+                value={fiscalYears.find(f => f.isCurrent)?.yearNumber || (isRTL ? 'غير محدد' : 'N/A')}
+                icon={AccountBalanceIcon}
+                color="success"
+                loading={loading}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={4}>
+              <MetricCard
+                title={isRTL ? 'المؤسسة' : 'Organization'}
+                value={orgId ? (isRTL ? 'محددة' : 'Selected') : (isRTL ? 'غير محددة' : 'Not selected')}
+                icon={SettingsIcon}
+                color={orgId ? 'info' : 'warning'}
+                loading={loading}
+              />
+            </Grid>
+          </Grid>
+
+          <Grid container spacing={2}>
+            {quickActions.map((a) => (
+              <Grid item xs={12} sm={6} md={4} key={a.label}>
+                <QuickActionButton icon={a.icon} label={a.label} onClick={a.onClick} color={a.color} disabled={loading} />
+              </Grid>
+            ))}
+          </Grid>
+
           <Stack direction={{ xs:'column', sm:'row' }} justifyContent="space-between" alignItems={{ xs:'stretch', sm:'center' }}>
             <Typography variant="h5" fontWeight="bold">{isRTL ? 'السنوات المالية' : 'Fiscal Years'}</Typography>
             <Button variant="contained" onClick={()=> setShowCreateDialog(true)}>{isRTL ? 'سنة مالية جديدة' : 'New Fiscal Year'}</Button>
@@ -544,40 +580,7 @@ export default function EnhancedFiscalYearDashboard() {
             <Grid container spacing={2}>
               {fiscalYears.map((fy:any)=> (
                 <Grid item xs={12} sm={6} md={4} key={fy.id}>
-                  <Card elevation={0} sx={{
-                    border: `2px solid ${fy.isCurrent ? theme.palette.primary.main : theme.palette.divider}`,
-                    borderRadius: 2,
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: theme.shadows[4]
-                    }
-                  }}>
-                    <CardContent>
-                      <Stack spacing={1}>
-                        <Stack direction={isRTL ? 'row-reverse' : 'row'} justifyContent="space-between" alignItems="center">
-                          <Typography variant="h6" fontWeight="bold">
-                            {fy.name}
-                          </Typography>
-                          {fy.isCurrent && (
-                            <Chip 
-                              label={isRTL ? 'نشط' : 'Active'} 
-                              color="primary" 
-                              size="small" 
-                            />
-                          )}
-                        </Stack>
-                        <Typography variant="body2" color="text.secondary">
-                          {fy.range}
-                        </Typography>
-                        <Chip 
-                          label={fy.status} 
-                          size="small" 
-                          sx={{ alignSelf: 'flex-start' }}
-                        />
-                      </Stack>
-                    </CardContent>
-                  </Card>
+                  <FiscalPeriodCard period={fy} isActive={!!fy.isCurrent} />
                 </Grid>
               ))}
             </Grid>

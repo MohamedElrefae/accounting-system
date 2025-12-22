@@ -1,68 +1,60 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import styles from './TransactionLineItems.module.css'
 import { useHasPermission } from '../../hooks/useHasPermission'
 import { useToast } from '../../contexts/ToastContext'
 import { getOrganizations, type Organization } from '../../services/organization'
 import { lineItemsCatalogService, type CatalogItem } from '../../services/line-items-catalog'
+import { useScopeOptional } from '../../contexts/ScopeContext'
 
 import ExportButtons from '../../components/Common/ExportButtons'
 import TreeView from '../../components/TreeView/TreeView'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
+import UnifiedCRUDForm, { type FormConfig } from '../../components/Common/UnifiedCRUDForm'
+import DraggablePanelContainer from '../../components/Common/DraggablePanelContainer'
+import TextField from '@mui/material/TextField'
+import Checkbox from '@mui/material/Checkbox'
 import {
   Button,
   Card,
   CardContent,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   FormControl,
   InputLabel,
   MenuItem,
   Select,
   Tab,
   Tabs,
-  TextField,
   Typography,
   Table,
   TableHead,
   TableRow,
   TableCell,
   TableBody,
-  Checkbox,
   TablePagination,
 } from '@mui/material'
-
-async function getInitialOrgId(): Promise<string> {
-  try {
-    const { getActiveOrgId } = await import('../../utils/org')
-    return getActiveOrgId?.() || ''
-  } catch {
-    return ''
-  }
-}
-
-type TransactionLineItemRow = {
-  id: string
-  item_code: string | null
-  item_name: string | null
-  item_name_ar: string | null
-  parent_id?: string | null
-  unit_price: number
-  unit_of_measure: string | null
-  is_active: boolean
-  level: number
-  child_count: number
-  has_usage: boolean
-  usage_count: number
-}
 
 const TransactionLineItemsPage: React.FC = () => {
   const { showToast } = useToast()
   const hasPermission = useHasPermission()
+  const scope = useScopeOptional()
+  const initialOrgId = scope?.currentOrg?.id || ''
   const canCreate = hasPermission('transaction_line_items.create')
   const canUpdate = hasPermission('transaction_line_items.update')
   const canDelete = hasPermission('transaction_line_items.delete')
+
+  type TransactionLineItemRow = {
+    id: string
+    item_code: string | null
+    item_name: string | null
+    item_name_ar: string | null
+    parent_id?: string | null
+    unit_price: number
+    unit_of_measure: string | null
+    is_active: boolean
+    level: number
+    child_count: number
+    has_usage: boolean
+    usage_count: number
+  }
 
   const [tab, setTab] = useState(0)
   const [orgs, setOrgs] = useState<Organization[]>([])
@@ -110,29 +102,7 @@ const TransactionLineItemsPage: React.FC = () => {
     position: 0
   })
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true)
-      try {
-        const [orgList, initialOrgId] = await Promise.all([
-          getOrganizations().catch(() => []),
-          getInitialOrgId()
-        ])
-        setOrgs(orgList)
-        const chosen = orgId || initialOrgId || orgList[0]?.id || ''
-        if (chosen !== orgId) setOrgId(chosen)
-        if (chosen) {
-          await reload(chosen)
-        }
-      } catch (e: unknown) {
-        showToast((e as Error).message || 'Failed to load data', { severity: 'error' })
-      } finally {
-        setLoading(false)
-      }
-    })()
-  }, [])
-
-  const reload = async (chosen: string) => {
+  const reload = useCallback(async (chosen: string) => {
     if (!chosen) return
     setLoading(true)
     try {
@@ -158,17 +128,37 @@ const TransactionLineItemsPage: React.FC = () => {
       const maxDepth = Math.max(0, ...itemsWithMeta.map(r => r.level || 1))
       setList(itemsWithMeta)
       setStats({ totalItems: itemsWithMeta.length, rootItems, maxDepth, usageCount: 0 })
-      console.log('✅ Loaded', itemsWithMeta.length, 'catalog items from line_items')
+      if (import.meta.env.DEV) console.log('✅ Loaded', itemsWithMeta.length, 'catalog items from line_items')
     } catch (e: unknown) {
       showToast((e as Error).message || 'Failed to reload', { severity: 'error' })
     } finally {
       setLoading(false)
     }
-  }
+  }, [showToast])
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true)
+      try {
+        const orgList = await getOrganizations().catch(() => [])
+        setOrgs(orgList)
+        const chosen = orgId || initialOrgId || orgList[0]?.id || ''
+        if (chosen !== orgId) setOrgId(chosen)
+        if (chosen) {
+          await reload(chosen)
+        }
+      } catch (e: unknown) {
+        showToast((e as Error).message || 'Failed to load data', { severity: 'error' })
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [initialOrgId, orgId, reload, showToast])
 
   // Calculate level from item code (1000=1, 1100=2, etc.)
   const calculateLevelFromCode = (code: string): number => {
     if (!code || !/^\d+$/.test(code)) return 1
+
     const codeNum = parseInt(code, 10)
     if (codeNum >= 1000 && codeNum < 10000) {
       if (codeNum % 1000 === 0) return 1      // 1000, 2000, 3000
@@ -273,29 +263,41 @@ const TransactionLineItemsPage: React.FC = () => {
     setOpen(true)
   }
 
-  const handleSave = async () => {
+  const handleSave = async (payloadOverride?: {
+    item_code: string
+    item_name: string
+    item_name_ar: string
+    description: string
+    parent_id: string | ''
+    quantity: number
+    unit_price: number
+    unit_of_measure: string
+    is_active: boolean
+    position: number
+  }) => {
     if (!orgId) { showToast('Select organization', { severity: 'warning' }); return }
+    const payload = payloadOverride ?? form
     try {
       if (editingId) {
         await lineItemsCatalogService.update(editingId, orgId, {
-          code: form.item_code,
-          name: form.item_name,
-          name_ar: form.item_name_ar || undefined,
-          parent_id: form.parent_id || null,
-          base_unit_of_measure: form.unit_of_measure || undefined,
-          standard_cost: form.unit_price,
-          is_active: form.is_active,
+          code: payload.item_code,
+          name: payload.item_name,
+          name_ar: payload.item_name_ar || undefined,
+          parent_id: payload.parent_id || null,
+          base_unit_of_measure: payload.unit_of_measure || undefined,
+          standard_cost: payload.unit_price,
+          is_active: payload.is_active,
         })
         showToast('تم التحديث بنجاح', { severity: 'success' })
       } else {
         await lineItemsCatalogService.create(orgId, {
-          code: form.item_code,
-          name: form.item_name,
-          name_ar: form.item_name_ar || undefined,
-          parent_id: form.parent_id || null,
-          base_unit_of_measure: form.unit_of_measure,
-          standard_cost: form.unit_price,
-          is_active: form.is_active,
+          code: payload.item_code,
+          name: payload.item_name,
+          name_ar: payload.item_name_ar || undefined,
+          parent_id: payload.parent_id || null,
+          base_unit_of_measure: payload.unit_of_measure,
+          standard_cost: payload.unit_price,
+          is_active: payload.is_active,
         })
         showToast('تم الإنشاء بنجاح', { severity: 'success' })
       }
@@ -361,16 +363,10 @@ const TransactionLineItemsPage: React.FC = () => {
             <Select
               label="Organization"
               value={orgId}
-              onChange={(e) => {
+              onChange={async (e) => {
                 const v = String(e.target.value)
                 setOrgId(v)
-                ;(async () => {
-                  try {
-                    const { setActiveOrgId } = await import('../../utils/org')
-                    setActiveOrgId?.(v)
-                  } catch {}
-                  await reload(v)
-                })()
+                await reload(v)
               }}
             >
               {orgs.map(o => (
@@ -382,7 +378,7 @@ const TransactionLineItemsPage: React.FC = () => {
             size="small" 
             label="Search / بحث" 
             value={search} 
-            onChange={(e) => setSearch(e.target.value)} 
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)} 
           />
           {canCreate && (
             <Button variant="contained" onClick={openCreate}>New / جديد</Button>
@@ -445,10 +441,7 @@ const TransactionLineItemsPage: React.FC = () => {
                       { 
                         key: 'quantity', 
                         header: 'Quantity', 
-                        render: (n) => {
-                          const item = list.find(i => i.id === n.id)
-return <span>{1}</span>
-                        }
+                        render: () => <span>1</span>
                       },
                       { 
                         key: 'unit_price', 
@@ -532,7 +525,7 @@ return <span>{1}</span>
                             <TableCell>{r.item_name}</TableCell>
                             <TableCell>{r.item_name_ar || ''}</TableCell>
                             <TableCell>{r.level}</TableCell>
-<TableCell>{1}</TableCell>
+                            <TableCell>{1}</TableCell>
                             <TableCell>{r.unit_price}</TableCell>
                             <TableCell>{r.unit_of_measure}</TableCell>
                             <TableCell><Checkbox checked={r.is_active !== false} disabled /></TableCell>
@@ -570,100 +563,83 @@ return <span>{1}</span>
         </Card>
       </div>
 
-      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{editingId ? 'Edit Line Item / تعديل بند التكلفة' : 'New Line Item / بند تكلفة جديد'}</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth 
-            margin="dense" 
-            label="Code / الكود" 
-            value={form.item_code}
-            onChange={(e) => setForm({ ...form, item_code: e.target.value })}
-          />
-          <TextField
-            fullWidth 
-            margin="dense" 
-            label="Name / الاسم" 
-            value={form.item_name}
-            onChange={(e) => setForm({ ...form, item_name: e.target.value })}
-          />
-          <TextField
-            fullWidth 
-            margin="dense" 
-            label="Arabic Name / الاسم بالعربية" 
-            value={form.item_name_ar}
-            onChange={(e) => setForm({ ...form, item_name_ar: e.target.value })}
-          />
-          <TextField
-            fullWidth 
-            margin="dense" 
-            multiline 
-            minRows={2} 
-            label="Description / الوصف" 
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-          />
-          <FormControl fullWidth margin="dense">
-            <InputLabel>Parent (optional)</InputLabel>
-            <Select
-              label="Parent (optional)"
-              value={form.parent_id}
-              onChange={(e) => setForm({ ...form, parent_id: String(e.target.value) })}
-            >
-              <MenuItem value="">None</MenuItem>
-              {list.filter(r => r.level <= 3).map(r => (
-                <MenuItem key={r.id} value={r.id}>{r.item_code} - {r.item_name}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <TextField
-            fullWidth 
-            margin="dense" 
-            type="number" 
-            label="Quantity / الكمية" 
-            value={form.quantity}
-            onChange={(e) => setForm({ ...form, quantity: parseFloat(e.target.value) || 0 })}
-          />
-          <TextField
-            fullWidth 
-            margin="dense" 
-            type="number" 
-            label="Unit Price / سعر الوحدة" 
-            value={form.unit_price}
-            onChange={(e) => setForm({ ...form, unit_price: parseFloat(e.target.value) || 0 })}
-          />
-          <TextField
-            fullWidth 
-            margin="dense" 
-            label="Unit of Measure / الوحدة" 
-            value={form.unit_of_measure}
-            onChange={(e) => setForm({ ...form, unit_of_measure: e.target.value })}
-          />
-          <TextField
-            fullWidth 
-            margin="dense" 
-            type="number" 
-            label="Position / الترتيب" 
-            value={form.position}
-            onChange={(e) => setForm({ ...form, position: parseInt(e.target.value) || 0 })}
-          />
-          <div className={styles.footerActions}>
-            <FormControl>
-              <InputLabel shrink>Active</InputLabel>
-            </FormControl>
-            <div>
-              <Checkbox 
-                checked={form.is_active} 
-                onChange={(e) => setForm({ ...form, is_active: e.target.checked })} 
-              /> Active / نشط
-            </div>
-          </div>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpen(false)}>Close</Button>
-          {(editingId ? canUpdate : canCreate) && <Button variant="contained" onClick={handleSave}>Save</Button>}
-        </DialogActions>
-      </Dialog>
+      <DraggablePanelContainer
+        storageKey="panel:transaction-line-items:crud"
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        title={editingId ? 'Edit Line Item / تعديل بند التكلفة' : 'New Line Item / بند تكلفة جديد'}
+        subtitle={orgId ? `Org: ${orgId}` : undefined}
+        defaults={{
+          position: () => ({ x: 140, y: 90 }),
+          size: () => ({ width: 1100, height: 760 }),
+          dockPosition: 'right',
+        }}
+      >
+        <UnifiedCRUDForm
+          config={{
+            title: 'Transaction Line Items Catalog / بنود التكلفة التفصيلية',
+            formId: 'transaction-line-items',
+            layout: { columns: 2, responsive: true },
+            fields: [
+              { id: 'item_code', type: 'text', label: 'Code / الكود', required: true },
+              { id: 'item_name', type: 'text', label: 'Name / الاسم', required: true },
+              { id: 'item_name_ar', type: 'text', label: 'Arabic Name / الاسم بالعربية', required: false },
+              { id: 'description', type: 'textarea', label: 'Description / الوصف', rows: 2, required: false, colSpan: 2 },
+              {
+                id: 'parent_id',
+                type: 'searchable-select',
+                label: 'Parent (optional) / الأصل',
+                optionsProvider: async () => [
+                  { value: '', label: '—', searchText: '' },
+                  ...list
+                    .filter(r => r.level <= 3)
+                    .filter(r => !editingId || r.id !== editingId)
+                    .map(r => ({
+                      value: r.id,
+                      label: `${r.item_code || ''} - ${r.item_name_ar || r.item_name || ''}`,
+                      searchText: `${r.item_code || ''} ${(r.item_name_ar || r.item_name || '')}`,
+                    })),
+                ],
+                clearable: true,
+              },
+              { id: 'quantity', type: 'number', label: 'Quantity / الكمية', required: false, defaultValue: 1 },
+              { id: 'unit_price', type: 'number', label: 'Unit Price / سعر الوحدة', required: false, defaultValue: 0 },
+              { id: 'unit_of_measure', type: 'text', label: 'Unit of Measure / الوحدة', required: false },
+              { id: 'position', type: 'number', label: 'Position / الترتيب', required: false, defaultValue: 0 },
+              { id: 'is_active', type: 'checkbox', label: 'Active / نشط', defaultValue: true },
+            ],
+          } as FormConfig}
+          initialData={{
+            item_code: form.item_code,
+            item_name: form.item_name,
+            item_name_ar: form.item_name_ar,
+            description: form.description,
+            parent_id: form.parent_id,
+            quantity: form.quantity,
+            unit_price: form.unit_price,
+            unit_of_measure: form.unit_of_measure,
+            is_active: form.is_active,
+            position: form.position,
+          }}
+          onSubmit={async (data) => {
+            const payload = {
+              item_code: String(data.item_code ?? '').trim(),
+              item_name: String(data.item_name ?? '').trim(),
+              item_name_ar: String(data.item_name_ar ?? ''),
+              description: String(data.description ?? ''),
+              parent_id: data.parent_id ? String(data.parent_id) : '',
+              quantity: Number.isFinite(Number(data.quantity)) ? Number(data.quantity) : 1,
+              unit_price: Number.isFinite(Number(data.unit_price)) ? Number(data.unit_price) : 0,
+              unit_of_measure: String(data.unit_of_measure ?? ''),
+              is_active: data.is_active === undefined ? true : !!data.is_active,
+              position: Number.isFinite(Number(data.position)) ? Number(data.position) : 0,
+            }
+            setForm(payload)
+            await handleSave(payload)
+          }}
+          onCancel={() => setOpen(false)}
+        />
+      </DraggablePanelContainer>
     </div>
   )
 }

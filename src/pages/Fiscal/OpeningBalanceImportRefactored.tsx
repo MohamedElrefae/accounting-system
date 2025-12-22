@@ -5,7 +5,7 @@ import { getAccounts, type Account } from '../../services/transactions'
 import { getCompanyConfig } from '../../services/company-config'
 import SearchableSelect from '../../components/Common/SearchableSelect'
 import { FiscalYearSelector } from '../../components/Fiscal/FiscalYearSelector'
-import { getActiveOrgId } from '@/utils/org'
+import { useScopeOptional } from '../../contexts/ScopeContext'
 import './FiscalPages.css'
 
 interface ImportRow {
@@ -19,6 +19,8 @@ interface ImportRow {
 
 export default function OpeningBalanceImportRefactored() {
   const { isRTL, formatCurrency } = useArabicLanguage()
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id ?? null
   const [importRows, setImportRows] = useState<ImportRow[]>([])
   const [loading, setLoading] = useState(false)
   const [importMode, setImportMode] = useState<'manual' | 'file'>('manual')
@@ -38,7 +40,7 @@ export default function OpeningBalanceImportRefactored() {
 
         // 1. Fetch Company Config for Currency
         try {
-          const config = await getCompanyConfig()
+          const config = await getCompanyConfig(orgId)
           if (config && config.currency_code) {
             setDefaultCurrency(config.currency_code)
             console.log('✅ Default Currency:', config.currency_code)
@@ -68,7 +70,7 @@ export default function OpeningBalanceImportRefactored() {
         const timeout = new Promise<Account[]>((_, reject) => {
           setTimeout(() => reject(new Error('Request timed out')), 10000)
         })
-        const accts = await Promise.race([getAccounts(), timeout])
+        const accts = await Promise.race([getAccounts(orgId), timeout])
 
         setAccounts(accts)
       } catch (err) {
@@ -80,7 +82,7 @@ export default function OpeningBalanceImportRefactored() {
     }
 
     initData()
-  }, [])
+  }, [orgId])
 
   // Filter only postable accounts and format for SearchableSelect
   const accountOptions = useMemo(() => {
@@ -133,7 +135,6 @@ export default function OpeningBalanceImportRefactored() {
 
   const handleImport = async () => {
     if (!canImport) return
-    const orgId = getActiveOrgId()
     if (!orgId) {
       alert(isRTL ? 'يرجى اختيار المؤسسة أولاً' : 'Please select organization first')
       return
@@ -211,7 +212,7 @@ export default function OpeningBalanceImportRefactored() {
           </div>
           <div className="fiscal-card-content">
             <FiscalYearSelector
-              orgId={getActiveOrgId()}
+              orgId={orgId}
               value={selectedFiscalYear}
               onChange={(fiscalYearId) => {
                 console.log('📅 Fiscal year selected:', fiscalYearId)

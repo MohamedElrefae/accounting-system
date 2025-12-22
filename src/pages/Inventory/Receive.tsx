@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, Suspense, lazy } from 'react'
+import { useEffect, useState, Suspense, lazy } from 'react'
 import { Card, CardContent, Typography, Grid, TextField, MenuItem, Button, Divider, Box } from '@mui/material'
 import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/hooks/useAuth'
@@ -13,17 +13,18 @@ import AsyncAutocomplete, { type AsyncOption } from '@/components/Common/AsyncAu
 import { useArabicLanguage } from '@/services/ArabicLanguageService'
 import { INVENTORY_TEXTS } from '@/i18n/inventory'
 import { getDisplayName } from '@/utils/inventoryDisplay'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 
 const DocumentActionsBar = lazy(() => import('@/components/Inventory/DocumentActionsBar'))
 
-function getActiveOrgIdSafe(): string | null { try { return localStorage.getItem('org_id') } catch { return null } }
-
-const ReceiveMaterialsPage: React.FC = () => {
+function ReceiveMaterialsPage() {
   const { showToast } = useToast()
   const { user } = useAuth()
   const { t, isRTL } = useArabicLanguage()
 
-  const [orgId, setOrgId] = useState<string>('')
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
+
   const [materials, setMaterials] = useState<MaterialRow[]>([])
   const [locations, setLocations] = useState<InventoryLocationRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -79,11 +80,6 @@ const ReceiveMaterialsPage: React.FC = () => {
   const priceSource = watch('priceSource')
   const notes = watch('notes')
 
-  useEffect(() => {
-    const v = getActiveOrgIdSafe()
-    if (v) setOrgId(v)
-  }, [])
-
   // Ensure orgId is present in the form before validation
   useEffect(() => {
     if (orgId) setValue('orgId', orgId, { shouldValidate: false, shouldDirty: false, shouldTouch: false })
@@ -108,9 +104,7 @@ const ReceiveMaterialsPage: React.FC = () => {
         setLoading(false)
       }
     })()
-  }, [orgId])
-
-  const selectedMaterial = useMemo(() => materials.find(m => m.id === materialId), [materials, materialId])
+  }, [orgId, showToast])
 
   const materialLoader = async (q: string): Promise<AsyncOption<MaterialRow>[]> => {
     const ql = (q || '').toLowerCase()
@@ -127,11 +121,10 @@ const ReceiveMaterialsPage: React.FC = () => {
 
   const addLine = () => {
     if (!materialId || !uomId || !quantity) { showToast('Select material, UOM and quantity', { severity: 'warning' }); return }
-    setLines(prev => [...prev, { materialId, uomId, quantity, unitCost, priceSource, notes }])
-    setMaterialId(''); setUomId(''); setQuantity(1); setUnitCost(0); setPriceSource('manual'); setNotes('')
+    setLines(prev => [...prev, { materialId, uomId, quantity, unitCost, priceSource, notes: notes || '' }])
+    reset({ ...watch(), materialId: '', uomId: '', quantity: 1, unitCost: 0, priceSource, notes: '' })
   }
   const removeLine = (idx: number) => setLines(prev => prev.filter((_, i) => i !== idx))
-
 
   const onCreateAndPost = async (values: FormValues) => {
     if (!orgId) { showToast('Select organization first', { severity: 'warning' }); return }
@@ -153,7 +146,6 @@ const ReceiveMaterialsPage: React.FC = () => {
       let lineNo = 1
       for (const ln of payloads) {
         await addInventoryDocumentLine({
-          id: '' as any,
           org_id: orgId,
           document_id: doc.id,
           line_no: lineNo++,
@@ -169,10 +161,7 @@ const ReceiveMaterialsPage: React.FC = () => {
           location_id: values.locationId,
           lot_id: null,
           serial_id: null,
-          notes: ln.notes,
-          created_at: '' as any,
-          updated_at: '' as any,
-          line_value: 0 as any,
+          notes: ln.notes || null,
         })
       }
       // 3) Approve

@@ -30,6 +30,7 @@ const OptimizedProtectedRoute: React.FC<OptimizedProtectedRouteProps> = ({
   fallback,
   redirectTo,
 }) => {
+  const helpScreenshotsBypass = import.meta.env.VITE_HELP_SCREENSHOTS === 'true';
   const {
     user,
     loading,
@@ -37,6 +38,10 @@ const OptimizedProtectedRoute: React.FC<OptimizedProtectedRouteProps> = ({
     hasActionAccess,
   } = useOptimizedAuth();
   const location = useLocation();
+
+  if (helpScreenshotsBypass) {
+    return <>{children}</>;
+  }
 
   if (import.meta.env.DEV) {
     console.log('[OptimizedProtectedRoute] render', {

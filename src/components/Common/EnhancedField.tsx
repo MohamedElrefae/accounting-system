@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef } from 'react'
 import { 
   CheckCircle, 
   AlertCircle, 
@@ -7,8 +7,7 @@ import {
   Search, 
   History, 
   X, 
-  Loader2,
-  Sparkles
+  Loader2
 } from 'lucide-react'
 
 interface EnhancedFieldProps {
@@ -77,7 +76,6 @@ export const EnhancedField: React.FC<EnhancedFieldProps> = ({
   loading = false,
   disabled = false,
   ariaLabel,
-  helpText,
   placeholder,
   id = `field-${label.replace(/\s+/g, '-').toLowerCase()}`,
   maxLength,

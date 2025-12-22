@@ -112,11 +112,15 @@ const ExportDatabasePage: React.FC = () => {
   useEffect(() => {
     (async () => {
       try {
-        const list = await getAccounts()
+        if (!orgId) {
+          setAccounts([])
+          return
+        }
+        const list = await getAccounts(orgId)
         setAccounts(list)
       } catch {}
     })()
-  }, [])
+  }, [orgId])
 
   const accountOptions = useMemo(() => {
     return accounts

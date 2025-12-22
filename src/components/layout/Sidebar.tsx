@@ -5,10 +5,10 @@ import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
-import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Collapse from '@mui/material/Collapse';
 import Badge from '@mui/material/Badge';
+import Tooltip from '@mui/material/Tooltip';
 import {
   ExpandLess,
   ExpandMore,
@@ -36,11 +36,13 @@ import {
   TableChart,
   CloudUpload,
   AssignmentTurnedIn,
+  Lightbulb,
 } from '@mui/icons-material';
 import useAppStore from '../../store/useAppStore';
 import { navigationItems } from '../../data/navigation';
 import type { NavigationItem } from '../../types';
 import { useHasPermission } from '../../hooks/useHasPermission';
+import BrandHeader from './BrandHeader';
 
 export const DRAWER_WIDTH = 280;
 export const DRAWER_COLLAPSED_WIDTH = 64;
@@ -115,6 +117,8 @@ const getIcon = (iconName: string) => {
       return <Tune />;
     case 'AutoAwesome':
       return <AutoAwesome />;
+    case 'Lightbulb':
+      return <Lightbulb />;
     case 'Upload':
       return <Upload />;
     default:
@@ -127,13 +131,13 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = () => {
-  const { sidebarCollapsed, language, companyName } = useAppStore();
+  const { sidebarCollapsed, language } = useAppStore();
   const [expandedItems, setExpandedItems] = useState<string[]>(['dashboard']);
   const navigate = useNavigate();
   const location = useLocation();
   const isRtl = language === 'ar';
   const hasPermission = useHasPermission();
-  
+
   // Force component update when language changes
   React.useEffect(() => {
     // Component will re-render when language or isRtl changes
@@ -243,119 +247,129 @@ const Sidebar: React.FC<SidebarProps> = () => {
     if (item.requiredPermission && !hasPermission(item.requiredPermission)) return null;
     if (item.superAdminOnly && !hasPermission('admin.all')) return null;
 
+    const ButtonComponent = (
+      <ListItemButton
+        onClick={() => {
+          if (hasChildren) {
+            toggleExpanded(item.id);
+          } else if (item.path) {
+            handleNavigation(item.path);
+          }
+        }}
+        sx={{
+          minHeight: 52,
+          justifyContent: sidebarCollapsed ? 'center' : 'initial',
+          px: level > 0 ? 1.5 : 2,
+          py: 1,
+          mx: level > 0 ? 1 : 0.5,
+          my: 0.25,
+          [isRtl ? 'pr' : 'pl']: level > 0 ? 3.5 + (level * 1.5) : 2,
+          backgroundColor: isItemActive
+            ? 'primary.main'
+            : isExpanded && hasChildren
+              ? 'action.selected'
+              : 'transparent',
+          borderRadius: level > 0 ? '8px' : '12px',
+          border: isItemActive ? '1px solid' : 'none',
+          borderColor: isItemActive ? 'primary.light' : 'transparent',
+          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          position: 'relative',
+          overflow: 'hidden',
+          '&:hover': {
+            backgroundColor: isItemActive
+              ? 'primary.dark'
+              : hasChildren
+                ? 'action.selected'
+                : 'action.hover',
+            transform: !sidebarCollapsed ? 'translateX(4px)' : 'none',
+            boxShadow: !sidebarCollapsed ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
+          },
+          '&:active': {
+            transform: !sidebarCollapsed ? 'translateX(2px)' : 'none',
+          },
+          // Modern gradient overlay effect
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: isRtl ? 'auto' : 0,
+            right: isRtl ? 0 : 'auto',
+            width: '3px',
+            height: '100%',
+            background: isItemActive
+              ? (theme: any) => `linear-gradient(180deg, ${theme.palette.primary.contrastText} 0%, ${theme.palette.primary.contrastText}cc 100%)`
+              : 'transparent',
+            borderRadius: '0 2px 2px 0',
+            transition: 'all 0.2s ease-in-out',
+          },
+        }}
+      >
+        <ListItemIcon
+          sx={{
+            minWidth: 0,
+            [isRtl ? 'ml' : 'mr']: sidebarCollapsed ? 'auto' : 3,
+            justifyContent: 'center',
+            color: isItemActive
+              ? 'primary.contrastText'
+              : isExpanded && hasChildren
+                ? 'primary.main'
+                : 'text.secondary',
+            fontSize: '20px',
+            transition: 'all 0.2s ease-in-out',
+          }}
+        >
+          {item.badge ? (
+            <Badge badgeContent={item.badge?.text} color="error">
+              {getIcon(item.icon || 'Dashboard')}
+            </Badge>
+          ) : (
+            getIcon(item.icon || 'Dashboard')
+          )}
+        </ListItemIcon>
+        <ListItemText
+          primary={title}
+          sx={{
+            opacity: sidebarCollapsed ? 0 : 1,
+            '& .MuiListItemText-primary': {
+              color: isItemActive
+                ? 'primary.contrastText'
+                : isExpanded && hasChildren
+                  ? 'primary.main'
+                  : 'text.primary',
+              fontWeight: isItemActive ? 600 : isExpanded && hasChildren ? 500 : 400,
+              fontSize: '14px',
+              transition: 'all 0.2s ease-in-out',
+            },
+          }}
+        />
+        {hasChildren && !sidebarCollapsed && (
+          <Box
+            sx={{
+              color: isItemActive
+                ? 'primary.contrastText'
+                : isExpanded
+                  ? 'primary.main'
+                  : 'text.secondary',
+              transition: 'all 0.2s ease-in-out',
+              transform: isExpanded ? 'rotate(0deg)' : 'rotate(0deg)',
+            }}
+          >
+            {isExpanded ? <ExpandLess /> : <ExpandMore />}
+          </Box>
+        )}
+      </ListItemButton>
+    );
+
     return (
       <React.Fragment key={item.id}>
         <ListItem disablePadding sx={{ display: 'block' }}>
-          <ListItemButton
-            onClick={() => {
-              if (hasChildren) {
-                toggleExpanded(item.id);
-              } else if (item.path) {
-                handleNavigation(item.path);
-              }
-            }}
-            sx={{
-              minHeight: 52,
-              justifyContent: sidebarCollapsed ? 'center' : 'initial',
-              px: level > 0 ? 1.5 : 2,
-              py: 1,
-              mx: level > 0 ? 1 : 0.5,
-              my: 0.25,
-              [isRtl ? 'pr' : 'pl']: level > 0 ? 3.5 + (level * 1.5) : 2,
-              backgroundColor: isItemActive 
-                ? 'primary.main' 
-                : isExpanded && hasChildren
-                ? 'action.selected'
-                : 'transparent',
-              borderRadius: level > 0 ? '8px' : '12px',
-              border: isItemActive ? '1px solid' : 'none',
-              borderColor: isItemActive ? 'primary.light' : 'transparent',
-              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-              position: 'relative',
-              overflow: 'hidden',
-              '&:hover': {
-                backgroundColor: isItemActive 
-                  ? 'primary.dark'
-                  : hasChildren
-                  ? 'action.selected'
-                  : 'action.hover',
-                transform: !sidebarCollapsed ? 'translateX(4px)' : 'none',
-                boxShadow: !sidebarCollapsed ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
-              },
-              '&:active': {
-                transform: !sidebarCollapsed ? 'translateX(2px)' : 'none',
-              },
-              // Modern gradient overlay effect
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                left: isRtl ? 'auto' : 0,
-                right: isRtl ? 0 : 'auto',
-                width: '3px',
-                height: '100%',
-                background: isItemActive 
-                  ? (theme) => `linear-gradient(180deg, ${theme.palette.primary.contrastText} 0%, ${theme.palette.primary.contrastText}cc 100%)`
-                  : 'transparent',
-                borderRadius: '0 2px 2px 0',
-                transition: 'all 0.2s ease-in-out',
-              },
-            }}
-          >
-            <ListItemIcon
-              sx={{
-                minWidth: 0,
-                [isRtl ? 'ml' : 'mr']: sidebarCollapsed ? 'auto' : 3,
-                justifyContent: 'center',
-                color: isItemActive 
-                  ? 'primary.contrastText' 
-                  : isExpanded && hasChildren
-                  ? 'primary.main'
-                  : 'text.secondary',
-                fontSize: '20px',
-                transition: 'all 0.2s ease-in-out',
-              }}
-            >
-              {item.badge ? (
-                <Badge badgeContent={item.badge?.text} color="error">
-                  {getIcon(item.icon || 'Dashboard')}
-                </Badge>
-              ) : (
-                getIcon(item.icon || 'Dashboard')
-              )}
-            </ListItemIcon>
-            <ListItemText
-              primary={title}
-              sx={{ 
-                opacity: sidebarCollapsed ? 0 : 1,
-                '& .MuiListItemText-primary': {
-                  color: isItemActive 
-                    ? 'primary.contrastText' 
-                    : isExpanded && hasChildren
-                    ? 'primary.main'
-                    : 'text.primary',
-                  fontWeight: isItemActive ? 600 : isExpanded && hasChildren ? 500 : 400,
-                  fontSize: '14px',
-                  transition: 'all 0.2s ease-in-out',
-                },
-              }}
-            />
-            {hasChildren && !sidebarCollapsed && (
-              <Box
-                sx={{
-                  color: isItemActive 
-                    ? 'primary.contrastText' 
-                    : isExpanded
-                    ? 'primary.main'
-                    : 'text.secondary',
-                  transition: 'all 0.2s ease-in-out',
-                  transform: isExpanded ? 'rotate(0deg)' : 'rotate(0deg)',
-                }}
-              >
-                {isExpanded ? <ExpandLess /> : <ExpandMore />}
-              </Box>
-            )}
-          </ListItemButton>
+          {sidebarCollapsed ? (
+            <Tooltip title={title} placement={isRtl ? 'left' : 'right'} arrow>
+              <Box>{ButtonComponent}</Box>
+            </Tooltip>
+          ) : (
+            ButtonComponent
+          )}
         </ListItem>
 
         {hasChildren && (
@@ -387,8 +401,8 @@ const Sidebar: React.FC<SidebarProps> = () => {
         borderColor: 'divider',
         backgroundColor: 'background.paper',
         backdropFilter: (theme) => theme.palette.mode === 'dark' ? 'none' : 'blur(10px)',
-        boxShadow: !isRtl 
-          ? '4px 0 24px rgba(0, 0, 0, 0.12)' 
+        boxShadow: !isRtl
+          ? '4px 0 24px rgba(0, 0, 0, 0.12)'
           : '-4px 0 24px rgba(0, 0, 0, 0.12)',
         height: '100%',
         // Scrollbar styling
@@ -408,73 +422,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
       }}
     >
       {/* Header */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-          px: sidebarCollapsed ? 1 : 2.5,
-          py: 2.5,
-          minHeight: 72,
-          borderBottom: 1,
-          borderColor: 'divider',
-          background: (theme) => 
-            `linear-gradient(135deg, ${theme.palette.primary.main}15 0%, ${theme.palette.primary.light}10 100%)`,
-          position: 'relative',
-          '&::after': {
-            content: '""',
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: '1px',
-            background: (theme) => 
-              `linear-gradient(90deg, transparent 0%, ${theme.palette.primary.main}40 50%, transparent 100%)`,
-          },
-        }}
-      >
-        {!sidebarCollapsed && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Box
-              sx={{
-                p: 1,
-                borderRadius: '12px',
-                background: (theme) => 
-                  `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              }}
-            >
-            <AccountBalance sx={{ color: 'primary.contrastText', fontSize: '24px' }} />
-            </Box>
-            <Typography 
-              variant="h6" 
-              noWrap 
-              component="div" 
-              sx={{
-                color: 'primary.main',
-                fontWeight: 700,
-                fontSize: '18px',
-                letterSpacing: '-0.5px',
-              }}
-            >
-              {companyName}
-            </Typography>
-          </Box>
-        )}
-        {sidebarCollapsed && (
-          <Box
-            sx={{
-              p: 1.5,
-              borderRadius: '12px',
-              background: (theme) => 
-                `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            }}
-          >
-            <AccountBalance sx={{ color: 'primary.contrastText', fontSize: '28px' }} />
-          </Box>
-        )}
-      </Box>
+      <BrandHeader collapsed={!!sidebarCollapsed} />
 
       {/* Navigation */}
       <Box sx={{ overflow: 'auto' }}>

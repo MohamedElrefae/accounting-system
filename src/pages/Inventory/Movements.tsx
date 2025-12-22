@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Card, CardContent, Typography, Table, TableHead, TableRow, TableCell, TableBody, Grid, TextField, Button } from '@mui/material'
+import { Card, CardContent, Typography, Table, TableHead, TableRow, TableCell, TableBody, Grid, TextField } from '@mui/material'
 import { listInventoryMovementsFiltered } from '@/services/inventory/documents'
 import { supabase } from '@/utils/supabase'
 import { listMaterials, type MaterialRow } from '@/services/inventory/materials'
 import { listInventoryLocations, type InventoryLocationRow } from '@/services/inventory/locations'
-
-function getActiveOrgIdSafe(): string | null { try { return localStorage.getItem('org_id') } catch { return null } }
+import { useScopeOptional } from '@/contexts/ScopeContext'
 
 const MovementsPage: React.FC = () => {
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
   const [rows, setRows] = useState<any[]>([])
   const [qFrom, setQFrom] = useState<string>('')
   const [qTo, setQTo] = useState<string>('')
@@ -48,7 +49,6 @@ const MovementsPage: React.FC = () => {
   }, [qMaterial, qLocation, qType, qFrom, qTo])
 
   useEffect(() => {
-    const orgId = getActiveOrgIdSafe()
     if (!orgId) return
     setLoading(true)
     Promise.all([
@@ -58,20 +58,20 @@ const MovementsPage: React.FC = () => {
     ])
       .then(([movs, mats, locs]) => { setRows(movs); setMaterials(mats); setLocations(locs) })
       .finally(() => setLoading(false))
-  }, [qMaterial, qLocation, qType, qFrom, qTo])
+  }, [orgId, qMaterial, qLocation, qType, qFrom, qTo])
 
   return (
     <div style={{ padding: 16 }}>
       <Typography variant="h6" gutterBottom>Movements / حركة المخزون</Typography>
       <Card>
         <CardContent>
-      <Grid container spacing={2} sx={{ mb: 1 }}>
-        <Grid item xs={12} md={3}>
-          <TextField fullWidth type="date" label="From" InputLabelProps={{ shrink: true }} value={qFrom} onChange={e=>setQFrom(e.target.value)} />
-        </Grid>
-        <Grid item xs={12} md={3}>
-          <TextField fullWidth type="date" label="To" InputLabelProps={{ shrink: true }} value={qTo} onChange={e=>setQTo(e.target.value)} />
-        </Grid>
+          <Grid container spacing={2} sx={{ mb: 1 }}>
+            <Grid item xs={12} md={3}>
+              <TextField fullWidth type="date" label="From" InputLabelProps={{ shrink: true }} value={qFrom} onChange={e=>setQFrom(e.target.value)} />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <TextField fullWidth type="date" label="To" InputLabelProps={{ shrink: true }} value={qTo} onChange={e=>setQTo(e.target.value)} />
+            </Grid>
             <Grid item xs={12} md={3}>
               <TextField select fullWidth label="Filter by Material" value={qMaterial} onChange={e=>setQMaterial(e.target.value)}>
                 <option value="">All</option>

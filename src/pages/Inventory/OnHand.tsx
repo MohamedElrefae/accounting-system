@@ -6,13 +6,12 @@ import { listInventoryLocations, type InventoryLocationRow } from '@/services/in
 import { useArabicLanguage } from '@/services/ArabicLanguageService'
 import { INVENTORY_TEXTS } from '@/i18n/inventory'
 import { getDisplayName } from '@/utils/inventoryDisplay'
-
-function getActiveOrgIdSafe(): string | null {
-  try { return localStorage.getItem('org_id') } catch { return null }
-}
+import { useScopeOptional } from '@/contexts/ScopeContext'
 
 const OnHandPage: React.FC = () => {
   const { t, isRTL } = useArabicLanguage()
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
   const [rows, setRows] = useState<any[]>([])
   const [materials, setMaterials] = useState<MaterialRow[]>([])
   const [locations, setLocations] = useState<InventoryLocationRow[]>([])
@@ -22,7 +21,6 @@ const OnHandPage: React.FC = () => {
   const [qText, setQText] = useState<string>('')
 
   useEffect(() => {
-    const orgId = getActiveOrgIdSafe()
     if (!orgId) return
     setLoading(true)
     Promise.all([
@@ -30,7 +28,7 @@ const OnHandPage: React.FC = () => {
       listMaterials(orgId),
       listInventoryLocations(orgId)
     ]).then(([rowsRes, mats, locs]) => { setRows(rowsRes); setMaterials(mats); setLocations(locs) }).finally(() => setLoading(false))
-  }, [materialId, locationId])
+  }, [orgId, materialId, locationId])
 
   return (
     <Box sx={{ padding: 2, direction: isRTL ? 'rtl' : 'ltr' }}>

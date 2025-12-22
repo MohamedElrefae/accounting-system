@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Card, CardContent, Typography, Grid, TextField, MenuItem, Button, Divider } from '@mui/material'
 import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/hooks/useAuth'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 import { listMaterials, type MaterialRow } from '@/services/inventory/materials'
 import { listInventoryLocations, type InventoryLocationRow } from '@/services/inventory/locations'
 import { createInventoryDocument, addInventoryDocumentLine, approveInventoryDocument, postInventoryDocument, type DocType } from '@/services/inventory/documents'
@@ -12,13 +13,13 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import AsyncAutocomplete, { type AsyncOption } from '@/components/Common/AsyncAutocomplete'
 import DocumentActionsBar from '@/components/Inventory/DocumentActionsBar'
 
-function getActiveOrgIdSafe(): string | null { try { return localStorage.getItem('org_id') } catch { return null } }
-
 const TransferMaterialsPage: React.FC = () => {
   const { showToast } = useToast()
   const { user } = useAuth()
 
-  const [orgId, setOrgId] = useState<string>('')
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
+
   const [materials, setMaterials] = useState<MaterialRow[]>([])
   const [locations, setLocations] = useState<InventoryLocationRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -54,10 +55,10 @@ const TransferMaterialsPage: React.FC = () => {
     .refine(v => v.locationFromId !== v.locationToId, { message: 'From/To cannot be the same location', path: ['locationToId'] })
   type FormValues = z.infer<typeof formSchema>
 
-  const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      orgId: '',
+      orgId: orgId,
       locationFromId: '',
       locationToId: '',
       materialId: '',
@@ -78,7 +79,9 @@ const TransferMaterialsPage: React.FC = () => {
   const unitCost = watch('unitCost')
   const notes = watch('notes')
 
-  useEffect(() => { const v = getActiveOrgIdSafe(); if (v) setOrgId(v) }, [])
+  useEffect(() => {
+    if (orgId) setValue('orgId', orgId, { shouldValidate: false, shouldDirty: false, shouldTouch: false })
+  }, [orgId, setValue])
 
   useEffect(() => {
     (async () => {
@@ -97,9 +100,7 @@ const TransferMaterialsPage: React.FC = () => {
         showToast(e?.message || 'Failed to load lookups', { severity: 'error' })
       } finally { setLoading(false) }
     })()
-  }, [orgId])
-
-  const selectedMaterial = useMemo(() => materials.find(m => m.id === materialId), [materials, materialId])
+  }, [orgId, showToast])
 
   const materialLoader = async (q: string): Promise<AsyncOption<MaterialRow>[]> => {
     const ql = (q || '').toLowerCase()
@@ -116,11 +117,18 @@ const TransferMaterialsPage: React.FC = () => {
 
   const addLine = () => {
     if (!materialId || !uomId || !quantity) { showToast('Select material, UOM and quantity', { severity: 'warning' }); return }
-    setLines(prev => [...prev, { materialId, uomId, quantity, priceSource, unitCost, notes }])
-    setMaterialId(''); setUomId(''); setQuantity(1); setPriceSource('moving_average'); setUnitCost(0); setNotes('')
+    setLines(prev => [...prev, { materialId, uomId, quantity, priceSource, unitCost, notes: notes || '' }])
+    reset({
+      ...watch(),
+      materialId: '',
+      uomId: '',
+      quantity: 1,
+      unitCost: 0,
+      notes: '',
+      priceSource,
+    })
   }
   const removeLine = (idx: number) => setLines(prev => prev.filter((_, i) => i !== idx))
-
 
   const onCreateAndPost = async (values: FormValues) => {
     if (!orgId) { showToast('Select organization first', { severity: 'warning' }); return }
@@ -141,7 +149,6 @@ const TransferMaterialsPage: React.FC = () => {
       let lineNo = 1
       for (const ln of payloads) {
         await addInventoryDocumentLine({
-          id: '' as any,
           org_id: orgId,
           document_id: doc.id,
           line_no: lineNo++,
@@ -157,10 +164,7 @@ const TransferMaterialsPage: React.FC = () => {
           location_id: null,
           lot_id: null,
           serial_id: null,
-          notes: ln.notes,
-          created_at: '' as any,
-          updated_at: '' as any,
-          line_value: 0 as any,
+          notes: ln.notes || null,
         })
       }
       await approveInventoryDocument(orgId, doc.id, user.id)

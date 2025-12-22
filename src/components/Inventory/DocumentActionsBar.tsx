@@ -3,8 +3,7 @@ import { Card, CardContent, Grid, TextField, Button, Typography, MenuItem } from
 import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/hooks/useAuth'
 import { approveInventoryDocument, postInventoryDocument, voidInventoryDocument, getInventoryDocument, listRecentDocuments, type InventoryDocumentSummary, type DocType } from '@/services/inventory/documents'
-
-function getActiveOrgIdSafe(): string | null { try { return localStorage.getItem('org_id') } catch { return null } }
+import { useScopeOptional } from '@/contexts/ScopeContext'
 
 // Lazy permission guard wrapper
 import { RequirePermission } from '@/components/security/RequirePermission'
@@ -16,7 +15,8 @@ const DocumentActionsBar: React.FC = () => {
   const { showToast } = useToast()
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [orgId] = useState<string>(getActiveOrgIdSafe() || '')
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
   const [documentId, setDocumentId] = useState<string>('')
   const [reason, setReason] = useState<string>('')
   const [loading, setLoading] = useState(false)

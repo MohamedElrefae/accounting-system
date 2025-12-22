@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   getUserFontPreferences,
@@ -22,7 +22,7 @@ export const FontPreferencesProvider: React.FC<FontPreferencesProviderProps> = (
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
-  const refreshPreferences = async () => {
+  const refreshPreferences = useCallback(async () => {
     if (!user) {
       setPreferences(null);
       setLoading(false);
@@ -55,9 +55,9 @@ export const FontPreferencesProvider: React.FC<FontPreferencesProviderProps> = (
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  const applyPreferences = (prefs: FontPreferences) => {
+  const applyPreferences = useCallback((prefs: FontPreferences) => {
     setPreferences(prefs);
     applyFontPreferencesToCSS(prefs);
     // Also persist locally so it sticks across reloads if server unavailable
@@ -65,7 +65,7 @@ export const FontPreferencesProvider: React.FC<FontPreferencesProviderProps> = (
       const key = `font_prefs_v1/${prefs.user_id || 'local'}`;
       localStorage.setItem(key, JSON.stringify(prefs));
     } catch {}
-  };
+  }, []);
 
   // Load preferences when user changes
   useEffect(() => {
@@ -89,7 +89,7 @@ export const FontPreferencesProvider: React.FC<FontPreferencesProviderProps> = (
       root.classList.remove('arabic-optimized');
       root.className = root.className.replace(/font-scale-\d+/g, '');
     }
-  }, [user]);
+  }, [user, refreshPreferences]);
 
   // Apply CSS overrides based on font preferences
   useEffect(() => {
@@ -233,7 +233,7 @@ export const FontPreferencesProvider: React.FC<FontPreferencesProviderProps> = (
     error,
     refreshPreferences,
     applyPreferences,
-  }), [preferences, loading, error]);
+  }), [preferences, loading, error, refreshPreferences, applyPreferences]);
 
   return (
     <FontPreferencesContext.Provider value={contextValue}>

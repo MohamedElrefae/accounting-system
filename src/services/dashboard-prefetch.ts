@@ -1,22 +1,21 @@
 import { getCompanyConfig } from './company-config'
 import { getCategoryTotals, type UnifiedFilters } from './reports/unified-financial-query'
-import { getActiveOrgId } from '../utils/org'
 import { supabase } from '../utils/supabase'
 
 // Fire-and-forget prefetch to warm up connections and caches.
-export async function prefetchDashboard(): Promise<void> {
+export async function prefetchDashboard(orgId?: string | null): Promise<void> {
   try {
-    const orgId = getActiveOrgId() || undefined
+    const effectiveOrgId = orgId ?? null
 
     // 1) Company config (currency/format + shortcuts)
-    void getCompanyConfig().catch(() => {})
+    void getCompanyConfig(effectiveOrgId).catch(() => {})
 
     // 2) Unified category totals used for stat cards - SINGLE SOURCE OF TRUTH
     const filters: UnifiedFilters = {
       dateFrom: null,
       dateTo: null,
       postedOnly: false,
-      orgId: orgId || null,
+      orgId: effectiveOrgId,
     }
     void getCategoryTotals(filters).catch(() => {})
 

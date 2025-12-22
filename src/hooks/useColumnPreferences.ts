@@ -169,7 +169,7 @@ export const useColumnPreferences = ({
     }
     loadServer()
     return () => { cancelled = true }
-  }, [userId, serverKey, defaultColumns, savePreferences])
+  }, [userId, serverKey, defaultColumns])
 
   return {
     columns,

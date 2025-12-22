@@ -19,7 +19,6 @@ import {
   FormControlLabel, 
   Box, 
   Typography, 
-  IconButton,
   Tabs,
   Tab,
   List,
@@ -28,8 +27,6 @@ import {
   Chip,
   Stack
 } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
-
 /**
  * Configuration for a single form field
  */
@@ -63,7 +60,6 @@ const FormLayoutSettings: React.FC<FormLayoutSettingsProps> = ({
   onSave,
   onReset,
 }) => {
-  const theme = useTheme();
   const [activeTab, setActiveTab] = useState<number>(0);
   const [draggedField, setDraggedField] = useState<string | null>(null);
   const [dragOverField, setDragOverField] = useState<string | null>(null);

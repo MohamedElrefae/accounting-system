@@ -3,8 +3,9 @@ import { Box, Card, CardContent, Button, Typography, Skeleton, Chip } from '@mui
 import { useNavigate } from 'react-router-dom'
 import { setLandingPreference } from '../services/user-preferences'
 import { supabase } from '../utils/supabase'
-import { getActiveOrgId } from '../utils/org'
 import useAppStore from '../store/useAppStore'
+import { useScopeOptional } from '../contexts/ScopeContext'
+
 import { useHasPermission } from '../hooks/useHasPermission'
 import { getReadMode } from '../config/featureFlags'
 import { useQueryClient } from '@tanstack/react-query'
@@ -21,10 +22,11 @@ interface RecentItem {
 const Welcome: React.FC = () => {
   const navigate = useNavigate()
   const hasPerm = useHasPermission()
-  const { language } = useAppStore()
-  const isAr = language === 'ar'
+  const { demoMode } = useAppStore()
   const t = useI18n()
   const qc = useQueryClient()
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id ?? null
 
   const [recent, setRecent] = React.useState<RecentItem[] | null>(null)
   const [loading, setLoading] = React.useState<boolean>(true)
@@ -38,14 +40,24 @@ const Welcome: React.FC = () => {
       const t = setTimeout(prefetch, 300)
       return () => clearTimeout(t)
     }
-  }, [])
+  }, [qc])
 
   React.useEffect(() => {
     let cancelled = false
     const load = async () => {
       setLoading(true)
       try {
-        const orgId = getActiveOrgId()
+        if (demoMode) {
+          if (!cancelled) {
+            setRecent([
+              { id: 'demo-1', date: '2024-01-20', status: 'posted', amount: 15000 },
+              { id: 'demo-2', date: '2024-01-19', status: 'draft', amount: 8500 },
+              { id: 'demo-3', date: '2024-01-18', status: 'posted', amount: 12000 },
+              { id: 'demo-4', date: '2024-01-17', status: 'posted', amount: -3500 },
+            ])
+          }
+          return
+        }
         const applyScope = (q: any) => (orgId ? q.eq('org_id', orgId) : q)
         const readMode = getReadMode()
         if (readMode !== 'legacy') {
@@ -78,10 +90,11 @@ const Welcome: React.FC = () => {
     }
     void load()
     return () => { cancelled = true }
-  }, [])
+  }, [demoMode, orgId])
 
   const setDefault = async (pref: 'welcome' | 'dashboard') => {
-    await setLandingPreference(pref)
+    if (demoMode) return
+    await setLandingPreference(pref, orgId ?? undefined)
   }
 
   return (

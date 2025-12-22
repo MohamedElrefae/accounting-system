@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import styles from './OrganizationSettings.module.css';
 import { Building2, Hash, Globe, FolderOpen, Settings } from 'lucide-react';
 import { getCompanyConfig, updateCompanyConfig, type CompanyConfig } from '../../services/company-config';
@@ -6,9 +6,11 @@ import { useToast } from '../../contexts/ToastContext';
 import { clearDateFormatCache } from '../../utils/dateHelpers';
 import { getActiveProjects, type Project } from '../../services/projects';
 import { getOrganizations, type Organization } from '../../services/organization';
-import { setActiveOrgId, setActiveProjectId } from '../../utils/org';
+import { useScopeOptional } from '../../contexts/ScopeContext';
 
 const OrganizationSettings: React.FC = () => {
+  const scope = useScopeOptional();
+  const orgId = scope?.currentOrg?.id ?? null;
   const [config, setConfig] = useState<CompanyConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -32,12 +34,10 @@ const OrganizationSettings: React.FC = () => {
 
   const { showToast } = useToast();
 
-  useEffect(() => { void loadConfig(); }, []);
-
-  const loadConfig = async () => {
+  const loadConfig = useCallback(async () => {
     try {
       const [currentConfig, projectsList, orgsList] = await Promise.all([
-        getCompanyConfig(),
+        getCompanyConfig(orgId),
         getActiveProjects().catch(() => []),
         getOrganizations().catch(() => [])
       ]);
@@ -64,20 +64,22 @@ const OrganizationSettings: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [orgId, showToast]);
+
+  useEffect(() => { void loadConfig(); }, [loadConfig]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!config) return;
     setSaving(true);
     try {
-      await updateCompanyConfig({ ...formData } as any);
+      await updateCompanyConfig({ ...formData } as any, orgId);
       clearDateFormatCache();
-      // Apply defaults to local storage immediately
-      try {
-        setActiveOrgId(formData.default_org_id || null);
-        setActiveProjectId(formData.default_project_id || null);
-      } catch {}
+      // Apply defaults to scope immediately
+      if (scope) {
+        await scope.setOrganization(formData.default_org_id || null);
+        await scope.setProject(formData.default_project_id || null);
+      }
       showToast('تم حفظ الإعدادات بنجاح', { severity: 'success' });
       await loadConfig();
     } catch {

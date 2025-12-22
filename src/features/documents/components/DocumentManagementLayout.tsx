@@ -97,8 +97,6 @@ const DocumentManagementLayout: React.FC<DocumentManagementLayoutProps> = ({
   onOpenDocumentPermissions,
   onLinkToCurrentProject,
   currentPage = 1,
-  pageSize = 20,
-  onPageChange,
   error,
 }) => {
   // Helper function to format file size

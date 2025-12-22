@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Box, Button, Divider, Stack, TextField, Typography, styled, FormControlLabel, Checkbox, Switch } from '@mui/material';
 import { useParams } from 'react-router-dom';
 import { useToast } from '../../../contexts/ToastContext';
@@ -22,21 +22,22 @@ export default function TemplateViewer() {
   const [autoPreview, setAutoPreview] = useState(true);
   const [continuous, setContinuous] = useState(true);
 
+  const load = useCallback(async () => {
+    if (!id) return;
+    try {
+      const t = await tpl.getTemplate(id);
+      setTemplate(t);
+    } catch (e:any) {
+      showToast(e?.message || 'Failed to load template', { severity: 'error' });
+    }
+  }, [id, showToast]);
+
   useEffect(()=>{
-    const load = async () => {
-      if (!id) return;
-      try {
-        const t = await tpl.getTemplate(id);
-        setTemplate(t);
-      } catch (e:any) {
-        showToast(e?.message || 'Failed to load template', { severity: 'error' });
-      }
-    };
     load();
     return () => { if (previewUrl) URL.revokeObjectURL(previewUrl); };
-  }, [id]);
+  }, [load, previewUrl]);
 
-  const generatePreview = async () => {
+  const generatePreview = useCallback(async () => {
     if (!template) return;
     try {
       const payload = JSON.parse(data || '{}');
@@ -47,7 +48,7 @@ export default function TemplateViewer() {
     } catch (e:any) {
       showToast(e?.message || 'Failed to generate preview', { severity: 'error' });
     }
-  };
+  }, [data, previewUrl, showToast, template]);
 
   const contentPretty = useMemo(()=> JSON.stringify(template?.content ?? {}, null, 2), [template?.content]);
 
@@ -55,7 +56,7 @@ export default function TemplateViewer() {
     if (!autoPreview) return;
     const t = setTimeout(() => { generatePreview(); }, 600);
     return () => clearTimeout(t);
-  }, [data, autoPreview]);
+  }, [data, autoPreview, generatePreview]);
 
   return (
     <Root>

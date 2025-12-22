@@ -5,10 +5,13 @@ import UnifiedTransactionDetailsPanel from '@/components/Transactions/UnifiedTra
 import EnhancedLineApprovalManager from '@/components/Approvals/EnhancedLineApprovalManager'
 import { findInventoryDocumentByTransaction, listInventoryPostingsByTransaction, listMovementsByDocument, listTransactionsLinkedToDocuments, type InventoryPostingLink } from '@/services/inventory/documents'
 import { getTransactionById, getTransactionAudit, getUserDisplayMap, type TransactionRecord, getAccounts, getProjects } from '@/services/transactions'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 
 const TransactionDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id ?? null
 
   const [loading, setLoading] = useState(true)
   const [tx, setTx] = useState<TransactionRecord | null>(null)
@@ -79,7 +82,7 @@ const TransactionDetailsPage: React.FC = () => {
         const [txRow, auditRows, acct, proj] = await Promise.all([
           getTransactionById(id),
           getTransactionAudit(id),
-          getAccounts(),
+          getAccounts(orgId),
           getProjects(),
         ])
         if (!mounted) return
@@ -126,7 +129,7 @@ const TransactionDetailsPage: React.FC = () => {
     }
     load()
     return () => { mounted = false }
-  }, [id])
+  }, [id, orgId])
 
   const handleClose = () => navigate(-1)
 

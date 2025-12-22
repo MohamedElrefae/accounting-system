@@ -5,7 +5,7 @@
 import React from 'react'
 import { MenuItem, TextField, Skeleton, Alert, Chip, Box } from '@mui/material'
 import { useFiscalPeriods } from '@/services/fiscal'
-import { getActiveOrgId } from '@/utils/org'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 
 export interface FiscalPeriodSelectorProps {
   orgId?: string | null
@@ -36,7 +36,8 @@ export const FiscalPeriodSelector: React.FC<FiscalPeriodSelectorProps> = ({
   disabled = false,
   sx,
 }) => {
-  const effectiveOrgId = orgId ?? getActiveOrgId()
+  const scope = useScopeOptional()
+  const effectiveOrgId = orgId ?? scope?.currentOrg?.id ?? null
 
   // Use the new unified hook
   const { data: periods, isLoading, error } = useFiscalPeriods(effectiveOrgId, fiscalYearId)
@@ -59,7 +60,7 @@ export const FiscalPeriodSelector: React.FC<FiscalPeriodSelectorProps> = ({
     if (value !== undefined && value !== selected) {
       setSelected(value || '')
     }
-  }, [value])
+  }, [value, selected])
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const id = event.target.value

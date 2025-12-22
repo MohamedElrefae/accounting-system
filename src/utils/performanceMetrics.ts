@@ -42,7 +42,7 @@ class PerformanceTracker {
   private getWarnThresholdMs(name: string): number {
     const tier = this.getNetworkTier();
     if (name === 'largest_contentful_paint') {
-      return tier === 'slow' ? 12000 : tier === 'medium' ? 6000 : 3500;
+      return tier === 'slow' ? 20000 : tier === 'medium' ? 15000 : 10000;
     }
     if (name === 'first_contentful_paint' || name === 'first_paint') {
       return tier === 'slow' ? 9000 : tier === 'medium' ? 5000 : 4000;

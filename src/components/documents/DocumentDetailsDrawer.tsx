@@ -84,7 +84,7 @@ export default function DocumentDetailsDrawer({ open, onClose, document }: Docum
       setDescInput((document as any).description || '');
       setEditMode(false);
     }
-  }, [document?.id]);
+  }, [document]);
 
   // Load category and project labels
   useEffect(() => {
@@ -116,7 +116,7 @@ export default function DocumentDetailsDrawer({ open, onClose, document }: Docum
       setCompareA(null);
       setCompareB(null);
     }
-  }, [document?.id, versions?.length]);
+  }, [document?.id, versions]);
 
   // Load compare URLs/text where possible
   useEffect(() => {
@@ -150,7 +150,7 @@ export default function DocumentDetailsDrawer({ open, onClose, document }: Docum
         setCompareBText(null);
       }
     })();
-  }, [compareA?.id, compareA?.storage_path, compareA?.mime_type, compareB?.id, compareB?.storage_path, compareB?.mime_type]);
+  }, [compareA, compareB]);
 
   // Preview selected version (falls back to latest)
   useEffect(() => {
@@ -228,7 +228,7 @@ export default function DocumentDetailsDrawer({ open, onClose, document }: Docum
     if (!document) return;
     try {
       setSaving(true);
-      const updated = await svc.updateDocument(document.id, { title: titleInput, description: descInput } as any);
+      await svc.updateDocument(document.id, { title: titleInput, description: descInput } as any);
       showToast('Document updated', { severity: 'success' });
       setEditMode(false);
       await qc.refetchQueries({ queryKey: ['documents'], type: 'active' });

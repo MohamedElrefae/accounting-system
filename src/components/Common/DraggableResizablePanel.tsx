@@ -88,8 +88,6 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
     // Allow left mouse button only (when button is available); some environments may not set button on mousedown
     if (typeof e.button === 'number' && e.button !== 0) return;
     const targetEl = e.target as HTMLElement;
-    // If clicking inside actions area (buttons etc.), don't start a drag
-    if (targetEl?.closest(`.${styles.actions}`)) return;
     // Also ignore direct interactive elements just in case
     if (targetEl?.closest('button, a, input, textarea, select, [role="button"]')) return;
 
@@ -176,6 +174,24 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
     } catch {}
   }, []);
 
+  // Safety: if the panel gets closed while a drag/resize is in-progress, ensure we reset the transient UI state.
+  useEffect(() => {
+    if (!isOpen) {
+      handleMouseUp();
+    }
+  }, [isOpen, handleMouseUp]);
+
+  // If the mouse leaves the browser window during an active drag/resize, we may never receive a mouseup.
+  // This can leave the UI in a stuck "grabbing" state. Treat a window-level mouseout as a cancel.
+  const handleWindowMouseOut = useCallback((e: MouseEvent) => {
+    if (!isDragging && !isResizing) return;
+    // relatedTarget is null when leaving the window/document
+    const related = (e as any).relatedTarget as Node | null | undefined;
+    if (!related) {
+      handleMouseUp();
+    }
+  }, [handleMouseUp, isDragging, isResizing]);
+
   // Touch handlers (support drag/resize on touch devices)
   const handleTouchStart: React.TouchEventHandler<HTMLDivElement> = (e) => {
     if (isMaximized || isDocked) {
@@ -235,6 +251,11 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
     if (isDragging || isResizing) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('pointerup', handleMouseUp);
+      window.addEventListener('pointercancel', handleMouseUp);
+      window.addEventListener('blur', handleMouseUp);
+      window.addEventListener('mouseout', handleWindowMouseOut);
       // Touch support
       document.addEventListener('touchmove', handleTouchMove, { passive: false });
       document.addEventListener('touchend', handleTouchEnd);
@@ -242,18 +263,26 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
       return () => {
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
+        window.removeEventListener('mouseup', handleMouseUp);
+        window.removeEventListener('pointerup', handleMouseUp);
+        window.removeEventListener('pointercancel', handleMouseUp);
+        window.removeEventListener('blur', handleMouseUp);
+        window.removeEventListener('mouseout', handleWindowMouseOut);
+        // Touch support
         document.removeEventListener('touchmove', handleTouchMove as any);
         document.removeEventListener('touchend', handleTouchEnd as any);
       };
     }
     return undefined;
-  }, [isDragging, isResizing, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
+  }, [isDragging, isResizing, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd, handleWindowMouseOut]);
 
   // Keyboard escape hatch: ESC resets layout (undock/unmaximize + reset position)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!isOpen) return;
       if (e.key === 'Escape') {
+        // Cancel any in-progress drag/resize first so the UI doesn't get stuck
+        handleMouseUp();
         onResetPosition();
         try {
           document.body.style.userSelect = '';
@@ -263,7 +292,7 @@ const DraggableResizablePanel: React.FC<DraggableResizablePanelProps> = ({
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [isOpen, onResetPosition]);
+  }, [isOpen, onResetPosition, handleMouseUp]);
 
   // Calculate panel style based on state
   const getPanelStyle = (): React.CSSProperties => {

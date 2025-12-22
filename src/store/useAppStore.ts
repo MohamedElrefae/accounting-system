@@ -8,6 +8,7 @@ const useAppStore = create<AppStore>()(
       // Initial state
       language: 'ar',
       theme: 'dark',
+      demoMode: false,
       sidebarCollapsed: false,
       notifications: [],
       companyName: 'Accounting Pro',
@@ -22,6 +23,13 @@ const useAppStore = create<AppStore>()(
       },
 
       setTheme: (theme: ThemeMode) => set({ theme }),
+
+      setDemoMode: (demoMode: boolean) => set({ demoMode }),
+
+      toggleDemoMode: () => {
+        const { demoMode } = get()
+        set({ demoMode: !demoMode })
+      },
 
       setSidebarCollapsed: (sidebarCollapsed: boolean) => set({ sidebarCollapsed }),
 
@@ -59,6 +67,7 @@ const useAppStore = create<AppStore>()(
       partialize: (state) => ({
         language: state.language,
         theme: state.theme,
+        demoMode: state.demoMode,
         sidebarCollapsed: state.sidebarCollapsed,
         notifications: state.notifications,
         companyName: state.companyName,

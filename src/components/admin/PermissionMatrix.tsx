@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Box,
   Dialog,
@@ -93,13 +93,7 @@ export const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
   const [showEffectiveOnly, setShowEffectiveOnly] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  useEffect(() => {
-    if (open && userId) {
-      loadPermissions();
-    }
-  }, [open, userId]);
-
-  const loadPermissions = async () => {
+  const loadPermissions = useCallback(async () => {
     try {
       setLoading(true);
       setPendingChanges(new Map());
@@ -221,7 +215,7 @@ export const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
   const handlePermissionToggle = (permissionName: string) => {
     const currentState = permissionStates.get(permissionName);

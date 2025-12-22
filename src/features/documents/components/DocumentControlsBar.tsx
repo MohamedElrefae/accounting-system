@@ -17,12 +17,9 @@ import {
 } from '@mui/material';
 import {
   Search as SearchIcon,
-  Upload as UploadIcon,
   Add as AddIcon,
   CloudUpload as CloudUploadIcon,
-  GetApp as ExportIcon,
   MoreVert as MoreVertIcon,
-  FilterList as FilterIcon,
   Close as CloseIcon,
   Tune as TuneIcon,
   Download as DownloadIcon,
@@ -31,7 +28,6 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
-  Plus,
 } from 'lucide-react';
 
 // Temporarily use plain MUI components

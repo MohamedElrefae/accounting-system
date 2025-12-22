@@ -83,7 +83,7 @@ const TransactionLinesTable: React.FC<TransactionLinesTableProps> = ({
       console.warn('TransactionLinesTable: lines prop is undefined or not an array', lines)
       return []
     }
-    
+
     const accLabel = (line: any) => {
       // Use enriched data from v_transaction_lines_enriched view
       // which includes account_code, account_name, and account_name_ar

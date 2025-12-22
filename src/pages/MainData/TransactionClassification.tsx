@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ExportButtons from '../../components/Common/ExportButtons';
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport';
 import './AccountsTree.css'; // Reuse the same CSS for consistency
@@ -14,6 +14,7 @@ import {
   deleteTransactionClassification,
   getNextTransactionClassificationCode,
 } from '../../services/transaction-classification';
+import { useScopeOptional } from '../../contexts/ScopeContext';
 
 interface TransactionClassificationItem {
   id: string;
@@ -25,16 +26,10 @@ interface TransactionClassificationItem {
   updated_at: string;
 }
 
-async function getInitialOrgId(): Promise<string> {
-  try {
-    const { getActiveOrgId } = await import('../../utils/org');
-    const v = getActiveOrgId?.();
-    if (v && v.length > 0) return v;
-  } catch {}
-  return '';
-}
-
 const TransactionClassificationPage: React.FC = () => {
+  const { showToast } = useToast()
+  const scope = useScopeOptional()
+  const initialOrgId = scope?.currentOrg?.id || ''
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'code' | 'name'>('code');
   const [classifications, setClassifications] = useState<TransactionClassificationItem[]>([]);
@@ -133,36 +128,22 @@ const TransactionClassificationPage: React.FC = () => {
     return createTransactionClassificationFormConfig(dialogMode === 'edit', existing);
   }, [dialogMode, draft]);
 
-  const { showToast } = useToast();
-
   useEffect(() => {
     // Load organizations first
     (async () => {
       try {
         const orgs = await getOrganizations();
         setOrganizations(orgs.map(o => ({ id: o.id, code: o.code, name: o.name })));
-        const initialOrgId = await getInitialOrgId();
-        if (!orgId && !initialOrgId && orgs.length > 0) {
-          const first = orgs[0].id;
-          setOrgId(first);
-          try {
-            const { setActiveOrgId } = await import('../../utils/org');
-            setActiveOrgId?.(first);
-          } catch {}
-        } else if (initialOrgId && initialOrgId !== orgId) {
-          setOrgId(initialOrgId);
-        }
+        setOrgId(prev => {
+          if (initialOrgId && prev !== initialOrgId) return initialOrgId;
+          if (!prev && !initialOrgId && orgs.length > 0) return orgs[0].id;
+          return prev;
+        });
       } catch {}
     })();
-  }, []);
+  }, [initialOrgId]);
 
-  useEffect(() => {
-    // When org changes, reload classifications
-    if (!orgId) return;
-    loadClassifications().catch(() => {});
-  }, [orgId]);
-
-  async function loadClassifications() {
+  const loadClassifications = useCallback(async () => {
     setLoading(true);
     if (!orgId) { 
       setLoading(false); 
@@ -178,7 +159,13 @@ const TransactionClassificationPage: React.FC = () => {
     }
     
     setLoading(false);
-  }
+  }, [orgId, showToast]);
+
+  useEffect(() => {
+    // When org changes, reload classifications
+    if (!orgId) return;
+    loadClassifications().catch(() => {});
+  }, [orgId, loadClassifications]);
 
   // Action handlers
   const handleEdit = (item: TransactionClassificationItem) => {
@@ -306,12 +293,6 @@ const TransactionClassificationPage: React.FC = () => {
           {/* Organization selector */}
           <select value={orgId} onChange={(e) => {
             setOrgId(e.target.value);
-            (async () => {
-              try {
-                const { setActiveOrgId } = await import('../../utils/org');
-                setActiveOrgId?.(e.target.value);
-              } catch {}
-            })()
           }} className="filter-select">
             <option value="">اختر المؤسسة</option>
             {organizations.map(o => (

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { ChevronDown, X, Search } from 'lucide-react';
 import styles from './SearchableSelect.module.css';
 
@@ -363,7 +363,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
     return text.includes(term.toLowerCase());
   };
   type TreeFlat = SearchableSelectOption & { __depth: number; __isParent: boolean };
-  const buildTreeVisible = (
+  const buildTreeVisible = useCallback((
     opts: SearchableSelectOption[],
     depth: number,
     out: TreeFlat[],
@@ -392,12 +392,13 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
         }
       }
     }
-  };
-  const treeFlat: TreeFlat[] = React.useMemo(() => {
+  }, [treeExpanded]);
+
+  const treeFlat: TreeFlat[] = useMemo(() => {
     const list: TreeFlat[] = [];
     buildTreeVisible(treeData, 0, list, treeSearchTerm);
     return list;
-  }, [treeData, treeExpanded, treeSearchTerm]);
+  }, [treeData, treeSearchTerm, buildTreeVisible]);
 
   return (
     <div

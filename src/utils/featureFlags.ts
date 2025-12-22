@@ -95,7 +95,9 @@ export class FeatureFlags {
     this.saveToStorage();
     this.notifyListeners();
     
-    console.log(`[FeatureFlags] ${flag} = ${enabled}`);
+    if (import.meta.env.DEV) {
+      console.log(`[FeatureFlags] ${flag} = ${enabled}`);
+    }
   }
   
   /**
@@ -123,7 +125,9 @@ export class FeatureFlags {
     this.flags = { ...DEFAULT_FLAGS };
     this.saveToStorage();
     this.notifyListeners();
-    console.log('[FeatureFlags] Reset to default configuration');
+    if (import.meta.env.DEV) {
+      console.log('[FeatureFlags] Reset to default configuration');
+    }
   }
   
   /**
@@ -163,7 +167,9 @@ export class FeatureFlags {
         
         // Validate structure
         if (this.isValidFlagConfig(parsed)) {
-          console.log('[FeatureFlags] Loaded from storage');
+          if (import.meta.env.DEV) {
+            console.log('[FeatureFlags] Loaded from storage');
+          }
           return parsed;
         }
       }

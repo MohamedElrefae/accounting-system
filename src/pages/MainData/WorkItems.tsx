@@ -3,6 +3,7 @@ import styles from './WorkItems.module.css'
 import { getOrganizations, type Organization } from '../../services/organization'
 import { getActiveProjects, type Project } from '../../services/projects'
 import { useToast } from '../../contexts/ToastContext'
+import { useScopeOptional } from '../../contexts/ScopeContext'
 import WorkItemsTree from '../../components/WorkItems/WorkItemsTree'
 import type { WorkItemRow, WorkItemTreeNode } from '../../types/work-items'
 import { listWorkItemsUnion, listWorkItemsAll, buildTreeFromUnion, createWorkItem, updateWorkItem, deleteWorkItem, toggleWorkItemActive, suggestWorkItemCode } from '../../services/work-items'
@@ -10,28 +11,13 @@ import * as XLSX from 'xlsx'
 import SearchableSelect, { type SearchableSelectOption } from '../../components/Common/SearchableSelect'
 import DraggableResizablePanel from '../../components/Common/DraggableResizablePanel'
 
-const getInitialOrgId = async (): Promise<string> => {
-  try {
-    const { getActiveOrgId } = await import('../../utils/org')
-    return getActiveOrgId?.() || ''
-  } catch {
-    return ''
-  }
-}
-
-const getInitialProjectId = async (): Promise<string> => {
-  try {
-    const { getActiveProjectId } = await import('../../utils/org')
-    return getActiveProjectId?.() || ''
-  } catch {
-    return ''
-  }
-}
-
 const MAX_LEVEL = 5
 
 const WorkItemsPage: React.FC = () => {
   const { showToast } = useToast()
+  const scope = useScopeOptional()
+  const initialOrgId = scope?.currentOrg?.id || ''
+  const initialProjectId = scope?.currentProject?.id || ''
   const [orgs, setOrgs] = useState<Organization[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [orgId, setOrgId] = useState<string>('')
@@ -99,42 +85,31 @@ const WorkItemsPage: React.FC = () => {
     (async () => {
       setLoading(true)
       try {
-        const [o, p, initialOrgId, initialProjectId] = await Promise.all([
-          getOrganizations().catch(() => []),
-          getActiveProjects().catch(() => []),
-          getInitialOrgId(),
-          getInitialProjectId()
-        ])
-        setOrgs(o)
-        setProjects(p)
-        const chosenOrg = orgId || initialOrgId || o[0]?.id || ''
-        if (chosenOrg !== orgId) setOrgId(chosenOrg)
-        const chosenProject = projectId || initialProjectId || ''
-        setProjectId(chosenProject)
-        if (chosenOrg) {
-          const list = (!chosenProject)
-            ? await listWorkItemsAll(chosenOrg, true)
-            : await listWorkItemsUnion(chosenOrg, chosenProject || null, true)
-          setItems(list)
-        }
-      } catch (e: unknown) {
-        showToast((e as Error).message || 'Failed to load work items', { severity: 'error' })
+        const orgList = await getOrganizations().catch(() => [])
+        setOrgs(orgList)
+        const chosenOrg = initialOrgId || orgList[0]?.id || ''
+        setOrgId(prev => prev || chosenOrg)
+        const projs = await getActiveProjects().catch(() => [])
+        setProjects(projs)
+        const chosenProject = initialProjectId || (projs.length > 0 ? projs[0].id : '')
+        setProjectId(prev => prev || chosenProject)
       } finally {
         setLoading(false)
       }
     })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [initialOrgId, initialProjectId])
 
-  const reload = async (org: string, project: string | null) => {
+  const reload = async () => {
     setLoading(true)
     try {
-      const list = (!project)
-        ? await listWorkItemsAll(org, true)
-        : await listWorkItemsUnion(org, project, true)
+      const chosenOrg = orgId
+      const chosenProject = projectId
+      const list = (!chosenProject)
+        ? await listWorkItemsAll(chosenOrg, true)
+        : await listWorkItemsUnion(chosenOrg, chosenProject || null, true)
       setItems(list)
     } catch (e: unknown) {
-      showToast((e as Error).message || 'Failed to reload work items', { severity: 'error' })
+      showToast((e as Error).message || 'Failed to load work items', { severity: 'error' })
     } finally {
       setLoading(false)
     }
@@ -145,7 +120,6 @@ const WorkItemsPage: React.FC = () => {
     const q = search.toLowerCase()
     return items.filter(r => r.code.toLowerCase().includes(q) || (r.name_ar || r.name).toLowerCase().includes(q))
   }, [items, search])
-
 
   // Helper: make a safe code segment from a name (simple slug)
   const makeCodeSegment = (s: string) => {
@@ -230,7 +204,7 @@ const WorkItemsPage: React.FC = () => {
     if (depth > MAX_LEVEL) { showToast(`الحد الأقصى للمستويات هو ${MAX_LEVEL}`, { severity: 'warning' }); return }
     try {
       if (editingId) {
-        const updated = await updateWorkItem(editingId, {
+        await updateWorkItem(editingId, {
           code: form.code,
           name: form.name,
           name_ar: form.name_ar || null,
@@ -239,12 +213,12 @@ const WorkItemsPage: React.FC = () => {
           is_active: form.is_active,
         })
         showToast('تم التحديث', { severity: 'success' })
-        await reload(updated.org_id, updated.project_id)
+        await reload()
       } else {
         // Enforce: child project must match parent's project (or both null)
         const parentScope = parentId ? (items.find(r => r.id === parentId)?.project_id ?? null) : null
         const effectiveProjectId = (parentScope !== null) ? parentScope : (formProjectId || null)
-        const created = await createWorkItem({
+        await createWorkItem({
           org_id: formOrgId,
           project_id: effectiveProjectId,
           parent_id: parentId || null,
@@ -256,7 +230,7 @@ const WorkItemsPage: React.FC = () => {
           is_active: form.is_active,
         })
         showToast('تم الإنشاء', { severity: 'success' })
-        await reload(created.org_id, created.project_id)
+        await reload()
       }
       setDialogOpen(false)
     } catch (e: unknown) {
@@ -268,7 +242,7 @@ const WorkItemsPage: React.FC = () => {
     try {
       await toggleWorkItemActive(row.id, !row.is_active, row.org_id, row.project_id)
       showToast(row.is_active ? 'تم التعطيل' : 'تم التفعيل', { severity: 'success' })
-      await reload(row.org_id, row.project_id)
+      await reload()
     } catch (e: unknown) {
       showToast((e as Error).message || 'فشل تغيير الحالة', { severity: 'error' })
     }
@@ -448,7 +422,7 @@ const WorkItemsPage: React.FC = () => {
       }
 
       showToast(`تم الاستيراد: ${inserted} مضافة، ${updated} محدثة، ${failed} فاشلة`, { severity: failed ? 'warning' : 'success' })
-      await reload(orgId, projectId || null)
+      await reload()
     } catch (err: any) {
       console.error(err)
       showToast(err.message || 'فشل استيراد الملف', { severity: 'error' })
@@ -512,7 +486,7 @@ const WorkItemsPage: React.FC = () => {
     try {
       await deleteWorkItem(row.id, row.org_id, row.project_id)
       showToast('تم الحذف', { severity: 'success' })
-      await reload(row.org_id, row.project_id)
+      await reload()
     } catch (e: unknown) {
       showToast((e as Error).message || 'فشل الحذف', { severity: 'error' })
     }
@@ -526,16 +500,10 @@ const WorkItemsPage: React.FC = () => {
           <select
             className={`${styles.select}`}
             value={orgId}
-            onChange={(e) => {
+            onChange={async (e) => {
               const v = String(e.target.value)
               setOrgId(v)
-              ;(async () => {
-                try {
-                  const { setActiveOrgId } = await import('../../utils/org')
-                  setActiveOrgId?.(v)
-                } catch {}
-                await reload(v, projectId || null)
-              })()
+              await reload()
             }}
           >
             <option value="">اختر المؤسسة</option>
@@ -546,16 +514,10 @@ const WorkItemsPage: React.FC = () => {
           <select
             className={`${styles.select}`}
             value={projectId}
-            onChange={(e) => {
+            onChange={async (e) => {
               const v = String(e.target.value)
               setProjectId(v)
-              ;(async () => {
-                try {
-                  const { setActiveProjectId } = await import('../../utils/org')
-                  setActiveProjectId?.(v)
-                } catch {}
-                await reload(orgId, v || null)
-              })()
+              await reload()
             }}
           >
             <option value="">بدون مشروع (كتالوج المؤسسة)</option>

@@ -60,7 +60,7 @@ const TransactionsHeaderTable: React.FC<TransactionsHeaderTableProps> = ({
       entry_date: t.entry_date,
       description: t.description,
       line_items_count: Number((t as any).line_items_count ?? 0),
-      line_items_total: Number((t as any).line_items_total ?? (Math.max(Number((t as any).total_debits ?? 0), Number((t as any).total_credits ?? 0)))),
+      line_items_total: Number((t as any).line_items_total ?? 0),
       total_debits: Number((t as any).total_debits ?? 0),
       total_credits: Number((t as any).total_credits ?? 0),
       organization_name: organizations.find(o => o.id === (t.org_id || ''))?.name || '—',

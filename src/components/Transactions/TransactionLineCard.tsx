@@ -1,12 +1,12 @@
 import React, { useState } from 'react'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronRight, Star } from 'lucide-react'
 import AttachDocumentsPanel from '../documents/AttachDocumentsPanel'
 import './TransactionLineCard.css'
 
 export interface TransactionLineCardProps {
     line: any
     lineIndex: number
-    accounts: Array<{ id: string; code: string; name: string }>
+    accounts: Array<{ id: string; code: string; name: string; name_ar?: string }>
     projects: Array<{ id: string; code: string; name: string }>
     costCenters: Array<{ id: string; code: string; name: string }>
     workItems: Array<{ id: string; code: string; name: string }>
@@ -15,6 +15,8 @@ export interface TransactionLineCardProps {
     analysisItemsMap: Record<string, { code: string; name: string }>
     orgId: string
     projectId?: string
+    canReview?: boolean
+    onReview?: () => void
 }
 
 export const TransactionLineCard: React.FC<TransactionLineCardProps> = ({
@@ -28,7 +30,9 @@ export const TransactionLineCard: React.FC<TransactionLineCardProps> = ({
     categories,
     analysisItemsMap,
     orgId,
-    projectId
+    projectId,
+    canReview = false,
+    onReview
 }) => {
     const [isDimensionsExpanded, setIsDimensionsExpanded] = useState(false)
     const [isAttachmentsExpanded, setIsAttachmentsExpanded] = useState(false)
@@ -36,8 +40,14 @@ export const TransactionLineCard: React.FC<TransactionLineCardProps> = ({
     // Helper functions
     const getAccountLabel = (accountId?: string | null) => {
         if (!accountId) return '—'
+        // Try enriched data first
+        if (line.account_code && (line.account_name_ar || line.account_name)) {
+            return `${line.account_code} - ${line.account_name_ar || line.account_name}`
+        }
+
+        // Fallback to lookup
         const account = accounts.find(a => a.id === accountId)
-        return account ? `${account.code} - ${account.name}` : accountId
+        return account ? `${account.code} - ${account.name_ar || account.name}` : accountId
     }
 
     const getProjectLabel = (projectId?: string | null) => {
@@ -98,16 +108,6 @@ export const TransactionLineCard: React.FC<TransactionLineCardProps> = ({
         return <span className={`line-status-badge ${conf.cls}`}>{conf.label}</span>
     }
 
-    // Check if dimensions exist
-    const hasDimensions = !!(
-        line.project_id ||
-        line.cost_center_id ||
-        line.work_item_id ||
-        line.classification_id ||
-        line.sub_tree_id ||
-        line.analysis_work_item_id
-    )
-
     const debitAmount = parseFloat(line.debit_amount || line.debit || 0)
     const creditAmount = parseFloat(line.credit_amount || line.credit || 0)
 
@@ -159,65 +159,73 @@ export const TransactionLineCard: React.FC<TransactionLineCardProps> = ({
                         <span className="attachments-count">{line.documents_count}</span>
                     )}
                 </button>
+
+                {/* Review Action */}
+                {canReview && onReview && (
+                    <button
+                        className="action-toggle review-action"
+                        onClick={onReview}
+                        title="مراجعة هذا السطر"
+                    >
+                        <Star size={16} />
+                        <span>مراجعة</span>
+                    </button>
+                )}
             </div>
 
             {/* Expanded Panels */}
-            {
-                isDimensionsExpanded && (
-                    <div className="line-card-panel">
-                        <div className="dimensions-grid">
-                            {line.project_id && (
-                                <div className="dimension-item">
-                                    <label>المشروع</label>
-                                    <div className="dimension-value">{getProjectLabel(line.project_id)}</div>
-                                </div>
-                            )}
-                            {line.cost_center_id && (
-                                <div className="dimension-item">
-                                    <label>مركز التكلفة</label>
-                                    <div className="dimension-value">{getCostCenterLabel(line.cost_center_id)}</div>
-                                </div>
-                            )}
-                            {line.work_item_id && (
-                                <div className="dimension-item">
-                                    <label>عنصر العمل</label>
-                                    <div className="dimension-value">{getWorkItemLabel(line.work_item_id)}</div>
-                                </div>
-                            )}
-                            {line.classification_id && (
-                                <div className="dimension-item">
-                                    <label>التصنيف</label>
-                                    <div className="dimension-value">{getClassificationLabel(line.classification_id)}</div>
-                                </div>
-                            )}
-                            {line.sub_tree_id && (
-                                <div className="dimension-item">
-                                    <label>الفئة</label>
-                                    <div className="dimension-value">{getCategoryLabel(line.sub_tree_id)}</div>
-                                </div>
-                            )}
-                            {line.analysis_work_item_id && (
-                                <div className="dimension-item">
-                                    <label>عنصر التحليل</label>
-                                    <div className="dimension-value">{getAnalysisWorkItemLabel(line.analysis_work_item_id)}</div>
-                                </div>
-                            )}
-                        </div>
+            {isDimensionsExpanded && (
+                <div className="line-card-panel">
+                    <div className="dimensions-grid">
+                        {line.project_id && (
+                            <div className="dimension-item">
+                                <label>المشروع</label>
+                                <div className="dimension-value">{getProjectLabel(line.project_id)}</div>
+                            </div>
+                        )}
+                        {line.cost_center_id && (
+                            <div className="dimension-item">
+                                <label>مركز التكلفة</label>
+                                <div className="dimension-value">{getCostCenterLabel(line.cost_center_id)}</div>
+                            </div>
+                        )}
+                        {line.work_item_id && (
+                            <div className="dimension-item">
+                                <label>عنصر العمل</label>
+                                <div className="dimension-value">{getWorkItemLabel(line.work_item_id)}</div>
+                            </div>
+                        )}
+                        {line.classification_id && (
+                            <div className="dimension-item">
+                                <label>التصنيف</label>
+                                <div className="dimension-value">{getClassificationLabel(line.classification_id)}</div>
+                            </div>
+                        )}
+                        {line.sub_tree_id && (
+                            <div className="dimension-item">
+                                <label>الفئة</label>
+                                <div className="dimension-value">{getCategoryLabel(line.sub_tree_id)}</div>
+                            </div>
+                        )}
+                        {line.analysis_work_item_id && (
+                            <div className="dimension-item">
+                                <label>عنصر التحليل</label>
+                                <div className="dimension-value">{getAnalysisWorkItemLabel(line.analysis_work_item_id)}</div>
+                            </div>
+                        )}
                     </div>
-                )
-            }
+                </div>
+            )}
 
-            {
-                isAttachmentsExpanded && (
-                    <div className="line-card-panel">
-                        <AttachDocumentsPanel
-                            orgId={orgId}
-                            transactionLineId={line.id}
-                            projectId={projectId}
-                        />
-                    </div>
-                )
-            }
-        </div >
+            {isAttachmentsExpanded && (
+                <div className="line-card-panel">
+                    <AttachDocumentsPanel
+                        orgId={orgId}
+                        transactionLineId={line.id}
+                        projectId={projectId}
+                    />
+                </div>
+            )}
+        </div>
     )
 }

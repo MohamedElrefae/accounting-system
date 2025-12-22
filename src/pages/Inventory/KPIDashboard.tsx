@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Box, Container, Grid, Paper, Stack, Typography } from '@mui/material'
 import { supabase } from '@/utils/supabase'
-import { getActiveOrgId } from '@/utils/org'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 
 interface KPI {
   label: string
@@ -9,7 +9,8 @@ interface KPI {
 }
 
 export default function InventoryKPIDashboardPage() {
-  const orgId = getActiveOrgId?.() || null
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || null
   const [loading, setLoading] = useState(false)
   const [kpis, setKpis] = useState<KPI[]>([
     { label: 'Total Valuation', value: '-' },
@@ -18,7 +19,7 @@ export default function InventoryKPIDashboardPage() {
     { label: 'Last Month Movements (In/Out)', value: '-' }
   ])
 
-  const loadKpis = async () => {
+  const loadKpis = useCallback(async () => {
     if (!orgId) return
     setLoading(true)
     try {
@@ -69,13 +70,13 @@ export default function InventoryKPIDashboardPage() {
       ])
     } catch (e) {
       // fallback values remain '-'
-      console.error('Error loading KPIs', e)
+      if (import.meta.env.DEV) console.error('Error loading KPIs', e)
     } finally {
       setLoading(false)
     }
-  }
+  }, [orgId])
 
-  useEffect(() => { loadKpis() }, [orgId])
+  useEffect(() => { loadKpis() }, [loadKpis])
 
   return (
     <Box sx={{ minHeight: '100vh', py: 3 }}>

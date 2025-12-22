@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useIdleLogout } from './hooks/useIdleLogout';
 import { useAuthPerformance } from './hooks/useAuthPerformance';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import useAppStore from './store/useAppStore';
 import { ArabicLanguageService } from './services/ArabicLanguageService';
 import DashboardLayout from './components/layout/DashboardLayout';
@@ -29,11 +29,10 @@ import { RegisterForm } from './components/auth/RegisterForm';
 import { ForgotPassword } from './components/auth/ForgotPassword';
 import { ResetPassword } from './components/auth/ResetPassword';
 import OptimizedProtectedRoute from './components/routing/OptimizedProtectedRoute';
-import ErrorBoundary from './components/Common/ErrorBoundary';
 
 // Lazy load admin and other specialized routes
-const UserManagementSystem = React.lazy(() => import('./pages/admin/UserManagementSystem'));
-const Profile = React.lazy(() => import('./pages/admin/Profile'));
+const _UserManagementSystem = React.lazy(() => import('./pages/admin/UserManagementSystem'));
+const _Profile = React.lazy(() => import('./pages/admin/Profile'));
 const ProjectAttachmentsPage = React.lazy(() => import('./pages/Projects/ProjectAttachments'));
 const FontSettings = React.lazy(() => import('./components/Settings/FontSettings'));
 

@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Box, Button, Container, Paper, Stack, Typography, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, TextField, Select, InputLabel, FormControl } from '@mui/material'
 import { FilterBar } from '@/components/Common/FilterBar'
 import { DataGrid } from '@mui/x-data-grid'
 import type { GridColDef } from '@mui/x-data-grid'
 import { useNavigate } from 'react-router-dom'
 import { InventoryReportsService, type ValuationRow } from '@/services/inventory/reports'
-import { getActiveOrgId } from '@/utils/org'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 import { MaterialSelect } from '@/components/Inventory/MaterialSelect'
 import { LocationSelect } from '@/components/Inventory/LocationSelect'
 import { ProjectSelect } from '@/components/Inventory/ProjectSelect'
@@ -14,7 +14,8 @@ import { listInventoryLocations, type InventoryLocationRow } from '@/services/in
 import { supabase } from '@/utils/supabase'
 
 export default function InventoryValuationPage() {
-  const orgId = getActiveOrgId?.() || null
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || null
   const navigate = useNavigate()
 const [rows, setRows] = useState<ValuationRow[]>([])
   const [materialFilter, setMaterialFilter] = useState('')
@@ -45,7 +46,7 @@ useEffect(() => {
           orgId ? listInventoryLocations(orgId) : Promise.resolve([])
         ])
         // Fetch detailed last purchase metadata
-        let metaMap: Record<string, { currency: string | null, vendor_id: string | null, at: string | null }> = {}
+        const metaMap: Record<string, { currency: string | null, vendor_id: string | null, at: string | null }> = {}
         if (orgId) {
           try {
             const { data: detailed, error: detailedErr } = await supabase
@@ -60,7 +61,7 @@ useEffect(() => {
             }
           } catch {
             // Costing snapshot view not available
-            console.warn('Costing snapshot view not available')
+            if (import.meta.env.DEV) console.warn('Costing snapshot view not available')
           }
         }
         if (mounted) {
@@ -74,16 +75,16 @@ useEffect(() => {
       }
     })()
     return () => { mounted = false }
-  }, [])
+  }, [orgId])
 
-const openPolicy = (row: any) => {
+const openPolicy = useCallback((row: any) => {
     setSel({ org_id: row.org_id, material_id: row.material_id, location_id: row.location_id, project_id: row.project_id ?? null })
     setPolicyMethod('STANDARD')
     setPolicyMarkup('')
     setPolicyManualCost('')
     setPolicyNote('')
     setPolicyOpen(true)
-  }
+  }, [])
 
   const savePolicy = async () => {
     if (!sel) return
@@ -132,17 +133,15 @@ const openPolicy = (row: any) => {
 
   const columns = useMemo<GridColDef[]>(() => [
     {
-      field: 'material_label', headerName: 'Material', width: 240, valueGetter: (params) => {
-        const r: any = params.row
-        const m = materials.find(mm => mm.id === r.material_id)
-        return m ? `${m.material_code} - ${m.material_name}` : r.material_id
+      field: 'material_label', headerName: 'Material', width: 240, valueGetter: (_value: unknown, row: any) => {
+        const m = materials.find(mm => mm.id === row.material_id)
+        return m ? `${m.material_code} - ${m.material_name}` : row.material_id
       }
     },
     {
-      field: 'location_label', headerName: 'Location', width: 220, valueGetter: (params) => {
-        const r: any = params.row
-        const l = locations.find(ll => ll.id === r.location_id)
-        return l ? `${l.location_code} - ${l.location_name}` : r.location_id
+      field: 'location_label', headerName: 'Location', width: 220, valueGetter: (_value: unknown, row: any) => {
+        const l = locations.find(ll => ll.id === row.location_id)
+        return l ? `${l.location_code} - ${l.location_name}` : row.location_id
       }
     },
     { field: 'project_id', headerName: 'Project', width: 220 },
@@ -170,7 +169,7 @@ const openPolicy = (row: any) => {
         </Stack>
       )
     }}
-  ], [navigate, materials, locations])
+  ], [navigate, materials, locations, lppMetaMap, openPolicy])
 
   return (
     <Box sx={{ minHeight: '100vh', py: 3 }}>
@@ -189,8 +188,8 @@ const headers = ['org_id','material_id','material_label','location_id','location
                     const materialLabel = m ? `${m.material_code} - ${m.material_name}` : ''
                     const locationLabel = l ? `${l.location_code} - ${l.location_name}` : ''
                     const arr = [r.org_id, r.material_id, materialLabel, r.location_id, locationLabel, r.project_id ?? '', r.on_hand_qty, r.method_used, r.last_purchase_unit_cost ?? '', r.effective_unit_cost, r.extended_value]
-                      .map(v => v === null || v === undefined ? '' : String(v).replace(/\"/g,'\"\"'))
-                      .map(v => /,|\"|\n/.test(v) ? `\"${v}` + '\"' : v)
+                      .map(v => v === null || v === undefined ? '' : String(v).replace(/"/g, '""'))
+                      .map(v => /,|"|\n/.test(v) ? `"${v}"` : v)
                     csvRows.push(arr.join(','))
                   })
                   const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' })

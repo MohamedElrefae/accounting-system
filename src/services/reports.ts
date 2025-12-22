@@ -77,13 +77,21 @@ function getMockReportFields(datasetId: string): ReportField[] {
 
 /**
  * Fetch all available report datasets
+ * @param orgId - Optional org ID to filter org-specific datasets (also includes system-wide)
  */
-export async function getReportDatasets(): Promise<ReportDataset[]> {
+export async function getReportDatasets(orgId?: string): Promise<ReportDataset[]> {
   try {
-    const { data, error } = await supabase
-.from('report_datasets')
-          .select('*')
-          .order('name', { ascending: true });
+    let query = supabase
+      .from('report_datasets')
+      .select('*')
+      .order('name', { ascending: true });
+    
+    // Filter: system-wide (org_id IS NULL) OR org-specific
+    if (orgId) {
+      query = query.or(`org_id.is.null,org_id.eq.${orgId}`);
+    }
+    
+    const { data, error } = await query;
 
     if (error) {
       console.error('Database error fetching report datasets:', error);
@@ -108,7 +116,7 @@ export async function getReportDatasets(): Promise<ReportDataset[]> {
           return getMockReportDatasets();
         }
         
-        console.log(`✅ Successfully populated and loaded ${newData.length} datasets from database`);
+        if (import.meta.env.DEV) console.log(`✅ Successfully populated and loaded ${newData.length} datasets from database`);
         // Normalize shape for UI (map base_view/fields to expected props)
         return (newData as any[]).map((row) => normalizeDatasetRow(row));
       } catch (populateError) {
@@ -117,7 +125,7 @@ export async function getReportDatasets(): Promise<ReportDataset[]> {
       }
     }
 
-    console.log(`✅ Loaded ${data.length} datasets from database`);
+    if (import.meta.env.DEV) console.log(`✅ Loaded ${data.length} datasets from database`);
     return (data as any[]).map((row) => normalizeDatasetRow(row));
   } catch (error) {
     console.error('Critical error accessing database:', error);
@@ -130,7 +138,7 @@ export async function getReportDatasets(): Promise<ReportDataset[]> {
  * Get a specific report dataset by ID
  */
 export async function getReportDataset(idOrKey: string): Promise<ReportDataset | null> {
-  console.log('🔍 getReportDataset called with:', idOrKey);
+  if (import.meta.env.DEV) console.log('🔍 getReportDataset called with:', idOrKey);
   
   // Try by id first (UUID format)
   let res = await supabase

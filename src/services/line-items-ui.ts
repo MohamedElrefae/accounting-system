@@ -63,7 +63,7 @@ export class LineItemsUIService {
    */
   async loadRootLineItems(transactionId: string): Promise<LineItemUINode[]> {
     try {
-      console.log('🌳 Loading root line items for transaction:', transactionId)
+      if (import.meta.env.DEV) console.log('🌳 Loading root line items for transaction:', transactionId)
       
       const tree = await transactionLineItemsEnhancedService.getLineItemsTree(transactionId)
       const flatItems = await transactionLineItemsEnhancedService.getLineItemsList(transactionId)
@@ -71,7 +71,7 @@ export class LineItemsUIService {
       // Convert tree nodes to UI nodes
       const rootNodes = tree.filter(node => node.depth === 0).map(node => this.convertToUINode(node, flatItems))
       
-      console.log('✅ Loaded', rootNodes.length, 'root line items')
+      if (import.meta.env.DEV) console.log('✅ Loaded', rootNodes.length, 'root line items')
       return rootNodes
     } catch (error) {
       console.error('❌ Error loading root line items:', error)
@@ -84,7 +84,7 @@ export class LineItemsUIService {
    */
   async loadChildLineItems(transactionId: string, parentCode: string): Promise<LineItemUINode[]> {
     try {
-      console.log('📂 Loading child line items for parent:', parentCode)
+      if (import.meta.env.DEV) console.log('📂 Loading child line items for parent:', parentCode)
       
       const descendants = await transactionLineItemsEnhancedService.getLineItemDescendants(transactionId, parentCode)
       const flatItems = await transactionLineItemsEnhancedService.getLineItemsList(transactionId)
@@ -97,7 +97,7 @@ export class LineItemsUIService {
       
       const childNodes = directChildren.map(child => this.convertToUINode(child, flatItems))
       
-      console.log('✅ Loaded', childNodes.length, 'child line items')
+      if (import.meta.env.DEV) console.log('✅ Loaded', childNodes.length, 'child line items')
       return childNodes
     } catch (error) {
       console.error('❌ Error loading child line items:', error)
@@ -110,7 +110,7 @@ export class LineItemsUIService {
    */
   async createParentLineItem(payload: CreateLineItemPayload): Promise<string> {
     try {
-      console.log('➕ Creating parent line item:', payload.item_name)
+      if (import.meta.env.DEV) console.log('➕ Creating parent line item:', payload.item_name)
 
       const newItem: EditableTxLineItem = {
         line_number: payload.line_number ?? 1,
@@ -129,7 +129,7 @@ export class LineItemsUIService {
 
       await transactionLineItemsEnhancedService.createLineItem(payload.transaction_id, newItem)
 
-      console.log('✅ Created parent line item with code:', newItem.item_code)
+      if (import.meta.env.DEV) console.log('✅ Created parent line item with code:', newItem.item_code)
       return newItem.item_code || ''
     } catch (error) {
       console.error('❌ Error creating parent line item:', error)
@@ -142,7 +142,7 @@ export class LineItemsUIService {
    */
   async createChildLineItem(payload: CreateLineItemPayload): Promise<string> {
     try {
-      console.log('➕ Creating child line item for parent:', payload.parent_code)
+      if (import.meta.env.DEV) console.log('➕ Creating child line item for parent:', payload.parent_code)
       
       if (!payload.parent_code) {
         throw new Error('Parent code is required for child line items')
@@ -177,7 +177,7 @@ export class LineItemsUIService {
         }
       )
 
-      console.log('✅ Created child line item with code:', createdItem.item_code)
+      if (import.meta.env.DEV) console.log('✅ Created child line item with code:', createdItem.item_code)
       return createdItem.item_code || ''
     } catch (error) {
       console.error('❌ Error creating child line item:', error)
@@ -190,7 +190,7 @@ export class LineItemsUIService {
    */
   async updateLineItem(transactionId: string, payload: UpdateLineItemPayload): Promise<boolean> {
     try {
-      console.log('✏️ Updating line item:', payload.id)
+      if (import.meta.env.DEV) console.log('✏️ Updating line item:', payload.id)
       
       const updates: Partial<EditableTxLineItem> = {
         item_code: payload.item_code,
@@ -211,7 +211,7 @@ export class LineItemsUIService {
       
       await transactionLineItemsEnhancedService.updateLineItem(transactionId, payload.id, updates)
       
-      console.log('✅ Updated line item successfully')
+      if (import.meta.env.DEV) console.log('✅ Updated line item successfully')
       return true
     } catch (error) {
       console.error('❌ Error updating line item:', error)
@@ -224,7 +224,7 @@ export class LineItemsUIService {
    */
   async toggleLineItemStatus(transactionId: string, itemId: string): Promise<boolean> {
     try {
-      console.log('🔄 Toggling line item status:', itemId)
+      if (import.meta.env.DEV) console.log('🔄 Toggling line item status:', itemId)
       
       // Get current item to check status
       const items = await transactionLineItemsEnhancedService.getLineItemsList(transactionId)
@@ -245,7 +245,7 @@ export class LineItemsUIService {
         item_name_ar: newName
       })
       
-      console.log('✅ Toggled line item status')
+      if (import.meta.env.DEV) console.log('✅ Toggled line item status')
       return !currentlyActive
     } catch (error) {
       console.error('❌ Error toggling line item status:', error)
@@ -258,7 +258,7 @@ export class LineItemsUIService {
    */
   async deleteLineItem(transactionId: string, itemId: string): Promise<boolean> {
     try {
-      console.log('🗑️ Deleting line item:', itemId)
+      if (import.meta.env.DEV) console.log('🗑️ Deleting line item:', itemId)
       
       // Check if item has children
       const items = await transactionLineItemsEnhancedService.getLineItemsList(transactionId)
@@ -280,7 +280,7 @@ export class LineItemsUIService {
       
       const result = await transactionLineItemsEnhancedService.deleteLineItem(transactionId, itemId)
       
-      console.log('✅ Deleted line item successfully')
+      if (import.meta.env.DEV) console.log('✅ Deleted line item successfully')
       return result
     } catch (error) {
       console.error('❌ Error deleting line item:', error)
@@ -325,7 +325,7 @@ export class LineItemsUIService {
     searchTerm: string
   ): Promise<LineItemUINode[]> {
     try {
-      console.log('🔍 Searching line items:', searchTerm)
+      if (import.meta.env.DEV) console.log('🔍 Searching line items:', searchTerm)
       
       const items = await transactionLineItemsEnhancedService.getLineItemsList(transactionId)
       const term = searchTerm.toLowerCase()
@@ -338,7 +338,7 @@ export class LineItemsUIService {
       
       const uiNodes = matches.map(item => this.convertToUINode(item, items))
       
-      console.log('✅ Found', uiNodes.length, 'matching line items')
+      if (import.meta.env.DEV) console.log('✅ Found', uiNodes.length, 'matching line items')
       return uiNodes
     } catch (error) {
       console.error('❌ Error searching line items:', error)

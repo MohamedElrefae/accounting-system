@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+
 import { Box, Button, Container, Paper, Stack, Typography, Tooltip } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import type { GridColDef } from '@mui/x-data-grid'
 import { supabase } from '@/utils/supabase'
-import { getActiveOrgId } from '@/utils/org'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 import { ProjectSelect } from '@/components/Inventory/ProjectSelect'
 import '@/styles/print.css'
 
@@ -17,12 +18,14 @@ interface Row {
 }
 
 export default function ValuationByProjectPage() {
-  const orgId = getActiveOrgId?.() || null
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || null
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(false)
   const [projectId, setProjectId] = useState('')
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    if (!orgId) return
     setLoading(true)
     try {
       let query = supabase
@@ -36,9 +39,9 @@ export default function ValuationByProjectPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [orgId, projectId])
 
-  useEffect(() => { if (orgId) fetchData() }, [orgId])
+  useEffect(() => { if (orgId) fetchData() }, [orgId, fetchData])
 
   const columns = useMemo<GridColDef[]>(() => [
     { field: 'project_code', headerName: 'Project', width: 160 },

@@ -27,7 +27,11 @@ interface LineReviewData {
   account_name: string
   account_name_ar?: string
   org_id?: string
+  org_name?: string
+  org_name_ar?: string
   project_id?: string
+  project_name?: string
+  project_name_ar?: string
   line_status?: string
   description?: string
   debit_amount: number
@@ -295,7 +299,7 @@ const EnhancedLineReviewModalV2: React.FC<EnhancedLineReviewModalV2Props> = ({
                       mb: 0.5
                     }}
                   >
-                    معرف المنظمة
+                    المنظمة
                   </Typography>
                   <Typography
                     variant="body2"
@@ -303,10 +307,9 @@ const EnhancedLineReviewModalV2: React.FC<EnhancedLineReviewModalV2Props> = ({
                       fontWeight: 600,
                       color: 'var(--text)',
                       fontSize: '0.9rem',
-                      fontFamily: 'monospace'
                     }}
                   >
-                    {lineData.org_id || '-'}
+                    {lineData.org_name_ar || lineData.org_name || lineData.org_id || '-'}
                   </Typography>
                 </Box>
               </Grid>
@@ -323,7 +326,7 @@ const EnhancedLineReviewModalV2: React.FC<EnhancedLineReviewModalV2Props> = ({
                       mb: 0.5
                     }}
                   >
-                    معرف المشروع
+                    المشروع
                   </Typography>
                   <Typography
                     variant="body2"
@@ -331,10 +334,9 @@ const EnhancedLineReviewModalV2: React.FC<EnhancedLineReviewModalV2Props> = ({
                       fontWeight: 600,
                       color: 'var(--text)',
                       fontSize: '0.9rem',
-                      fontFamily: 'monospace'
                     }}
                   >
-                    {lineData.project_id || '-'}
+                    {lineData.project_name_ar || lineData.project_name || lineData.project_id || '-'}
                   </Typography>
                 </Box>
               </Grid>
@@ -392,37 +394,57 @@ const EnhancedLineReviewModalV2: React.FC<EnhancedLineReviewModalV2Props> = ({
                   </Typography>
                 </Box>
               </Grid>
-              {lineData.description && (
-                <Grid item xs={12}>
-                  <Box>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        color: 'var(--muted_text)',
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        display: 'block',
-                        mb: 0.5
-                      }}
-                    >
-                      الوصف
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        color: 'var(--text)',
-                        fontSize: '0.9rem',
-                        lineHeight: 1.6
-                      }}
-                    >
-                      {lineData.description}
-                    </Typography>
-                  </Box>
-                </Grid>
-              )}
             </Grid>
           </Paper>
+
+          {/* Line Description - Location 3 */}
+          <Box sx={{ mt: 2.5 }}>
+            <Paper
+              sx={{
+                p: 2.5,
+                background: 'rgba(32, 118, 255, 0.03)',
+                border: '1px dashed var(--accent)',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: 'none'
+              }}
+            >
+              <Typography
+                variant="caption"
+                sx={{
+                  color: 'var(--accent)',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  mb: 1
+                }}
+              >
+                <Box
+                  sx={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: 'var(--accent)'
+                  }}
+                />
+                وصف السطر
+              </Typography>
+              <Typography
+                variant="body1"
+                sx={{
+                  color: lineData.description ? 'var(--text)' : 'var(--muted_text)',
+                  fontSize: '1rem',
+                  fontWeight: 500,
+                  lineHeight: 1.6,
+                  fontStyle: lineData.description ? 'normal' : 'italic'
+                }}
+              >
+                {lineData.description || 'لا يوجد وصف متاح لهذا السطر'}
+              </Typography>
+            </Paper>
+          </Box>
         </Box>
 
         <Divider sx={{ my: 3, borderColor: 'var(--border)' }} />

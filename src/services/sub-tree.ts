@@ -189,6 +189,15 @@ export async function deleteExpensesCategory(id: string, orgId?: string): Promis
 }
 
 export async function listAccountsForOrg(orgId: string): Promise<AccountLite[]> {
+  // Debug: Log the orgId to see what type it is
+  console.log('listAccountsForOrg called with orgId:', orgId, typeof orgId)
+  
+  // Defensive check: ensure orgId is a string, not an object
+  if (orgId && typeof orgId !== 'string') {
+    console.error('listAccountsForOrg: orgId is not a string:', orgId)
+    return []
+  }
+  
   if (cache.accounts.has(orgId)) return cache.accounts.get(orgId)!
   const { data, error } = await supabase
     .from('accounts')

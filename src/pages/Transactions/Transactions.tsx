@@ -5,11 +5,6 @@ import {
   deleteTransaction,
   updateTransaction,
   getTransactionAudit,
-  approveTransaction,
-  requestRevision,
-  rejectTransaction,
-  submitTransaction,
-  cancelSubmission,
   postTransaction,
   getUserDisplayMap,
   type TransactionRecord,
@@ -41,6 +36,8 @@ import TransactionsDocumentsPanel from '../../components/Transactions/Transactio
 import { type UnifiedCRUDFormHandle, type FormField } from '../../components/Common/UnifiedCRUDForm'
 import formStyles from '../../components/Common/UnifiedCRUDForm.module.css'
 import UnifiedTransactionDetailsPanel from '../../components/Transactions/UnifiedTransactionDetailsPanel'
+const EnhancedLineApprovalManager = React.lazy(() => import('../../components/Approvals/EnhancedLineApprovalManager'))
+const EnhancedLineReviewModalV2 = React.lazy(() => import('../../components/Approvals/EnhancedLineReviewModalV2'))
 // Unused imports commented out - available for future use
 // import DraggableResizablePanel from '../../components/Common/DraggableResizablePanel'
 // import TransactionsDetailsPanel from '../../components/Transactions/TransactionsDetailsPanel'
@@ -75,7 +72,7 @@ const TransactionsPage: React.FC = () => {
   } = useTransactionsData()
   const [transactions, setTransactions] = useState<TransactionRecord[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, _setError] = useState<string | null>(null)
   const [_isSaving, _setIsSaving] = useState(false)
   const [_formErrors, _setFormErrors] = useState<Record<string, string>>({})
 
@@ -84,26 +81,26 @@ const TransactionsPage: React.FC = () => {
   const [wizardOpen, setWizardOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<TransactionRecord | null>(null)
   const [_detailsOpen, _setDetailsOpen] = useState(false)
-  
+
   // Debug details panel state changes
   useEffect(() => {
-    console.log('🔍 Details panel state changed:', _detailsOpen);
+    if (import.meta.env.DEV) console.log('🔍 Details panel state changed:', _detailsOpen);
   }, [_detailsOpen]);
   const [detailsFor, setDetailsFor] = useState<TransactionRecord | null>(null)
   const [autoOpenDeleteModal, setAutoOpenDeleteModal] = useState(false)
   const [createdTxId, setCreatedTxId] = useState<string | null>(null)
 
   // Debug: track which form is open
-  useEffect(() => { try { console.log('🧪 Form state -> wizardOpen:', wizardOpen, 'formOpen:', formOpen); } catch { } }, [wizardOpen, formOpen])
+  useEffect(() => { try { if (import.meta.env.DEV) console.log('🧪 Form state -> wizardOpen:', wizardOpen, 'formOpen:', formOpen); } catch { } }, [wizardOpen, formOpen])
   const [audit, setAudit] = useState<TransactionAudit[]>([])
   const [approvalHistory, setApprovalHistory] = useState<any[]>([])
-  
+
   // Define onClose function with useCallback to ensure it's stable across re-renders
   const handleDetailsPanelClose = useCallback(() => {
     _setDetailsOpen(false);
     setAutoOpenDeleteModal(false);
   }, []);
-  
+
   // Keep create-mode title even after header insert until user saves draft/post
   const [_keepCreateTitle, _setKeepCreateTitle] = useState<boolean>(false)
 
@@ -212,7 +209,7 @@ const TransactionsPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(20)
   const [userNames, setUserNames] = useState<Record<string, string>>({})
   // Wrap mode preference (persisted per user locally)
-  const [wrapMode, setWrapMode] = useState<boolean>(() => {
+  const [wrapMode, _setWrapMode] = useState<boolean>(() => {
     try {
       const raw = localStorage.getItem('transactions_table_wrap')
       return raw ? raw === '1' : false
@@ -311,28 +308,26 @@ const TransactionsPage: React.FC = () => {
   // Fetch transaction lines when transaction is selected
   useEffect(() => {
     const fetchLines = async () => {
-      console.log('🔄 useEffect triggered, selectedTransactionId:', selectedTransactionId);
+      if (import.meta.env.DEV) console.log('🔄 useEffect triggered, selectedTransactionId:', selectedTransactionId);
 
       if (!selectedTransactionId) {
-        console.log('⚠️ No transaction selected, clearing lines');
+        if (import.meta.env.DEV) console.log('⚠️ No transaction selected, clearing lines');
         setTransactionLines([])
         _setSelectedLineId(null)
         return
       }
       try {
-        console.log('📡 Querying transaction_lines for transaction:', selectedTransactionId);
-        const { data, error } = await supabase
-          .from('v_transaction_lines_enriched')
-          .select('*')
-          .eq('transaction_id', selectedTransactionId)
-          .order('line_no', { ascending: true })
+        if (import.meta.env.DEV) console.log('📡 Querying transaction_lines for transaction:', selectedTransactionId);
 
-        if (error) {
-          console.error('❌ Supabase error fetching lines:', error);
-          setTransactionLines([])
-        } else if (Array.isArray(data)) {
-          console.log('✅ Lines fetched successfully:', data.length, 'lines for transaction', selectedTransactionId);
-          console.log('📊 Line data:', data);
+        // Use the centralized service that handles enrichment and cost aggregation
+        const { getTransactionLinesWithCosts } = await import('../../services/transaction-lines')
+        const data = await getTransactionLinesWithCosts(selectedTransactionId)
+
+        if (Array.isArray(data)) {
+          if (import.meta.env.DEV) {
+            console.log('✅ Lines fetched successfully:', data.length, 'lines for transaction', selectedTransactionId);
+            console.log('📊 Line data:', data);
+          }
           setTransactionLines(data)
         } else {
           console.warn('⚠️ Unexpected data format:', data);
@@ -352,7 +347,7 @@ const TransactionsPage: React.FC = () => {
   useEffect(() => {
     // Context already provides analysisItemsMap; this effect can trigger refreshAnalysisItems if needed
     if (headerAppliedFilters.orgId) {
-      refreshAnalysisItems(headerAppliedFilters.orgId, headerAppliedFilters.projectId || null).catch(() => {})
+      refreshAnalysisItems(headerAppliedFilters.orgId, headerAppliedFilters.projectId || null).catch(() => { })
     }
   }, [headerAppliedFilters.orgId, headerAppliedFilters.projectId, refreshAnalysisItems])
 
@@ -499,16 +494,16 @@ const TransactionsPage: React.FC = () => {
 
     // Load dimensions for this transaction's organization on-demand
     if (tx.org_id) {
-      console.log(`🔄 Loading dimensions for transaction details org ${tx.org_id}`)
+      if (import.meta.env.DEV) console.log(`🔄 Loading dimensions for transaction details org ${tx.org_id}`)
       await loadDimensionsForOrg(tx.org_id)
     }
 
     // Fetch audit data
     try {
-      console.log('🔄 Fetching transaction audit data...')
+      if (import.meta.env.DEV) console.log('🔄 Fetching transaction audit data...')
       const rows = await getTransactionAudit(tx.id)
       setAudit(rows)
-      console.log(`✅ Loaded ${rows.length} audit records`)
+      if (import.meta.env.DEV) console.log(`✅ Loaded ${rows.length} audit records`)
     } catch (error) {
       console.error('❌ Failed to fetch audit data:', error)
       setAudit([])
@@ -516,12 +511,12 @@ const TransactionsPage: React.FC = () => {
 
     // Fetch approval history
     try {
-      console.log('🔄 Fetching approval history...')
+      if (import.meta.env.DEV) console.log('🔄 Fetching approval history...')
       const { getLineReviewsForTransaction } = await import('../../services/lineReviewService')
       const lines = await getLineReviewsForTransaction(tx.id)
       const hist = lines.flatMap(line => line.approval_history || [])
       setApprovalHistory(hist)
-      console.log(`✅ Loaded ${hist.length} approval history records`)
+      if (import.meta.env.DEV) console.log(`✅ Loaded ${hist.length} approval history records`)
     } catch (error) {
       console.error('❌ Failed to fetch approval history:', error)
       setApprovalHistory([])
@@ -529,10 +524,10 @@ const TransactionsPage: React.FC = () => {
 
     // Fetch transaction lines
     try {
-      console.log('🔄 Fetching transaction lines...')
+      if (import.meta.env.DEV) console.log('🔄 Fetching transaction lines...')
       const { getTransactionLines } = await import('../../services/transaction-lines')
       const lines = await getTransactionLines(tx.id)
-      console.log(`✅ Loaded ${lines.length} transaction lines`)
+      if (import.meta.env.DEV) console.log(`✅ Loaded ${lines.length} transaction lines`)
       setDetailsFor(prev => prev ? { ...prev, lines } : null)
     } catch (error) {
       console.error('❌ Failed to fetch transaction lines:', error)
@@ -589,7 +584,7 @@ const TransactionsPage: React.FC = () => {
         userPreferred: true
       };
       localStorage.setItem('transactionFormPanel:preferred', JSON.stringify(panelPreference));
-      console.log('✅ تم حفظ تخطيط مودال النموذج كمفضل');
+      if (import.meta.env.DEV) console.log('✅ تم حفظ تخطيط مودال النموذج كمفضل');
       showToast('✅ تم حفظ تخطيط النموذج', { severity: 'success' });
     } catch (error) {
       console.error('Failed to save form panel layout:', error);
@@ -613,23 +608,18 @@ const TransactionsPage: React.FC = () => {
       localStorage.removeItem('transactionFormPanel:maximized');
       localStorage.removeItem('transactionFormPanel:docked');
       localStorage.removeItem('transactionFormPanel:dockPosition');
-      console.log('🔄 تم إعادة تعيين تخطيط مودال النموذج');
+      if (import.meta.env.DEV) console.log('🔄 تم إعادة تعيين تخطيط مودال النموذج');
       showToast('🔄 تم إعادة تعيين تخطيط النموذج', { severity: 'info' });
     } catch { }
   }
 
-  // Review modal state
-  const [reviewOpen, setReviewOpen] = useState(false)
-  const [reviewAction, setReviewAction] = useState<'approve' | 'revise' | 'reject' | null>(null)
-  const [reviewReason, setReviewReason] = useState('')
-  const [reviewTargetId, setReviewTargetId] = useState<string | null>(null)
-  const [reviewBusy, setReviewBusy] = useState(false)
+  // Modern Approval Workflow state
+  const [approvalWorkflowOpen, setApprovalWorkflowOpen] = useState(false)
+  const [selectedReviewTxId, setSelectedReviewTxId] = useState<string | null>(null)
 
-  // Submit modal state
-  const [submitOpen, setSubmitOpen] = useState(false)
-  const [submitNote, setSubmitNote] = useState('')
-  const [submitTargetId, setSubmitTargetId] = useState<string | null>(null)
-  const [submitBusy, setSubmitBusy] = useState(false)
+  // Line Review state
+  const [lineReviewOpen, setLineReviewOpen] = useState(false)
+  const [selectedLineForReview, setSelectedLineForReview] = useState<any | null>(null)
 
   // determine mode: my | pending | all
   const mode: 'my' | 'pending' | 'all' = location.pathname.includes('/transactions/my')
@@ -647,6 +637,71 @@ const TransactionsPage: React.FC = () => {
       } catch { }
     })()
   }, [])
+
+  // Line Review Handlers
+  const handleOpenLineReview = useCallback((line: any) => {
+    // Enrich with names from local DIMENSIONS data if missing
+    // This is useful for lines opened from TransactionLinesTable or Details Panel
+    const enrichedLine = {
+      ...line,
+      line_id: line.id || line.line_id, // ensure we have both
+      org_name: line.org_name || (line.org_id ? organizations.find(o => o.id === line.org_id)?.name : undefined),
+      org_name_ar: line.org_name_ar || (line.org_id ? organizations.find(o => o.id === line.org_id)?.name_ar : undefined),
+      project_name: line.project_name || (line.project_id ? projects.find(p => p.id === line.project_id)?.name : undefined),
+      project_name_ar: line.project_name_ar || (line.project_id ? projects.find(p => p.id === line.project_id)?.name_ar : undefined),
+    }
+    setSelectedLineForReview(enrichedLine)
+    setLineReviewOpen(true)
+  }, [organizations, projects])
+
+  const handleAddLineComment = useCallback(async (comment: string, reviewType: string) => {
+    if (!selectedLineForReview) return
+    const { addLineReviewComment } = await import('../../services/lineReviewService')
+    await addLineReviewComment(null, selectedLineForReview.line_id || selectedLineForReview.id, comment, reviewType as any)
+    showToast('تم إضافة التعليق بنجاح', { severity: 'success' })
+    // Refresh lines if possible, or just the whole tx
+    if (selectedTransactionId) {
+      const { getTransactionLinesWithCosts } = await import('../../services/transaction-lines')
+      const data = await getTransactionLinesWithCosts(selectedTransactionId)
+      setTransactionLines(data)
+    }
+  }, [selectedLineForReview, selectedTransactionId, showToast])
+
+  const handleRequestLineEdit = useCallback(async (reason: string) => {
+    if (!selectedLineForReview) return
+    const { requestLineEdit } = await import('../../services/lineReviewService')
+    await requestLineEdit(null as any, selectedLineForReview.line_id || selectedLineForReview.id, reason)
+    showToast('تم طلب التعديل بنجاح', { severity: 'warning' })
+    if (selectedTransactionId) {
+      const { getTransactionLinesWithCosts } = await import('../../services/transaction-lines')
+      const data = await getTransactionLinesWithCosts(selectedTransactionId)
+      setTransactionLines(data)
+    }
+  }, [selectedLineForReview, selectedTransactionId, showToast])
+
+  const handleApproveLine = useCallback(async (notes?: string) => {
+    if (!selectedLineForReview) return
+    const { approveLineReview } = await import('../../services/lineReviewService')
+    await approveLineReview(null as any, selectedLineForReview.line_id || selectedLineForReview.id, notes)
+    showToast('تم اعتماد السطر بنجاح', { severity: 'success' })
+    if (selectedTransactionId) {
+      const { getTransactionLinesWithCosts } = await import('../../services/transaction-lines')
+      const data = await getTransactionLinesWithCosts(selectedTransactionId)
+      setTransactionLines(data)
+    }
+  }, [selectedLineForReview, selectedTransactionId, showToast])
+
+  const handleFlagLine = useCallback(async (reason: string) => {
+    if (!selectedLineForReview) return
+    const { flagLine } = await import('../../services/lineReviewService')
+    await flagLine(null as any, selectedLineForReview.line_id || selectedLineForReview.id, reason)
+    showToast('تم إضافة تنبيه على السطر', { severity: 'info' })
+    if (selectedTransactionId) {
+      const { getTransactionLinesWithCosts } = await import('../../services/transaction-lines')
+      const data = await getTransactionLinesWithCosts(selectedTransactionId)
+      setTransactionLines(data)
+    }
+  }, [selectedLineForReview, selectedTransactionId, showToast])
 
   // Default column configuration for transactions table (documents column moved to lines table)
   const defaultColumns: ColumnConfig[] = useMemo(() => [
@@ -950,7 +1005,7 @@ const TransactionsPage: React.FC = () => {
   const _handleFormSubmit = async (data: any) => {
     _setFormErrors({})
     try {
-      setIsSaving(true)
+      _setIsSaving(true)
 
       // Perform backend validation only when editing an existing transaction (header-only create has no lines yet)
       if (editingTx) {
@@ -974,7 +1029,7 @@ const TransactionsPage: React.FC = () => {
             const warningMessage = validationResult.warnings.map((w: any) => w.message).join('\n')
             const proceed = window.confirm(`تحذيرات التحقق:\n${warningMessage}\n\nهل تريد المتابعة؟`)
             if (!proceed) {
-              setIsSaving(false)
+              _setIsSaving(false)
               return
             }
           }
@@ -983,7 +1038,7 @@ const TransactionsPage: React.FC = () => {
           if (!validationResult.is_valid) {
             const errorMessage = validationResult.errors.map((e: any) => e.message).join('\n')
             showToast(`أخطاء في التحقق من صحة المعاملة:\n${errorMessage}`, { severity: 'error' })
-            setIsSaving(false)
+            _setIsSaving(false)
             return
           }
         } catch (validationError) {
@@ -1092,7 +1147,7 @@ const TransactionsPage: React.FC = () => {
         } : data
       })
     } finally {
-      setIsSaving(false)
+      _setIsSaving(false)
     }
   }
 
@@ -1426,74 +1481,11 @@ const TransactionsPage: React.FC = () => {
     }
   }
 
-  const openReview = (action: 'approve' | 'revise' | 'reject', id: string) => {
-    setReviewAction(action)
-    setReviewReason('')
-    setReviewTargetId(id)
-    setReviewOpen(true)
+  const openEnhancedReview = (id: string) => {
+    setSelectedReviewTxId(id)
+    setApprovalWorkflowOpen(true)
   }
 
-  const submitReview = async () => {
-    if (!reviewAction || !reviewTargetId) return
-    setReviewBusy(true)
-    try {
-      await measurePerformance(`transactions.review.${reviewAction}`, async () => {
-        if (reviewAction === 'approve') {
-          await withRetry(() => approveTransaction(reviewTargetId, reviewReason || null as any))
-          // After approval, check whether posting actually happened. If posting permissions
-          // are missing, the RPC succeeds (approved) but posting is skipped gracefully.
-          let posted = false
-          try {
-            const { data } = await supabase
-              .from('transactions')
-              .select('is_posted')
-              .eq('id', reviewTargetId)
-              .single()
-            posted = Boolean(data?.is_posted)
-          } catch { }
-          if (!posted && autoPostOnApprove) {
-            // Client-side fallback auto-post (best-effort)
-            try {
-              await postTransaction(reviewTargetId)
-              posted = true
-            } catch { }
-          }
-          if (posted) {
-            showToast('تم اعتماد المعاملة (وتم ترحيلها)', { severity: 'success' })
-          } else {
-            showToast(autoPostOnApprove ? 'تم الاعتماد — جارٍ انتظار الترحيل (تحقق من الصلاحيات)' : 'تم اعتماد المعاملة (لم تُرحَّل — صلاحية الترحيل مطلوبة)', { severity: 'warning' as any })
-          }
-        } else if (reviewAction === 'revise') {
-          if (!reviewReason.trim()) {
-            showToast('يرجى إدخال سبب الإرجاع للتعديل', { severity: 'error' })
-            setReviewBusy(false)
-            return
-          }
-          await withRetry(() => requestRevision(reviewTargetId, reviewReason))
-          showToast('تم إرجاع المعاملة للتعديل', { severity: 'success' })
-        } else if (reviewAction === 'reject') {
-          if (!reviewReason.trim()) {
-            showToast('يرجى إدخال سبب الرفض', { severity: 'error' })
-            setReviewBusy(false)
-            return
-          }
-          await withRetry(() => rejectTransaction(reviewTargetId, reviewReason))
-          showToast('تم رفض المعاملة', { severity: 'success' })
-        }
-      })
-      setReviewOpen(false)
-      setReviewTargetId(null)
-      setReviewAction(null)
-      setReviewReason('')
-      await reload()
-    } catch (e: any) {
-      const msg = formatSupabaseError(e) || 'فشل إجراء المراجعة'
-      showToast(msg, { severity: 'error' })
-      logClientError({ context: `transactions.review.${reviewAction}`, message: msg, extra: { id: reviewTargetId, reason: reviewReason } })
-    } finally {
-      setReviewBusy(false)
-    }
-  }
 
   // Reload transactions when appliedFilters, pagination, or mode changes
   useEffect(() => {
@@ -1589,7 +1581,7 @@ const TransactionsPage: React.FC = () => {
               onSelectTransaction={async (tx: TransactionRecord) => {
                 setSelectedTransactionId(tx.id)
                 _setSelectedLineId(null)
-                
+
                 // Load dimensions for this transaction's organization on-demand
                 if (tx.org_id) {
                   console.log(`🔄 Loading dimensions for transaction org ${tx.org_id}`)
@@ -1610,7 +1602,7 @@ const TransactionsPage: React.FC = () => {
                 setDocumentsFor(tx)
                 setDocumentsOpen(true)
               }}
-              onOpenApprovalWorkflow={(tx: TransactionRecord) => openReview('approve', tx.id)}
+              onOpenApprovalWorkflow={(tx: TransactionRecord) => openEnhancedReview(tx.id)}
               mode={mode}
               currentUserId={currentUserId || undefined}
               hasPerm={hasPerm}
@@ -1636,724 +1628,594 @@ const TransactionsPage: React.FC = () => {
         {/* SECTION 2: TRANSACTION LINES TABLE (T2) */}
         {selectedTransactionId && (
           <div className="transactions-section lines-section">
-              <div className="section-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <h2>القيود التفصيلية</h2>
-                  <div className="section-controls">
-                    <button
-                      className="ultimate-btn ultimate-btn-edit"
-                      onClick={() => setLineColumnsConfigOpen(true)}
-                      disabled={!selectedTransactionId}
-                      title="إعدادات أعمدة جدول القيود التفصيلية"
-                    >
-                      <div className="btn-content"><span className="btn-text">⚙️ إعدادات الأعمدة</span></div>
-                    </button>
-                    <label className="wrap-toggle">
+            <div className="section-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <h2>القيود التفصيلية</h2>
+                <div className="section-controls">
+                  <button
+                    className="ultimate-btn ultimate-btn-edit"
+                    onClick={() => setLineColumnsConfigOpen(true)}
+                    disabled={!selectedTransactionId}
+                    title="إعدادات أعمدة جدول القيود التفصيلية"
+                  >
+                    <div className="btn-content"><span className="btn-text">⚙️ إعدادات الأعمدة</span></div>
+                  </button>
+                  <label className="wrap-toggle">
+                    <input
+                      type="checkbox"
+                      checked={lineWrapMode}
+                      onChange={(e) => setLineWrapMode(e.target.checked)}
+                    />
+                    <span>التفاف النص</span>
+                  </label>
+                  <button
+                    className="ultimate-btn ultimate-btn-warning"
+                    onClick={async () => {
+                      if (!confirmRestore('transactions_lines_table_reset_confirm_suppressed', 'سيتم استعادة الإعدادات الافتراضية لأعمدة جدول القيود التفصيلية.')) return
+                      try {
+                        setLineWrapMode(false)
+                        try { localStorage.setItem('transactions_lines_table_wrap', '0') } catch { }
+                        handleLineColumnConfigChange(defaultLineColumns)
+                        if (currentUserId) {
+                          const mod = await import('../../services/column-preferences')
+                          await mod.upsertUserColumnPreferences({
+                            tableKey: 'transactions_lines_table',
+                            columnConfig: { columns: defaultLineColumns, wrapMode: false },
+                            version: 1,
+                          })
+                        }
+                        showToast('تمت استعادة الإعدادات الافتراضية للجدول', { severity: 'success' })
+                      } catch {
+                        showToast('فشل استعادة الإعدادات الافتراضية', { severity: 'error' })
+                      }
+                    }}
+                    title="استعادة الإعدادات الافتراضية"
+                    disabled={!selectedTransactionId}
+                  >
+                    <div className="btn-content"><span className="btn-text">استعادة الافتراضي</span></div>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <OptimizedSuspense fallback={<div className="p-4 text-center">جاري تحميل جدول القيود...</div>}>
+              <TransactionLinesTable
+                lines={transactionLines}
+                transaction={transactions.find(t => t.id === selectedTransactionId) || detailsFor}
+                audit={audit}
+                approvalHistory={approvalHistory}
+                userNames={userNames}
+                accounts={accounts}
+                projects={projects}
+                organizations={organizations}
+                classifications={classifications}
+                categories={categories}
+                workItems={workItems}
+                costCenters={costCenters}
+                analysisItemsMap={analysisItemsMap}
+                currentUserId={currentUserId}
+                mode={mode}
+                canEdit={hasPerm('transactions.update')}
+                canDelete={hasPerm('transactions.delete')}
+                canReview={hasPerm('transactions.review')}
+                canPost={hasPerm('transactions.post')}
+                canManage={hasPerm('transactions.manage')}
+                onSelectLine={(line) => _setSelectedLineId(line.id)}
+                onEditLine={(line) => {
+                  console.log('Edit line functionality to be implemented:', line.id)
+                  // TODO: Implement line editing
+                }}
+                onDeleteLine={async (id) => {
+                  const ok = window.confirm('هل أنت متأكد من حذف هذا السطر؟')
+                  if (!ok) return
+                  try {
+                    const { deleteTransactionLine } = await import('../../services/transaction-lines')
+                    await deleteTransactionLine(id)
+                    showToast('تم حذف السطر', { severity: 'success' })
+                    // Reload transaction lines
+                    if (selectedTransactionId) {
+                      const { data } = await supabase
+                        .from('v_transaction_lines_enriched')
+                        .select('*')
+                        .eq('transaction_id', selectedTransactionId)
+                        .order('line_no', { ascending: true })
+                      setTransactionLines(data || [])
+                    }
+                  } catch (error: any) {
+                    showToast('فشل في حذف السطر: ' + error.message, { severity: 'error' })
+                  }
+                }}
+                onOpenDocuments={(line) => {
+                  setDocumentsForLine(line)
+                  setDocumentsOpen(true)
+                }}
+                onOpenCostAnalysis={(line) => {
+                  const transaction = transactions.find(t => t.id === selectedTransactionId) || detailsFor;
+                  if (transaction) {
+                    openCostAnalysisModal(transaction, line.id);
+                  }
+                }}
+                onOpenLineReview={handleOpenLineReview}
+                onClose={() => _setDetailsOpen(false)}
+                onUpdate={async (updatedTransaction) => {
+                  try {
+                    const updateData = {
+                      entry_date: updatedTransaction.entry_date,
+                      description: updatedTransaction.description,
+                      reference_number: updatedTransaction.reference_number || null,
+                      debit_account_id: updatedTransaction.debit_account_id,
+                      credit_account_id: updatedTransaction.credit_account_id,
+                      amount: updatedTransaction.amount,
+                      notes: updatedTransaction.notes || null,
+                      classification_id: updatedTransaction.classification_id || null,
+                      sub_tree_id: (updatedTransaction as any).sub_tree_id || null,
+                      work_item_id: (updatedTransaction as any).work_item_id || null,
+                      analysis_work_item_id: (updatedTransaction as any).analysis_work_item_id || null,
+                      cost_center_id: updatedTransaction.cost_center_id || null,
+                      org_id: updatedTransaction.org_id || null,
+                      project_id: updatedTransaction.project_id || null,
+                    }
+                    const updated = await updateTransaction(updatedTransaction.id, updateData as any)
+                    const enrichedUpdated = enrichTx(updated)
+                    setTransactions(prev => prev.map(t => t.id === updated.id ? enrichedUpdated : t))
+                    showToast('تم تحديث المعاملة', { severity: 'success' })
+                    await reload()
+                  } catch (e: any) {
+                    throw new Error(e?.message || 'فشل في تحديث المعاملة')
+                  }
+                }}
+                onDelete={async (transactionId) => {
+                  await handleDelete(transactionId)
+                }}
+                onPost={async (transactionId) => {
+                  await measurePerformance('transactions.post.inline', async () => {
+                    await withRetry(() => postTransaction(transactionId))
+                    showToast('تم ترحيل المعاملة', { severity: 'success' })
+                  })
+                  await reload()
+                }}
+                columns={lineColumns}
+                wrapMode={lineWrapMode}
+                loading={loading}
+                selectedLineId={_selectedLineId}
+                onColumnResize={handleLineColumnResize}
+              />
+            </OptimizedSuspense>
+          </div>
+        )}
+
+        {/* Admin: Client Error Logs Viewer */}
+        {showLogs && (
+          <div className="transaction-modal" onClick={() => setShowLogs(false)}>
+            <div className="transaction-modal-content transaction-modal-content--wide" onClick={e => e.stopPropagation()}>
+              <div className="modal-header-row">
+                <h3 className="modal-title">سجل أخطاء العميل</h3>
+                <button className="ultimate-btn ultimate-btn-delete" onClick={() => setShowLogs(false)}>
+                  <div className="btn-content"><span className="btn-text">إغلاق</span></div>
+                </button>
+              </div>
+              <ClientErrorLogs />
+            </div>
+          </div>
+        )}
+
+        {/* Enhanced Line Approval Manager Modal */}
+        {approvalWorkflowOpen && selectedReviewTxId && (
+          <OptimizedSuspense fallback={<div className="p-4 text-center">جاري تحميل نظام الموافقات الجديد...</div>}>
+            <EnhancedLineApprovalManager
+              transactionId={selectedReviewTxId}
+              onClose={() => {
+                setApprovalWorkflowOpen(false)
+                setSelectedReviewTxId(null)
+              }}
+              onApprovalComplete={async () => {
+                setApprovalWorkflowOpen(false)
+                setSelectedReviewTxId(null)
+                await reload()
+              }}
+              onApprovalFailed={(error) => {
+                console.error('Approval failed:', error)
+                showToast('فشل إجراء الموافقة: ' + error, { severity: 'error' })
+              }}
+            />
+          </OptimizedSuspense>
+        )}
+
+        {/* Enhanced Line Review Modal (Single Line) */}
+        {lineReviewOpen && selectedLineForReview && (
+          <OptimizedSuspense fallback={<div className="p-4 text-center">جاري تحميل مراجعة السطر...</div>}>
+            <EnhancedLineReviewModalV2
+              open={lineReviewOpen}
+              onClose={() => {
+                setLineReviewOpen(false)
+                setSelectedLineForReview(null)
+              }}
+              lineData={selectedLineForReview}
+              onAddComment={handleAddLineComment}
+              onRequestEdit={handleRequestLineEdit}
+              onApprove={handleApproveLine}
+              onFlag={handleFlagLine}
+            />
+          </OptimizedSuspense>
+        )}
+
+        {/* Transactions Configuration Modal */}
+        {transactionsConfigOpen && (
+          <div className="transaction-modal" onClick={() => setTransactionsConfigOpen(false)}>
+            <div className="config-modal-content" onClick={e => e.stopPropagation()}>
+              <div className="modal-header-row">
+                <h3 className="modal-title">تخطيط عرض المعاملات</h3>
+                <button className="ultimate-btn ultimate-btn-delete" onClick={() => setTransactionsConfigOpen(false)}>
+                  <div className="btn-content"><span className="btn-text">إغلاق</span></div>
+                </button>
+              </div>
+
+              <div className="config-modal-body">
+                <div className="config-section">
+                  <h4>إعدادات العرض</h4>
+
+                  <div className="config-field">
+                    <label className="config-label">
                       <input
                         type="checkbox"
-                        checked={lineWrapMode}
-                        onChange={(e) => setLineWrapMode(e.target.checked)}
+                        checked={transactionsConfig.showAuditInfo}
+                        onChange={(e) => setTransactionsConfig(prev => ({ ...prev, showAuditInfo: e.target.checked }))}
                       />
-                      <span>التفاف النص</span>
+                      عرض معلومات التدقيق
                     </label>
+                  </div>
+
+                  <div className="config-field">
+                    <label className="config-label">
+                      <input
+                        type="checkbox"
+                        checked={transactionsConfig.showApprovalBadges}
+                        onChange={(e) => setTransactionsConfig(prev => ({ ...prev, showApprovalBadges: e.target.checked }))}
+                      />
+                      عرض رموز حالة الاعتماد
+                    </label>
+                  </div>
+
+                  <div className="config-field">
+                    <label className="config-label">
+                      <input
+                        type="checkbox"
+                        checked={transactionsConfig.highlightPostedTransactions}
+                        onChange={(e) => setTransactionsConfig(prev => ({ ...prev, highlightPostedTransactions: e.target.checked }))}
+                      />
+                      تمييز المعاملات المرحلة
+                    </label>
+                  </div>
+
+                  <div className="config-field">
+                    <label className="config-label">
+                      <input
+                        type="checkbox"
+                        checked={transactionsConfig.groupByOrganization}
+                        onChange={(e) => setTransactionsConfig(prev => ({ ...prev, groupByOrganization: e.target.checked }))}
+                      />
+                      تجميع حسب المؤسسة
+                    </label>
+                  </div>
+
+                  <div className="config-field">
+                    <label className="config-label">
+                      <input
+                        type="checkbox"
+                        checked={transactionsConfig.autoRefresh}
+                        onChange={(e) => setTransactionsConfig(prev => ({ ...prev, autoRefresh: e.target.checked }))}
+                      />
+                      تحديث تلقائي
+                    </label>
+                  </div>
+
+                  <div className="config-field">
+                    <label className="config-label-block">
+                      حجم الصفحة الافتراضي:
+                      <select
+                        value={transactionsConfig.defaultPageSize}
+                        onChange={(e) => setTransactionsConfig(prev => ({ ...prev, defaultPageSize: parseInt(e.target.value) }))}
+                        className="config-select"
+                      >
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="config-field">
+                    <label className="config-label-block">
+                      فلتر المبلغ الافتراضي:
+                      <select
+                        value={transactionsConfig.defaultAmountFilter}
+                        onChange={(e) => setTransactionsConfig(prev => ({ ...prev, defaultAmountFilter: e.target.value as 'all' | 'positive' | 'negative' }))}
+                        className="config-select"
+                      >
+                        <option value="all">جميع المبالغ</option>
+                        <option value="positive">مبالغ موجبة</option>
+                        <option value="negative">مبالغ سالبة</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="config-field">
+                    <label className="config-label-block">
+                      نطاق التاريخ الافتراضي:
+                      <select
+                        value={transactionsConfig.defaultDateRange}
+                        onChange={(e) => setTransactionsConfig(prev => ({ ...prev, defaultDateRange: e.target.value as 'all' | 'month' | 'quarter' | 'year' }))}
+                        className="config-select"
+                      >
+                        <option value="all">جميع التواريخ</option>
+                        <option value="month">الشهر الحالي</option>
+                        <option value="quarter">الربع الحالي</option>
+                        <option value="year">العام الحالي</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="config-section">
+                  <h4>إعدادات التصدير</h4>
+
+                  <div className="config-field">
+                    <label className="config-label-block">
+                      تنسيق التصدير الافتراضي:
+                      <select
+                        value={transactionsConfig.exportFormat}
+                        onChange={(e) => setTransactionsConfig(prev => ({ ...prev, exportFormat: e.target.value as 'excel' | 'pdf' | 'csv' }))}
+                        className="config-select"
+                      >
+                        <option value="excel">Excel (.xlsx)</option>
+                        <option value="pdf">PDF (.pdf)</option>
+                        <option value="csv">CSV (.csv)</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="config-section">
+                  <h4>عرض تحكم التخطيط</h4>
+                  <div className="layout-control-section">
                     <button
-                      className="ultimate-btn ultimate-btn-warning"
-                      onClick={async () => {
-                        if (!confirmRestore('transactions_lines_table_reset_confirm_suppressed', 'سيتم استعادة الإعدادات الافتراضية لأعمدة جدول القيود التفصيلية.')) return
-                        try {
-                          setLineWrapMode(false)
-                          try { localStorage.setItem('transactions_lines_table_wrap', '0') } catch { }
-                          handleLineColumnConfigChange(defaultLineColumns)
-                          if (currentUserId) {
-                            const mod = await import('../../services/column-preferences')
-                            await mod.upsertUserColumnPreferences({
-                              tableKey: 'transactions_lines_table',
-                              columnConfig: { columns: defaultLineColumns, wrapMode: false },
-                              version: 1,
-                            })
-                          }
-                          showToast('تمت استعادة الإعدادات الافتراضية للجدول', { severity: 'success' })
-                        } catch {
-                          showToast('فشل استعادة الإعدادات الافتراضية', { severity: 'error' })
-                        }
+                      className="ultimate-btn ultimate-btn-primary"
+                      onClick={() => {
+                        setTransactionsConfigOpen(false);
+                        setLineColumnsConfigOpen(true);
                       }}
-                      title="استعادة الإعدادات الافتراضية"
-                      disabled={!selectedTransactionId}
                     >
-                      <div className="btn-content"><span className="btn-text">استعادة الافتراضي</span></div>
+                      <div className="btn-content"><span className="btn-text">فتح تعديل الأعمدة</span></div>
                     </button>
+                    <p className="config-help-text">يمكنك تخصيص عرض وترتيب وعرض الأعمدة</p>
                   </div>
                 </div>
               </div>
 
-              <OptimizedSuspense fallback={<div className="p-4 text-center">جاري تحميل جدول القيود...</div>}>
-                <TransactionLinesTable
-                  lines={transactionLines}
-                  transaction={transactions.find(t => t.id === selectedTransactionId) || detailsFor}
-                  audit={audit}
-                  approvalHistory={approvalHistory}
-                  userNames={userNames}
-                  accounts={accounts}
-                  projects={projects}
-                  organizations={organizations}
-                  classifications={classifications}
-                  categories={categories}
-                  workItems={workItems}
-                  costCenters={costCenters}
-                  analysisItemsMap={analysisItemsMap}
-                  currentUserId={currentUserId}
-                  mode={mode}
-                  canEdit={hasPerm('transactions.update')}
-                  canDelete={hasPerm('transactions.delete')}
-                  canReview={hasPerm('transactions.review')}
-                  canPost={hasPerm('transactions.post')}
-                  canManage={hasPerm('transactions.manage')}
-                  onSelectLine={(line) => _setSelectedLineId(line.id)}
-                  onEditLine={(line) => {
-                    console.log('Edit line functionality to be implemented:', line.id)
-                    // TODO: Implement line editing
+              <div className="modal-actions">
+                <button
+                  className="ultimate-btn ultimate-btn-success"
+                  onClick={() => setTransactionsConfigOpen(false)}
+                >
+                  <div className="btn-content"><span className="btn-text">حفظ الإعدادات</span></div>
+                </button>
+
+                <button
+                  className="ultimate-btn ultimate-btn-warning"
+                  onClick={() => {
+                    setTransactionsConfig({
+                      showAuditInfo: true,
+                      showApprovalBadges: true,
+                      defaultAmountFilter: 'all',
+                      defaultDateRange: 'all',
+                      defaultPageSize: 20,
+                      autoRefresh: false,
+                      exportFormat: 'excel',
+                      groupByOrganization: false,
+                      highlightPostedTransactions: true
+                    });
                   }}
-                  onDeleteLine={async (id) => {
-                    const ok = window.confirm('هل أنت متأكد من حذف هذا السطر؟')
-                    if (!ok) return
-                    try {
-                      const { deleteTransactionLine } = await import('../../services/transaction-lines')
-                      await deleteTransactionLine(id)
-                      showToast('تم حذف السطر', { severity: 'success' })
-                      // Reload transaction lines
-                      if (selectedTransactionId) {
-                        const { data } = await supabase
-                          .from('v_transaction_lines_enriched')
-                          .select('*')
-                          .eq('transaction_id', selectedTransactionId)
-                          .order('line_no', { ascending: true })
-                        setTransactionLines(data || [])
-                      }
-                    } catch (error: any) {
-                      showToast('فشل في حذف السطر: ' + error.message, { severity: 'error' })
-                    }
-                  }}
-                  onOpenDocuments={(line) => {
-                    setDocumentsForLine(line)
-                    setDocumentsOpen(true)
-                  }}
-                  onOpenCostAnalysis={(line) => {
-                    const transaction = transactions.find(t => t.id === selectedTransactionId) || detailsFor;
-                    if (transaction) {
-                      openCostAnalysisModal(transaction, line.id);
-                    }
-                  }}
-                  onOpenLineReview={(line) => {
-                    console.log('Line review functionality to be implemented:', line.id)
-                    // TODO: Implement line review
-                  }}
-                  onClose={() => _setDetailsOpen(false)}
-                  onUpdate={async (updatedTransaction) => {
-            try {
-              const updateData = {
-                entry_date: updatedTransaction.entry_date,
-                description: updatedTransaction.description,
-                reference_number: updatedTransaction.reference_number || null,
-                debit_account_id: updatedTransaction.debit_account_id,
-                credit_account_id: updatedTransaction.credit_account_id,
-                amount: updatedTransaction.amount,
-                notes: updatedTransaction.notes || null,
-                classification_id: updatedTransaction.classification_id || null,
-                sub_tree_id: (updatedTransaction as any).sub_tree_id || null,
-                work_item_id: (updatedTransaction as any).work_item_id || null,
-                analysis_work_item_id: (updatedTransaction as any).analysis_work_item_id || null,
-                cost_center_id: updatedTransaction.cost_center_id || null,
-                org_id: updatedTransaction.org_id || null,
-                project_id: updatedTransaction.project_id || null,
-              }
-              const updated = await updateTransaction(updatedTransaction.id, updateData as any)
-              const enrichedUpdated = enrichTx(updated)
-              setTransactions(prev => prev.map(t => t.id === updated.id ? enrichedUpdated : t))
-              showToast('تم تحديث المعاملة', { severity: 'success' })
-              await reload()
-            } catch (e: any) {
-              throw new Error(e?.message || 'فشل في تحديث المعاملة')
-            }
-          }}
-          onDelete={async (transactionId) => {
-            await handleDelete(transactionId)
-          }}
-          onSubmitForReview={async (transactionId, note) => {
-            await measurePerformance('transactions.submit', async () => {
-              await withRetry(() => submitTransaction(transactionId, note))
-              showToast('تم إرسال المعاملة للمراجعة بنجاح', { severity: 'success' })
-            })
-            await reload()
-          }}
-          onApprove={async (transactionId, reason) => {
-            await measurePerformance('transactions.approve.inline', async () => {
-              await withRetry(() => approveTransaction(transactionId, reason || null as any))
-              showToast('تم اعتماد المعاملة', { severity: 'success' })
-            })
-            await reload()
-          }}
-          onReject={async (transactionId, reason) => {
-            await measurePerformance('transactions.reject.inline', async () => {
-              await withRetry(() => rejectTransaction(transactionId, reason))
-              showToast('تم رفض المعاملة', { severity: 'success' })
-            })
-            await reload()
-          }}
-          onRequestRevision={async (transactionId, reason) => {
-            await measurePerformance('transactions.requestRevision.inline', async () => {
-              await withRetry(() => requestRevision(transactionId, reason))
-              showToast('تم إرجاع المعاملة للتعديل', { severity: 'success' })
-            })
-            await reload()
-          }}
-          onPost={async (transactionId) => {
-            await measurePerformance('transactions.post.inline', async () => {
-              await withRetry(() => postTransaction(transactionId))
-              showToast('تم ترحيل المعاملة', { severity: 'success' })
-            })
-            await reload()
-          }}
-          columns={lineColumns}
-          wrapMode={lineWrapMode}
-          loading={loading}
-          selectedLineId={_selectedLineId}
-          onColumnResize={handleLineColumnResize}
+                >
+                  <div className="btn-content"><span className="btn-text">إعادة تعيين</span></div>
+                </button>
+
+                <button
+                  className="ultimate-btn ultimate-btn-delete"
+                  onClick={() => setTransactionsConfigOpen(false)}
+                >
+                  <div className="btn-content"><span className="btn-text">إلغاء</span></div>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+        {/* Transaction Analysis Modal */}
+        <TransactionAnalysisModal
+          open={analysisModalOpen}
+          transactionId={analysisTransactionId}
+          transactionLineId={analysisTransactionLineId}
+          onClose={closeCostAnalysisModal}
+          entryNumber={analysisTransaction?.entry_number}
+          description={analysisTransaction?.description}
+          effectiveTolerance={1.0}
+          transactionAmount={analysisTransaction?.amount ?? undefined}
+          orgId={analysisTransaction?.org_id || ''}
+          workItems={workItems}
         />
-              </OptimizedSuspense>
-            </div>
-          )}
 
-      {/* Admin: Client Error Logs Viewer */}
-      {showLogs && (
-        <div className="transaction-modal" onClick={() => setShowLogs(false)}>
-          <div className="transaction-modal-content transaction-modal-content--wide" onClick={e => e.stopPropagation()}>
-            <div className="modal-header-row">
-              <h3 className="modal-title">سجل أخطاء العميل</h3>
-              <button className="ultimate-btn ultimate-btn-delete" onClick={() => setShowLogs(false)}>
-                <div className="btn-content"><span className="btn-text">إغلاق</span></div>
-              </button>
-            </div>
-            <ClientErrorLogs />
-          </div>
-        </div>
-      )}
+        {/* Column Configuration Modal - Headers Table */}
+        <ColumnConfiguration
+          columns={columns}
+          onConfigChange={handleColumnConfigChange}
+          isOpen={headersColumnConfigOpen}
+          onClose={() => setHeadersColumnConfigOpen(false)}
+          onReset={resetToDefaults}
+          sampleData={tableData as any}
+        />
 
-      {/* Review Modal */}
-      {reviewOpen && (
-        <div className="transaction-modal" onClick={() => !reviewBusy && setReviewOpen(false)}>
-          <div className="transaction-modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header-row">
-              <h3 className="modal-title">{reviewAction === 'approve' ? 'اعتماد المعاملة' : reviewAction === 'revise' ? 'إرجاع للتعديل' : 'رفض المعاملة'}</h3>
-              <button className="ultimate-btn ultimate-btn-delete" onClick={() => !reviewBusy && setReviewOpen(false)}>
-                <div className="btn-content"><span className="btn-text">إغلاق</span></div>
-              </button>
-            </div>
-            <div>
-              <label className="modal-title modal-label">سبب الإجراء</label>
-              <textarea
-                className="textarea-field"
-                placeholder={reviewAction === 'approve' ? 'ملاحظات (اختياري)' : 'السبب (إلزامي)'}
-                value={reviewReason}
-                onChange={e => setReviewReason(e.target.value)}
-              />
-              <div className="button-container">
-                <button className="ultimate-btn ultimate-btn-success" onClick={submitReview} disabled={reviewBusy}>
-                  <div className="btn-content"><span className="btn-text">تأكيد</span></div>
-                </button>
-                <button className="ultimate-btn ultimate-btn-warning" onClick={() => !reviewBusy && setReviewOpen(false)} disabled={reviewBusy}>
-                  <div className="btn-content"><span className="btn-text">إلغاء</span></div>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Submit Note Modal */}
-      {submitOpen && (
-        <div className="transaction-modal" onClick={() => !submitBusy && setSubmitOpen(false)}>
-          <div className="transaction-modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header-row">
-              <h3 className="modal-title">إرسال للمراجعة</h3>
-              <button className="ultimate-btn ultimate-btn-delete" onClick={() => !submitBusy && setSubmitOpen(false)}>
-                <div className="btn-content"><span className="btn-text">إغلاق</span></div>
-              </button>
-            </div>
-            <div>
-              <label className="modal-title modal-label">ملاحظات الإرسال (اختياري)</label>
-              <textarea
-                className="textarea-field"
-                placeholder={'أدخل سبب/ملاحظات الإرسال'}
-                value={submitNote}
-                onChange={e => setSubmitNote(e.target.value)}
-              />
-              <div className="button-container">
-                <button className="ultimate-btn ultimate-btn-success" onClick={async () => {
-                  if (!submitTargetId) return
-                  setSubmitBusy(true)
-                  try {
-                    await submitTransaction(submitTargetId, submitNote)
-                    showToast('تم إرسال المعاملة للمراجعة بنجاح', { severity: 'success' })
-                    setSubmitOpen(false)
-                    setSubmitTargetId(null)
-                    setSubmitNote('')
-                    await reload()
-                    try { window.location.href = '/transactions/pending' } catch { /* ignore navigation error */ }
-                  } catch (e: any) {
-                    showToast(e?.message || 'فشل إرسال المعاملة للمراجعة', { severity: 'error' })
-                    logClientError({ context: 'transactions.submit', message: e?.message || '', extra: { id: submitTargetId, note: submitNote } })
-                  } finally {
-                    setSubmitBusy(false)
-                  }
-                }} disabled={submitBusy}>
-                  <div className="btn-content"><span className="btn-text">تأكيد الإرسال</span></div>
-                </button>
-                <button className="ultimate-btn ultimate-btn-warning" onClick={() => !submitBusy && setSubmitOpen(false)} disabled={submitBusy}>
-                  <div className="btn-content"><span className="btn-text">إلغاء</span></div>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Transactions Configuration Modal */}
-      {transactionsConfigOpen && (
-        <div className="transaction-modal" onClick={() => setTransactionsConfigOpen(false)}>
-          <div className="config-modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header-row">
-              <h3 className="modal-title">تخطيط عرض المعاملات</h3>
-              <button className="ultimate-btn ultimate-btn-delete" onClick={() => setTransactionsConfigOpen(false)}>
-                <div className="btn-content"><span className="btn-text">إغلاق</span></div>
-              </button>
-            </div>
-
-            <div className="config-modal-body">
-              <div className="config-section">
-                <h4>إعدادات العرض</h4>
-
-                <div className="config-field">
-                  <label className="config-label">
-                    <input
-                      type="checkbox"
-                      checked={transactionsConfig.showAuditInfo}
-                      onChange={(e) => setTransactionsConfig(prev => ({ ...prev, showAuditInfo: e.target.checked }))}
-                    />
-                    عرض معلومات التدقيق
-                  </label>
-                </div>
-
-                <div className="config-field">
-                  <label className="config-label">
-                    <input
-                      type="checkbox"
-                      checked={transactionsConfig.showApprovalBadges}
-                      onChange={(e) => setTransactionsConfig(prev => ({ ...prev, showApprovalBadges: e.target.checked }))}
-                    />
-                    عرض رموز حالة الاعتماد
-                  </label>
-                </div>
-
-                <div className="config-field">
-                  <label className="config-label">
-                    <input
-                      type="checkbox"
-                      checked={transactionsConfig.highlightPostedTransactions}
-                      onChange={(e) => setTransactionsConfig(prev => ({ ...prev, highlightPostedTransactions: e.target.checked }))}
-                    />
-                    تمييز المعاملات المرحلة
-                  </label>
-                </div>
-
-                <div className="config-field">
-                  <label className="config-label">
-                    <input
-                      type="checkbox"
-                      checked={transactionsConfig.groupByOrganization}
-                      onChange={(e) => setTransactionsConfig(prev => ({ ...prev, groupByOrganization: e.target.checked }))}
-                    />
-                    تجميع حسب المؤسسة
-                  </label>
-                </div>
-
-                <div className="config-field">
-                  <label className="config-label">
-                    <input
-                      type="checkbox"
-                      checked={transactionsConfig.autoRefresh}
-                      onChange={(e) => setTransactionsConfig(prev => ({ ...prev, autoRefresh: e.target.checked }))}
-                    />
-                    تحديث تلقائي
-                  </label>
-                </div>
-
-                <div className="config-field">
-                  <label className="config-label-block">
-                    حجم الصفحة الافتراضي:
-                    <select
-                      value={transactionsConfig.defaultPageSize}
-                      onChange={(e) => setTransactionsConfig(prev => ({ ...prev, defaultPageSize: parseInt(e.target.value) }))}
-                      className="config-select"
-                    >
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
-                  </label>
-                </div>
-
-                <div className="config-field">
-                  <label className="config-label-block">
-                    فلتر المبلغ الافتراضي:
-                    <select
-                      value={transactionsConfig.defaultAmountFilter}
-                      onChange={(e) => setTransactionsConfig(prev => ({ ...prev, defaultAmountFilter: e.target.value as 'all' | 'positive' | 'negative' }))}
-                      className="config-select"
-                    >
-                      <option value="all">جميع المبالغ</option>
-                      <option value="positive">مبالغ موجبة</option>
-                      <option value="negative">مبالغ سالبة</option>
-                    </select>
-                  </label>
-                </div>
-
-                <div className="config-field">
-                  <label className="config-label-block">
-                    نطاق التاريخ الافتراضي:
-                    <select
-                      value={transactionsConfig.defaultDateRange}
-                      onChange={(e) => setTransactionsConfig(prev => ({ ...prev, defaultDateRange: e.target.value as 'all' | 'month' | 'quarter' | 'year' }))}
-                      className="config-select"
-                    >
-                      <option value="all">جميع التواريخ</option>
-                      <option value="month">الشهر الحالي</option>
-                      <option value="quarter">الربع الحالي</option>
-                      <option value="year">العام الحالي</option>
-                    </select>
-                  </label>
-                </div>
-              </div>
-
-              <div className="config-section">
-                <h4>إعدادات التصدير</h4>
-
-                <div className="config-field">
-                  <label className="config-label-block">
-                    تنسيق التصدير الافتراضي:
-                    <select
-                      value={transactionsConfig.exportFormat}
-                      onChange={(e) => setTransactionsConfig(prev => ({ ...prev, exportFormat: e.target.value as 'excel' | 'pdf' | 'csv' }))}
-                      className="config-select"
-                    >
-                      <option value="excel">Excel (.xlsx)</option>
-                      <option value="pdf">PDF (.pdf)</option>
-                      <option value="csv">CSV (.csv)</option>
-                    </select>
-                  </label>
-                </div>
-              </div>
-
-              <div className="config-section">
-                <h4>عرض تحكم التخطيط</h4>
-                <div className="layout-control-section">
-                  <button
-                    className="ultimate-btn ultimate-btn-primary"
-                    onClick={() => {
-                      setTransactionsConfigOpen(false);
-                      setLineColumnsConfigOpen(true);
-                    }}
-                  >
-                    <div className="btn-content"><span className="btn-text">فتح تعديل الأعمدة</span></div>
-                  </button>
-                  <p className="config-help-text">يمكنك تخصيص عرض وترتيب وعرض الأعمدة</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="modal-actions">
-              <button
-                className="ultimate-btn ultimate-btn-success"
-                onClick={() => setTransactionsConfigOpen(false)}
-              >
-                <div className="btn-content"><span className="btn-text">حفظ الإعدادات</span></div>
-              </button>
-
-              <button
-                className="ultimate-btn ultimate-btn-warning"
-                onClick={() => {
-                  setTransactionsConfig({
-                    showAuditInfo: true,
-                    showApprovalBadges: true,
-                    defaultAmountFilter: 'all',
-                    defaultDateRange: 'all',
-                    defaultPageSize: 20,
-                    autoRefresh: false,
-                    exportFormat: 'excel',
-                    groupByOrganization: false,
-                    highlightPostedTransactions: true
-                  });
-                }}
-              >
-                <div className="btn-content"><span className="btn-text">إعادة تعيين</span></div>
-              </button>
-
-              <button
-                className="ultimate-btn ultimate-btn-delete"
-                onClick={() => setTransactionsConfigOpen(false)}
-              >
-                <div className="btn-content"><span className="btn-text">إلغاء</span></div>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        {/* Column Configuration Modal - Lines Table */}
+        <ColumnConfiguration
+          columns={lineColumns}
+          onConfigChange={handleLineColumnConfigChange}
+          isOpen={lineColumnsConfigOpen}
+          onClose={() => setLineColumnsConfigOpen(false)}
+          onReset={resetLineColumnsToDefaults}
+          sampleData={transactionLines as any}
+        />
 
 
-      {/* Transaction Analysis Modal */}
-      <TransactionAnalysisModal
-        open={analysisModalOpen}
-        transactionId={analysisTransactionId}
-        transactionLineId={analysisTransactionLineId}
-        onClose={closeCostAnalysisModal}
-        entryNumber={analysisTransaction?.entry_number}
-        description={analysisTransaction?.description}
-        effectiveTolerance={1.0}
-        transactionAmount={analysisTransaction?.amount ?? undefined}
-        orgId={analysisTransaction?.org_id || ''}
-        workItems={workItems}
-      />
+        <TransactionsDocumentsPanel
+          open={documentsOpen}
+          onClose={() => {
+            setDocumentsOpen(false)
+            setDocumentsFor(null)
+            setDocumentsForLine(null)
+          }}
+          transaction={documentsFor}
+          transactionLine={documentsForLine}
+        />
 
-      {/* Column Configuration Modal - Headers Table */}
-      <ColumnConfiguration
-        columns={columns}
-        onConfigChange={handleColumnConfigChange}
-        isOpen={headersColumnConfigOpen}
-        onClose={() => setHeadersColumnConfigOpen(false)}
-        onReset={resetToDefaults}
-        sampleData={tableData as any}
-      />
+        {/* Transaction Wizard - Using TransactionsDataContext for all dimensions */}
+        <TransactionWizard
+          open={wizardOpen}
+          onClose={() => {
+            setWizardOpen(false)
+            setEditingTx(null) // Clear edit state when closing
+          }}
+          onSubmit={async (data) => {
+            try {
+              console.log('Saving transaction:', data)
 
-      {/* Column Configuration Modal - Lines Table */}
-      <ColumnConfiguration
-        columns={lineColumns}
-        onConfigChange={handleLineColumnConfigChange}
-        isOpen={lineColumnsConfigOpen}
-        onClose={() => setLineColumnsConfigOpen(false)}
-        onReset={resetLineColumnsToDefaults}
-        sampleData={transactionLines as any}
-      />
+              // Get current user ID
+              const authService = await import('../../services/authService')
+              const userId = await authService.AuthService.getCurrentUserId()
 
-
-      <TransactionsDocumentsPanel
-        open={documentsOpen}
-        onClose={() => {
-          setDocumentsOpen(false)
-          setDocumentsFor(null)
-          setDocumentsForLine(null)
-        }}
-        transaction={documentsFor}
-        transactionLine={documentsForLine}
-      />
-
-      {/* Transaction Wizard - Using TransactionsDataContext for all dimensions */}
-      <TransactionWizard
-        open={wizardOpen}
-        onClose={() => {
-          setWizardOpen(false)
-          setEditingTx(null) // Clear edit state when closing
-        }}
-        onSubmit={async (data) => {
-          try {
-            console.log('Saving transaction:', data)
-
-            // Get current user ID
-            const authService = await import('../../services/authService')
-            const userId = await authService.AuthService.getCurrentUserId()
-
-            // Save transaction header to Supabase
-            const { data: transaction, error: txError } = await supabase
-              .from('transactions')
-              .insert({
-                entry_date: data.entry_date,
-                description: data.description,
-                description_ar: data.description_ar,
-                org_id: data.org_id,
-                project_id: data.project_id,
-                reference_number: data.reference_number,
-                notes: data.notes,
-                notes_ar: data.notes_ar,
-                created_by: userId
-              })
-              .select()
-              .single()
-
-            if (txError) {
-              console.error('Error saving transaction:', txError)
-              throw new Error(txError.message || 'فشل حفظ المعاملة')
-            }
-
-            console.log('Transaction saved:', transaction)
-
-            // Save transaction lines
-            if (data.lines && data.lines.length > 0) {
-              const linesData = data.lines.map((line: any) => ({
-                transaction_id: transaction.id,
-                line_no: line.line_no,
-                account_id: line.account_id,
-                debit_amount: line.debit_amount || 0,
-                credit_amount: line.credit_amount || 0,
-                description: line.description,
-                org_id: line.org_id || data.org_id,
-                project_id: line.project_id || data.project_id,
-                cost_center_id: line.cost_center_id,
-                work_item_id: line.work_item_id,
-                analysis_work_item_id: line.analysis_work_item_id,
-                classification_id: line.classification_id,
-                sub_tree_id: line.sub_tree_id
-              }))
-
-              const { data: savedLines, error: linesError } = await supabase
-                .from('transaction_lines')
-                .insert(linesData)
+              // Save transaction header to Supabase
+              const { data: transaction, error: txError } = await supabase
+                .from('transactions')
+                .insert({
+                  entry_date: data.entry_date,
+                  description: data.description,
+                  description_ar: data.description_ar,
+                  org_id: data.org_id,
+                  project_id: data.project_id,
+                  reference_number: data.reference_number,
+                  notes: data.notes,
+                  notes_ar: data.notes_ar,
+                  created_by: userId
+                })
                 .select()
+                .single()
 
-              if (linesError) {
-                console.error('Error saving transaction lines:', linesError)
-                throw new Error(linesError.message || 'فشل حفظ بنود المعاملة')
+              if (txError) {
+                console.error('Error saving transaction:', txError)
+                throw new Error(txError.message || 'فشل حفظ المعاملة')
               }
 
-              console.log('Transaction lines saved successfully')
+              console.log('Transaction saved:', transaction)
 
-              // Upload and link staged documents
-              if (data.attachments) {
-                const { uploadDocument, linkDocumentToTransactionLine } = await import('../../services/documents')
+              // Save transaction lines
+              if (data.lines && data.lines.length > 0) {
+                const linesData = data.lines.map((line: any) => ({
+                  transaction_id: transaction.id,
+                  line_no: line.line_no,
+                  account_id: line.account_id,
+                  debit_amount: line.debit_amount || 0,
+                  credit_amount: line.credit_amount || 0,
+                  description: line.description,
+                  org_id: line.org_id || data.org_id,
+                  project_id: line.project_id || data.project_id,
+                  cost_center_id: line.cost_center_id,
+                  work_item_id: line.work_item_id,
+                  analysis_work_item_id: line.analysis_work_item_id,
+                  classification_id: line.classification_id,
+                  sub_tree_id: line.sub_tree_id
+                }))
 
-                // Upload and link line-level documents
-                if (data.attachments.lines && Object.keys(data.attachments.lines).length > 0) {
-                  for (const [lineIdx, files] of Object.entries(data.attachments.lines)) {
-                    const lineIndex = Number(lineIdx)
-                    const savedLine = savedLines?.[lineIndex]
+                const { data: savedLines, error: linesError } = await supabase
+                  .from('transaction_lines')
+                  .insert(linesData)
+                  .select()
 
-                    if (savedLine && Array.isArray(files) && files.length > 0) {
-                      for (const file of files) {
-                        try {
-                          // Upload document
-                          const uploadResult = await uploadDocument({
-                            orgId: data.org_id,
-                            title: file.name,
-                            file: file,
-                            projectId: data.project_id || undefined
-                          })
+                if (linesError) {
+                  console.error('Error saving transaction lines:', linesError)
+                  throw new Error(linesError.message || 'فشل حفظ بنود المعاملة')
+                }
 
-                          // Link to transaction line
-                          await linkDocumentToTransactionLine(uploadResult.document.id, savedLine.id)
-                          console.log(`Document ${file.name} uploaded and linked to line ${savedLine.line_no}`)
-                        } catch (docError) {
-                          console.error(`Failed to upload/link document ${file.name}:`, docError)
-                          // Continue with other documents even if one fails
+                console.log('Transaction lines saved successfully')
+
+                // Upload and link staged documents
+                if (data.attachments) {
+                  const { uploadDocument, linkDocumentToTransactionLine } = await import('../../services/documents')
+
+                  // Upload and link line-level documents
+                  if (data.attachments.lines && Object.keys(data.attachments.lines).length > 0) {
+                    for (const [lineIdx, files] of Object.entries(data.attachments.lines)) {
+                      const lineIndex = Number(lineIdx)
+                      const savedLine = savedLines?.[lineIndex]
+
+                      if (savedLine && Array.isArray(files) && files.length > 0) {
+                        for (const file of files) {
+                          try {
+                            // Upload document
+                            const uploadResult = await uploadDocument({
+                              orgId: data.org_id,
+                              title: file.name,
+                              file: file,
+                              projectId: data.project_id || undefined
+                            })
+
+                            // Link to transaction line
+                            await linkDocumentToTransactionLine(uploadResult.document.id, savedLine.id)
+                            console.log(`Document ${file.name} uploaded and linked to line ${savedLine.line_no}`)
+                          } catch (docError) {
+                            console.error(`Failed to upload/link document ${file.name}:`, docError)
+                            // Continue with other documents even if one fails
+                          }
                         }
                       }
                     }
                   }
-                }
 
-                // Upload and link transaction-level documents
-                if (data.attachments.transaction && Array.isArray(data.attachments.transaction) && data.attachments.transaction.length > 0) {
-                  const { linkDocument } = await import('../../services/documents')
-                  for (const file of data.attachments.transaction) {
-                    try {
-                      // Upload document
-                      const uploadResult = await uploadDocument({
-                        orgId: data.org_id,
-                        title: file.name,
-                        file: file,
-                        projectId: data.project_id || undefined
-                      })
+                  // Upload and link transaction-level documents
+                  if (data.attachments.transaction && Array.isArray(data.attachments.transaction) && data.attachments.transaction.length > 0) {
+                    const { linkDocument } = await import('../../services/documents')
+                    for (const file of data.attachments.transaction) {
+                      try {
+                        // Upload document
+                        const uploadResult = await uploadDocument({
+                          orgId: data.org_id,
+                          title: file.name,
+                          file: file,
+                          projectId: data.project_id || undefined
+                        })
 
-                      // Link to transaction
-                      await linkDocument(uploadResult.document.id, 'transactions', transaction.id)
-                      console.log(`Document ${file.name} uploaded and linked to transaction`)
-                    } catch (docError) {
-                      console.error(`Failed to upload/link document ${file.name}:`, docError)
-                      // Continue with other documents even if one fails
+                        // Link to transaction
+                        await linkDocument(uploadResult.document.id, 'transactions', transaction.id)
+                        console.log(`Document ${file.name} uploaded and linked to transaction`)
+                      } catch (docError) {
+                        console.error(`Failed to upload/link document ${file.name}:`, docError)
+                        // Continue with other documents even if one fails
+                      }
                     }
                   }
                 }
               }
+
+              // Reload transactions
+              await reload()
+
+              // Success - the wizard will show success message
+              console.log('Transaction created successfully!')
+            } catch (error: any) {
+              console.error('Transaction creation failed:', error)
+              throw error // Re-throw to let the wizard handle the error
             }
-
-            // Reload transactions
-            await reload()
-
-            // Success - the wizard will show success message
-            console.log('Transaction created successfully!')
-          } catch (error: any) {
-            console.error('Transaction creation failed:', error)
-            throw error // Re-throw to let the wizard handle the error
-          }
-        }}
-        // All data from TransactionsDataContext - single source of truth
-        accounts={accounts}
-        projects={projects}
-        organizations={organizations}
-        classifications={classifications}
-        categories={categories}
-        workItems={workItems}
-        costCenters={costCenters}
-        analysisItemsMap={analysisItemsMap}
-        
-        // Edit mode support
-        mode={editingTx ? 'edit' : 'create'}
-        transactionId={editingTx?.id}
-        initialData={editingTx ? {
-          header: {
-            entry_date: editingTx.entry_date,
-            description: editingTx.description,
-            description_ar: (editingTx as any).description_ar || '',
-            org_id: editingTx.org_id,
-            project_id: editingTx.project_id,
-            reference_number: editingTx.reference_number || '',
-            notes: editingTx.notes || '',
-            notes_ar: (editingTx as any).notes_ar || '',
-            classification_id: editingTx.classification_id || '',
-            default_cost_center_id: editingTx.cost_center_id || '',
-            default_work_item_id: (editingTx as any).work_item_id || '',
-            default_sub_tree_id: (editingTx as any).sub_tree_id || ''
-          },
-          lines: transactionLines.map((line, idx) => ({
-            id: line.id,
-            line_no: idx + 1,
-            account_id: line.account_id,
-            debit_amount: Number(line.debit_amount || 0),
-            credit_amount: Number(line.credit_amount || 0),
-            description: line.description || '',
-            org_id: line.org_id || editingTx.org_id,
-            project_id: line.project_id || editingTx.project_id,
-            cost_center_id: line.cost_center_id || '',
-            work_item_id: line.work_item_id || '',
-            analysis_work_item_id: line.analysis_work_item_id || '',
-            classification_id: line.classification_id || '',
-            sub_tree_id: line.sub_tree_id || ''
-          }))
-        } : undefined}
-        approvalStatus={editingTx ? (editingTx as any).approval_status : undefined}
-        canEdit={editingTx ? hasPerm('transactions.update') : true}
-        onEditComplete={() => {
-          setEditingTx(null)
-          setWizardOpen(false)
-          reload() // Refresh the transactions list
-        }}
-      />
-      
-      {/* Unified Transaction Details Panel */}
-      {_detailsOpen && detailsFor && (
-        <UnifiedTransactionDetailsPanel
-          transaction={detailsFor}
-          audit={audit}
-          approvalHistory={approvalHistory}
-          userNames={userNames}
-          transactionLines={detailsFor?.lines || []}
+          }}
+          // All data from TransactionsDataContext - single source of truth
           accounts={accounts}
           projects={projects}
           organizations={organizations}
@@ -2362,108 +2224,130 @@ const TransactionsPage: React.FC = () => {
           workItems={workItems}
           costCenters={costCenters}
           analysisItemsMap={analysisItemsMap}
-          currentUserId={currentUserId}
-          mode={mode}
-          canEdit={hasPerm('transactions.update')}
-          canDelete={hasPerm('transactions.delete')}
-          canReview={hasPerm('transactions.review')}
-          canPost={hasPerm('transactions.post')}
-          canManage={hasPerm('transactions.manage')}
-          autoOpenDeleteModal={autoOpenDeleteModal}
-          onDeleteModalHandled={() => setAutoOpenDeleteModal(false)}
-          onClose={handleDetailsPanelClose}
-          onUpdate={async (updatedTransaction: TransactionRecord) => {
-            try {
-              const updateData = {
-                entry_date: updatedTransaction.entry_date,
-                description: updatedTransaction.description,
-                reference_number: updatedTransaction.reference_number || null,
-                debit_account_id: updatedTransaction.debit_account_id,
-                credit_account_id: updatedTransaction.credit_account_id,
-                amount: updatedTransaction.amount,
-                org_id: updatedTransaction.org_id,
-                project_id: updatedTransaction.project_id,
-                cost_center_id: updatedTransaction.cost_center_id,
-                classification_id: updatedTransaction.classification_id,
-                notes: updatedTransaction.notes
-              }
-              await updateTransaction(detailsFor.id, updateData)
-              showToast('تم تحديث المعاملة', { severity: 'success' })
-              reload()
-              _setDetailsOpen(false)
-            } catch (error: any) {
-              showToast('فشل في تحديث المعاملة', { severity: 'error' })
-              console.error('Update error:', error)
-            }
-          }}
-          onEditWithWizard={async (tx: TransactionRecord) => {
-            // Close details panel and open wizard for editing
-            _setDetailsOpen(false)
-            setEditingTx(tx)
-            setWizardOpen(true)
-          }}
-          onSubmitForReview={async (txId: string, note: string) => {
-            try {
-              await submitTransaction(txId, note)
-              showToast('تم إرسال المعاملة للمراجعة', { severity: 'success' })
-              reload()
-              _setDetailsOpen(false)
-            } catch (error: any) {
-              showToast('فشل في إرسال المعاملة', { severity: 'error' })
-            }
-          }}
-          onApprove={async (txId: string, reason?: string) => {
-            try {
-              await approveTransaction(txId, reason)
-              showToast('تم اعتماد المعاملة', { severity: 'success' })
-              reload()
-              _setDetailsOpen(false)
-            } catch (error: any) {
-              showToast('فشل في اعتماد المعاملة', { severity: 'error' })
-            }
-          }}
-          onReject={async (txId: string, reason: string) => {
-            try {
-              await rejectTransaction(txId, reason)
-              showToast('تم رفض المعاملة', { severity: 'success' })
-              reload()
-              _setDetailsOpen(false)
-            } catch (error: any) {
-              showToast('فشل في رفض المعاملة', { severity: 'error' })
-            }
-          }}
-          onRequestRevision={async (txId: string, reason: string) => {
-            try {
-              await requestRevision(txId, reason)
-              showToast('تم إرجاع المعاملة للتعديل', { severity: 'success' })
-              reload()
-              _setDetailsOpen(false)
-            } catch (error: any) {
-              showToast('فشل في إرجاع المعاملة', { severity: 'error' })
-            }
-          }}
-          onPost={async (txId: string) => {
-            try {
-              await postTransaction(txId)
-              showToast('تم ترحيل المعاملة', { severity: 'success' })
-              reload()
-              _setDetailsOpen(false)
-            } catch (error: any) {
-              showToast('فشل في ترحيل المعاملة', { severity: 'error' })
-            }
-          }}
-          onDelete={async (txId: string) => {
-            try {
-              await deleteTransaction(txId)
-              showToast('تم حذف المعاملة', { severity: 'success' })
-              reload()
-              _setDetailsOpen(false)
-            } catch (error: any) {
-              showToast('فشل في حذف المعاملة', { severity: 'error' })
-            }
+
+          // Edit mode support
+          mode={editingTx ? 'edit' : 'create'}
+          transactionId={editingTx?.id}
+          initialData={editingTx ? {
+            header: {
+              entry_date: editingTx.entry_date,
+              description: editingTx.description,
+              description_ar: (editingTx as any).description_ar || '',
+              org_id: editingTx.org_id,
+              project_id: editingTx.project_id,
+              reference_number: editingTx.reference_number || '',
+              notes: editingTx.notes || '',
+              notes_ar: (editingTx as any).notes_ar || '',
+              classification_id: editingTx.classification_id || '',
+              default_cost_center_id: editingTx.cost_center_id || '',
+              default_work_item_id: (editingTx as any).work_item_id || '',
+              default_sub_tree_id: (editingTx as any).sub_tree_id || ''
+            },
+            lines: transactionLines.map((line, idx) => ({
+              id: line.id,
+              line_no: idx + 1,
+              account_id: line.account_id,
+              debit_amount: Number(line.debit_amount || 0),
+              credit_amount: Number(line.credit_amount || 0),
+              description: line.description || '',
+              org_id: line.org_id || editingTx.org_id,
+              project_id: line.project_id || editingTx.project_id,
+              cost_center_id: line.cost_center_id || '',
+              work_item_id: line.work_item_id || '',
+              analysis_work_item_id: line.analysis_work_item_id || '',
+              classification_id: line.classification_id || '',
+              sub_tree_id: line.sub_tree_id || ''
+            }))
+          } : undefined}
+          approvalStatus={editingTx ? (editingTx as any).approval_status : undefined}
+          canEdit={editingTx ? hasPerm('transactions.update') : true}
+          onEditComplete={() => {
+            setEditingTx(null)
+            setWizardOpen(false)
+            reload() // Refresh the transactions list
           }}
         />
-      )}
+
+        {/* Unified Transaction Details Panel */}
+        {_detailsOpen && detailsFor && (
+          <UnifiedTransactionDetailsPanel
+            transaction={detailsFor}
+            audit={audit}
+            approvalHistory={approvalHistory}
+            userNames={userNames}
+            transactionLines={detailsFor?.lines || []}
+            accounts={accounts}
+            projects={projects}
+            organizations={organizations}
+            classifications={classifications}
+            categories={categories}
+            workItems={workItems}
+            costCenters={costCenters}
+            analysisItemsMap={analysisItemsMap}
+            currentUserId={currentUserId}
+            mode={mode}
+            canEdit={hasPerm('transactions.update')}
+            canDelete={hasPerm('transactions.delete')}
+            canReview={hasPerm('transactions.review')}
+            canPost={hasPerm('transactions.post')}
+            canManage={hasPerm('transactions.manage')}
+            autoOpenDeleteModal={autoOpenDeleteModal}
+            onDeleteModalHandled={() => setAutoOpenDeleteModal(false)}
+            onClose={handleDetailsPanelClose}
+            onUpdate={async (updatedTransaction: TransactionRecord) => {
+              try {
+                const updateData = {
+                  entry_date: updatedTransaction.entry_date,
+                  description: updatedTransaction.description,
+                  reference_number: updatedTransaction.reference_number || null,
+                  debit_account_id: updatedTransaction.debit_account_id,
+                  credit_account_id: updatedTransaction.credit_account_id,
+                  amount: updatedTransaction.amount,
+                  org_id: updatedTransaction.org_id,
+                  project_id: updatedTransaction.project_id,
+                  cost_center_id: updatedTransaction.cost_center_id,
+                  classification_id: updatedTransaction.classification_id,
+                  notes: updatedTransaction.notes
+                }
+                await updateTransaction(detailsFor.id, updateData)
+                showToast('تم تحديث المعاملة', { severity: 'success' })
+                reload()
+                _setDetailsOpen(false)
+              } catch (error: any) {
+                showToast('فشل في تحديث المعاملة', { severity: 'error' })
+                console.error('Update error:', error)
+              }
+            }}
+            onEditWithWizard={async (tx: TransactionRecord) => {
+              // Close details panel and open wizard for editing
+              _setDetailsOpen(false)
+              setEditingTx(tx)
+              setWizardOpen(true)
+            }}
+            onOpenEnhancedReview={(id) => openEnhancedReview(id)}
+            onOpenLineReview={handleOpenLineReview}
+            onPost={async (txId: string) => {
+              try {
+                await postTransaction(txId)
+                showToast('تم ترحيل المعاملة', { severity: 'success' })
+                reload()
+                _setDetailsOpen(false)
+              } catch {
+                showToast('فشل في ترحيل المعاملة', { severity: 'error' })
+              }
+            }}
+            onDelete={async (txId: string) => {
+              try {
+                await deleteTransaction(txId)
+                showToast('تم حذف المعاملة', { severity: 'success' })
+                reload()
+                _setDetailsOpen(false)
+              } catch {
+                showToast('فشل في حذف المعاملة', { severity: 'error' })
+              }
+            }}
+          />
+        )}
       </div>
     </div>
   )

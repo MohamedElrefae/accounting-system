@@ -2,17 +2,17 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useToast } from '../../../contexts/ToastContext';
 import { useHasPermission } from '../../../hooks/useHasPermission';
 import { getOrganizations } from '../../../services/organization';
-import { getActiveOrgId, getActiveProjectId } from '../../../utils/org';
 import { supabase } from '../../../utils/supabase';
 import { useDocuments } from '../../../hooks/documents/useDocuments';
 import { uploadDocument, getSignedUrl, type Document as SvcDocument } from '../../../services/documents';
 import CategorySelectDialog from '../../../components/documents/CategorySelectDialog';
 import { downloadZip } from '../../../services/zip';
-import { listFolders, getUnfiledFolderId, createFolder, renameFolder, deleteFolder, type DocumentFolder } from '../../../services/document-folders';
+import { listFolders, getUnfiledFolderId, createFolder, deleteFolder, type DocumentFolder } from '../../../services/document-folders';
 import DocumentDetailsDrawer from '../../../components/documents/DocumentDetailsDrawer';
 import { moveDocument, deleteDocument } from '../../../services/documents';
 import FolderPermissionsDialog from '../../../components/documents/FolderPermissionsDialog';
 import DocumentPermissionsDialog from '../../../components/documents/DocumentPermissionsDialog';
+import { useScopeOptional } from '../../../contexts/ScopeContext';
 
 import DocumentManagementLayout, { 
   type Document, 
@@ -42,13 +42,15 @@ const DocumentManagementPage: React.FC = () => {
   
   // Permissions
   const hasPermission = useHasPermission();
+
+  const scope = useScopeOptional();
+  const orgId = scope?.currentOrg?.id || '';
+  const projectId = scope?.currentProject?.id || '';
   
   // Organization and Project state
   const [organizations, setOrganizations] = useState<Array<{ id: string; name: string; code: string }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; name: string; name_ar?: string }>>([]);
-  const [orgId, setOrgId] = useState<string>(() => getActiveOrgId() || '');
-  const [projectId, setProjectId] = useState<string>(() => getActiveProjectId() || '');
-
+  
   // Folders state
   const [folders, setFolders] = useState<DocumentFolder[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -66,7 +68,7 @@ const DocumentManagementPage: React.FC = () => {
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   
   // UI state
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode] = useState<'grid' | 'list'>('grid');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -121,7 +123,7 @@ const DocumentManagementPage: React.FC = () => {
         // Set default org if not already set
         if (!orgId && orgs && orgs.length > 0) {
           const defaultOrgId = orgs[0].id as string;
-          setOrgId(defaultOrgId);
+          if (scope) { void scope.setOrganization(defaultOrgId) }
         }
       } catch (error) {
         console.error('Failed to initialize document management:', error);
@@ -132,7 +134,7 @@ const DocumentManagementPage: React.FC = () => {
     };
     
     initializeData();
-  }, [orgId, showToast]);
+  }, [orgId, showToast, scope]);
   
   // Load projects & folders when organization changes
   useEffect(() => {
@@ -193,28 +195,22 @@ const DocumentManagementPage: React.FC = () => {
         const map: Record<string, string> = {};
         (data || []).forEach((c: any) => { map[c.id] = c.name; });
         setCategoryNames(map);
-      } catch (e) {
+      } catch {
         setCategoryNames({});
       }
     };
     
     loadProjects();
-  }, [orgId]);
-  
-  // Reset project selection when organization changes
-  useEffect(() => {
-    setProjectId('');
-  }, [orgId]);
+  }, [orgId, selectedFolderId]);
   
   // Event handlers
   const handleOrgChange = useCallback((newOrgId: string) => {
-    setOrgId(newOrgId);
-    setProjectId(''); // Reset project when org changes
-  }, []);
+    if (scope) { void scope.setOrganization(newOrgId) }
+  }, [scope]);
   
   const handleProjectChange = useCallback((newProjectId: string) => {
-    setProjectId(newProjectId);
-  }, []);
+    if (scope) { void scope.setProject(newProjectId || null) }
+  }, [scope]);
   
   const handleSearchChange = useCallback((newSearchText: string) => {
     setSearchText(newSearchText);
@@ -263,7 +259,7 @@ const DocumentManagementPage: React.FC = () => {
       } else {
         showToast(`Unable to open document details for: ${doc.title}`, { severity: 'warning' });
       }
-    } catch (e) {
+    } catch {
       showToast('Unable to open document details', { severity: 'error' });
     }
   }, [documentsData?.data, showToast]);
@@ -301,33 +297,12 @@ const DocumentManagementPage: React.FC = () => {
   
   // Build props for layout component
   const onFileSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    try {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      setPendingFile(file);
-      setCategoryDialogOpen(true);
-      return;
-      if (!orgId) {
-        showToast('Select an organization first', { severity: 'warning' });
-        return;
-      }
-
-      const title = (file as any).name?.split('.')?.slice(0, -1).join('.') || 'Untitled document';
-      const { document, version } = await uploadDocument({ orgId, title, file, folderId: selectedFolderId || undefined });
-      // Try to get a quick signed URL to validate storage path
-      try {
-        const url = await getSignedUrl(version.storage_path);
-        console.debug('Signed URL generated', url);
-      } catch {}
-      showToast('Document uploaded successfully', { severity: 'success' });
-    } catch (err: any) {
-      console.error('Upload failed', err);
-      showToast(err?.message || 'Upload failed', { severity: 'error' });
-    } finally {
-      try { if (fileInputRef.current) (fileInputRef.current as any).value = ''; } catch {}
-    }
-  }, [orgId, showToast, selectedFolderId]);
-
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPendingFile(file);
+    setCategoryDialogOpen(true);
+  }, []);
+  
   const layoutProps: DocumentManagementLayoutProps = {
     // Organization and project data
     organizations,

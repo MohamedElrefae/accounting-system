@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../utils/supabase';
 import { useAuth } from './useAuth';
 
@@ -8,17 +8,12 @@ export function usePermissions() {
   const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (user) {
-      loadPermissions();
-    } else {
-      setPermissions([]);
-      setLoading(false);
-    }
-  }, [user]);
-
-  const loadPermissions = async () => {
+  const loadPermissions = useCallback(async () => {
     try {
+      if (!user?.id) {
+        setPermissions([]);
+        return;
+      }
       setLoading(true);
       
       // Get user's active role IDs (simple query to avoid nested relationship 406)
@@ -106,7 +101,16 @@ export function usePermissions() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (user) {
+      loadPermissions();
+    } else {
+      setPermissions([]);
+      setLoading(false);
+    }
+  }, [user, loadPermissions]);
 
   const hasPermission = (permission: string): boolean => {
     return permissions.includes('*') || permissions.includes(permission);

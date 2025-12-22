@@ -310,7 +310,7 @@ export const TransactionSettingsPanel: React.FC<TransactionSettingsPanelProps> =
       await onSave?.()
       setSaveMessage('تم حفظ الإعدادات بنجاح')
       setTimeout(() => setSaveMessage(null), 3000)
-    } catch (error) {
+    } catch {
       setSaveMessage('حدث خطأ أثناء حفظ الإعدادات')
       setTimeout(() => setSaveMessage(null), 3000)
     } finally {

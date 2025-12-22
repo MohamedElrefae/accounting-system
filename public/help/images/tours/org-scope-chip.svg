@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1e88e5"/>
+      <stop offset="1" stop-color="#00acc1"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="500" fill="#0b1020"/>
+  <rect x="40" y="40" width="820" height="420" rx="20" fill="#111a33" stroke="#223"/>
+  <rect x="80" y="90" width="520" height="56" rx="28" fill="url(#g)" opacity="0.9"/>
+  <text x="110" y="126" font-family="Segoe UI, Arial" font-size="22" fill="#fff">Scope chip / زر النطاق</text>
+  <text x="80" y="190" font-family="Segoe UI, Arial" font-size="20" fill="#cbd5e1">Placeholder screenshot</text>
+  <text x="80" y="226" font-family="Segoe UI, Arial" font-size="16" fill="#94a3b8">Replace this file with your real screenshot:</text>
+  <text x="80" y="252" font-family="Consolas, monospace" font-size="14" fill="#94a3b8">public/help/images/tours/org-scope-chip.svg</text>
+</svg>

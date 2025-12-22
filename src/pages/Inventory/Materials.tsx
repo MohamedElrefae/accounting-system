@@ -13,14 +13,13 @@ import ColumnConfiguration from '@/components/Common/ColumnConfiguration'
 import type { ColumnConfig } from '@/components/Common/ColumnConfiguration'
 import useColumnPreferences from '@/hooks/useColumnPreferences'
 import '../MainData/AccountsTree.css'
-
-function getActiveOrgIdSafe(): string | null {
-  try { return localStorage.getItem('org_id') } catch { return null }
-}
+import { useScopeOptional } from '@/contexts/ScopeContext'
 
 const MaterialsPage: React.FC = () => {
   const { showToast } = useToast()
   const { t, isRTL } = useArabicLanguage()
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
   const [rows, setRows] = useState<MaterialRow[]>([])
   const [loading, setLoading] = useState(false)
   const [uoms, setUoms] = useState<UomRow[]>([])
@@ -85,7 +84,6 @@ const MaterialsPage: React.FC = () => {
   }), [isRTL, uomOptions])
 
   const fetchData = useCallback(async () => {
-    const orgId = getActiveOrgIdSafe()
     if (!orgId) {
       showToast(isRTL ? 'الرجاء اختيار مؤسسة أولاً' : 'Please select an organization first', { severity: 'warning' })
       return
@@ -102,7 +100,7 @@ const MaterialsPage: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }, [showToast, isRTL])
+  }, [showToast, isRTL, orgId])
 
   useEffect(() => {
     fetchData().catch(() => {})
@@ -211,7 +209,7 @@ const MaterialsPage: React.FC = () => {
   }, [editingRow])
 
   const handleFormSubmit = async (data: Record<string, unknown>) => {
-    const orgId = getActiveOrgIdSafe()
+    const orgId = scope?.currentOrg?.id
     if (!orgId) {
       showToast(t({ en: 'Please select an organization first', ar: 'الرجاء اختيار مؤسسة أولاً' }), { severity: 'warning' })
       return

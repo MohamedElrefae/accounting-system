@@ -5,15 +5,10 @@ import {
   DialogContent,
   DialogActions,
   Button,
-  Chip,
   Box,
   Typography,
   Alert,
   CircularProgress,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   IconButton,
   Card,
   CardContent,
@@ -38,7 +33,6 @@ import {
   Close as CloseIcon,
   ExpandMore as ExpandMoreIcon,
   SelectAll as SelectAllIcon,
-  Clear as ClearIcon,
   Security as SecurityIcon,
   Group as GroupIcon
 } from '@mui/icons-material';

@@ -1,12 +1,14 @@
 import React, { useState } from 'react'
-import type { ReportUser, SyncMode } from '../../hooks/useUniversalReportSync'
+// import type { ReportUser, SyncMode } from '../../hooks/useUniversalReportSync' // Deleted
+
+export type SyncMode = 'realtime' | 'manual' | 'interval' | 'idle' | 'off'
 
 interface ReportSyncStatusProps {
   isConnected: boolean
-  pendingUpdates: boolean
-  activeUsers: ReportUser[]
+  pendingUpdates?: boolean
+  activeUsers?: any[]
   lastUpdate: number | null
-  error: string | null
+  error?: string | null
   syncMode?: SyncMode
   isPaused?: boolean
   pauseReason?: string
@@ -39,14 +41,14 @@ const ReportSyncStatus: React.FC<ReportSyncStatusProps> = ({
   const [showControls, setShowControls] = useState(false)
   const formatLastUpdate = (timestamp: number | null) => {
     if (!timestamp) return 'لم يتم التحديث'
-    
+
     const now = Date.now()
     const diff = now - timestamp
-    
+
     if (diff < 60000) return 'منذ لحظات'
     if (diff < 3600000) return `منذ ${Math.floor(diff / 60000)} دقيقة`
     if (diff < 86400000) return `منذ ${Math.floor(diff / 3600000)} ساعة`
-    
+
     return new Date(timestamp).toLocaleDateString('ar-EG')
   }
 
@@ -85,7 +87,7 @@ const ReportSyncStatus: React.FC<ReportSyncStatusProps> = ({
 
   return (
     <>
-      <div 
+      <div
         className={className}
         style={{
           display: 'flex',
@@ -100,55 +102,55 @@ const ReportSyncStatus: React.FC<ReportSyncStatusProps> = ({
           direction: 'rtl'
         }}
       >
-      {/* Connection Status */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <span style={{ fontSize: '12px' }}>{getStatusIcon()}</span>
-        <span style={{ color: getStatusColor(), fontWeight: '500' }}>
-          {getStatusText()}
-        </span>
-      </div>
-
-      {/* Last Update Time */}
-      {lastUpdate && (
-        <div style={{ fontSize: '12px', color: 'var(--muted_text)' }}>
-          آخر تحديث: {formatLastUpdate(lastUpdate)}
-        </div>
-      )}
-
-      {/* Active Users Count */}
-      {activeUsers.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <span>👥</span>
-          <span style={{ fontSize: '12px', color: 'var(--muted_text)' }}>
-            {activeUsers.length} مستخدم متصل
+        {/* Connection Status */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '12px' }}>{getStatusIcon()}</span>
+          <span style={{ color: getStatusColor(), fontWeight: '500' }}>
+            {getStatusText()}
           </span>
         </div>
-      )}
 
-      {/* Manual Refresh Button */}
-      {onRefresh && (
-        <button
-          onClick={onRefresh}
-          style={{
-            padding: '4px 8px',
-            backgroundColor: 'var(--accent)',
-            color: 'var(--on-accent)',
-            border: 'none',
-            borderRadius: '4px',
-            fontSize: '12px',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--accent-hover)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--accent)'
-          }}
-        >
-          تحديث يدوي
-        </button>
-      )}
+        {/* Last Update Time */}
+        {lastUpdate && (
+          <div style={{ fontSize: '12px', color: 'var(--muted_text)' }}>
+            آخر تحديث: {formatLastUpdate(lastUpdate)}
+          </div>
+        )}
+
+        {/* Active Users Count */}
+        {activeUsers.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span>👥</span>
+            <span style={{ fontSize: '12px', color: 'var(--muted_text)' }}>
+              {activeUsers.length} مستخدم متصل
+            </span>
+          </div>
+        )}
+
+        {/* Manual Refresh Button */}
+        {onRefresh && (
+          <button
+            onClick={onRefresh}
+            style={{
+              padding: '4px 8px',
+              backgroundColor: 'var(--accent)',
+              color: 'var(--on-accent)',
+              border: 'none',
+              borderRadius: '4px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--accent-hover)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--accent)'
+            }}
+          >
+            تحديث يدوي
+          </button>
+        )}
 
         {/* Sync Mode Display */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

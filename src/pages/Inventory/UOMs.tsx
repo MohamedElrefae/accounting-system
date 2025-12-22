@@ -1,9 +1,9 @@
-import { useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { Box, Paper, Stack, Typography, Button, IconButton, Tooltip, Dialog, DialogContent, Menu, MenuItem, useTheme } from '@mui/material'
 import { DataGrid, type GridColDef } from '@mui/x-data-grid'
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Download as DownloadIcon } from '@mui/icons-material'
 import { supabase } from '@/utils/supabase'
-import { getActiveOrgId } from '@/utils/org'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useArabicLanguage } from '@/services/ArabicLanguageService'
 import UnifiedCRUDForm, { type FormConfig, type UnifiedCRUDFormHandle } from '@/components/Common/UnifiedCRUDForm'
@@ -22,7 +22,8 @@ interface UomRow {
 
 export default function UOMsPage() {
   const theme = useTheme()
-  const orgId = getActiveOrgId?.() || null
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || null
   const { showToast } = useToast()
   const { isRTL } = useArabicLanguage()
   const formRef = useRef<UnifiedCRUDFormHandle>(null)
@@ -35,7 +36,7 @@ export default function UOMsPage() {
   const [exportAnchor, setExportAnchor] = useState<null | HTMLElement>(null)
   const [exporting, setExporting] = useState(false)
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!orgId) return
     setLoading(true)
     try {
@@ -47,9 +48,9 @@ export default function UOMsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [orgId, showToast])
 
-  useEffect(() => { fetchData() }, [orgId])
+  useEffect(() => { fetchData() }, [fetchData])
 
   const formConfig: FormConfig = {
     title: isRTL ? 'وحدة القياس' : 'Unit of Measure',

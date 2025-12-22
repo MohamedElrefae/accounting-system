@@ -15,7 +15,6 @@ import {
   Chip,
   Card,
   CardContent,
-  CardHeader,
   LinearProgress,
   IconButton,
   Tooltip,
@@ -29,7 +28,6 @@ import {
   Stepper,
   Step,
   StepLabel,
-  StepContent,
   Fade,
   Grow,
   CircularProgress,
@@ -40,7 +38,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TablePagination,
   useTheme,
   TextField,
   Autocomplete,
@@ -58,12 +55,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import DownloadIcon from '@mui/icons-material/Download'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import ErrorIcon from '@mui/icons-material/Error'
-import WarningIcon from '@mui/icons-material/Warning'
 import InfoIcon from '@mui/icons-material/Info'
-import AccountBalanceIcon from '@mui/icons-material/AccountBalance'
-import BusinessIcon from '@mui/icons-material/Business'
-import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn'
-import TimelineIcon from '@mui/icons-material/Timeline'
 import LanguageIcon from '@mui/icons-material/Language'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import VisibilityIcon from '@mui/icons-material/Visibility'
@@ -80,11 +72,10 @@ import { useArabicLanguage, ArabicLanguageService } from '@/services/ArabicLangu
 import { OpeningBalanceImportService } from '@/services/OpeningBalanceImportService'
 import { FiscalYearSelector } from '@/components/Fiscal/FiscalYearSelector'
 import { FiscalYearService } from '@/services/fiscal'
-import { getActiveOrgId, getActiveProjectId } from '@/utils/org'
-import useAppStore from '@/store/useAppStore'
 import { tokens } from '@/theme/tokens'
 import { getOrganization, getOrganizations } from '@/services/organization'
 import { getProject } from '@/services/projects'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 import './FiscalPages.css'
 
 // Enhanced Professional Container
@@ -95,7 +86,7 @@ const ProfessionalContainer = ({ children, title, subtitle, actions }: {
   actions?: React.ReactNode
 }) => {
   const { isRTL, getDirectionalStyle } = useArabicLanguage()
-  const theme = useTheme()
+  useTheme()
 
   return (
     <Box sx={{
@@ -446,16 +437,17 @@ const ImportStepper = ({
 
 // Main Enhanced Component
 export default function EnhancedOpeningBalanceImport() {
-  const { t, isRTL, texts, getDirectionalStyle, formatNumber, formatCurrency } = useArabicLanguage()
-  const theme = useTheme()
+  const { t, isRTL, texts, getDirectionalStyle } = useArabicLanguage()
+  useTheme()
   const navigate = useNavigate()
+  const scope = useScopeOptional()
 
   const enableManual = false
   const [searchParams] = useSearchParams()
 
   // State
-  const [orgId, setOrgId] = useState(() => getActiveOrgId() || '')
-  const [projectId] = useState(() => getActiveProjectId() || '')
+  const orgId = scope?.currentOrg?.id || ''
+  const projectId = scope?.currentProject?.id || ''
   const [orgName, setOrgName] = useState<string>('')
   const [projectName, setProjectName] = useState<string>('')
   const [fiscalYearId, setFiscalYearId] = useState('')
@@ -500,12 +492,6 @@ export default function EnhancedOpeningBalanceImport() {
   const [manualRows, setManualRows] = useState<Array<{ account_code: string; opening_balance_debit?: string | number; opening_balance_credit?: string | number; amount?: string | number; project_code?: string; cost_center_code?: string; currency_code?: string }>>([
     { account_code: '', opening_balance_debit: '', opening_balance_credit: '' }
   ])
-  const [accountOptions, setAccountOptions] = useState<Array<{ id: string; code: string; name?: string }>>([])
-  const [accountLoading, setAccountLoading] = useState(false)
-  const [projectOptions, setProjectOptions] = useState<Array<{ id: string; code: string; name?: string }>>([])
-  const [projectLoading, setProjectLoading] = useState(false)
-  const [ccOptions, setCcOptions] = useState<Array<{ id: string; code: string; name?: string }>>([])
-  const [ccLoading, setCcLoading] = useState(false)
   const [currencyOptions, setCurrencyOptions] = useState<string[]>(['EGP','SAR','AED','USD','EUR','KWD','QAR','BHD'])
   const [balanceGuard, setBalanceGuard] = useState(true)
   const [perCurrencyGuard, setPerCurrencyGuard] = useState(false)
@@ -526,12 +512,6 @@ export default function EnhancedOpeningBalanceImport() {
   const [normalizedPreview, setNormalizedPreview] = useState<any[]>([])
   // Review columns (visibility/order/width)
   const [reviewColConfig, setReviewColConfig] = useState<Array<{ key: string; labelAr: string; labelEn: string; visible: boolean; width?: number }>>([])
-  // Debounce timers
-  const [accTimer, setAccTimer] = useState<any>(null)
-  const [projTimer, setProjTimer] = useState<any>(null)
-  const [ccTimer, setCCTimer] = useState<any>(null)
-  // Row-level errors for unified CRUD validation
-  const [rowErrors, setRowErrors] = useState<Array<{ account_code?: string; project_code?: string; cost_center_code?: string }>>([])
   const [submitForApproval, setSubmitForApproval] = useState<boolean>(true)
   // Templates
   const [templates, setTemplates] = useState<Array<{ id: string; name: string; rows: any[] }>>([])
@@ -619,7 +599,7 @@ export default function EnhancedOpeningBalanceImport() {
         setReviewColConfig(base)
       }
     } catch { setReviewColConfig(base) }
-  }, [useAmountMode])
+  }, [useAmountMode, manualCols.costCenter, manualCols.currency, manualCols.project])
 
   // Persist review column config
   useEffect(()=>{ try { if (reviewColConfig.length) localStorage.setItem('obi.review.columns', JSON.stringify(reviewColConfig)) } catch {} }, [reviewColConfig])
@@ -799,7 +779,7 @@ export default function EnhancedOpeningBalanceImport() {
       const def = base.map(b => ({ ...b, visible: b.key === 'amount' ? useAmountMode : (b.key==='opening_balance_debit'||b.key==='opening_balance_credit' ? !useAmountMode : true) }))
       setManualColConfig(def)
     }
-  }, [useAmountMode])
+  }, [useAmountMode, manualCols.costCenter, manualCols.currency, manualCols.project])
 
   // Persist manual column config
   useEffect(() => {
@@ -825,7 +805,7 @@ export default function EnhancedOpeningBalanceImport() {
           } else {
             setActiveStep(5)
           }
-        } catch (e) {
+        } catch {
           // If not found, ignore
         } finally {
           setLoading(false)
@@ -913,10 +893,10 @@ export default function EnhancedOpeningBalanceImport() {
       if (isCsv) {
         const text = await selectedFile.text()
         const lines = text.split(/\r?\n/).filter(Boolean)
-        const heads = (lines[0] || '').split(',').map(h => h.replace(/^\"|\"$/g,'').trim())
+        const heads = (lines[0] || '').split(',').map(h => h.replace(/^"|"$/g,'').trim())
         if (heads.length) setUploadHeaders(heads)
         const body = lines.slice(1).map(l => {
-          const vals = l.split(',').map(v => v.replace(/^\"|\"$/g,'').trim())
+          const vals = l.split(',').map(v => v.replace(/^"|"$/g,'').trim())
           const obj: any = {}
           heads.forEach((h,i)=> obj[h]=vals[i] ?? '')
           return obj
@@ -1007,7 +987,7 @@ export default function EnhancedOpeningBalanceImport() {
       setLoading(false)
       try { (window as any)?.toast?.error?.(msg || (isRTL ? 'فشل الاستيراد' : 'Import failed')) } catch {}
     }
-  }, [file, orgId, fiscalYearId, waitForTerminalAndShow])
+  }, [file, orgId, fiscalYearId, waitForTerminalAndShow, isRTL])
 
   // Header Actions
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -1119,7 +1099,7 @@ export default function EnhancedOpeningBalanceImport() {
         {t(texts.common.cancel)}
       </UltimateButton>
     </>
-  ), [isRTL, includeCurrencyInTemplate, orgId, toggleLanguage, t, texts, orgName, projectName])
+  ), [isRTL, includeCurrencyInTemplate, orgId, toggleLanguage, t, texts, orgName, projectName, enableManual])
 
   return (
     <ProfessionalContainer
@@ -1169,7 +1149,7 @@ export default function EnhancedOpeningBalanceImport() {
                           <Select
                             label={isRTL ? 'المؤسسة' : 'Organization'}
                             value={orgId || ''}
-                            onChange={(e)=>{ const v = String(e.target.value); setOrgId(v); try{ localStorage.setItem('org_id', v) }catch{}; if (v) setActiveStep(1) }}
+                            onChange={(e)=>{ const v = String(e.target.value); if (scope) void scope.setOrganization(v); if (v) setActiveStep(1) }}
                           >
                             {(orgOptions||[]).map((o)=> (
                               <MenuItem key={o.id} value={o.id}>{o.code ? `${o.code} - ${o.name}` : (o.name || o.id)}</MenuItem>
@@ -1565,7 +1545,7 @@ export default function EnhancedOpeningBalanceImport() {
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
-                    {previewColConfig.filter(c=>c.visible).map((c, idxVisible)=> {
+                    {previewColConfig.filter(c=>c.visible).map((c)=> {
                       const allVisible = previewColConfig.filter(v=>v.visible)
                       const idx = allVisible.findIndex(v=> v.key===c.key)
                       return (
@@ -1580,7 +1560,7 @@ export default function EnhancedOpeningBalanceImport() {
                             const sample = previewRows.slice(0, 100)
                             const vals = sample.map(r => (r as any)[c.key])
                             const w = calcAutoWidth(vals)
-                            setPreviewColConfig(prev=> prev.map((col,i)=> (col.key===c.key? {...col, width: w}: col)))
+                            setPreviewColConfig(prev=> prev.map((col)=> (col.key===c.key? {...col, width: w}: col)))
                           }}
                           sx={{ position:'relative', ...(c.width ? { width: c.width } : {}) }}
                           title={isRTL ? 'اسحب لإعادة الترتيب • اسحب الحافة لتغيير العرض • نقر مزدوج لملاءمة' : 'Drag to reorder • Drag edge to resize • Double-click to autosize'}
@@ -1661,7 +1641,6 @@ export default function EnhancedOpeningBalanceImport() {
             variant="outlined"
             onClick={() => {
               // download edited CSV
-              const heads = uploadHeaders
               const esc = (s:any)=> {
                 const t = s==null?'' : String(s)
                 return /[",\n]/.test(t) ? '"' + t.replace(/"/g,'""') + '"' : t
@@ -1934,7 +1913,7 @@ export default function EnhancedOpeningBalanceImport() {
             const errs: Array<{account_code?:string; project_code?:string; cost_center_code?:string}> = manualRows.map(()=> ({}))
             try {
               // accounts
-              let validAcc = new Set<string>()
+              const validAcc = new Set<string>()
               if (accCodes.length && orgId) {
                 const found = await OpeningBalanceImportService.searchAccounts(orgId, '', accCodes.length+50)
                 for (const a of found) validAcc.add(a.code)
@@ -1954,7 +1933,6 @@ export default function EnhancedOpeningBalanceImport() {
               }
             } catch {}
             const hasErr = errs.some(e=> e.account_code || e.project_code || e.cost_center_code)
-            setRowErrors(errs)
             if (hasErr) { try { (window as any)?.toast?.error?.(isRTL ? 'تحقق من الرموز غير الصالحة' : 'Please fix invalid codes') } catch {}; return }
 
             // Build normalized preview, then confirm

@@ -1,12 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { Plus, Edit2, Trash2, X, RefreshCw, Search } from 'lucide-react'
-import { lineItemsUIService } from '../../services/line-items-ui'
+import React, { useCallback, useEffect, useState } from 'react'
 import { LineItemsTreeView } from '../../components/LineItems/LineItemsTreeView'
-import type { LineItemUINode, CreateLineItemPayload, UpdateLineItemPayload } from '../../services/line-items-ui'
+import type { LineItemUINode } from '../../services/line-items-ui'
 import { useToast } from '../../contexts/ToastContext'
+import { useScopeOptional } from '../../contexts/ScopeContext'
 
 const CostAnalysisItems: React.FC = () => {
-  const [orgId, setOrgId] = useState<string>('')
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
   const [currentTransactionId, setCurrentTransactionId] = useState<string>('')
   const [availableTransactions, setAvailableTransactions] = useState<{ id: string; entry_number: string; description: string }[]>([])
   const [stats, setStats] = useState<{ totalItems: number; rootItems: number; maxDepth: number; totalValue: number }>({
@@ -15,26 +15,28 @@ const CostAnalysisItems: React.FC = () => {
   
   const { showToast } = useToast()
 
-  // Load organization and available transactions
+  // Load available transactions whenever org scope changes
   useEffect(() => {
     let mounted = true
     ;(async () => {
       try {
-        const { getActiveOrgId } = await import('../../utils/org')
-        const id = getActiveOrgId() || ''
-        if (mounted) {
-          setOrgId(id)
-          await loadAvailableTransactions(id)
+        if (!orgId) {
+          if (!mounted) return
+          setAvailableTransactions([])
+          setCurrentTransactionId('')
+          return
         }
+        await loadAvailableTransactions(orgId)
       } catch {
-        if (mounted) setOrgId('')
+        if (!mounted) return
+        setAvailableTransactions([])
       }
     })()
     return () => { mounted = false }
-  }, [])
+  }, [orgId, loadAvailableTransactions])
 
   // Load available transactions for the organization
-  const loadAvailableTransactions = async (orgId: string) => {
+  const loadAvailableTransactions = useCallback(async (orgId: string) => {
     try {
       const { supabase } = await import('../../utils/supabase')
       const { data, error } = await supabase
@@ -48,14 +50,14 @@ const CostAnalysisItems: React.FC = () => {
       setAvailableTransactions(data || [])
       
       // Select the first transaction by default for editing
-      if (data && data.length > 0 && !currentTransactionId) {
-        setCurrentTransactionId(data[0].id)
+      if (data && data.length > 0) {
+        setCurrentTransactionId(prev => prev || data[0].id)
       }
-    } catch (error) {
-      console.error('Error loading transactions:', error)
+    } catch (error: any) {
+      showToast((error as any)?.message || (orgId ? 'فشل تحميل المعاملات' : 'خطأ غير متوقع'), { severity: 'error' })
       setAvailableTransactions([])
     }
-  }
+  }, [showToast])
 
   // Handle line items changes callback from TreeView
   const handleLineItemsChange = (items: LineItemUINode[]) => {

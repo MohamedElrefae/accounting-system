@@ -22,12 +22,15 @@ import DeleteIcon from '@mui/icons-material/Delete'
 
 import { useArabicLanguage } from '@/services/ArabicLanguageService'
 import { OpeningBalanceImportService, type ImportResult } from '@/services/OpeningBalanceImportService'
-import { getActiveOrgId } from '@/utils/org'
 import EnhancedOBImportResultsModal from '@/components/Fiscal/EnhancedOBImportResultsModal'
 import { supabase } from '@/utils/supabase'
+import { audit } from '@/utils/audit'
 import SearchableSelect, { type SearchableSelectOption } from '@/components/Common/SearchableSelect'
+import DraggablePanelContainer from '@/components/Common/DraggablePanelContainer'
+import UnifiedCRUDForm, { type FormConfig } from '@/components/Common/UnifiedCRUDForm'
 import { useFiscalYears } from '@/services/fiscal/hooks/useFiscalYear'
 import { useTransactionsData } from '@/contexts/TransactionsDataContext'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 
 import './FiscalPages.css'
 
@@ -52,9 +55,10 @@ type ExistingBalanceRow = {
 export default function OpeningBalanceImportSimple() {
   const { isRTL } = useArabicLanguage()
 
-  const txData = useTransactionsData()
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
 
-  const [orgId, setOrgId] = useState<string>(() => getActiveOrgId() || '')
+  const txData = useTransactionsData()
   const [fiscalYearId, setFiscalYearId] = useState<string>('')
 
   const [projectCode, setProjectCode] = useState<string>('')
@@ -79,6 +83,10 @@ export default function OpeningBalanceImportSimple() {
 
   const [importStatus, setImportStatus] = useState<ImportResult | null>(null)
   const [showResultsModal, setShowResultsModal] = useState(false)
+
+  const [obCrudOpen, setObCrudOpen] = useState(false)
+  const [obCrudMode, setObCrudMode] = useState<'create' | 'edit'>('create')
+  const [obEditingRow, setObEditingRow] = useState<ExistingBalanceRow | null>(null)
 
   const fiscalYearsQuery = useFiscalYears(orgId)
 
@@ -203,6 +211,65 @@ export default function OpeningBalanceImportSimple() {
       }))
   }, [fiscalYearsQuery.data, isRTL])
 
+  const selectedFiscalYear = useMemo(() => {
+    const rows = (fiscalYearsQuery.data || []) as any[]
+    return rows.find((fy) => String((fy as any).id) === String(fiscalYearId)) || null
+  }, [fiscalYearsQuery.data, fiscalYearId])
+
+  const fiscalYearStatus = useMemo(() => {
+    const s = (selectedFiscalYear as any)?.status
+    return typeof s === 'string' ? s : null
+  }, [selectedFiscalYear])
+
+  const canMutateOpeningBalances = useMemo(() => {
+    if (!orgId || !fiscalYearId) return false
+    if (fiscalYearStatus === 'closed' || fiscalYearStatus === 'archived') return false
+    return true
+  }, [orgId, fiscalYearId, fiscalYearStatus])
+
+  const accountIdSelectOptions: SearchableSelectOption[] = useMemo(() => {
+    return (accounts || [])
+      .filter((a: any) => !orgId || !a.org_id || a.org_id === orgId)
+      .filter((a: any) => {
+        const hasPostableFlags = a.is_postable !== undefined || a.is_leaf !== undefined
+        const isPostable = hasPostableFlags ? (a.is_postable === true || a.is_leaf === true) : true
+        const allowTx = a.allow_transactions !== false
+        const isLeaf = !accountHasChildren(String(a.id))
+        return isPostable && allowTx && isLeaf
+      })
+      .slice()
+      .sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
+      .map((a: any) => ({
+        value: String(a.id),
+        label: `${a.code} - ${(a.name_ar || a.name || '')}`.substring(0, 60),
+        searchText: `${a.code} ${(a.name_ar || a.name || '')}`.toLowerCase(),
+      }))
+  }, [accounts, orgId, accountHasChildren])
+
+  const projectIdSelectOptions: SearchableSelectOption[] = useMemo(() => {
+    return (projects || [])
+      .filter((p: any) => !orgId || !p.org_id || p.org_id === orgId)
+      .slice()
+      .sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
+      .map((p: any) => ({
+        value: String(p.id),
+        label: `${p.code} - ${p.name}`.substring(0, 52),
+        searchText: `${p.code} ${p.name}`.toLowerCase(),
+      }))
+  }, [projects, orgId])
+
+  const costCenterIdSelectOptions: SearchableSelectOption[] = useMemo(() => {
+    return (costCenters || [])
+      .filter((c: any) => !orgId || !c.org_id || c.org_id === orgId)
+      .slice()
+      .sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
+      .map((c: any) => ({
+        value: String(c.id),
+        label: `${c.code} - ${c.name}`.substring(0, 52),
+        searchText: `${c.code} ${c.name}`.toLowerCase(),
+      }))
+  }, [costCenters, orgId])
+
   const projectSelectOptions: SearchableSelectOption[] = useMemo(() => {
     return [
       { value: '', label: isRTL ? 'كل المشاريع' : 'All projects', searchText: '' },
@@ -273,6 +340,17 @@ export default function OpeningBalanceImportSimple() {
 
     const delRes = await dq
     if (delRes.error) throw delRes.error
+
+    await audit(supabase, 'opening_balances.bulk_delete', 'opening_balances', null, {
+      page: 'Fiscal/OpeningBalanceImport',
+      table: 'opening_balances',
+      operation: 'bulk_delete',
+      org_id: orgId,
+      fiscal_year_id: fiscalYearId,
+      account_ids: accIds,
+      project_id: projectCode ? (projectId as string) : null,
+      cost_center_id: costCenterCode ? (costCenterId as string) : null,
+    })
   }, [orgId, fiscalYearId, projectCode, costCenterCode, projectId, costCenterId, isRTL, accountIdByCode])
 
   const totals = useMemo(() => {
@@ -431,6 +509,211 @@ export default function OpeningBalanceImportSimple() {
     }
   }, [orgId, fiscalYearId, projectCode, costCenterCode, projectId, costCenterId])
 
+  const openCreateOpeningBalance = useCallback(() => {
+    setObCrudMode('create')
+    setObEditingRow(null)
+    setObCrudOpen(true)
+  }, [])
+
+  const openEditOpeningBalance = useCallback((row: ExistingBalanceRow) => {
+    setObCrudMode('edit')
+    setObEditingRow(row)
+    setObCrudOpen(true)
+  }, [])
+
+  const closeOpeningBalanceCrud = useCallback(() => {
+    setObCrudOpen(false)
+    setObEditingRow(null)
+  }, [])
+
+  const openingBalanceCrudConfig: FormConfig = useMemo(() => {
+    const isEdit = obCrudMode === 'edit'
+    return {
+      title: isRTL
+        ? (isEdit ? 'تعديل رصيد افتتاحي' : 'إضافة رصيد افتتاحي')
+        : (isEdit ? 'Edit Opening Balance' : 'Add Opening Balance'),
+      formId: 'opening_balance.crud',
+      fields: [
+        {
+          id: 'account_id',
+          type: 'searchable-select',
+          label: isRTL ? 'الحساب' : 'Account',
+          required: true,
+          options: accountIdSelectOptions,
+          placeholder: isRTL ? 'اختر الحساب' : 'Select account',
+          searchable: true,
+          clearable: true,
+          disabled: isEdit,
+        },
+        {
+          id: 'project_id',
+          type: 'searchable-select',
+          label: isRTL ? 'المشروع' : 'Project',
+          required: false,
+          options: projectIdSelectOptions,
+          placeholder: isRTL ? 'اختياري' : 'Optional',
+          searchable: true,
+          clearable: true,
+          disabled: !!projectCode,
+        },
+        {
+          id: 'cost_center_id',
+          type: 'searchable-select',
+          label: isRTL ? 'مركز التكلفة' : 'Cost Center',
+          required: false,
+          options: costCenterIdSelectOptions,
+          placeholder: isRTL ? 'اختياري' : 'Optional',
+          searchable: true,
+          clearable: true,
+          disabled: !!costCenterCode,
+        },
+        {
+          id: 'amount',
+          type: 'number',
+          label: isRTL ? 'المبلغ' : 'Amount',
+          required: true,
+        },
+        {
+          id: 'currency_code',
+          type: 'select',
+          label: isRTL ? 'العملة' : 'Currency',
+          required: false,
+          options: (currencyOptions.length ? currencyOptions : ['EGP']).map((c) => ({ value: c, label: c, searchText: c })),
+        },
+      ],
+      submitLabel: isRTL ? 'حفظ' : 'Save',
+      cancelLabel: isRTL ? 'إغلاق' : 'Close',
+      customValidator: (data) => {
+        const raw = (data as any).amount
+        const n = raw === '' || raw === null || raw === undefined ? NaN : Number(raw)
+        const errors = [] as any[]
+        if (!isFinite(n)) errors.push({ field: 'amount', message: isRTL ? 'المبلغ مطلوب' : 'Amount is required' })
+        return { isValid: errors.length === 0, errors }
+      },
+    }
+  }, [isRTL, obCrudMode, accountIdSelectOptions, projectIdSelectOptions, costCenterIdSelectOptions, currencyOptions, projectCode, costCenterCode])
+
+  const handleOpeningBalanceCrudSubmit = useCallback(async (data: Record<string, unknown>) => {
+    if (!orgId || !fiscalYearId) throw new Error(isRTL ? 'يجب اختيار المؤسسة والسنة المالية' : 'Organization and fiscal year are required')
+    if (!canMutateOpeningBalances) {
+      throw new Error(isRTL ? 'لا يمكن تعديل الأرصدة في سنة مالية مغلقة/مؤرشفة' : 'Cannot edit balances for a closed/archived fiscal year')
+    }
+
+    if (projectCode && !projectId) throw new Error(isRTL ? 'المشروع غير صحيح' : 'Invalid project selection')
+    if (costCenterCode && !costCenterId) throw new Error(isRTL ? 'مركز التكلفة غير صحيح' : 'Invalid cost center selection')
+
+    const accountId = String((data as any).account_id || '').trim()
+    if (!accountId) throw new Error(isRTL ? 'الحساب مطلوب' : 'Account is required')
+
+    const projectIdVal = projectCode ? (projectId as string) : ((data as any).project_id ? String((data as any).project_id) : null)
+    const costCenterIdVal = costCenterCode ? (costCenterId as string) : ((data as any).cost_center_id ? String((data as any).cost_center_id) : null)
+    const amount = Number((data as any).amount)
+    const currencyCode = (data as any).currency_code ? String((data as any).currency_code) : null
+
+    if (!isFinite(amount)) throw new Error(isRTL ? 'المبلغ غير صالح' : 'Invalid amount')
+
+    if (obCrudMode === 'create') {
+      const { data: insData, error: insErr } = await supabase
+        .from('opening_balances')
+        .insert({
+          org_id: orgId,
+          fiscal_year_id: fiscalYearId,
+          account_id: accountId,
+          project_id: projectIdVal,
+          cost_center_id: costCenterIdVal,
+          amount,
+          currency_code: currencyCode,
+        } as any)
+        .select('id')
+        .single()
+
+      if (insErr) throw insErr
+
+      await audit(supabase, 'opening_balances.create', 'opening_balances', (insData as any)?.id ?? null, {
+        page: 'Fiscal/OpeningBalanceImport',
+        table: 'opening_balances',
+        operation: 'create',
+        org_id: orgId,
+        fiscal_year_id: fiscalYearId,
+        account_id: accountId,
+        project_id: projectIdVal,
+        cost_center_id: costCenterIdVal,
+        amount,
+        currency_code: currencyCode,
+      })
+    } else {
+      if (!obEditingRow?.id) throw new Error(isRTL ? 'سجل غير صالح' : 'Invalid record')
+
+      const { error: updErr } = await supabase
+        .from('opening_balances')
+        .update({
+          project_id: projectIdVal,
+          cost_center_id: costCenterIdVal,
+          amount,
+          currency_code: currencyCode,
+        } as any)
+        .eq('id', obEditingRow.id)
+
+      if (updErr) throw updErr
+
+      await audit(supabase, 'opening_balances.update', 'opening_balances', obEditingRow.id, {
+        page: 'Fiscal/OpeningBalanceImport',
+        table: 'opening_balances',
+        operation: 'update',
+        org_id: orgId,
+        fiscal_year_id: fiscalYearId,
+        record_id: obEditingRow.id,
+        account_id: accountId,
+        project_id: projectIdVal,
+        cost_center_id: costCenterIdVal,
+        amount,
+        currency_code: currencyCode,
+      })
+    }
+
+    closeOpeningBalanceCrud()
+    await refreshExisting()
+  }, [orgId, fiscalYearId, isRTL, canMutateOpeningBalances, projectCode, costCenterCode, projectId, costCenterId, obCrudMode, obEditingRow?.id, closeOpeningBalanceCrud, refreshExisting])
+
+  const handleDeleteOpeningBalance = useCallback(async (row: ExistingBalanceRow) => {
+    if (!canMutateOpeningBalances) {
+      setError(isRTL ? 'لا يمكن حذف الأرصدة في سنة مالية مغلقة/مؤرشفة' : 'Cannot delete balances for a closed/archived fiscal year')
+      return
+    }
+    const ok = window.confirm(
+      isRTL
+        ? 'هل أنت متأكد من حذف هذا الرصيد الافتتاحي؟'
+        : 'Are you sure you want to delete this opening balance?'
+    )
+    if (!ok) return
+
+    setExistingLoading(true)
+    setError(null)
+    try {
+      const { error: delErr } = await supabase.from('opening_balances').delete().eq('id', row.id)
+      if (delErr) throw delErr
+
+      await audit(supabase, 'opening_balances.delete', 'opening_balances', row.id, {
+        page: 'Fiscal/OpeningBalanceImport',
+        table: 'opening_balances',
+        operation: 'delete',
+        org_id: orgId,
+        fiscal_year_id: fiscalYearId,
+        record_id: row.id,
+        account_id: row.account_id,
+        project_id: row.project_id,
+        cost_center_id: row.cost_center_id,
+        amount: row.amount,
+        currency_code: row.currency_code,
+      })
+      await refreshExisting()
+    } catch (e: any) {
+      setError(e?.message || String(e))
+    } finally {
+      setExistingLoading(false)
+    }
+  }, [canMutateOpeningBalances, isRTL, refreshExisting, orgId, fiscalYearId])
+
   useEffect(() => {
     refreshExisting()
   }, [refreshExisting])
@@ -475,7 +758,7 @@ export default function OpeningBalanceImportSimple() {
                 id="opening_balance.org"
                 value={orgId}
                 options={orgSelectOptions}
-                onChange={(v) => setOrgId(String(v || ''))}
+                onChange={(v) => { if (scope) void scope.setOrganization(String(v || '')) }}
                 placeholder={isRTL ? 'المؤسسة' : 'Organization'}
                 clearable={false}
               />
@@ -526,6 +809,14 @@ export default function OpeningBalanceImportSimple() {
             <Button size="small" variant="outlined" onClick={refreshExisting} disabled={!orgId || !fiscalYearId || existingLoading || loading}>
               {isRTL ? 'تحديث القائمة' : 'Refresh list'}
             </Button>
+            <Button
+              size="small"
+              variant="contained"
+              onClick={openCreateOpeningBalance}
+              disabled={!canMutateOpeningBalances || existingLoading || loading}
+            >
+              {isRTL ? 'إضافة رصيد' : 'Add balance'}
+            </Button>
           </Stack>
         </div>
 
@@ -552,6 +843,7 @@ export default function OpeningBalanceImportSimple() {
                     <th style={{ minWidth: 140 }}>{isRTL ? 'المبلغ' : 'Amount'}</th>
                     <th style={{ minWidth: 120 }}>{isRTL ? 'العملة' : 'Currency'}</th>
                     <th style={{ minWidth: 220 }}>{isRTL ? 'Import' : 'Import'}</th>
+                    <th style={{ minWidth: 180 }}>{isRTL ? 'إجراءات' : 'Actions'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -572,6 +864,27 @@ export default function OpeningBalanceImportSimple() {
                         <td>{Number(r.amount || 0).toLocaleString('ar-EG')}</td>
                         <td>{r.currency_code || ''}</td>
                         <td>{r.import_id || ''}</td>
+                        <td>
+                          <Stack direction={isRTL ? 'row-reverse' : 'row'} spacing={1} sx={{ flexWrap: 'wrap' }}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => openEditOpeningBalance(r)}
+                              disabled={!canMutateOpeningBalances || existingLoading || loading}
+                            >
+                              {isRTL ? 'تعديل' : 'Edit'}
+                            </Button>
+                            <Button
+                              size="small"
+                              color="error"
+                              variant="outlined"
+                              onClick={() => handleDeleteOpeningBalance(r)}
+                              disabled={!canMutateOpeningBalances || existingLoading || loading}
+                            >
+                              {isRTL ? 'حذف' : 'Delete'}
+                            </Button>
+                          </Stack>
+                        </td>
                       </tr>
                     )
                   })}
@@ -580,6 +893,42 @@ export default function OpeningBalanceImportSimple() {
             </Box>
           )}
         </div>
+
+        <DraggablePanelContainer
+          storageKey="panel:opening-balances:crud"
+          isOpen={obCrudOpen}
+          onClose={closeOpeningBalanceCrud}
+          title={openingBalanceCrudConfig.title}
+          defaults={{
+            position: () => ({ x: 120, y: 90 }),
+            size: () => ({ width: 980, height: 640 }),
+            dockPosition: 'right',
+          }}
+        >
+          <Box sx={{ p: 2 }}>
+            <UnifiedCRUDForm
+              config={openingBalanceCrudConfig}
+              initialData={
+                obCrudMode === 'edit' && obEditingRow
+                  ? {
+                      account_id: obEditingRow.account_id,
+                      project_id: obEditingRow.project_id ?? '',
+                      cost_center_id: obEditingRow.cost_center_id ?? '',
+                      amount: obEditingRow.amount,
+                      currency_code: obEditingRow.currency_code || 'EGP',
+                    }
+                  : { currency_code: currencyOptions[0] || 'EGP' }
+              }
+              onSubmit={handleOpeningBalanceCrudSubmit}
+              onCancel={closeOpeningBalanceCrud}
+            />
+            {fiscalYearStatus && (fiscalYearStatus === 'closed' || fiscalYearStatus === 'archived') && (
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                {isRTL ? 'هذه السنة المالية مغلقة/مؤرشفة. لا يمكن تعديل الأرصدة.' : 'This fiscal year is closed/archived. Balances cannot be modified.'}
+              </Alert>
+            )}
+          </Box>
+        </DraggablePanelContainer>
 
         <div className="fiscal-card">
           <div className="fiscal-card-header">

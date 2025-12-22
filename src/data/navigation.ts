@@ -12,6 +12,22 @@ const baseNavigation: NavigationItem[] = [
     path: "/"
   },
   {
+    id: "getting-started",
+    label: "Getting Started",
+    titleEn: "Getting Started",
+    titleAr: "ابدأ هنا",
+    icon: "AutoAwesome",
+    path: "/getting-started"
+  },
+  {
+    id: "help-center",
+    label: "Help",
+    titleEn: "Help Center",
+    titleAr: "مركز المساعدة",
+    icon: "Lightbulb",
+    path: "/help"
+  },
+  {
     id: "main-data",
     label: "Main Data",
     titleEn: "Main Data", 
@@ -147,12 +163,30 @@ const baseNavigation: NavigationItem[] = [
         requiredPermission: "transactions.read.own"
       },
       {
+        id: "my-lines-enriched",
+        label: "My Lines (Enriched)", 
+        titleEn: "My Lines (Enriched)",
+        titleAr: "سطور معاملاتي",
+        icon: "file-text",
+        path: "/transactions/my-lines",
+        requiredPermission: "transactions.read.own"
+      },
+      {
         id: "all-transactions-enriched",
         label: "All Transactions (Enriched)", 
         titleEn: "All Transactions (Enriched)",
         titleAr: "جميع المعاملات (محسّن)",
         icon: "list",
         path: "/transactions/all-enriched",
+        requiredPermission: "transactions.read.all"
+      },
+      {
+        id: "all-lines-enriched",
+        label: "All Lines (Enriched)", 
+        titleEn: "All Lines (Enriched)",
+        titleAr: "جميع سطور المعاملات",
+        icon: "file-text",
+        path: "/transactions/all-lines",
         requiredPermission: "transactions.read.all"
       },
       {
@@ -377,6 +411,15 @@ const baseNavigation: NavigationItem[] = [
         requiredPermission: "users.view"
       },
       {
+        id: "online-users",
+        label: "Online Users",
+        titleEn: "Online Users",
+        titleAr: "المستخدمون المتصلون الآن",
+        icon: "People",
+        path: "/settings/online-users",
+        requiredPermission: "presence.view.team"
+      },
+      {
         id: "org-management",
         label: "Organization Management",
         titleEn: "Organization Management",
@@ -408,6 +451,15 @@ const baseNavigation: NavigationItem[] = [
         icon: "database",
         path: "/settings/export-database",
         requiredPermission: "data.export"
+      },
+      {
+        id: "enterprise-audit",
+        label: "Audit Log",
+        titleEn: "Audit Log",
+        titleAr: "سجل المراجعة",
+        icon: "Security",
+        path: "/settings/audit",
+        requiredPermission: "settings.audit"
       },
       {
         id: "diagnostics",

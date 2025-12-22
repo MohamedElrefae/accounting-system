@@ -1,61 +1,64 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { Plus, Edit2, Trash2, X, RefreshCw, Search } from 'lucide-react'
-import { lineItemsUIService } from '../../services/line-items-ui'
+import React, { useCallback, useEffect, useState } from 'react'
 import { LineItemsTreeView } from '../../components/LineItems/LineItemsTreeView'
-import type { LineItemUINode, CreateLineItemPayload, UpdateLineItemPayload } from '../../services/line-items-ui'
+import type { LineItemUINode } from '../../services/line-items-ui'
 import { useToast } from '../../contexts/ToastContext'
+import { useScopeOptional } from '../../contexts/ScopeContext'
+import ScopeChips from '../../components/Scope/ScopeChips'
+
+import { supabase } from '../../utils/supabase'
 
 const AssignCostAnalysis: React.FC = () => {
-  const [orgId, setOrgId] = useState<string>('')
   const [currentTransactionId, setCurrentTransactionId] = useState<string>('')
   const [availableTransactions, setAvailableTransactions] = useState<{ id: string; entry_number: string; description: string }[]>([])
-  const [stats, setStats] = useState<{ totalItems: number; rootItems: number; maxDepth: number; totalValue: number }>({
-    totalItems: 0, rootItems: 0, maxDepth: 0, totalValue: 0
-  })
+  const [stats, setStats] = useState<{ totalItems: number; rootItems: number; maxDepth: number; totalValue: number }>(
+    {
+      totalItems: 0, rootItems: 0, maxDepth: 0, totalValue: 0
+    }
+  )
   
   const { showToast } = useToast()
 
-  // Load organization and available transactions
-  useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        const { getActiveOrgId } = await import('../../utils/org')
-        const id = getActiveOrgId() || ''
-        if (mounted) {
-          setOrgId(id)
-          await loadAvailableTransactions(id)
-        }
-      } catch {
-        if (mounted) setOrgId('')
-      }
-    })()
-    return () => { mounted = false }
-  }, [])
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
 
   // Load available transactions for the organization
-  const loadAvailableTransactions = async (orgId: string) => {
+  const loadAvailableTransactions = useCallback(async (targetOrgId: string) => {
     try {
-      const { supabase } = await import('../../utils/supabase')
       const { data, error } = await supabase
         .from('transactions')
         .select('id, entry_number, description')
-        .eq('org_id', orgId)
+        .eq('org_id', targetOrgId)
         .order('entry_number', { ascending: true })
         .limit(100)
-      
+
       if (error) throw error
       setAvailableTransactions(data || [])
-      
+
       // Select the first transaction by default for editing
-      if (data && data.length > 0 && !currentTransactionId) {
-        setCurrentTransactionId(data[0].id)
+      if (data && data.length > 0) {
+        const stillValid = currentTransactionId && data.some(tx => tx.id === currentTransactionId)
+        if (!stillValid) setCurrentTransactionId(data[0].id)
+      } else {
+        setCurrentTransactionId('')
       }
     } catch (error) {
       console.error('Error loading transactions:', error)
       setAvailableTransactions([])
+      setCurrentTransactionId('')
+      showToast('فشل تحميل قائمة المعاملات', 'error')
     }
-  }
+  }, [currentTransactionId, showToast])
+
+  // Load organization and available transactions
+  useEffect(() => {
+    if (!orgId) {
+      setAvailableTransactions([])
+      setCurrentTransactionId('')
+      return
+    }
+
+    void loadAvailableTransactions(orgId)
+  }, [orgId, loadAvailableTransactions])
 
   // Handle line items changes callback from TreeView
   const handleLineItemsChange = (items: LineItemUINode[]) => {
@@ -74,6 +77,7 @@ const AssignCostAnalysis: React.FC = () => {
       <div className="page-header flex-row items-center justify-between">
         <div>
           <h2 className="text-title">تسجيل التكاليف</h2>
+          <ScopeChips />
           <div className="text-secondary flex-row gap-4 items-center">
             <span>إنشاء وتعديل وحذف بنود المعاملات بعرض هرمي</span>
             {stats.totalItems > 0 && (
@@ -111,9 +115,9 @@ const AssignCostAnalysis: React.FC = () => {
       {!currentTransactionId ? (
         <div className="empty-state text-center py-12">
           <div className="text-6xl mb-4">📋</div>
-          <h3 className="text-xl font-bold mb-2">اختر معاملة لبدء تسجيل التكاليف</h3>
+          <h3 className="text-xl font-bold mb-2">{orgId ? 'اختر معاملة لبدء تسجيل التكاليف' : 'اختر مؤسسة أولاً'}</h3>
           <p className="text-gray-600 mb-4">
-            يمكنك إضافة وتعديل وحذف بنود المعاملات بعرض هرمي متقدم
+            {orgId ? 'يمكنك إضافة وتعديل وحذف بنود المعاملات بعرض هرمي متقدم' : 'اختر المؤسسة من الشريط العلوي ثم اختر معاملة'}
           </p>
         </div>
       ) : (

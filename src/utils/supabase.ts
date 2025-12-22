@@ -45,8 +45,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
           <ol style="margin: 10px 0; padding-left: 20px;">
             <li>Check your <code>.env.local</code> file in the project root</li>
             <li>Ensure it contains:<br>
-              <pre style="background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 4px; overflow-x: auto;"><code>VITE_SUPABASE_URL=https://bgxknceshxxifwytalex.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJneGtuY2VzaHh4aWZ3eXRhbGV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTM1MjEsImV4cCI6MjA3MTI2OTUyMX0.Kmt0yuef-hlRDgRfXD2emkW5NKhMUVqr_pBVWkr8Vy0</code></pre>
+              <pre style="background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 4px; overflow-x: auto;"><code>VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY</code></pre>
             </li>
             <li>Restart the dev server: <code>npm run dev</code></li>
           </ol>
@@ -62,7 +62,23 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
   }, 100)
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true, // Persists session using browser storage by default (typically localStorage)
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce', // Recommended for web apps
+    debug: import.meta.env.DEV
+  }
+})
+
+// Export auth configuration for verification
+export const authConfig = {
+  usesHttpOnlyCookies: false,
+  secureCookies: false,
+  sameSitePolicy: 'n/a',
+  tokenStorage: 'localStorage'
+}
 
 // Database types (you can customize these based on your actual database schema)
 export interface Account {

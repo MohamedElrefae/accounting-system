@@ -4,7 +4,7 @@ import { Box, Button, Container, Paper, Stack, Typography, Tooltip, MenuItem, Se
 import { DataGrid, type GridColDef } from '@mui/x-data-grid'
 import { ReconciliationService, type ReconLine, type ReconSummary } from '@/services/inventory/reconciliation'
 import { useAuth } from '@/hooks/useAuth'
-import { getActiveOrgId } from '@/utils/org'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 
 export default function ReconciliationSessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>()
@@ -16,7 +16,8 @@ export default function ReconciliationSessionPage() {
   const [lastDocInfo, setLastDocInfo] = useState<{ id: string, status: string, total_lines: number, total_quantity: number, total_value: number, posted_at: string | null } | null>(null)
   const { user } = useAuth() as any
 
-  const orgId = getActiveOrgId?.() || null
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || null
 
   useEffect(() => {
     if (!sessionId) return
@@ -77,7 +78,7 @@ export default function ReconciliationSessionPage() {
         <TextField size="small" fullWidth disabled={disabled} value={value} onChange={(e) => setValue(e.target.value)} onBlur={onBlur} placeholder="Add notes" />
       )
     }},
-  ], [])
+  ], [loading, posting, user?.id])
 
   const handleBulkAutoResolve = async () => {
     if (!sessionId) return

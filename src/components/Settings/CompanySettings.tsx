@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Building2, Settings, Hash, Calendar, Globe, FolderOpen } from 'lucide-react'
 import { getCompanyConfig, updateCompanyConfig, type CompanyConfig } from '../../services/company-config'
 import { useToast } from '../../contexts/ToastContext'
@@ -34,9 +34,9 @@ const CompanySettings: React.FC = () => {
 
   useEffect(() => {
     loadConfig()
-  }, [])
+  }, [loadConfig])
 
-  const loadConfig = async () => {
+  const loadConfig = useCallback(async () => {
     try {
       const [currentConfig, projectsList, orgsList] = await Promise.all([
         getCompanyConfig(),
@@ -69,7 +69,7 @@ const CompanySettings: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [showToast])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Box, Button, Chip, Divider, Stack, Typography } from '@mui/material';
 import { supabase } from '../../utils/supabase';
 import { useToast } from '../../contexts/ToastContext';
@@ -10,7 +10,7 @@ export default function DocumentApprovalsPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -23,11 +23,11 @@ export default function DocumentApprovalsPage() {
     } catch (e:any) {
       showToast(e?.message || 'Failed to load approvals', { severity: 'error' });
     } finally { setLoading(false); }
-  };
+  }, [showToast]);
 
-  useEffect(()=>{ refresh(); },[]);
+  useEffect(()=>{ refresh(); },[refresh]);
 
-  const approve = async (id: string, docId: string) => {
+  const approve = async (_id: string, docId: string) => {
     try {
       const { error } = await supabase.from('documents').update({ status: 'approved' }).eq('id', docId);
       if (error) throw error;
@@ -36,7 +36,7 @@ export default function DocumentApprovalsPage() {
     } catch (e:any) { showToast(e?.message || 'فشل الاعتماد', { severity: 'error' }); }
   };
 
-  const reject = async (id: string, docId: string) => {
+  const reject = async (_id: string, docId: string) => {
     try {
       const { error } = await supabase.from('documents').update({ status: 'rejected' }).eq('id', docId);
       if (error) throw error;

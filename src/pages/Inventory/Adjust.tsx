@@ -1,24 +1,25 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Card, CardContent, Typography, Grid, TextField, MenuItem, Button, Divider } from '@mui/material'
 import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/hooks/useAuth'
 import { listMaterials, type MaterialRow } from '@/services/inventory/materials'
 import { listInventoryLocations, type InventoryLocationRow } from '@/services/inventory/locations'
-import { createInventoryDocument, addInventoryDocumentLine, approveInventoryDocument, postInventoryDocument, type DocType } from '@/services/inventory/documents'
+import { createInventoryDocument, addInventoryDocumentLine, approveInventoryDocument, type DocType } from '@/services/inventory/documents'
 import { listUOMs, type UomRow } from '@/services/inventory/uoms'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import AsyncAutocomplete, { type AsyncOption } from '@/components/Common/AsyncAutocomplete'
 import DocumentActionsBar from '@/components/Inventory/DocumentActionsBar'
-
-function getActiveOrgIdSafe(): string | null { try { return localStorage.getItem('org_id') } catch { return null } }
+import { useScopeOptional } from '@/contexts/ScopeContext'
 
 const AdjustMaterialsPage: React.FC = () => {
   const { showToast } = useToast()
   const { user } = useAuth()
 
-  const [orgId, setOrgId] = useState<string>('')
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
+
   const [materials, setMaterials] = useState<MaterialRow[]>([])
   const [locations, setLocations] = useState<InventoryLocationRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -52,7 +53,7 @@ const formSchema = headerSchema.extend({
   })
   type FormValues = z.infer<typeof formSchema>
 
-  const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       orgId: '',
@@ -75,7 +76,10 @@ const quantity = watch('quantity')
   const unitCost = watch('unitCost')
   const notes = watch('notes')
 
-  useEffect(() => { const v = getActiveOrgIdSafe(); if (v) setOrgId(v) }, [])
+
+  useEffect(() => {
+    if (orgId) setValue('orgId', orgId, { shouldValidate: false, shouldDirty: false, shouldTouch: false })
+  }, [orgId, setValue])
 
   useEffect(() => {
     (async () => {
@@ -94,9 +98,8 @@ const quantity = watch('quantity')
         showToast(e?.message || 'Failed to load lookups', { severity: 'error' })
       } finally { setLoading(false) }
     })()
-  }, [orgId])
+  }, [orgId, showToast])
 
-  const selectedMaterial = useMemo(() => materials.find(m => m.id === materialId), [materials, materialId])
 
   const materialLoader = async (q: string): Promise<AsyncOption<MaterialRow>[]> => {
     const ql = (q || '').toLowerCase()
@@ -113,7 +116,7 @@ const quantity = watch('quantity')
 
   const addLine = () => {
     if (!materialId || !uomId || !quantity) { showToast('Select material, UOM and quantity', { severity: 'warning' }); return }
-setLines(prev => [...prev, { materialId, uomId, quantity, adjustType: adjustType || 'increase', priceSource, unitCost, notes }])
+    setLines(prev => [...prev, { materialId, uomId, quantity, adjustType: adjustType || 'increase', priceSource, unitCost, notes: notes || '' }])
     reset({ ...watch(), materialId: '', uomId: '', quantity: 1, unitCost: 0, priceSource, notes: '' })
   }
   const removeLine = (idx: number) => {
@@ -160,7 +163,6 @@ setLines(prev => [...prev, { materialId, uomId, quantity, adjustType: adjustType
       let lineNo = 1
       for (const ln of payloads) {
         await addInventoryDocumentLine({
-          id: '' as any,
           org_id: orgId,
           document_id: doc.id,
           line_no: lineNo++,
@@ -176,16 +178,12 @@ setLines(prev => [...prev, { materialId, uomId, quantity, adjustType: adjustType
           location_id: values.locationId,
           lot_id: null,
           serial_id: null,
-          notes: ln.notes,
-          created_at: '' as any,
-          updated_at: '' as any,
-          line_value: 0 as any,
+          notes: ln.notes || null,
         })
       }
 await approveInventoryDocument(orgId, doc.id, user.id)
       // Post via inventory function to support explicit increase/decrease without negative line qty
       const postType = (lines[0]?.adjustType || values.adjustType || 'increase') as 'increase' | 'decrease'
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { postAdjustWithType } = await import('@/services/inventory/documents')
       await postAdjustWithType({ orgId, documentId: doc.id, userId: user.id, adjustType: postType })
       showToast('Adjustment posted successfully', { severity: 'success' })
@@ -312,8 +310,6 @@ await approveInventoryDocument(orgId, doc.id, user.id)
                   </thead>
                   <tbody>
                     {lines.map((ln, idx) => {
-                      const mat = materials.find(m=>m.id===ln.materialId)
-                      const uom = uoms.find(u=>u.id===ln.uomId)
                       const qtyErr = !(ln.quantity > 0)
                       const costErr = !(ln.unitCost == null || ln.unitCost >= 0)
                       const lineValue = (ln.unitCost ?? 0) * (ln.quantity ?? 0)

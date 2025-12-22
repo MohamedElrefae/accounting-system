@@ -26,7 +26,6 @@ import {
 } from '@mui/material';
 import {
   Security as SecurityIcon,
-  AdminPanelSettings as AdminIcon,
   Assignment as AssignIcon,
   CheckCircle as SuccessIcon,
   Error as ErrorIcon,
@@ -205,7 +204,7 @@ export default function EnhancedQuickPermissionAssignment({
 
     try {
       setAssigning(true);
-      let overallResult: AssignmentResult = {
+      const overallResult: AssignmentResult = {
         success: true,
         message: '',
         permissions_assigned: 0,

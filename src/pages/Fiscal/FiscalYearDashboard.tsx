@@ -55,7 +55,7 @@ import {
   useCanManageFiscal
 } from '@/services/fiscal/hooks/useFiscalYear'
 import { useToast } from '@/contexts/ToastContext'
-import { getActiveOrgId } from '@/utils/org'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 import type { FiscalYear, CreateFiscalYearInput, UpdateFiscalYearInput } from '@/services/fiscal/types'
 import './FiscalPages.css'
 
@@ -509,7 +509,8 @@ export default function FiscalYearDashboard() {
   const { isRTL } = useArabicLanguage()
   const { showToast } = useToast()
 
-  const [orgId] = useState(() => getActiveOrgId() || '')
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
   const [showModal, setShowModal] = useState(false)
   const [editingFiscalYear, setEditingFiscalYear] = useState<FiscalYear | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)

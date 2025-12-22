@@ -5,8 +5,6 @@ import {
   DialogContent,
   DialogActions,
   Button,
-  Autocomplete,
-  TextField,
   Chip,
   Box,
   Typography,
@@ -22,7 +20,6 @@ import {
 } from '@mui/material';
 import {
   Add as AddIcon,
-  Delete as DeleteIcon,
   Save as SaveIcon,
   Close as CloseIcon
 } from '@mui/icons-material';

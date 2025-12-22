@@ -71,12 +71,15 @@ export interface AppStore {
   user: User | null;
   language: Language;
   theme: ThemeMode;
+  demoMode: boolean;
   sidebarCollapsed?: boolean;
   notifications?: any[];
   companyName?: string;
   setUser: (user: User | null) => void;
   setLanguage: (language: Language) => void;
   setTheme: (theme: ThemeMode) => void;
+  setDemoMode: (enabled: boolean) => void;
+  toggleDemoMode: () => void;
   toggleTheme: () => void;
   toggleLanguage?: () => void;
   setSidebarCollapsed?: (collapsed: boolean) => void;

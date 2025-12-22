@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Box, Button, Checkbox, Divider, List, ListItem, ListItemText, Stack, Typography } from '@mui/material';
 import { useUploadDocument } from '../../hooks/documents/useDocuments';
 import { useToast } from '../../contexts/ToastContext';
@@ -38,15 +38,15 @@ export default function AttachDocumentsPanel({ orgId, transactionId, transaction
     : 'transactions';
   const entityId = transactionLineItemId || transactionLineId || transactionId;
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     if (!entityId) return;
     const linked = await svc.getLinkedDocuments(entityType as any, entityId);
     setDocs(linked);
-  };
+  }, [entityId, entityType]);
 
   useEffect(() => {
-    refresh();
-  }, [transactionId, transactionLineId, transactionLineItemId]);
+    refresh().catch(() => {});
+  }, [refresh]);
 
   const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

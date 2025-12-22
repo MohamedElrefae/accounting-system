@@ -1,73 +1,74 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { TextField, MenuItem } from '@mui/material';
 import { getOrganizations, type Organization } from '../../services/organization';
-import { getActiveOrgId, setActiveOrgId } from '../../utils/org';
+import { useScopeOptional } from '../../contexts/ScopeContext';
 
 interface Props {
   value?: string;
   onChange?: (orgId: string) => void;
   label?: string;
-  persist?: boolean; // also update local storage
+  persist?: boolean;
   sx?: any;
   size?: 'small' | 'medium';
 }
 
 export default function OrgSelector({ value, onChange, label = 'Organization', persist = true, sx, size = 'small' }: Props) {
+  const scope = useScopeOptional();
   const [orgs, setOrgs] = useState<Organization[]>([]);
-  const [orgId, setOrgId] = useState<string>(value || getActiveOrgId() || '');
+  const [orgId, setOrgId] = useState<string>('');
+
+  const effectiveValue = useMemo(() => {
+    if (value !== undefined) return value;
+    return scope?.currentOrg?.id || '';
+  }, [scope?.currentOrg?.id, value]);
 
   useEffect(() => {
     (async () => {
       try {
-        console.log('🔍 [OrgSelector] Fetching organizations...');
         const list = await getOrganizations();
-        console.log(`✅ [OrgSelector] Loaded ${list.length} organizations`, list);
         setOrgs(list);
-        if (!orgId && list.length > 0) {
+
+        const candidate = effectiveValue;
+        if (candidate && list.some(o => o.id === candidate)) {
+          setOrgId(candidate);
+        } else if (list.length > 0) {
           const first = list[0].id as string;
           setOrgId(first);
-          if (persist) setActiveOrgId(first);
+          if (persist && scope) { void scope.setOrganization(first) }
           onChange?.(first);
-          console.log(`✅ [OrgSelector] Auto-selected first org: ${first}`);
-        } else if (list.length === 0) {
-          console.warn('⚠️ [OrgSelector] No organizations found in database');
         }
       } catch (err) {
-        console.error('❌ [OrgSelector] Error fetching organizations:', err);
+        console.error('[OrgSelector] Error:', err);
         setOrgs([]);
       }
     })();
-  }, []);
+  }, [effectiveValue, persist, scope, onChange]);
 
-  useEffect(() => { if (value !== undefined) setOrgId(value); }, [value]);
+  useEffect(() => {
+    setOrgId(effectiveValue);
+  }, [effectiveValue]);
 
-  const handleChange = (id: string) => {
+  const handleChange = useCallback((id: string) => {
     setOrgId(id);
-    if (persist) setActiveOrgId(id);
+    if (persist && scope) { void scope.setOrganization(id) }
     onChange?.(id);
-  };
+  }, [persist, onChange, scope]);
 
   return (
     <TextField
       select
+      fullWidth
       size={size}
       label={label}
       value={orgId}
       onChange={(e) => handleChange(e.target.value)}
       sx={sx}
-      helperText={orgs.length === 0 ? 'No organizations found. Please add one in settings.' : undefined}
+      helperText={orgs.length === 0 ? 'No organizations found' : undefined}
       error={orgs.length === 0}
-      placeholder="Select organization"
     >
-      {orgs.length === 0 ? (
-        <MenuItem value="" disabled>
-          No organizations available
-        </MenuItem>
-      ) : (
-        orgs.map((o) => (
-          <MenuItem key={o.id} value={o.id}>{o.code} - {o.name}</MenuItem>
-        ))
-      )}
+      {orgs.map((o) => (
+        <MenuItem key={o.id} value={o.id}>{o.code} - {o.name}</MenuItem>
+      ))}
     </TextField>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Building2, UserPlus2, Users2, Trash2, RefreshCw } from 'lucide-react';
 import styles from './OrgMembersManagement.module.css';
 import { useToast } from '../../contexts/ToastContext';
@@ -27,17 +27,7 @@ const OrgMembersManagement: React.FC = () => {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    loadOrganizations();
-  }, []);
-
-  useEffect(() => {
-    if (selectedOrgId) {
-      loadMembers(selectedOrgId);
-    }
-  }, [selectedOrgId]);
-
-  const loadOrganizations = async () => {
+  const loadOrganizations = useCallback(async () => {
     try {
       setLoading(true);
       const data = await getOrganizations();
@@ -50,9 +40,9 @@ const OrgMembersManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
-  const loadMembers = async (orgId: string) => {
+  const loadMembers = useCallback(async (orgId: string) => {
     try {
       setRefreshing(true);
       const list = await listOrgMembers(orgId);
@@ -62,7 +52,17 @@ const OrgMembersManagement: React.FC = () => {
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => {
+    loadOrganizations();
+  }, [loadOrganizations]);
+
+  useEffect(() => {
+    if (selectedOrgId) {
+      loadMembers(selectedOrgId);
+    }
+  }, [selectedOrgId, loadMembers]);
 
   const handleOpenAdd = async () => {
     setUserQuery('');

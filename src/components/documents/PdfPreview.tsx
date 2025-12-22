@@ -6,7 +6,7 @@ import NavigateBefore from '@mui/icons-material/NavigateBefore';
 import NavigateNext from '@mui/icons-material/NavigateNext';
 
 // NOTE: requires: npm install pdfjs-dist
-import { getDocument, GlobalWorkerOptions, version as pdfjsVersion } from 'pdfjs-dist';
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 // Import the worker URL from Vite
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker?url';
 
@@ -72,7 +72,6 @@ export default function PdfPreview({ file, height = 480, continuous = false }: P
 
       if (continuous) {
         for (let i = 1; i <= pageCount; i++) {
-          // eslint-disable-next-line no-await-in-loop
           await renderPage(i);
         }
       } else {

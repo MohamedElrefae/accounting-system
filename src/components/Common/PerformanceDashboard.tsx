@@ -7,23 +7,17 @@ import {
   Grid,
   LinearProgress,
   Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   Alert
 } from '@mui/material';
+
 import {
   Speed as SpeedIcon,
   Memory as MemoryIcon,
   NetworkCheck as NetworkIcon,
   Timer as TimerIcon,
-  TrendingUp as TrendingUpIcon,
   Warning as WarningIcon
 } from '@mui/icons-material';
+
 import { performanceTracker } from '../../utils/performanceMetrics';
 
 const PerformanceDashboard: React.FC = () => {

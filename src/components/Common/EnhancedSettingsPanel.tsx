@@ -10,21 +10,14 @@ import {
   DollarSign, 
   Calendar, 
   Palette, 
-  Type, 
   CheckSquare, 
-  Grid3x3, 
-  ArrowUpDown, 
   Save, 
-  MousePointer, 
-  Sparkles, 
   Gauge, 
-  Database, 
   Code, 
   RotateCcw, 
   Download, 
   Upload, 
-  Check, 
-  GripVertical 
+  Check 
 } from 'lucide-react'
 
 interface WizardSettings {

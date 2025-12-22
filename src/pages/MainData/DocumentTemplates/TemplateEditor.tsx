@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Box, Button, Divider, Stack, TextField, Typography, styled, FormControlLabel, Checkbox } from '@mui/material';
 import OrgSelector from '../../../components/Organizations/OrgSelector';
 import { useParams } from 'react-router-dom';
@@ -7,7 +7,7 @@ import * as tpl from '../../../services/templates';
 import * as docs from '../../../services/documents';
 import PdfPreview from '../../../components/documents/PdfPreview';
 import { useHasPermission } from '../../../hooks/useHasPermission';
-import { getActiveOrgId } from '../../../utils/org';
+import { useScopeOptional } from '../../../contexts/ScopeContext';
 
 const Root = styled(Box)(({ theme }) => ({
   padding: theme.spacing(2)
@@ -25,7 +25,9 @@ const TwoCol = styled(Stack)(({ theme }) => ({
 export default function TemplateEditor() {
   const { id } = useParams();
   const { showToast } = useToast();
+  const scope = useScopeOptional();
   const [orgId, setOrgId] = useState('');
+
   const [template, setTemplate] = useState<tpl.DocumentTemplate | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -38,9 +40,12 @@ export default function TemplateEditor() {
   const canManage = hasPerm('templates.manage');
   const canGenerate = hasPerm('templates.generate') || canManage;
 
-  useEffect(()=>{ const id = getActiveOrgId(); if (id) setOrgId(id); },[]);
+  useEffect(() => {
+    const id = scope?.currentOrg?.id || '';
+    setOrgId(id);
+  }, [scope?.currentOrg?.id]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!id) return;
     try {
       const t = await tpl.getTemplate(id);
@@ -51,9 +56,9 @@ export default function TemplateEditor() {
     } catch (e:any) {
       showToast(e?.message || 'Failed to load template', { severity: 'error' });
     }
-  };
+  }, [id, showToast]);
 
-  useEffect(()=>{ load(); }, [id]);
+  useEffect(()=>{ load(); }, [load]);
 
   useEffect(() => {
     if (!autoPreview) return;
@@ -69,7 +74,7 @@ export default function TemplateEditor() {
       }
     }, 700);
     return () => clearTimeout(t);
-  }, [data, name, autoPreview]);
+  }, [data, name, autoPreview, template, previewUrl]);
 
   const save = async () => {
     if (!id) return;
@@ -90,7 +95,7 @@ export default function TemplateEditor() {
       const payload = JSON.parse(data || '{}');
       const blob = await tpl.generatePdfFromTemplate(template, payload);
       const file = new File([blob], `${template.name}.pdf`, { type: 'application/pdf' });
-      const upload = await docs.uploadDocument({ orgId, title: `${template.name} (${new Date().toLocaleDateString()})`, file });
+      await docs.uploadDocument({ orgId, title: `${template.name} (${new Date().toLocaleDateString()})`, file });
       showToast('تم إنشاء المستند من القالب', { severity: 'success' });
     } catch (e:any) {
       showToast(e?.message || 'فشل إنشاء المستند', { severity: 'error' });

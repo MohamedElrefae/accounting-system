@@ -3,40 +3,42 @@ import { Card, CardContent, Typography, Grid, TextField, MenuItem, Button, Divid
 import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/hooks/useAuth'
 import { listMaterials, type MaterialRow } from '@/services/inventory/materials'
-import { listAnalysisWorkItems, type AnalysisWorkItemFull } from '@/services/analysis-work-items'
-import { listWorkItemsAll, type WorkItemRow } from '@/services/work-items'
+import { listAnalysisWorkItems } from '@/services/analysis-work-items'
+import { listWorkItemsAll } from '@/services/work-items'
+import type { AnalysisWorkItemFull } from '@/types/analysis-work-items'
+import type { WorkItemRow } from '@/types/work-items'
 import { getCostCentersList, type CostCenterRow } from '@/services/cost-centers'
-import { getActiveProjectId } from '@/utils/org'
 import { getActiveProjectsByOrg, type Project } from '@/services/projects'
 import { listInventoryLocations, type InventoryLocationRow } from '@/services/inventory/locations'
-import { createInventoryDocument, addInventoryDocumentLine, approveInventoryDocument, postInventoryDocument, type DocType } from '@/services/inventory/documents'
+import { createInventoryDocument, addInventoryDocumentLine, approveInventoryDocument, type DocType } from '@/services/inventory/documents'
 import { listUOMs, type UomRow } from '@/services/inventory/uoms'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import AsyncAutocomplete, { type AsyncOption } from '@/components/Common/AsyncAutocomplete'
 import DocumentActionsBar from '@/components/Inventory/DocumentActionsBar'
 
-function getActiveOrgIdSafe(): string | null { try { return localStorage.getItem('org_id') } catch { return null } }
-
 const ReturnsPage: React.FC = () => {
   const { showToast } = useToast()
   const { user } = useAuth()
 
-  const [orgId, setOrgId] = useState<string>('')
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
+  const scopeProjectId = scope?.currentProject?.id || ''
+
   const [materials, setMaterials] = useState<MaterialRow[]>([])
   const [locations, setLocations] = useState<InventoryLocationRow[]>([])
   const [loading, setLoading] = useState(false)
   const [uoms, setUoms] = useState<UomRow[]>([])
   const [projects, setProjects] = useState<Project[]>([])
-  const [defaultProjectId, setDefaultProjectId] = useState<string>('')
   const [projectId, setProjectId] = useState<string>('')
   const [costCenters, setCostCenters] = useState<CostCenterRow[]>([])
-  const [costCenterId, setCostCenterId] = useState<string>('')
+  const [costCenterId, _setCostCenterId] = useState<string>('')
   const [analysisItems, setAnalysisItems] = useState<AnalysisWorkItemFull[]>([])
-  const [analysisItemId, setAnalysisItemId] = useState<string>('')
+  const [analysisItemId, _setAnalysisItemId] = useState<string>('')
   const [workItems, setWorkItems] = useState<WorkItemRow[]>([])
-  const [workItemId, setWorkItemId] = useState<string>('')
+  const [workItemId, _setWorkItemId] = useState<string>('')
 
 type Line = { materialId: string; uomId: string; quantity: number; returnType: 'from_project' | 'to_vendor'; priceSource: 'moving_average' | 'last_purchase' | 'manual'; unitCost?: number; notes: string }
   const [lines, setLines] = useState<Line[]>([])
@@ -97,18 +99,13 @@ const quantity = watch('quantity')
   const unitCost = watch('unitCost')
   const notes = watch('notes')
   const wfProjectId = watch('projectId')
-  const wfCostCenterId = watch('costCenterId')
-  const wfAnalysisItemId = watch('analysisItemId')
-  const wfWorkItemId = watch('workItemId')
 
-  useEffect(() => { const v = getActiveOrgIdSafe(); if (v) setOrgId(v) }, [])
+  useEffect(() => {
+    if (scopeProjectId) setProjectId(prev => prev || scopeProjectId)
+  }, [scopeProjectId])
 
   useEffect(() => {
     (async () => {
-      try {
-        const activeProj = getActiveProjectId?.() || ''
-        if (activeProj) { setDefaultProjectId(activeProj); setProjectId(prev => prev || activeProj) }
-      } catch {}
       if (!orgId) return
       setLoading(true)
       try {
@@ -131,9 +128,7 @@ const quantity = watch('quantity')
         showToast(e?.message || 'Failed to load lookups', { severity: 'error' })
       } finally { setLoading(false) }
     })()
-  }, [orgId])
-
-  const selectedMaterial = useMemo(() => materials.find(m => m.id === materialId), [materials, materialId])
+  }, [orgId, wfProjectId, showToast])
 
   const materialLoader = async (q: string): Promise<AsyncOption<MaterialRow>[]> => {
     const ql = (q || '').toLowerCase()
@@ -150,7 +145,7 @@ const quantity = watch('quantity')
 
   const addLine = () => {
     if (!materialId || !uomId || !quantity) { showToast('Select material, UOM and quantity', { severity: 'warning' }); return }
-setLines(prev => [...prev, { materialId, uomId, quantity, returnType: returnType || 'from_project', priceSource, unitCost, notes }])
+setLines(prev => [...prev, { materialId, uomId, quantity, returnType: returnType || 'from_project', priceSource, unitCost, notes: notes || '' }])
     reset({ ...watch(), materialId: '', uomId: '', quantity: 1, unitCost: 0, priceSource, notes: '' })
   }
   const removeLine = (idx: number) => {
@@ -197,7 +192,6 @@ setLines(prev => [...prev, { materialId, uomId, quantity, returnType: returnType
       let lineNo = 1
       for (const ln of payloads) {
         await addInventoryDocumentLine({
-          id: '' as any,
           org_id: orgId,
           document_id: doc.id,
           line_no: lineNo++,
@@ -214,15 +208,11 @@ setLines(prev => [...prev, { materialId, uomId, quantity, returnType: returnType
           lot_id: null,
           serial_id: null,
           notes: ln.notes,
-          created_at: '' as any,
-          updated_at: '' as any,
-          line_value: 0 as any,
         })
       }
 await approveInventoryDocument(orgId, doc.id, user.id)
       // Post via inventory function to support explicit return type without negative line qty
       const postType = (lines[0]?.returnType || values.returnType || 'from_project') as 'from_project' | 'to_vendor'
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { postReturnWithType } = await import('@/services/inventory/documents')
       await postReturnWithType({ orgId, documentId: doc.id, userId: user.id, returnType: postType })
       showToast('Return posted successfully', { severity: 'success' })

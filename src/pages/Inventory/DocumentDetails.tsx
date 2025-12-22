@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Card, CardContent, Typography, Grid, Divider, Button } from '@mui/material'
+import { Card, CardContent, Typography, Grid, Button } from '@mui/material'
 import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/hooks/useAuth'
 import { getInventoryDocument, listDocumentLines, listInventoryMovements } from '@/services/inventory/documents'
@@ -20,8 +20,8 @@ interface TxRow {
 const DocumentDetailsPage: React.FC = () => {
   const { showToast } = useToast()
   const navigate = useNavigate()
-  const { user } = useAuth()
-  const [loading, setLoading] = useState(false)
+  useAuth()
+  const [_loading, setLoading] = useState(false)
   const [docId, setDocId] = useState<string>('')
   const [header, setHeader] = useState<any>(null)
   const [lines, setLines] = useState<any[]>([])
@@ -69,7 +69,7 @@ const DocumentDetailsPage: React.FC = () => {
         showToast(e?.message || 'Failed to load document details', { severity: 'error' })
       } finally { setLoading(false) }
     })()
-  }, [docId])
+  }, [docId, showToast])
 
   const docTitle = useMemo(() => {
     if (!header) return 'Inventory Document'

@@ -31,8 +31,8 @@ export interface TransactionLineItemsEditorProps {
  * ✅ Real-time total updates
  */
 export const TransactionLineItemsEditor: React.FC<TransactionLineItemsEditorProps> = ({
-  transactionLineId,
-  orgId,
+  transactionLineId: _transactionLineId,
+  orgId: _orgId,
   items,
   onChange,
   disabled = false,

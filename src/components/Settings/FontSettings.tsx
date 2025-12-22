@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Type, Settings, RotateCcw, Eye, Save } from 'lucide-react'
 import { 
   getUserFontPreferences, 
@@ -30,9 +30,9 @@ const FontSettings: React.FC = () => {
 
   useEffect(() => {
     loadPreferences()
-  }, [])
+  }, [loadPreferences])
 
-  const loadPreferences = async () => {
+  const loadPreferences = useCallback(async () => {
     try {
       const userPrefs = await getUserFontPreferences()
       setPreferences(userPrefs)
@@ -52,7 +52,7 @@ const FontSettings: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [showToast])
 
   const handlePreviewUpdate = (updates: Partial<typeof formData>) => {
     const newFormData = { ...formData, ...updates }

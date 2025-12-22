@@ -5,13 +5,14 @@ import { DataGrid } from '@mui/x-data-grid'
 import type { GridColDef } from '@mui/x-data-grid'
 import { useNavigate } from 'react-router-dom'
 import { InventoryReportsService, type AgeingRow } from '@/services/inventory/reports'
-import { getActiveOrgId } from '@/utils/org'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 import { MaterialSelect } from '@/components/Inventory/MaterialSelect'
 import { LocationSelect } from '@/components/Inventory/LocationSelect'
 import { ProjectSelect } from '@/components/Inventory/ProjectSelect'
 
 export default function InventoryAgeingPage() {
-  const orgId = getActiveOrgId?.() || null
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || null
   const navigate = useNavigate()
   const [rows, setRows] = useState<AgeingRow[]>([])
   const [projectFilter, setProjectFilter] = useState('')
@@ -32,7 +33,7 @@ export default function InventoryAgeingPage() {
       }
     })()
     return () => { mounted = false }
-  }, [])
+  }, [orgId])
 
   const columns = useMemo<GridColDef[]>(() => [
     { field: 'material_code', headerName: 'Material', width: 180 },
@@ -66,8 +67,8 @@ export default function InventoryAgeingPage() {
                   const csvRows = [headers.join(',')]
                   rows.forEach((r: any) => {
                     const arr = [r.org_id, r.material_id, r.material_code ?? '', r.material_name ?? '', r.location_id, r.location_code ?? '', r.location_name ?? '', r.project_id ?? '', r.project_code ?? '', r.project_name ?? '', r.on_hand_qty, r.last_inbound_at ?? '', r.days_since_inbound, r.ageing_bucket]
-                      .map(v => v === null || v === undefined ? '' : String(v).replace(/\"/g,'\"\"'))
-                      .map(v => /,|\"|\n/.test(v) ? `\"${v}` + '\"' : v)
+                      .map(v => v === null || v === undefined ? '' : String(v).replace(/"/g, '""'))
+                      .map(v => /,|"|\n/.test(v) ? `"${v}"` : v)
                     csvRows.push(arr.join(','))
                   })
                   const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' })

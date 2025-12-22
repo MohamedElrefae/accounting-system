@@ -1,5 +1,4 @@
 import { supabase } from '../utils/supabase'
-import { getActiveOrgId } from '../utils/org'
 
 export interface CompanyConfig {
   id: string
@@ -45,29 +44,30 @@ const DEFAULT_COMPANY_CONFIG: Partial<CompanyConfig> = {
 // Cache for company config
 let configCache: CompanyConfig | null = null
 let configCacheTime = 0
+let configCacheOrgId: string | null = null
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
 /**
  * Get the current company configuration
  */
-export async function getCompanyConfig(): Promise<CompanyConfig> {
+export async function getCompanyConfig(orgId?: string | null): Promise<CompanyConfig> {
   const now = Date.now()
+  const effectiveOrgId = orgId ?? null
   
   // Return cached config if it's still valid
-  if (configCache && now - configCacheTime < CACHE_DURATION) {
+  if (configCache && now - configCacheTime < CACHE_DURATION && configCacheOrgId === effectiveOrgId) {
     return configCache
   }
 
   try {
-    const orgId = getActiveOrgId() || null
     let query = supabase
       .from('company_config')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(1)
 
-    if (orgId) {
-      query = query.eq('org_id', orgId)
+    if (effectiveOrgId) {
+      query = query.eq('org_id', effectiveOrgId)
     }
 
     const { data, error } = await query
@@ -84,11 +84,13 @@ export async function getCompanyConfig(): Promise<CompanyConfig> {
       } as CompanyConfig
       configCache = fallback
       configCacheTime = now
+      configCacheOrgId = effectiveOrgId
       return fallback
     }
 
     configCache = row
     configCacheTime = now
+    configCacheOrgId = effectiveOrgId
     return configCache
   } catch (error) {
     console.error('Error fetching company config:', error)
@@ -116,13 +118,14 @@ export async function createDefaultConfig(): Promise<CompanyConfig> {
   } as CompanyConfig
   configCache = fallback
   configCacheTime = Date.now()
+  configCacheOrgId = null
   return fallback
 }
 
 /**
  * Update company configuration
  */
-export async function updateCompanyConfig(updates: Partial<CompanyConfig>): Promise<CompanyConfig> {
+export async function updateCompanyConfig(updates: Partial<CompanyConfig>, orgId?: string | null): Promise<CompanyConfig> {
   // Only send columns that certainly exist in the DB to avoid PostgREST 400 (unknown column)
   const ALLOWED_COLUMNS: (keyof CompanyConfig)[] = [
     'company_name',
@@ -147,7 +150,7 @@ export async function updateCompanyConfig(updates: Partial<CompanyConfig>): Prom
   }
 
   try {
-    const currentConfig = await getCompanyConfig();
+    const currentConfig = await getCompanyConfig(orgId ?? null);
 
     // Include optional columns only if they exist in current config shape
     const OPTIONAL_KEYS = [
@@ -164,8 +167,7 @@ export async function updateCompanyConfig(updates: Partial<CompanyConfig>): Prom
 
     // If no persistent row exists yet (cache fallback id), insert a new row
     if (!currentConfig || currentConfig.id === 'default') {
-      const orgId = getActiveOrgId() || null
-      const insertPayload = { ...payload, updated_at: new Date().toISOString(), org_id: orgId }
+      const insertPayload = { ...payload, updated_at: new Date().toISOString(), org_id: (orgId ?? null) }
       const { data, error } = await supabase
         .from('company_config')
         .insert(insertPayload)
@@ -176,6 +178,7 @@ export async function updateCompanyConfig(updates: Partial<CompanyConfig>): Prom
       // Clear cache
       configCache = null;
       configCacheTime = 0;
+      configCacheOrgId = null;
       return data as CompanyConfig;
     }
 
@@ -194,6 +197,7 @@ export async function updateCompanyConfig(updates: Partial<CompanyConfig>): Prom
     // Clear cache
     configCache = null;
     configCacheTime = 0;
+    configCacheOrgId = null;
 
     return data as CompanyConfig;
   } catch (error) {
@@ -206,7 +210,7 @@ export async function updateCompanyConfig(updates: Partial<CompanyConfig>): Prom
  * Get transaction number configuration from company config
  */
 export async function getTransactionNumberConfig() {
-  const config = await getCompanyConfig()
+  const config = await getCompanyConfig(null)
   
   return {
     prefix: config.transaction_number_prefix,
@@ -222,4 +226,5 @@ export async function getTransactionNumberConfig() {
 export function clearConfigCache() {
   configCache = null
   configCacheTime = 0
+  configCacheOrgId = null
 }

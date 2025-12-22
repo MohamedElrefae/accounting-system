@@ -1,6 +1,7 @@
 import * as React from 'react'
-import { forwardRef, useEffect, useRef, useState } from 'react'
+import { forwardRef, useEffect, useRef } from 'react'
 import { styled } from '@mui/material/styles'
+
 import { autocompleteClasses } from '@mui/material/Autocomplete'
 import { VariableSizeList } from 'react-window'
 import type { ListChildComponentProps } from 'react-window'
@@ -8,11 +9,10 @@ import type { ListChildComponentProps } from 'react-window'
 // A virtualized ListboxComponent for MUI Autocomplete using react-window.
 // - Supports variable item sizes
 // - Respects MUI theming and RTL
-// - Accepts indentation via a getItemLevel function for tree-like display
 
 const LISTBOX_PADDING = 8 // px
 
-const StyledListbox = styled('div')(({ theme }) => ({
+const StyledListbox = styled('div')(() => ({
   [`& .${autocompleteClasses.listbox}`]: {
     boxSizing: 'border-box',
     padding: 0,
@@ -51,7 +51,7 @@ function useResetCache(data: any) {
   return ref
 }
 
-export interface VirtualizedListboxProps<T> {
+export interface VirtualizedListboxProps {
   itemSize?: number
   getItemSize?: (child: React.ReactNode) => number
 }
@@ -64,7 +64,8 @@ const VirtualizedAutocompleteListbox = forwardRef<HTMLDivElement, React.HTMLAttr
 
   const itemData = React.Children.toArray(children)
   const gridRef = useResetCache(itemData)
-  const getChildSize = (child: React.ReactNode) => {
+  const getChildSize = (_child: React.ReactNode) => {
+
     // Could be enhanced to read a prop set by renderOption for variable heights
     return itemSize
   }
@@ -84,7 +85,7 @@ const VirtualizedAutocompleteListbox = forwardRef<HTMLDivElement, React.HTMLAttr
           ref={gridRef}
           outerElementType={OuterElementType as any}
           innerElementType="ul"
-          itemSize={(index) => getChildSize(itemData[index])}
+          itemSize={(index: number) => getChildSize(itemData[index])}
           overscanCount={5}
           itemCount={itemData.length}
         >

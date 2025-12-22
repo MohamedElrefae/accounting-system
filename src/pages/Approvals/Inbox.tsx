@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Box, Typography, Button, CircularProgress, Chip } from '@mui/material'
 import EnhancedLineApprovalManager from '../../components/Approvals/EnhancedLineApprovalManager'
+import { getTransactionsWithPendingLines } from '../../services/lineReviewService'
 import './Approvals.css'
 
 const ApprovalsInbox: React.FC = () => {
@@ -9,7 +10,7 @@ const ApprovalsInbox: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
-  
+
   // Modern approval workflow modal state
   const [approvalWorkflowOpen, setApprovalWorkflowOpen] = useState(false)
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null)
@@ -17,10 +18,10 @@ const ApprovalsInbox: React.FC = () => {
   async function reload() {
     setLoading(true)
     try {
-      // TODO: Implement getTransactionsWithPendingLines using lineReviewService
-      // For now, show empty state
-      setTransactions([])
-      console.log('✅ Loaded transactions with pending lines: 0')
+      // Use the enhanced line review service to fetch transactions
+      const data = await getTransactionsWithPendingLines()
+      setTransactions(data)
+      console.log(`✅ Loaded transactions with pending lines: ${data.length}`)
     } catch (err: any) {
       console.error('Error loading transactions:', err)
       setError(err?.message || 'فشل تحميل صندوق الموافقات')
@@ -98,7 +99,7 @@ const ApprovalsInbox: React.FC = () => {
                       {r.description || 'No description'}
                     </Typography>
                   </Box>
-                  <Chip 
+                  <Chip
                     label={`${r.pending_lines_count} سطور معلقة`}
                     color="warning"
                     size="small"

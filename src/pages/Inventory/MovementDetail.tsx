@@ -1,15 +1,16 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Box, Button, Container, Paper, Stack, Typography, Tooltip, Select, MenuItem, Checkbox, ListItemText } from '@mui/material'
 import { DataGrid, type GridColDef } from '@mui/x-data-grid'
 import { InventoryMovementService, type MovementDetailRow } from '@/services/inventory/reports'
-import { getActiveOrgId } from '@/utils/org'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 import { useLocation } from 'react-router-dom'
 import { MaterialSelect } from '@/components/Inventory/MaterialSelect'
 import { LocationSelect } from '@/components/Inventory/LocationSelect'
 import { supabase } from '@/utils/supabase'
 
 export default function InventoryMovementDetailPage() {
-  const orgId = getActiveOrgId?.() || null
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || null
   const [rows, setRows] = useState<MovementDetailRow[]>([])
   const [loading, setLoading] = useState(false)
   const [materialId, setMaterialId] = useState('')
@@ -18,7 +19,7 @@ export default function InventoryMovementDetailPage() {
   const [to, setTo] = useState('')
   // Saved filters example (local only): key per page
   // const [saved, setSaved] = useSavedFilters('inventory:movement-detail', { materialId: '', locationId: '', from: '', to: '' })
-const [movementTypes, setMovementTypes] = useState<string[]>([])
+  const [movementTypes, setMovementTypes] = useState<string[]>([])
   const [costingMap, setCostingMap] = useState<Record<string, { method_used: string | null, last_purchase_unit_cost: number | null, effective_unit_cost: number | null }>>({})
   const [lppMetaMap, setLppMetaMap] = useState<Record<string, { currency: string | null, vendor_id: string | null, at: string | null }>>({})
 
@@ -49,7 +50,7 @@ const [movementTypes, setMovementTypes] = useState<string[]>([])
         }
       } catch {
         // Costing snapshot view not available - continue without costing data
-        console.warn('Costing snapshot view not available')
+        if (import.meta.env.DEV) console.warn('Costing snapshot view not available')
       }
     } finally {
       setLoading(false)
@@ -83,7 +84,7 @@ const [movementTypes, setMovementTypes] = useState<string[]>([])
     { field: 'quantity', headerName: 'Qty', width: 120, type: 'number' },
     { field: 'unit_cost', headerName: 'Unit Cost', width: 120, type: 'number' },
     { field: 'total_cost', headerName: 'Total Cost', width: 140, type: 'number' },
-    { field: 'method_used_ref', headerName: 'Cost Method', width: 140, valueGetter: (p) => p?.row ? (costingMap[`${p.row.org_id}-${p.row.material_id}-${p.row.location_id}-${p.row.project_id ?? 'none'}`]?.method_used || '') : '' },
+    { field: 'method_used_ref', headerName: 'Cost Method', width: 140, valueGetter: (p: any) => p?.row ? (costingMap[`${p.row.org_id}-${p.row.material_id}-${p.row.location_id}-${p.row.project_id ?? 'none'}`]?.method_used || '') : '' },
     { field: 'last_purchase_unit_cost_ref', headerName: 'Last Purchase', width: 160, type: 'number', renderCell: (params) => {
       const r: any = params.row
       const key = `${r.org_id}-${r.material_id}-${r.location_id}-${r.project_id ?? 'none'}`
@@ -97,15 +98,15 @@ const [movementTypes, setMovementTypes] = useState<string[]>([])
       )
     } },
     { field: 'document_id', headerName: 'Doc ID', width: 260 }
-  ], [costingMap])
+  ], [costingMap, lppMetaMap])
 
   const handleExport = () => {
     const headers = ['movement_date','movement_type','material_id','material_code','material_name','location_id','location_code','location_name','project_id','project_code','project_name','quantity','unit_cost','total_cost','document_id']
     const csvRows = [headers.join(',')]
     rows.forEach((r: any) => {
       const arr = [r.movement_date, r.movement_type, r.material_id, r.material_code ?? '', r.material_name ?? '', r.location_id, r.location_code ?? '', r.location_name ?? '', r.project_id ?? '', r.project_code ?? '', r.project_name ?? '', r.quantity, r.unit_cost ?? '', r.total_cost ?? '', r.document_id ?? '']
-        .map(v => v === null || v === undefined ? '' : String(v).replace(/\"/g,'\"\"'))
-        .map(v => /,|\"|\n/.test(v) ? `\"${v}` + '\"' : v)
+        .map(v => v === null || v === undefined ? '' : String(v).replace(/"/g, '""'))
+        .map(v => /,|"|\n/.test(v) ? `"${v}"` : v)
       csvRows.push(arr.join(','))
     })
     const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' })

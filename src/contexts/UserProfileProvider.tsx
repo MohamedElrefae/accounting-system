@@ -38,7 +38,7 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
       setProfile(null);
       setError(null);
     }
-  }, [authProfile, authRoles, user?.id]);
+  }, [authProfile, authRoles, user?.id, profile?.created_at, profile?.updated_at]);
 
   const load = useCallback(async (userId: string) => {
     try {
@@ -131,7 +131,13 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
     await refreshProfile();
   }, [user?.id, user, refreshProfile]);
 
+  const normalizeRole = useCallback((role: string): string => {
+    // Normalize role names: convert to lowercase and replace spaces with underscores
+    return role.toLowerCase().replace(/\s+/g, '_');
+  }, []);
+
   const getRoleDisplayName = useCallback((role: string) => {
+    const normalized = normalizeRole(role);
     const map: Record<string, string> = {
       super_admin: 'مدير النظام الرئيسي',
       admin: 'مدير النظام',
@@ -140,10 +146,14 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
       auditor: 'مدقق',
       viewer: 'عارض',
     };
-    return map[role] || role;
-  }, []);
+    return map[normalized] || role;
+  }, [normalizeRole]);
 
-  const hasRole = useCallback((role: string) => !!profile?.roles?.includes(role), [profile?.roles]);
+  const hasRole = useCallback((role: string) => {
+    const normalized = normalizeRole(role);
+    return !!profile?.roles?.some(r => normalizeRole(r) === normalized);
+  }, [profile?.roles, normalizeRole]);
+
   const isSuperAdmin = useCallback(() => hasRole('super_admin'), [hasRole]);
 
   const value: UserProfileContextValue = useMemo(() => ({

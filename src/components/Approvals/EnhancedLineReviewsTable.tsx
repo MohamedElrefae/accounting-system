@@ -18,7 +18,7 @@ import {
   Card,
   CardContent
 } from '@mui/material'
-import { Edit, Message as Comment, CheckCircle, ExpandMore, ExpandLess } from '@mui/icons-material'
+import { Edit, Message as Comment, CheckCircle, ExpandMore, ExpandLess, Close } from '@mui/icons-material'
 
 interface LineReview {
   line_id: string
@@ -27,7 +27,11 @@ interface LineReview {
   account_name: string
   account_name_ar?: string
   org_id?: string
+  org_name?: string
+  org_name_ar?: string
   project_id?: string
+  project_name?: string
+  project_name_ar?: string
   line_status?: string
   description?: string
   debit_amount: number
@@ -424,7 +428,7 @@ const EnhancedLineReviewsTable: React.FC<EnhancedLineReviewsTableProps> = ({
                                     mb: 0.5
                                   }}
                                 >
-                                  معرف المنظمة
+                                  المنظمة
                                 </Typography>
                                 <Typography
                                   variant="body2"
@@ -432,10 +436,9 @@ const EnhancedLineReviewsTable: React.FC<EnhancedLineReviewsTableProps> = ({
                                     fontWeight: 600,
                                     color: 'var(--text)',
                                     fontSize: '0.9rem',
-                                    fontFamily: 'monospace'
                                   }}
                                 >
-                                  {line.org_id || '-'}
+                                  {line.org_name_ar || line.org_name || line.org_id || '-'}
                                 </Typography>
                               </CardContent>
                             </Card>
@@ -461,7 +464,7 @@ const EnhancedLineReviewsTable: React.FC<EnhancedLineReviewsTableProps> = ({
                                     mb: 0.5
                                   }}
                                 >
-                                  معرف المشروع
+                                  المشروع
                                 </Typography>
                                 <Typography
                                   variant="body2"
@@ -469,53 +472,62 @@ const EnhancedLineReviewsTable: React.FC<EnhancedLineReviewsTableProps> = ({
                                     fontWeight: 600,
                                     color: 'var(--text)',
                                     fontSize: '0.9rem',
-                                    fontFamily: 'monospace'
                                   }}
                                 >
-                                  {line.project_id || '-'}
+                                  {line.project_name_ar || line.project_name || line.project_id || '-'}
                                 </Typography>
                               </CardContent>
                             </Card>
                           </Grid>
-                          {line.description && (
-                            <Grid item xs={12}>
-                              <Card
-                                sx={{
-                                  background: 'var(--surface)',
-                                  border: '1px solid var(--border)',
-                                  borderRadius: 'var(--radius-md)',
-                                  boxShadow: 'none'
-                                }}
-                              >
-                                <CardContent sx={{ p: 2 }}>
-                                  <Typography
-                                    variant="caption"
-                                    sx={{
-                                      color: 'var(--muted_text)',
-                                      fontSize: '0.75rem',
-                                      fontWeight: 600,
-                                      textTransform: 'uppercase',
-                                      display: 'block',
-                                      mb: 0.5
-                                    }}
-                                  >
-                                    الوصف
-                                  </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      color: 'var(--text)',
-                                      fontSize: '0.9rem',
-                                      lineHeight: 1.6
-                                    }}
-                                  >
-                                    {line.description}
-                                  </Typography>
-                                </CardContent>
-                              </Card>
-                            </Grid>
-                          )}
                         </Grid>
+                      </Box>
+
+                      {/* Line Description - Location 3 */}
+                      <Box sx={{ mb: 3 }}>
+                        <Paper
+                          sx={{
+                            p: 2,
+                            background: 'rgba(32, 118, 255, 0.03)',
+                            border: '1px dashed var(--accent)',
+                            borderRadius: 'var(--radius-md)',
+                            boxShadow: 'none'
+                          }}
+                        >
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: 'var(--accent)',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1,
+                              mb: 1
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                background: 'var(--accent)'
+                              }}
+                            />
+                            وصف السطر
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: line.description ? 'var(--text)' : 'var(--muted_text)',
+                              fontSize: '0.9rem',
+                              lineHeight: 1.6,
+                              fontStyle: line.description ? 'normal' : 'italic'
+                            }}
+                          >
+                            {line.description || 'لا يوجد وصف متاح لهذا السطر'}
+                          </Typography>
+                        </Paper>
                       </Box>
 
                       {/* Location 2: Approval Audit */}
@@ -553,7 +565,7 @@ const EnhancedLineReviewsTable: React.FC<EnhancedLineReviewsTableProps> = ({
 
                         {line.approval_history && line.approval_history.length > 0 ? (
                           <Box sx={{ display: 'grid', gap: 1.5 }}>
-                            {line.approval_history.map((audit, idx) => (
+                            {line.approval_history.map((audit) => (
                               <Card
                                 key={audit.id}
                                 sx={{
@@ -681,35 +693,37 @@ const EnhancedLineReviewsTable: React.FC<EnhancedLineReviewsTableProps> = ({
               </TableRow>
 
               {/* Latest Comment Display */}
-              {line.latest_comment && !expandedLineId && (
-                <TableRow sx={{ background: 'var(--field_bg)' }}>
-                  <TableCell colSpan={8} sx={{ p: 2, borderBottom: '1px solid var(--border)' }}>
-                    <Box sx={{ pl: 2 }}>
-                      <Typography variant="caption" sx={{ color: 'var(--muted_text)', fontWeight: 600 }}>
-                        آخر تعليق من {line.latest_reviewer_email}:
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          mt: 1,
-                          p: 1.5,
-                          background: 'rgba(255, 243, 205, 0.1)',
-                          border: '1px solid rgba(255, 192, 72, 0.3)',
-                          borderRadius: 'var(--radius-sm)',
-                          color: 'var(--text)'
-                        }}
-                      >
-                        {line.latest_comment}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              )}
+              {
+                line.latest_comment && !expandedLineId && (
+                  <TableRow sx={{ background: 'var(--field_bg)' }}>
+                    <TableCell colSpan={8} sx={{ p: 2, borderBottom: '1px solid var(--border)' }}>
+                      <Box sx={{ pl: 2 }}>
+                        <Typography variant="caption" sx={{ color: 'var(--muted_text)', fontWeight: 600 }}>
+                          آخر تعليق من {line.latest_reviewer_email}:
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            mt: 1,
+                            p: 1.5,
+                            background: 'rgba(255, 243, 205, 0.1)',
+                            border: '1px solid rgba(255, 192, 72, 0.3)',
+                            borderRadius: 'var(--radius-sm)',
+                            color: 'var(--text)'
+                          }}
+                        >
+                          {line.latest_comment}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                )
+              }
             </React.Fragment>
           ))}
         </TableBody>
-      </Table>
-    </TableContainer>
+      </Table >
+    </TableContainer >
   )
 }
 

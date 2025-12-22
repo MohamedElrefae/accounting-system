@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -142,24 +142,7 @@ export default function EnterpriseUserManagement() {
   });
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    // Load data on component mount
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      await Promise.all([loadUsers(), loadRoles()]);
-    } catch (error) {
-      console.error('Error loading data:', error);
-      alert('فشل تحميل البيانات. يرجى المحاولة مرة أخرى.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       console.log('[EnterpriseUserManagement] Loading users...');
       
@@ -245,9 +228,9 @@ export default function EnterpriseUserManagement() {
     } catch (error) {
       console.error('Error loading users:', error);
     }
-  };
+  }, []);
 
-  const loadRoles = async () => {
+  const loadRoles = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('roles')
@@ -262,7 +245,24 @@ export default function EnterpriseUserManagement() {
     } catch (error) {
       console.error('Error loading roles:', error);
     }
-  };
+  }, []);
+
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      await Promise.all([loadUsers(), loadRoles()]);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      alert('فشل تحميل البيانات. يرجى المحاولة مرة أخرى.');
+    } finally {
+      setLoading(false);
+    }
+  }, [loadRoles, loadUsers]);
+
+  useEffect(() => {
+    // Load data on component mount
+    loadData();
+  }, [loadData]);
 
   // Filtered and sorted users
   const processedUsers = useMemo(() => {

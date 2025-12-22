@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Save,
   X,
@@ -173,7 +173,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
 
       // Debug logging for transaction forms
       const isTransactionForm = config.title && (config.title.includes('معاملة') || config.title.includes('transaction'));
-      if (isTransactionForm) {
+      if (isTransactionForm && import.meta.env.DEV) {
         console.log('🌳 Transaction form field order - stored:', arr.length, 'default:', defaultOrder.length);
         console.log('🌳 Default fields include sub_tree_id:', defaultOrder.includes('sub_tree_id'));
         console.log('🌳 Stored fields include sub_tree_id:', arr.includes('sub_tree_id'));
@@ -192,7 +192,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       const isTransactionForm = config.title && (config.title.includes('معاملة') || config.title.includes('transaction'));
       if (isTransactionForm) {
         defaultFields.add('sub_tree_id');
-        console.log('🌳 Transaction form detected - ensuring sub_tree_id visibility:', config.title);
+        if (import.meta.env.DEV) console.log('🌳 Transaction form detected - ensuring sub_tree_id visibility:', config.title);
       }
 
       if (arr.length > 0) {
@@ -200,12 +200,14 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
         // Ensure sub_tree_id is in stored fields too for transaction forms  
         if (isTransactionForm) {
           storedFields.add('sub_tree_id');
-          console.log('🌳 Stored visible fields updated - sub_tree_id added:', storedFields.has('sub_tree_id'));
-          console.log('🌳 Total visible fields:', storedFields.size);
+          if (import.meta.env.DEV) {
+            console.log('🌳 Stored visible fields updated - sub_tree_id added:', storedFields.has('sub_tree_id'));
+            console.log('🌳 Total visible fields:', storedFields.size);
+          }
         }
         return storedFields;
       }
-      console.log('🌳 Using default visible fields - sub_tree_id included:', defaultFields.has('sub_tree_id'));
+      if (import.meta.env.DEV) console.log('🌳 Using default visible fields - sub_tree_id included:', defaultFields.has('sub_tree_id'));
       return defaultFields;
     } catch {
       const defaultFields = new Set(config.fields.map(f => f.id));
@@ -213,7 +215,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       const isTransactionFormCatch = config.title && (config.title.includes('معاملة') || config.title.includes('transaction'));
       if (isTransactionFormCatch) {
         defaultFields.add('sub_tree_id');
-        console.log('🌳 Transaction form detected (catch) - ensuring sub_tree_id visibility:', config.title);
+        if (import.meta.env.DEV) console.log('🌳 Transaction form detected (catch) - ensuring sub_tree_id visibility:', config.title);
       }
       return defaultFields;
     }
@@ -221,7 +223,8 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   const [layoutControlsOpen, setLayoutControlsOpen] = useState(false);
 
   // Async options management - track loading states and resolved options per field
-  const [fieldOptions, setFieldOptions] = useState<Record<string, any>>({});
+  const [fieldOptions, setFieldOptions] = useState<Record<string, SearchableSelectOption[]>>({});
+  const [fieldOptionKeys, setFieldOptionKeys] = useState<Record<string, string>>({});
   const [fieldOptionsLoading, setFieldOptionsLoading] = useState<Set<string>>(new Set());
   const [fieldOptionsErrors, setFieldOptionsErrors] = useState<Record<string, string>>({});
 
@@ -316,7 +319,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
         }
       }
     }
-  }, [config.autoFillLogic, formData]); // Trigger on full form data to satisfy exhaustive-deps
+  }, [config, formData]); // Trigger on full form data to satisfy exhaustive-deps
 
   // Handle async options loading for fields with optionsProvider
   useEffect(() => {
@@ -329,7 +332,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       const currentKey = `${field.id}:${dependencyValues}`;
 
       // Check if we already have options for this field+dependency combo
-      const existingKey = fieldOptions[field.id + '_key'] as string | undefined;
+      const existingKey = fieldOptionKeys[field.id];
       if (existingKey === currentKey && Array.isArray(fieldOptions[field.id])) {
         return; // Already loaded for these dependencies
       }
@@ -345,8 +348,8 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
         setFieldOptions(prev => ({
           ...prev,
           [field.id]: options as SearchableSelectOption[],
-          [field.id + '_key']: currentKey
         }));
+        setFieldOptionKeys(prev => ({ ...prev, [field.id]: currentKey }));
       } catch (error) {
         console.error(`Failed to load options for field ${field.id}:`, error);
         setFieldOptionsErrors(prev => ({
@@ -369,7 +372,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       .forEach(field => {
         loadAsyncOptions(field);
       });
-  }, [config.fields, formData]);
+  }, [config, fieldOptionKeys, fieldOptions, formData, visibleFields]);
 
   // Get field error
   const getFieldError = (fieldId: string): ValidationError | null => {
@@ -387,12 +390,12 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   };
 
   // Check if field should be shown
-  const shouldShowField = (field: FormField): boolean => {
+  const shouldShowField = useCallback((field: FormField): boolean => {
     // Check visibility setting first
     const isVisible = visibleFields.has(field.id);
     if (!isVisible) {
       // Debug logging for sub_tree_id specifically
-      if (field.id === 'sub_tree_id') {
+      if (field.id === 'sub_tree_id' && import.meta.env.DEV) {
         console.log('🌳 sub_tree_id field not visible - visibleFields:', Array.from(visibleFields));
         console.log('🌳 Form title:', config.title);
       }
@@ -401,22 +404,22 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     // Then check conditional logic
     if (field.conditionalLogic) {
       const conditionalResult = field.conditionalLogic(formData);
-      if (field.id === 'sub_tree_id') {
+      if (field.id === 'sub_tree_id' && import.meta.env.DEV) {
         console.log('🌳 sub_tree_id conditional logic result:', conditionalResult);
       }
       return conditionalResult;
     }
 
     // Debug logging for sub_tree_id when it should be visible
-    if (field.id === 'sub_tree_id') {
+    if (field.id === 'sub_tree_id' && import.meta.env.DEV) {
       console.log('🌳 sub_tree_id field should be visible');
     }
 
     return true;
-  };
+  }, [visibleFields, config.title, formData]);
 
   // Check if field is disabled due to unmet dependencies
-  const isDisabledByDependency = (field: FormField): boolean => {
+  const isDisabledByDependency = useCallback((field: FormField): boolean => {
     if (field.dependsOn) {
       const depValue = formData[field.dependsOn];
       return !depValue || (typeof depValue === 'string' && depValue.trim() === '');
@@ -428,7 +431,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       });
     }
     return false;
-  };
+  }, [formData]);
 
   // Handle field change with debouncing for async validation
   const handleFieldChange = React.useCallback((fieldId: string, value: unknown, field: FormField) => {
@@ -478,7 +481,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     if (updatedFormData !== formData) {
       setFormData(updatedFormData);
     }
-  }, [config.fields, config.customValidator, formData]);
+  }, [config, formData]);
 
   // Validate form
   const validateForm = (): ValidationResult => {
@@ -598,7 +601,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     } catch {
       return true; // be safe
     }
-  }, [config.fields, formData, initialData]);
+  }, [config, formData, initialData]);
 
   // Expose submit() and hasUnsavedChanges() to parent
   React.useImperativeHandle(ref, () => ({
@@ -709,13 +712,13 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   // Render field based on type
   const renderField = (field: FormField) => {
     if (!shouldShowField(field)) {
-      if (field.id === 'sub_tree_id') {
+      if (field.id === 'sub_tree_id' && import.meta.env.DEV) {
         console.log('🌳 sub_tree_id field filtered out in renderField');
       }
       return null;
     }
 
-    if (field.id === 'sub_tree_id') {
+    if (field.id === 'sub_tree_id' && import.meta.env.DEV) {
       console.log('🌳 Rendering sub_tree_id field - type:', field.type, 'hasOptionsProvider:', !!field.optionsProvider);
     }
 
@@ -726,7 +729,9 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     const showSuccess = isTouched && !error;
 
     // Resolve options: use preloaded async options if available, otherwise static options
-    const resolvedOptions = field.optionsProvider ? (fieldOptions[field.id] || []) : (field.options || []);
+    const resolvedOptions = field.optionsProvider
+      ? (fieldOptions[field.id] ?? [])
+      : (field.options ?? []);
     const isLoadingOptions = fieldOptionsLoading.has(field.id);
     const optionsError = fieldOptionsErrors[field.id];
 

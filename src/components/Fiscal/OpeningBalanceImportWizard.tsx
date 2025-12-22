@@ -1,8 +1,7 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { Box, Button, Stack, Typography, Chip, Checkbox, FormControlLabel, Alert, CircularProgress } from '@mui/material'
 import DraggableResizableDialog from '@/components/Common/DraggableResizableDialog'
 import { FiscalYearSelector } from '@/components/Fiscal/FiscalYearSelector'
-import { getActiveOrgId } from '@/utils/org'
 import { getOrganizations } from '@/services/organization'
 import { OpeningBalanceImportService } from '@/services/OpeningBalanceImportService'
 import EnhancedOBImportResultsModal from '@/components/Fiscal/EnhancedOBImportResultsModal'
@@ -11,6 +10,7 @@ import OpeningBalanceManualCrud from '@/components/Fiscal/OpeningBalanceManualCr
 import type { ManualOBRow } from '@/components/Fiscal/OpeningBalanceManualCrud'
 import SearchableSelect, { type SearchableSelectOption } from '@/components/Common/SearchableSelect'
 import { useToast } from '@/contexts/ToastContext'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 
 interface OpeningBalanceImportWizardProps {
   open: boolean
@@ -19,16 +19,17 @@ interface OpeningBalanceImportWizardProps {
 
 // A lightweight wizard that reuses existing preview/manual/review logic from the page
 const OpeningBalanceImportWizard: React.FC<OpeningBalanceImportWizardProps> = ({ open, onClose }) => {
-  const { isRTL, t, texts } = useArabicLanguage()
+  const { isRTL, t: _t, texts: _texts } = useArabicLanguage()
   const { showToast } = (useToast?.() as any) || { showToast: (msg:string,_opts?:any)=>{ try{ (window as any)?.toast?.info?.(msg) } catch {} } }
+  const scope = useScopeOptional()
 
   // Step: 0 org, 1 fiscal year, 2 choose mode, 3 import process, 4 complete
   const [step, setStep] = useState<number>(0)
 
   // Basic state
-  const [orgId, setOrgId] = useState<string>(() => getActiveOrgId() || '')
+  const orgId = scope?.currentOrg?.id || ''
   const [fiscalYearId, setFiscalYearId] = useState<string>('')
-  const [orgOptions, setOrgOptions] = useState<any[]>([])
+  const [_orgOptions, setOrgOptions] = useState<any[]>([])
   const [orgSelectOptions, setOrgSelectOptions] = useState<SearchableSelectOption[]>([])
   const [loading, setLoading] = useState<boolean>(false)
   const [mode, setMode] = useState<'file' | 'manual' | ''>('')
@@ -38,7 +39,7 @@ const OpeningBalanceImportWizard: React.FC<OpeningBalanceImportWizardProps> = ({
   // File preview state
   const [file, setFile] = useState<File | null>(null)
   const [uploadHeaders, setUploadHeaders] = useState<string[]>([])
-  const [previewRows, setPreviewRows] = useState<any[]>([])
+  const [_previewRows, setPreviewRows] = useState<any[]>([])
 
   // Import status
   const [currentImportId, setCurrentImportId] = useState<string>('')
@@ -67,10 +68,10 @@ const OpeningBalanceImportWizard: React.FC<OpeningBalanceImportWizardProps> = ({
       if (isCsv) {
         const text = await f.text()
         const lines = text.split(/\r?\n/).filter(Boolean)
-        const heads = (lines[0] || '').split(',').map(h => h.replace(/^\"|\"$/g,'').trim())
+        const heads = (lines[0] || '').split(',').map(h => h.replace(/^"|"$/g,'').trim())
         if (heads.length) setUploadHeaders(heads)
         const body = lines.slice(1).map(l => {
-          const vals = l.split(',').map(v => v.replace(/^\"|\"$/g,'').trim())
+          const vals = l.split(',').map(v => v.replace(/^"|"$/g,'').trim())
           const obj: any = {}
           heads.forEach((h,i)=> obj[h]=vals[i] ?? '')
           return obj
@@ -150,7 +151,7 @@ const OpeningBalanceImportWizard: React.FC<OpeningBalanceImportWizardProps> = ({
               id="wizard-org-select"
               value={orgId}
               options={orgSelectOptions}
-              onChange={(v)=> setOrgId(String(v||''))}
+              onChange={(v)=> { if (scope) void scope.setOrganization(String(v || '')) }}
               placeholder={isRTL ? 'اختر المؤسسة' : 'Choose organization'}
               clearable
               compact

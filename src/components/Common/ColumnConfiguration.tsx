@@ -189,20 +189,6 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
   }
 
   // Begin width drag on handle (index is filteredWorking index)
-  const startWidthDrag = useCallback((e: React.MouseEvent, index: number) => {
-    e.preventDefault()
-    const key = filteredWorking[index]?.key
-    const globalIndex = working.findIndex(c => c.key === key)
-    if (globalIndex < 0) return
-    widthDragRef.current = {
-      globalIndex,
-      startX: e.clientX,
-      startWidth: working[globalIndex]?.width || 100,
-    }
-    document.addEventListener('mousemove', onWidthDragMove)
-    document.addEventListener('mouseup', onWidthDragEnd)
-  }, [filteredWorking, working])
-
   const onWidthDragMove = useCallback((e: MouseEvent) => {
     if (!widthDragRef.current) return
     const { globalIndex, startX, startWidth } = widthDragRef.current
@@ -221,6 +207,20 @@ const ColumnConfiguration: React.FC<ColumnConfigurationProps> = ({
     document.removeEventListener('mouseup', onWidthDragEnd)
     widthDragRef.current = null
   }, [onWidthDragMove])
+
+  const startWidthDrag = useCallback((e: React.MouseEvent, index: number) => {
+    e.preventDefault()
+    const key = filteredWorking[index]?.key
+    const globalIndex = working.findIndex(c => c.key === key)
+    if (globalIndex < 0) return
+    widthDragRef.current = {
+      globalIndex,
+      startX: e.clientX,
+      startWidth: working[globalIndex]?.width || 100,
+    }
+    document.addEventListener('mousemove', onWidthDragMove)
+    document.addEventListener('mouseup', onWidthDragEnd)
+  }, [filteredWorking, working, onWidthDragMove, onWidthDragEnd])
 
   useEffect(() => {
     return () => {

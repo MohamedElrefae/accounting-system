@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+
 import { Box, Button, Checkbox, Divider, List, ListItem, ListItemText, Stack, Typography, Tooltip } from '@mui/material';
 import { useToast } from '../../contexts/ToastContext';
 import * as svc from '../../services/documents';
@@ -21,12 +22,14 @@ export default function ProjectAttachmentsPanel({ orgId, projectId }: Props) {
   const hasPerm = useHasPermission();
   const canGenerate = hasPerm('templates.generate') || hasPerm('templates.manage');
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     const linked = await svc.getLinkedDocuments('projects', projectId);
     setDocs(linked);
-  };
+  }, [projectId]);
 
-  useEffect(() => { refresh(); }, [projectId]);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

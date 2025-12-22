@@ -18,6 +18,7 @@ import { useTransactionsData } from '../../contexts/TransactionsDataContext'
 import SearchableSelect, { type SearchableSelectOption } from './SearchableSelect'
 import useFilterOptions from '../../hooks/useFilterOptions'
 import type { FilterState } from '../../hooks/useFilterState'
+import { ScopeChips } from '../Scope/ScopeChips'
 
 export type { FilterState }
 
@@ -90,8 +91,8 @@ const defaultConfig: FilterConfig = {
   showSearch: true,
   showDateRange: true,
   showAmountRange: false,
-  showOrg: true,
-  showProject: true,
+  showOrg: false, // Now managed by TopBar ScopeContext
+  showProject: false, // Now managed by TopBar ScopeContext
   showDebitAccount: true,
   showCreditAccount: true,
   showClassification: true,
@@ -311,6 +312,9 @@ export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
         ...style 
       }}
     >
+      {/* Current Scope Display - Shows org/project from TopBar */}
+      <ScopeChips showLabels={false} size="small" variant="filled" />
+
       <button
         type="button"
         className="ultimate-btn"

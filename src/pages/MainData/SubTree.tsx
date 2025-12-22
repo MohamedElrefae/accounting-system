@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import styles from './SubTree.module.css'
 import { useHasPermission } from '../../hooks/useHasPermission'
 import { useToast } from '../../contexts/ToastContext'
+import { useScopeOptional } from '../../contexts/ScopeContext'
 import { getOrganizations, type Organization } from '../../services/organization'
 import {
   getExpensesCategoriesTree,
@@ -14,9 +15,9 @@ import {
 } from '../../services/sub-tree'
 import type { ExpensesCategoryTreeNode, ExpensesCategoryRow } from '../../types/sub-tree'
 import ExportButtons from '../../components/Common/ExportButtons'
+import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
 import TreeView from '../../components/TreeView/TreeView'
 import UnifiedCRUDForm, { type FormConfig } from '../../components/Common/UnifiedCRUDForm'
-import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
 import {
   Button,
   Card,
@@ -50,18 +51,11 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import DeleteIcon from '@mui/icons-material/Delete'
 
-async function getInitialOrgId(): Promise<string> {
-  try { 
-    const { getActiveOrgId } = await import('../../utils/org'); 
-    return getActiveOrgId?.() || ''; 
-  } catch { 
-    return ''; 
-  }
-}
-
 const SubTreePage: React.FC = () => {
   const { showToast } = useToast()
   const hasPermission = useHasPermission()
+  const scope = useScopeOptional()
+  const initialOrgId = scope?.currentOrg?.id || ''
   // View-level permission is enforced by the route guard (ProtectedRoute with requiredAction="sub_tree.view")
   const canCreate = hasPermission('sub_tree.create')
   const canUpdate = hasPermission('sub_tree.update')
@@ -90,12 +84,10 @@ const SubTreePage: React.FC = () => {
     (async () => {
       setLoading(true)
       try {
-        const [orgList, initialOrgId] = await Promise.all([
-          getOrganizations().catch(() => []),
-          getInitialOrgId()
-        ]);
+        const orgList = await getOrganizations().catch(() => [])
         setOrgs(orgList)
         const chosen = orgId || initialOrgId || orgList[0]?.id || ''
+        console.log('SubTree: chosen orgId:', chosen, typeof chosen, 'orgId:', orgId, typeof orgId, 'initialOrgId:', initialOrgId, typeof initialOrgId)
         if (chosen !== orgId) setOrgId(chosen)
         if (chosen) {
           const [t, l, accs] = await Promise.all([
@@ -114,7 +106,7 @@ const SubTreePage: React.FC = () => {
       }
     })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [initialOrgId])
 
   const reload = async (chosen: string) => {
     if (!chosen) return
@@ -283,10 +275,6 @@ const SubTreePage: React.FC = () => {
               onChange={async (e) => {
                 const v = String(e.target.value)
                 setOrgId(v)
-                try { 
-                  const { setActiveOrgId } = await import('../../utils/org'); 
-                  setActiveOrgId?.(v); 
-                } catch { /* ignore org utils errors */ }
                 await reload(v)
               }}
             >

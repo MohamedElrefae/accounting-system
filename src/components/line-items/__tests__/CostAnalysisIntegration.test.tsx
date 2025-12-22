@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { CostAnalysisModal } from '../CostAnalysisModal'
 import { TransactionLineItemsEditor } from '../TransactionLineItemsEditor'
@@ -290,7 +290,7 @@ describe('CostAnalysisModal Integration', () => {
     const mockOnSave = jest.fn()
     const user = userEvent.setup()
 
-    const { rerender } = render(
+    render(
       <CostAnalysisModal
         item={mockItem}
         isOpen={true}

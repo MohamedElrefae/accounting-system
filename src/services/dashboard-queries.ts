@@ -2,6 +2,7 @@ import { QueryClient } from '@tanstack/react-query'
 import { supabase } from '../utils/supabase'
 import { getCategoryTotalsLegacyFormat } from './reports/unified-financial-query'
 import { getReadMode } from '../config/featureFlags'
+import useAppStore from '../store/useAppStore'
 
 export interface RecentRow {
   id: string
@@ -40,6 +41,15 @@ export const dashboardQueryKeys = {
 export async function fetchCategoryTotals(f: { orgId?: string; projectId?: string; dateFrom?: string; dateTo?: string; postedOnly?: boolean }) {
   console.log('🎯 Dashboard fetchCategoryTotals called with:', f)
   try {
+    if (useAppStore.getState().demoMode) {
+      return {
+        asset: 250000,
+        liability: 90000,
+        equity: 160000,
+        revenue: 125420,
+        expense: 89320,
+      }
+    }
     // Use unified financial query service - SINGLE SOURCE OF TRUTH
     const result = await getCategoryTotalsLegacyFormat({
       orgId: f.orgId || null,
@@ -57,6 +67,41 @@ export async function fetchCategoryTotals(f: { orgId?: string; projectId?: strin
 }
 
 export async function fetchRecentActivity(f: { orgId?: string; projectId?: string; postedOnly?: boolean }): Promise<RecentRow[]> {
+  if (useAppStore.getState().demoMode) {
+    // A small, read-only set of demo rows (never touches Supabase)
+    return [
+      {
+        id: 'demo-1',
+        entry_date: '2024-01-20',
+        description: 'Demo: Cash sales',
+        amount: 15000,
+        debit_account_id: null,
+        credit_account_id: null,
+        type: 'income',
+        category: 'Sales',
+      },
+      {
+        id: 'demo-2',
+        entry_date: '2024-01-19',
+        description: 'Demo: Office expenses',
+        amount: -3500,
+        debit_account_id: null,
+        credit_account_id: null,
+        type: 'expense',
+        category: 'Office Expenses',
+      },
+      {
+        id: 'demo-3',
+        entry_date: '2024-01-18',
+        description: 'Demo: Consulting services',
+        amount: 12000,
+        debit_account_id: null,
+        credit_account_id: null,
+        type: 'income',
+        category: 'Services',
+      },
+    ]
+  }
   const readMode = getReadMode()
 
   // Fetch accounts to map categories by id or code

@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Box, Button, Divider, IconButton, Stack, TextField, Typography } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ArrowUpward from '@mui/icons-material/ArrowUpward';
 import ArrowDownward from '@mui/icons-material/ArrowDownward';
-import { getActiveOrgId } from '../../utils/org';
 import { useToast } from '../../contexts/ToastContext';
 import * as svc from '../../services/document-categories';
+import { useScopeOptional } from '../../contexts/ScopeContext';
 
 interface Node extends svc.DocumentCategory { children?: Node[] }
 
@@ -27,7 +27,9 @@ function buildTree(rows: svc.DocumentCategory[]): Node[] {
 
 export default function DocumentCategoriesPage() {
   const { showToast } = useToast();
-  const [orgId, setOrgId] = useState<string>('');
+  const scope = useScopeOptional();
+  const orgId = scope?.currentOrg?.id || '';
+
   const [rows, setRows] = useState<svc.DocumentCategory[]>([]);
   const [filter, setFilter] = useState('');
   const [selectMode, setSelectMode] = useState(false);
@@ -57,21 +59,16 @@ export default function DocumentCategoriesPage() {
     return path;
   };
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     if (!orgId) return;
     setLoading(true);
     try {
       const data = await svc.listCategories(orgId);
       setRows(data);
     } finally { setLoading(false); }
-  };
+  }, [orgId]);
 
-  useEffect(()=>{
-    const id = getActiveOrgId();
-    if (id) setOrgId(id);
-  },[]);
-
-  useEffect(()=>{ refresh(); }, [orgId]);
+  useEffect(()=>{ refresh(); }, [refresh]);
 
   const addCategory = async (parentId: string | null) => {
     if (!orgId || !newName.trim()) return;

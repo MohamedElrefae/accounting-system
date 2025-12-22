@@ -8,7 +8,11 @@ export interface LineReview {
   account_name: string
   account_name_ar?: string
   org_id?: string
+  org_name?: string
+  org_name_ar?: string
   project_id?: string
+  project_name?: string
+  project_name_ar?: string
   line_status?: string
   description?: string
   debit_amount: number
@@ -114,7 +118,9 @@ export async function getLineReviewsForTransaction(
         org_id,
         project_id,
         line_status,
-        accounts(code, name, name_ar)
+        accounts(code, name, name_ar),
+        organizations(name, name_ar),
+        projects(name, name_ar)
       `)
       .eq('transaction_id', transactionId)
       .order('line_no', { ascending: true })
@@ -164,7 +170,11 @@ export async function getLineReviewsForTransaction(
         account_name: line.accounts?.name || '',
         account_name_ar: line.accounts?.name_ar,
         org_id: line.org_id,
+        org_name: (line as any).organizations?.name,
+        org_name_ar: (line as any).organizations?.name_ar,
         project_id: line.project_id,
+        project_name: (line as any).projects?.name,
+        project_name_ar: (line as any).projects?.name_ar,
         line_status: line.line_status,
         description: line.description,
         debit_amount: line.debit_amount,
@@ -240,7 +250,7 @@ export async function approveLineReview(
 /**
  * Flag a line for attention (shorthand)
  */
-export async function flagLineForAttention(
+export async function flagLine(
   approvalRequestId: string,
   lineId: string,
   reason: string
@@ -251,4 +261,49 @@ export async function flagLineForAttention(
     reason,
     'flag'
   )
+}
+
+/**
+ * Get all transactions that have lines needing review (not approved)
+ * Validates against enhanced approval workflow logic
+ */
+export async function getTransactionsWithPendingLines() {
+  // Fetch unposted transactions with their lines
+  // We use the transactions table as the base
+  const { data, error } = await supabase
+    .from('transactions')
+    .select(`
+      *,
+      transaction_lines (
+        id,
+        line_status
+      )
+    `)
+    .eq('is_posted', false)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+
+  // Filter for transactions that have at least one non-approved line
+  // and map them to the format expected by the inbox
+  return (data || [])
+    .filter(tx => 
+      tx.transaction_lines && 
+      tx.transaction_lines.length > 0 &&
+      tx.transaction_lines.some((l: any) => l.line_status !== 'approved')
+    )
+    .map(tx => {
+      const allLines = tx.transaction_lines || []
+      const pendingLines = allLines.filter((l: any) => l.line_status !== 'approved')
+      
+      return {
+        transaction_id: tx.id,
+        entry_number: tx.entry_number,
+        description: tx.description,
+        entry_date: tx.entry_date,
+        status: tx.approval_status || 'pending',
+        total_lines_count: allLines.length,
+        pending_lines_count: pendingLines.length
+      }
+    })
 }

@@ -10,6 +10,8 @@ const Profile = React.lazy(() => import('../pages/admin/Profile'));
 const ExportDatabasePage = React.lazy(() => import('../pages/admin/ExportDatabase'));
 const AccountPrefixMappingPage = React.lazy(() => import('../pages/admin/AccountPrefixMapping'));
 const FontSettings = React.lazy(() => import('../components/Settings/FontSettings'));
+const OnlineUsers = React.lazy(() => import('../pages/admin/OnlineUsers'));
+const EnterpriseAudit = React.lazy(() => import('../pages/admin/EnterpriseAudit'));
 
 // Organization Management
 const OrganizationManagement = React.lazy(() => import('../components/Organizations/OrganizationManagement'));
@@ -22,6 +24,15 @@ const SettingsRoutes: React.FC = () => {
         <OptimizedProtectedRoute requiredAction="users.view">
           <OptimizedSuspense>
             <UserManagementSystem />
+          </OptimizedSuspense>
+        </OptimizedProtectedRoute>
+      } />
+
+      {/* Online Users - /settings/online-users */}
+      <Route path="online-users" element={
+        <OptimizedProtectedRoute requiredAction="presence.view.team">
+          <OptimizedSuspense>
+            <OnlineUsers />
           </OptimizedSuspense>
         </OptimizedProtectedRoute>
       } />
@@ -63,6 +74,15 @@ const SettingsRoutes: React.FC = () => {
         <OptimizedProtectedRoute requiredAction="users.manage">
           <OptimizedSuspense>
             <Diagnostics />
+          </OptimizedSuspense>
+        </OptimizedProtectedRoute>
+      } />
+
+      {/* Enterprise Audit - /settings/audit */}
+      <Route path="audit" element={
+        <OptimizedProtectedRoute requiredAction="settings.audit">
+          <OptimizedSuspense>
+            <EnterpriseAudit />
           </OptimizedSuspense>
         </OptimizedProtectedRoute>
       } />

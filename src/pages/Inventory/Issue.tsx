@@ -1,42 +1,46 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Card, CardContent, Typography, Grid, TextField, MenuItem, Button, Divider } from '@mui/material'
 import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/hooks/useAuth'
 import { listMaterials, type MaterialRow } from '@/services/inventory/materials'
-import { listAnalysisWorkItems, type AnalysisWorkItemFull } from '@/services/analysis-work-items'
-import { listWorkItemsAll, type WorkItemRow } from '@/services/work-items'
+import { listAnalysisWorkItems } from '@/services/analysis-work-items'
+import { listWorkItemsAll } from '@/services/work-items'
+import type { AnalysisWorkItemFull } from '@/types/analysis-work-items'
+import type { WorkItemRow } from '@/types/work-items'
 import { getCostCentersList, type CostCenterRow } from '@/services/cost-centers'
-import { getActiveProjectId } from '@/utils/org'
 import { getActiveProjectsByOrg, type Project } from '@/services/projects'
 import { listInventoryLocations, type InventoryLocationRow } from '@/services/inventory/locations'
 import { createInventoryDocument, addInventoryDocumentLine, approveInventoryDocument, postInventoryDocument, type DocType } from '@/services/inventory/documents'
 import { listUOMs, type UomRow } from '@/services/inventory/uoms'
+import { useScopeOptional } from '@/contexts/ScopeContext'
+
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import AsyncAutocomplete, { type AsyncOption } from '@/components/Common/AsyncAutocomplete'
 import DocumentActionsBar from '@/components/Inventory/DocumentActionsBar'
 
-function getActiveOrgIdSafe(): string | null { try { return localStorage.getItem('org_id') } catch { return null } }
-
 const IssueMaterialsPage: React.FC = () => {
   const { showToast } = useToast()
   const { user } = useAuth()
 
-  const [orgId, setOrgId] = useState<string>('')
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
+  const scopeProjectId = scope?.currentProject?.id || ''
+
   const [materials, setMaterials] = useState<MaterialRow[]>([])
   const [locations, setLocations] = useState<InventoryLocationRow[]>([])
   const [loading, setLoading] = useState(false)
   const [uoms, setUoms] = useState<UomRow[]>([])
   const [projects, setProjects] = useState<Project[]>([])
-  const [defaultProjectId, setDefaultProjectId] = useState<string>('')
   const [projectId, setProjectId] = useState<string>('')
   const [costCenters, setCostCenters] = useState<CostCenterRow[]>([])
-  const [costCenterId, setCostCenterId] = useState<string>('')
+  const [costCenterId, _setCostCenterId] = useState<string>('')
   const [analysisItems, setAnalysisItems] = useState<AnalysisWorkItemFull[]>([])
-  const [analysisItemId, setAnalysisItemId] = useState<string>('')
+  const [analysisItemId, _setAnalysisItemId] = useState<string>('')
+
   const [workItems, setWorkItems] = useState<WorkItemRow[]>([])
-  const [workItemId, setWorkItemId] = useState<string>('')
+  const [workItemId, _setWorkItemId] = useState<string>('')
 
   type Line = { materialId: string; uomId: string; quantity: number; priceSource: 'moving_average' | 'last_purchase' | 'manual'; notes: string }
   const [lines, setLines] = useState<Line[]>([])
@@ -95,16 +99,11 @@ const IssueMaterialsPage: React.FC = () => {
   const wfWorkItemId = watch('workItemId')
 
   useEffect(() => {
-    const v = getActiveOrgIdSafe()
-    if (v) setOrgId(v)
-  }, [])
+    if (scopeProjectId) setProjectId(prev => prev || scopeProjectId)
+  }, [scopeProjectId])
 
   useEffect(() => {
     (async () => {
-      try {
-        const activeProj = getActiveProjectId?.() || ''
-        if (activeProj) { setDefaultProjectId(activeProj); setProjectId(prev => prev || activeProj) }
-      } catch {}
       if (!orgId) return
       setLoading(true)
       try {
@@ -130,9 +129,7 @@ const IssueMaterialsPage: React.FC = () => {
         setLoading(false)
       }
     })()
-  }, [orgId])
-
-  const selectedMaterial = useMemo(() => materials.find(m => m.id === materialId), [materials, materialId])
+  }, [orgId, projectId, showToast])
 
   const materialLoader = async (q: string): Promise<AsyncOption<MaterialRow>[]> => {
     const ql = (q || '').toLowerCase()
@@ -149,11 +146,17 @@ const IssueMaterialsPage: React.FC = () => {
 
   const addLine = () => {
     if (!materialId || !uomId || !quantity) { showToast('Select material, UOM and quantity', { severity: 'warning' }); return }
-    setLines(prev => [...prev, { materialId, uomId, quantity, priceSource, notes }])
-    setMaterialId(''); setUomId(''); setQuantity(1); setPriceSource('moving_average'); setNotes('')
+    setLines(prev => [...prev, { materialId, uomId, quantity, priceSource, notes: notes || '' }])
+    reset({
+      ...watch(),
+      materialId: '',
+      uomId: '',
+      quantity: 1,
+      notes: '',
+      priceSource,
+    })
   }
   const removeLine = (idx: number) => setLines(prev => prev.filter((_, i) => i !== idx))
-
 
   const onCreateAndPost = async (values: FormValues) => {
     if (!orgId) { showToast('Select organization first', { severity: 'warning' }); return }
@@ -174,7 +177,6 @@ const IssueMaterialsPage: React.FC = () => {
       let lineNo = 1
       for (const ln of payloads) {
         await addInventoryDocumentLine({
-          id: '' as any,
           org_id: orgId,
           document_id: doc.id,
           line_no: lineNo++,
@@ -191,9 +193,6 @@ const IssueMaterialsPage: React.FC = () => {
           lot_id: null,
           serial_id: null,
           notes: ln.notes,
-          created_at: '' as any,
-          updated_at: '' as any,
-          line_value: 0 as any,
         })
       }
       // 3) Approve
@@ -202,7 +201,20 @@ const IssueMaterialsPage: React.FC = () => {
       await postInventoryDocument(orgId, doc.id, user.id)
       showToast('Issue posted successfully', { severity: 'success' })
       // reset form but keep lookups
-      reset({ orgId, locationId: '', materialId: '', uomId: '', quantity: 1, priceSource: 'moving_average', notes: '', projectId: wfProjectId || '', costCenterId: wfCostCenterId || '', analysisItemId: wfAnalysisItemId || '', workItemId: wfWorkItemId || '' })
+      reset({
+        ...watch(),
+        orgId,
+        locationId: '',
+        materialId: '',
+        uomId: '',
+        quantity: 1,
+        priceSource: 'moving_average',
+        notes: '',
+        projectId: wfProjectId || '',
+        costCenterId: wfCostCenterId || '',
+        analysisItemId: wfAnalysisItemId || '',
+        workItemId: wfWorkItemId || '',
+      })
       setLines([])
     } catch (e: any) {
       showToast(e?.message || 'Operation failed', { severity: 'error' })
@@ -213,8 +225,8 @@ const IssueMaterialsPage: React.FC = () => {
 
   return (
     <div style={{ padding: 16 }}>
-<Typography variant="h6" gutterBottom>Issue to Project / صرف للمشروع</Typography>
-          <DocumentActionsBar />
+      <Typography variant="h6" gutterBottom>Issue to Project / صرف للمشروع</Typography>
+      <DocumentActionsBar />
       <Card>
         <CardContent>
           <form onSubmit={handleSubmit(onCreateAndPost)}>

@@ -41,9 +41,9 @@ import {
 } from '@/services/fiscal/hooks/useFiscalPeriods'
 import { useCurrentFiscalYear, useFiscalYears } from '@/services/fiscal/hooks/useFiscalYear'
 import { useToast } from '@/contexts/ToastContext'
-import { getActiveOrgId } from '@/utils/org'
 import { supabase } from '@/utils/supabase'
 import type { FiscalPeriod, UpdateFiscalPeriodInput } from '@/services/fiscal/types'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 
 // Props are now optional - component can work standalone
 interface FiscalPeriodManagerProps {
@@ -57,7 +57,8 @@ export default function FiscalPeriodManagerRefactored({
 }: FiscalPeriodManagerProps) {
   const { isRTL } = useArabicLanguage()
   const { showToast } = useToast()
-  const [orgId] = useState(() => getActiveOrgId() || '')
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
 
   // State for selected fiscal year (when not provided via props)
   const [selectedFiscalYearId, setSelectedFiscalYearId] = useState<string>('')

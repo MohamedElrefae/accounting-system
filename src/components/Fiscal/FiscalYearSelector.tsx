@@ -5,7 +5,7 @@
 import React from 'react'
 import { MenuItem, TextField, Skeleton, Alert } from '@mui/material'
 import { useFiscalYears } from '@/services/fiscal'
-import { getActiveOrgId } from '@/utils/org'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 
 export interface FiscalYearSelectorProps {
   orgId?: string | null
@@ -30,7 +30,8 @@ export const FiscalYearSelector: React.FC<FiscalYearSelectorProps> = ({
   sx,
   disabled = false,
 }) => {
-  const effectiveOrgId = orgId ?? getActiveOrgId()
+  const scope = useScopeOptional()
+  const effectiveOrgId = orgId ?? scope?.currentOrg?.id ?? null
 
   // Use the new unified hook instead of direct Supabase calls
   const { data: years, isLoading, error } = useFiscalYears(effectiveOrgId)
@@ -72,7 +73,7 @@ export const FiscalYearSelector: React.FC<FiscalYearSelectorProps> = ({
     if (value !== undefined && value !== selected) {
       setSelected(value || '')
     }
-  }, [value])
+  }, [value, selected])
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const id = event.target.value

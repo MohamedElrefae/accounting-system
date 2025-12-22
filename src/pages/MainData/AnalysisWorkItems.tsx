@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import styles from './AnalysisWorkItems.module.css'
 import './AccountsTree.css'
 import { useToast } from '../../contexts/ToastContext'
@@ -15,8 +15,6 @@ import {
 } from '../../services/analysis-work-items'
 import type { AnalysisWorkItemFull, AnalysisWorkItemRow } from '../../types/analysis-work-items'
 import {
-  Card,
-  CardContent,
   Dialog,
   DialogActions,
   DialogContent,
@@ -36,29 +34,13 @@ import {
 } from '@mui/material'
 import ExportButtons from '../../components/Common/ExportButtons'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
-
-const APP_FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif";
-
-async function getInitialOrgId(): Promise<string> { 
-  try { 
-    const { getActiveOrgId } = await import('../../utils/org'); 
-    return getActiveOrgId?.() || ''; 
-  } catch { 
-    return ''; 
-  } 
-}
-
-async function getInitialProjectId(): Promise<string> { 
-  try { 
-    const { getActiveProjectId } = await import('../../utils/org'); 
-    return getActiveProjectId?.() || ''; 
-  } catch { 
-    return ''; 
-  } 
-}
+import { useScopeOptional } from '../../contexts/ScopeContext'
 
 const AnalysisWorkItemsPage: React.FC = () => {
   const { showToast } = useToast()
+  const scope = useScopeOptional()
+  const initialOrgId = scope?.currentOrg?.id || ''
+  const initialProjectId = scope?.currentProject?.id || ''
   const hasPermission = useHasPermission()
   const canCreate = hasPermission('work_items.create')
   const canUpdate = hasPermission('work_items.update')
@@ -84,11 +66,7 @@ const AnalysisWorkItemsPage: React.FC = () => {
     (async () => {
       setLoading(true)
       try {
-        const [orgList, initialOrgId, initialProjectId] = await Promise.all([
-          getOrganizations().catch(() => []),
-          getInitialOrgId(),
-          getInitialProjectId()
-        ]);
+        const orgList = await getOrganizations().catch(() => [])
         setOrgs(orgList)
         const chosenOrg = orgId || initialOrgId || orgList[0]?.id || ''
         if (chosenOrg !== orgId) setOrgId(chosenOrg)
@@ -100,9 +78,9 @@ const AnalysisWorkItemsPage: React.FC = () => {
         setLoading(false)
       }
     })()
-  }, [])
+  }, [initialOrgId, initialProjectId, orgId, projectId])
 
-  const reload = async () => {
+  const reload = useCallback(async () => {
     if (!orgId) return
     setLoading(true)
     try {
@@ -114,9 +92,9 @@ const AnalysisWorkItemsPage: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [orgId, search, showToast])
 
-  useEffect(() => { reload() }, [orgId, projectId])
+  useEffect(() => { reload() }, [orgId, projectId, reload])
 
   const filtered = useMemo(() => {
     if (!search) return rows
@@ -232,10 +210,6 @@ const AnalysisWorkItemsPage: React.FC = () => {
             <Select label="المؤسسة" value={orgId} onChange={async (e) => { 
               const v = String(e.target.value); 
               setOrgId(v); 
-              try { 
-                const { setActiveOrgId } = await import('../../utils/org'); 
-                setActiveOrgId?.(v); 
-              } catch {}
               await reload();
             }}>
               {orgs.map(o => (<MenuItem key={o.id} value={o.id}>{o.code} - {o.name}</MenuItem>))}
@@ -244,16 +218,10 @@ const AnalysisWorkItemsPage: React.FC = () => {
 
           <FormControl size="small">
             <InputLabel>المشروع (لنطاق الإجماليات)</InputLabel>
-            <Select label="المشروع (لنطاق الإجماليات)" value={projectId} onChange={(e) => {
+            <Select label="المشروع (لنطاق الإجماليات)" value={projectId} onChange={async (e) => {
               const v = String(e.target.value)
               setProjectId(v)
-              ;(async () => {
-                try {
-                  const { setActiveProjectId } = await import('../../utils/org')
-                  setActiveProjectId?.(v)
-                } catch {}
-                await reload()
-              })()
+              await reload()
             }}>
               <MenuItem value="">كل المشروعات</MenuItem>
               {projects.map(p => (<MenuItem key={p.id} value={p.id}>{p.code} - {p.name}</MenuItem>))}

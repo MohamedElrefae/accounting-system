@@ -8,12 +8,15 @@ import SidebarPortal from "./SidebarPortal";
 import useAppStore from '../../store/useAppStore';
 import { DRAWER_WIDTH, DRAWER_COLLAPSED_WIDTH } from './Sidebar';
 import { useSmartRoutePreloading } from '../../routes/RouteGroups';
+import { usePresenceHeartbeat } from '../../hooks/usePresenceHeartbeat';
 
 const DashboardLayout: React.FC = () => {
   const { sidebarCollapsed, toggleSidebar, language } = useAppStore();
   const isRtl = language === 'ar';
   const location = useLocation();
   const { recordNavigation, preloadBasedOnPatterns, enabled } = useSmartRoutePreloading();
+
+  usePresenceHeartbeat();
   
   // Simple direction update - no remounting needed
   React.useEffect(() => {

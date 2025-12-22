@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import styles from './CostCenters.module.css'
 import { useHasPermission } from '../../hooks/useHasPermission'
 import { useToast } from '../../contexts/ToastContext'
+import { useScopeOptional } from '../../contexts/ScopeContext'
 import { getOrganizations, type Organization } from '../../services/organization'
 import { getProjects, type Project } from '../../services/projects'
 import {
@@ -15,43 +16,34 @@ import {
 import ExportButtons from '../../components/Common/ExportButtons'
 import TreeView from '../../components/TreeView/TreeView'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
+import UnifiedCRUDForm, { type FormConfig } from '../../components/Common/UnifiedCRUDForm'
+import DraggablePanelContainer from '../../components/Common/DraggablePanelContainer'
+import TextField from '@mui/material/TextField'
+import Checkbox from '@mui/material/Checkbox'
 import {
   Button,
   Card,
   CardContent,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   FormControl,
   InputLabel,
   MenuItem,
   Select,
   Tab,
   Tabs,
-  TextField,
   Typography,
   Table,
   TableHead,
   TableRow,
   TableCell,
   TableBody,
-  Checkbox,
   TablePagination,
 } from '@mui/material'
-
-async function getInitialOrgId(): Promise<string> {
-  try {
-    const { getActiveOrgId } = await import('../../utils/org')
-    return getActiveOrgId?.() || ''
-  } catch {
-    return ''
-  }
-}
 
 const CostCentersPage: React.FC = () => {
   const { showToast } = useToast()
   const hasPermission = useHasPermission()
+  const scope = useScopeOptional()
+  const initialOrgId = scope?.currentOrg?.id || ''
   const canCreate = hasPermission('cost_centers.create')
   const canUpdate = hasPermission('cost_centers.update')
   const canDelete = hasPermission('cost_centers.delete')
@@ -90,33 +82,7 @@ const CostCentersPage: React.FC = () => {
     position: 0
   })
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true)
-      try {
-        const [orgList, projList, initialOrgId] = await Promise.all([
-          getOrganizations().catch(() => []),
-          getProjects().catch(() => ({ rows: [], total: 0 })),
-          getInitialOrgId()
-        ])
-        setOrgs(orgList)
-        // getProjects returns a paged result; ensure we set an array
-        setProjects(Array.isArray(projList) ? projList : (projList as { rows: Project[] }).rows ?? [])
-        const chosen = orgId || initialOrgId || orgList[0]?.id || ''
-        if (chosen !== orgId) setOrgId(chosen)
-        if (chosen) {
-          const costCenterList = await getCostCentersList(chosen, true)
-          setList(costCenterList)
-        }
-      } catch (e: unknown) {
-        showToast((e as Error).message || 'Failed to load data', { severity: 'error' })
-      } finally {
-        setLoading(false)
-      }
-    })()
-  }, [])
-
-  const reload = async (chosen: string) => {
+  const reload = useCallback(async (chosen: string) => {
     if (!chosen) return
     setLoading(true)
     try {
@@ -127,7 +93,28 @@ const CostCentersPage: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [showToast])
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true)
+      try {
+        const orgList = await getOrganizations().catch(() => [])
+        setOrgs(orgList)
+        const chosen = initialOrgId || orgList[0]?.id || ''
+        setOrgId(chosen)
+        const projs = await getProjects().catch(() => ({ rows: [], total: 0 }))
+        setProjects(projs.rows || [])
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [initialOrgId])
+
+  useEffect(() => {
+    if (!orgId) return
+    void reload(orgId)
+  }, [orgId, reload])
 
   const filteredList = useMemo(() => {
     if (!search) return list
@@ -218,34 +205,44 @@ const CostCentersPage: React.FC = () => {
     setOpen(true)
   }
 
-  const handleSave = async () => {
+  const handleSave = async (payloadOverride?: {
+    code: string
+    name: string
+    name_ar: string
+    description: string
+    parent_id: string | ''
+    project_id: string | ''
+    is_active: boolean
+    position: number
+  }) => {
     if (!orgId) { showToast('Select organization', { severity: 'warning' }); return }
+    const payload = payloadOverride ?? form
     try {
       if (editingId) {
         await updateCostCenter({
           id: editingId,
-          code: form.code,
-          name: form.name,
-          name_ar: form.name_ar || null,
-          description: form.description || null,
-          parent_id: form.parent_id || null,
-          project_id: form.project_id || null,
-          is_active: form.is_active,
-          position: form.position,
+          code: payload.code,
+          name: payload.name,
+          name_ar: payload.name_ar || null,
+          description: payload.description || null,
+          parent_id: payload.parent_id || null,
+          project_id: payload.project_id || null,
+          is_active: payload.is_active,
+          position: payload.position,
           org_id: orgId,
         })
         showToast('تم التحديث بنجاح', { severity: 'success' })
       } else {
         await createCostCenter({
           org_id: orgId,
-          code: form.code,
-          name: form.name,
-          name_ar: form.name_ar || null,
-          description: form.description || null,
-          parent_id: form.parent_id || null,
-          project_id: form.project_id || null,
-          is_active: form.is_active,
-          position: form.position,
+          code: payload.code,
+          name: payload.name,
+          name_ar: payload.name_ar || null,
+          description: payload.description || null,
+          parent_id: payload.parent_id || null,
+          project_id: payload.project_id || null,
+          is_active: payload.is_active,
+          position: payload.position,
         })
         showToast('تم الإنشاء بنجاح', { severity: 'success' })
       }
@@ -306,16 +303,9 @@ const CostCentersPage: React.FC = () => {
             <Select
               label="Organization"
               value={orgId}
-              onChange={(e) => {
+              onChange={async (e) => {
                 const v = String(e.target.value)
                 setOrgId(v)
-                ;(async () => {
-                  try {
-                    const { setActiveOrgId } = await import('../../utils/org')
-                    setActiveOrgId?.(v)
-                  } catch {}
-                  await reload(v)
-                })()
               }}
             >
               {orgs.map(o => (
@@ -327,7 +317,7 @@ const CostCentersPage: React.FC = () => {
             size="small" 
             label="Search / بحث" 
             value={search} 
-            onChange={(e) => setSearch(e.target.value)} 
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)} 
           />
           {canCreate && (
             <Button variant="contained" onClick={openCreate}>New / جديد</Button>
@@ -482,90 +472,92 @@ const CostCentersPage: React.FC = () => {
         </Card>
       </div>
 
-      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{editingId ? 'Edit Cost Center / تعديل مركز التكلفة' : 'New Cost Center / مركز تكلفة جديد'}</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth 
-            margin="dense" 
-            label="Code / الكود" 
-            value={form.code}
-            onChange={(e) => setForm({ ...form, code: e.target.value })}
-          />
-          <TextField
-            fullWidth 
-            margin="dense" 
-            label="Name / الاسم" 
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-          />
-          <TextField
-            fullWidth 
-            margin="dense" 
-            label="Arabic Name / الاسم بالعربية" 
-            value={form.name_ar}
-            onChange={(e) => setForm({ ...form, name_ar: e.target.value })}
-          />
-          <TextField
-            fullWidth 
-            margin="dense" 
-            multiline 
-            minRows={2} 
-            label="Description / الوصف" 
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-          />
-          <FormControl fullWidth margin="dense">
-            <InputLabel>Parent (optional)</InputLabel>
-            <Select
-              label="Parent (optional)"
-              value={form.parent_id}
-              onChange={(e) => setForm({ ...form, parent_id: String(e.target.value) })}
-            >
-              <MenuItem value="">None</MenuItem>
-              {list.filter(r => r.level <= 3).map(r => (
-                <MenuItem key={r.id} value={r.id}>{r.code} - {r.name}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth margin="dense">
-            <InputLabel>Project (optional)</InputLabel>
-            <Select
-              label="Project (optional)"
-              value={form.project_id}
-              onChange={(e) => setForm({ ...form, project_id: String(e.target.value) })}
-            >
-              <MenuItem value="">Global (All Projects)</MenuItem>
-              {projects.filter(p => p.org_id === orgId).map(p => (
-                <MenuItem key={p.id} value={p.id}>{p.code} - {p.name}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <TextField
-            fullWidth 
-            margin="dense" 
-            type="number" 
-            label="Position / الترتيب" 
-            value={form.position}
-            onChange={(e) => setForm({ ...form, position: parseInt(e.target.value) || 0 })}
-          />
-          <div className={styles.footerActions}>
-            <FormControl>
-              <InputLabel shrink>Active</InputLabel>
-            </FormControl>
-            <div>
-              <Checkbox 
-                checked={form.is_active} 
-                onChange={(e) => setForm({ ...form, is_active: e.target.checked })} 
-              /> Active / نشط
-            </div>
-          </div>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpen(false)}>Close</Button>
-          {(editingId ? canUpdate : canCreate) && <Button variant="contained" onClick={handleSave}>Save</Button>}
-        </DialogActions>
-      </Dialog>
+      <DraggablePanelContainer
+        storageKey="panel:cost-centers:crud"
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        title={editingId ? 'Edit Cost Center / تعديل مركز التكلفة' : 'New Cost Center / مركز تكلفة جديد'}
+        subtitle={orgId ? `Org: ${orgId}` : undefined}
+        defaults={{
+          position: () => ({ x: 120, y: 90 }),
+          size: () => ({ width: 980, height: 720 }),
+          dockPosition: 'right',
+        }}
+      >
+        <UnifiedCRUDForm
+          config={{
+            title: 'Cost Centers / مراكز التكلفة',
+            formId: 'cost-centers',
+            layout: { columns: 2, responsive: true },
+            fields: [
+              { id: 'code', type: 'text', label: 'Code / الكود', required: true },
+              { id: 'name', type: 'text', label: 'Name / الاسم', required: true },
+              { id: 'name_ar', type: 'text', label: 'Arabic Name / الاسم بالعربية', required: false },
+              { id: 'description', type: 'textarea', label: 'Description / الوصف', rows: 2, required: false, colSpan: 2 },
+              {
+                id: 'parent_id',
+                type: 'searchable-select',
+                label: 'Parent (optional) / الأصل',
+                optionsProvider: async () => [
+                  { value: '', label: '—', searchText: '' },
+                  ...list
+                    .filter(r => r.level <= 3)
+                    .filter(r => !editingId || r.id !== editingId)
+                    .map(r => ({
+                      value: r.id,
+                      label: `${r.code} - ${r.name_ar || r.name}`,
+                      searchText: `${r.code} ${r.name_ar || r.name}`,
+                    })),
+                ],
+                clearable: true,
+              },
+              {
+                id: 'project_id',
+                type: 'searchable-select',
+                label: 'Project (optional) / المشروع',
+                optionsProvider: async () => [
+                  { value: '', label: 'Global (All Projects) / عام', searchText: 'global عام' },
+                  ...projects
+                    .filter(p => p.org_id === orgId)
+                    .map(p => ({
+                      value: p.id,
+                      label: `${p.code} - ${p.name}`,
+                      searchText: `${p.code} ${p.name}`,
+                    })),
+                ],
+                clearable: true,
+              },
+              { id: 'position', type: 'number', label: 'Position / الترتيب', required: false, defaultValue: 0 },
+              { id: 'is_active', type: 'checkbox', label: 'Active / نشط', defaultValue: true },
+            ],
+          } as FormConfig}
+          initialData={{
+            code: form.code,
+            name: form.name,
+            name_ar: form.name_ar,
+            description: form.description,
+            parent_id: form.parent_id,
+            project_id: form.project_id,
+            is_active: form.is_active,
+            position: form.position,
+          }}
+          onSubmit={async (data) => {
+            const payload = {
+              code: String(data.code ?? '').trim(),
+              name: String(data.name ?? '').trim(),
+              name_ar: String(data.name_ar ?? ''),
+              description: String(data.description ?? ''),
+              parent_id: data.parent_id ? String(data.parent_id) : '',
+              project_id: data.project_id ? String(data.project_id) : '',
+              is_active: data.is_active === undefined ? true : !!data.is_active,
+              position: Number.isFinite(Number(data.position)) ? Number(data.position) : 0,
+            }
+            setForm(payload)
+            await handleSave(payload)
+          }}
+          onCancel={() => setOpen(false)}
+        />
+      </DraggablePanelContainer>
     </div>
   )
 }

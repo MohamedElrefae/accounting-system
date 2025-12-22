@@ -1,17 +1,23 @@
 import React from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getLandingPreference } from '../services/user-preferences'
+import useAppStore from '../store/useAppStore'
+import { useScopeOptional } from '../contexts/ScopeContext'
 
 const Dashboard = React.lazy(() => import('./Dashboard'))
 const Welcome = React.lazy(() => import('./Welcome'))
 
 const LandingDecider: React.FC = () => {
   const qc = useQueryClient()
+  const { demoMode } = useAppStore()
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id
   
   // Fetch server-backed landing preference (scoped by active org via service)
   const { data: pref, isLoading, error } = useQuery({
-    queryKey: ['landingPreference'],
-    queryFn: () => getLandingPreference(),
+    queryKey: ['landingPreference', orgId ?? null],
+    queryFn: () => getLandingPreference(orgId ?? undefined),
+    enabled: !demoMode,
     staleTime: 5 * 60 * 1000,
     retry: 1, // Only retry once
     retryDelay: 500,
@@ -26,19 +32,20 @@ const LandingDecider: React.FC = () => {
       void import('./Reports/TrialBalanceOriginal')
       void import('./Reports/GeneralLedger')
     }
+    if (demoMode) return
     if ('requestIdleCallback' in window) {
       ;(window as any).requestIdleCallback(prefetch, { timeout: 1500 })
     } else {
       const t = setTimeout(prefetch, 300)
       return () => clearTimeout(t)
     }
-  }, [])
+  }, [demoMode, qc])
 
   // Show loading state briefly
-  if (isLoading) return <div style={{ padding: '20px' }}>Loading...</div>
+  if (!demoMode && isLoading) return <div style={{ padding: '20px' }}>Loading...</div>
 
   // If there's an error or no preference, default to dashboard
-  const effectivePref = error ? 'dashboard' : (pref || 'dashboard')
+  const effectivePref = demoMode ? 'dashboard' : (error ? 'dashboard' : (pref || 'dashboard'))
 
   return (
     <React.Suspense fallback={<div style={{ padding: '20px' }}>Loading dashboard...</div>}> 

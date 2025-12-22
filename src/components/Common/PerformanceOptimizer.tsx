@@ -71,7 +71,6 @@ export const withPerformanceMonitoring = <P extends object>(
 export const EnhancedLoader: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState("Initializing...");
-  const startTime = useRef(performance.now());
   
   useEffect(() => {
     const messages = [

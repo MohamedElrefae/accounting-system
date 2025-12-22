@@ -87,6 +87,20 @@ export async function getActiveProjects(): Promise<Project[]> {
 }
 
 export async function getActiveProjectsByOrg(orgId: string): Promise<Project[]> {
+  // Try to use the new RPC that respects project_memberships
+  // Falls back to direct query if RPC doesn't exist
+  try {
+    const { data, error } = await supabase
+      .rpc('get_user_accessible_projects', { p_org_id: orgId });
+    
+    if (!error && data) {
+      return (data as Project[]) || [];
+    }
+  } catch {
+    // RPC doesn't exist yet, fall back to direct query
+  }
+  
+  // Fallback: direct query (for backward compatibility)
   const { data, error } = await supabase
     .from('projects')
     .select('*')
@@ -95,6 +109,45 @@ export async function getActiveProjectsByOrg(orgId: string): Promise<Project[]> 
     .order('code', { ascending: true });
   if (error) throw error;
   return (data as Project[]) || [];
+}
+
+// Get user's project memberships
+export async function getUserProjectMemberships(): Promise<Array<{
+  project_id: string;
+  project_code: string;
+  project_name: string;
+  org_id: string;
+  org_code: string;
+  org_name: string;
+  role: string;
+  can_create: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+  can_approve: boolean;
+  is_default: boolean;
+}>> {
+  try {
+    const { data, error } = await supabase
+      .rpc('get_user_project_memberships');
+    
+    if (error) throw error;
+    return data || [];
+  } catch {
+    return [];
+  }
+}
+
+// Check if user can access a specific project
+export async function canAccessProject(projectId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .rpc('can_access_project', { p_project_id: projectId });
+    
+    if (error) return true; // Default to true if function doesn't exist
+    return data ?? true;
+  } catch {
+    return true; // Default to true for backward compatibility
+  }
 }
 
 // Get project by ID

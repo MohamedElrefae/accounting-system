@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ExportButtons from '../../components/Common/ExportButtons';
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport';
 import TreeView from '../../components/TreeView/TreeView';
@@ -31,22 +31,10 @@ interface AncestorItem {
   id: string;
   code: string;
   name: string;
+  name_ar?: string;
   level: number;
   path_text: string;
 }
-
-async function getInitialOrgId(): Promise<string> {
-  try {
-    // Centralized helper
-    // Using dynamic import to avoid SSR issues or test environments
-    const { getActiveOrgId } = await import('../../utils/org')
-    const v = getActiveOrgId?.()
-    if (v && v.length > 0) return v
-  } catch {}
-  return ''
-}
-
-// Enum mapping functions to convert frontend values to database enum types
 function mapAccountTypeToDbEnum(frontendType: string): string {
   const mapping: { [key: string]: string } = {
     'assets': 'asset',
@@ -236,17 +224,14 @@ const AccountsTreePage: React.FC = () => {
   const { showToast } = useToast();
 
   // Cache for delete-eligibility info to reduce RPC traffic
-  const [deleteFlags, setDeleteFlags] = useState<Record<string, { has_transactions: boolean; is_standard: boolean; linked_to_sub_tree: boolean }>>({});
+  const [_deleteFlags, _setDeleteFlags] = useState<Record<string, { has_transactions: boolean; is_standard: boolean; linked_to_sub_tree: boolean }>>({});
 
-  async function fetchCanDeleteFlags(accountIds: string[]) {
+  const fetchCanDeleteFlags = useCallback(async (accountIds: string[]) => {
     if (!orgId || accountIds.length === 0) return;
-    // Derive locally using existing data to avoid RPC dependency
+    // Default flags (actual delete enforcement is server-side; UI flags are best-effort)
     const updates: Record<string, { has_transactions: boolean; is_standard: boolean; linked_to_sub_tree: boolean }> = {};
     for (const id of accountIds) {
-      const item = accounts.find(a => a.id === id) as (AccountItem & { is_standard?: boolean; linked_to_sub_tree?: boolean }) | undefined;
-      const hasTx = !!(rollups[id]?.has_transactions);
-      const isStd = !!item?.['is_standard'];
-      updates[id] = { has_transactions: hasTx, is_standard: isStd, linked_to_sub_tree: !!item?.['linked_to_sub_tree'] };
+      updates[id] = { has_transactions: false, is_standard: false, linked_to_sub_tree: false };
     }
 
     // Enrich with server check: is this account linked in sub_tree (linked_account_id)?
@@ -267,10 +252,10 @@ const AccountsTreePage: React.FC = () => {
       }
     } catch {}
 
-    setDeleteFlags(prev => ({ ...prev, ...updates }));
+    _setDeleteFlags(prev => ({ ...prev, ...updates }));
     // Also merge onto accounts so UI logic sees them immediately
     setAccounts(prev => prev.map(a => updates[a.id] ? { ...a, ...updates[a.id] } : a));
-  }
+  }, [orgId]);
 
   useEffect(() => {
     // Load organizations first
@@ -278,43 +263,81 @@ const AccountsTreePage: React.FC = () => {
       try {
         const orgs = await getOrganizations();
         setOrganizations(orgs.map(o => ({ id: o.id, code: o.code, name: o.name })));
-        const initialOrgId = await getInitialOrgId();
-        if (!orgId && !initialOrgId && orgs.length > 0) {
+        if (orgs.length > 0) {
           const first = orgs[0].id;
-          setOrgId(first);
-          try {
-            const { setActiveOrgId } = await import('../../utils/org');
-            setActiveOrgId?.(first);
-          } catch {}
-        } else if (initialOrgId && initialOrgId !== orgId) {
-          setOrgId(initialOrgId);
+          setOrgId(prev => prev || first);
         }
-      } catch {}
+      } catch (e) {
+        console.error('Failed to load organizations:', e);
+      }
     })();
-    loadProjects().catch(() => {});
   }, []);
 
+  // Load projects when orgId changes
   useEffect(() => {
-    // When org or project changes or search cleared, reload roots
-    if (!orgId) return;
-    if (!searchTerm) {
-      loadRoots().catch(() => {});
-    } else {
-      performSearch().catch(() => {});
+    if (orgId) {
+      loadProjects().catch(console.error);
     }
-  }, [orgId, selectedProject, balanceMode]);
+  }, [orgId]);
 
-  useEffect(() => {
-    // server-driven search
-    if (!orgId) return;
-    if (!searchTerm) {
-      loadRoots().catch(() => {});
-    } else {
-      performSearch().catch(() => {});
+  const fetchAccountRollups = useCallback(async (accountIds: string[]) => {
+    if (!orgId || accountIds.length === 0) return;
+    const unique = Array.from(new Set(accountIds));
+
+    let rollupData: any[] = [];
+    // Use view-based query to avoid RPC dependency
+    try {
+      const viewQuery = supabase
+        .from('v_accounts_activity_rollups')
+        .select('id, org_id, has_transactions, net_amount, total_debit_amount, total_credit_amount, child_count')
+        .eq('org_id', orgId);
+      const { data: viewData, error: viewError } = await viewQuery;
+      if (viewError) {
+        console.error('❌ Error fetching from view:', viewError);
+        return;
+      }
+      rollupData = viewData || [];
+    } catch (err) {
+      console.error('❌ Failed to fetch rollups:', err);
+      return;
     }
-  }, [searchTerm, orgId, balanceMode]);
 
-  async function loadRoots() {
+    if (!rollupData || rollupData.length === 0) {
+      const defaultMap: Record<string, { has_transactions: boolean; net_amount: number }> = {};
+      unique.forEach(id => {
+        defaultMap[id] = { has_transactions: false, net_amount: 0 };
+      });
+      setRollups(prev => ({ ...prev, ...defaultMap }));
+      return;
+    }
+
+    // Filter data to only the accounts we requested
+    const filteredData = rollupData.filter((r: any) => unique.includes(r.id));
+
+    const map: Record<string, { has_transactions: boolean; net_amount: number }> = {};
+    filteredData.forEach((r: any) => {
+      const hasTransactions = !!r.has_transactions;
+      const netAmount = Number(r.net_amount || 0);
+      map[r.id] = {
+        has_transactions: hasTransactions,
+        net_amount: netAmount
+      };
+    });
+
+    // Add default values for accounts not found in the rollups
+    unique.forEach(id => {
+      if (!map[id]) {
+        map[id] = { has_transactions: false, net_amount: 0 };
+      }
+    });
+
+    if (Object.keys(map).length) {
+      setRollups(prev => ({ ...prev, ...map }));
+      setAccounts(prev => prev.map(a => map[a.id] ? { ...(a as any), ...map[a.id] } : a));
+    }
+  }, [orgId]);
+
+  const loadRoots = useCallback(async () => {
     setLoading(true);
     if (!orgId) { setLoading(false); return; }
     let query = supabase
@@ -337,9 +360,9 @@ const AccountsTreePage: React.FC = () => {
       fetchAccountRollups(rows.map(r => r.id)).catch(() => {});
     }
     setLoading(false);
-  }
+  }, [fetchAccountRollups, fetchCanDeleteFlags, orgId, selectedProject]);
 
-  async function loadChildren(parentId: string) {
+  const loadChildren = useCallback(async (parentId: string) => {
     let query = supabase
       .from('v_accounts_tree_ui')
       .select('*')
@@ -353,7 +376,83 @@ const AccountsTreePage: React.FC = () => {
     // fetch rollups for these children
     fetchAccountRollups(mapped.map(r => r.id)).catch(() => {});
     return mapped;
-  }
+  }, [fetchAccountRollups, orgId, selectedProject]);
+
+  const performSearch = useCallback(async () => {
+    // Fetch matches by code/name/name_ar and include project filter
+    let query = supabase
+      .from('v_accounts_tree_ui')
+      .select('*')
+      .eq('org_id', orgId)
+      .or(`code.ilike.%${searchTerm}%,name.ilike.%${searchTerm}%,name_ar.ilike.%${searchTerm}%`)
+      .order('path_text', { ascending: true })
+      .limit(200);
+    if (selectedProject) query = query.eq('project_id', selectedProject);
+    const { data, error } = await query;
+    if (error) return;
+    const matches = (data || []).map(mapRow);
+
+    // For each match, fetch ancestors for context
+    const ancestorSets: AccountItem[][] = [];
+    for (const m of matches) {
+      const { data: anc, error: ancErr } = await supabase.rpc('get_account_ancestors', {
+        p_org_id: orgId,
+        p_account_id: m.id,
+      });
+      if (!ancErr) {
+        const rows = (anc || []) as AncestorItem[];
+        const ids = rows.map(r => r.id);
+        if (ids.length) {
+          const { data: ancRows } = await supabase
+            .from('v_accounts_tree_ui')
+            .select('*')
+            .in('id', ids);
+          const mapped = (ancRows || []).map(mapRow);
+          ancestorSets.push(mapped);
+        }
+      }
+    }
+
+    // Optionally load immediate children of matches for better context
+    const childrenSets: AccountItem[][] = [];
+    for (const m of matches) {
+      const kids = await loadChildren(m.id);
+      if (kids.length) childrenSets.push(kids);
+    }
+
+    const combined = uniqueById([
+      ...matches,
+      ...ancestorSets.flat(),
+      ...childrenSets.flat(),
+    ]);
+    setAccounts(combined);
+
+    // Hydrate delete flags for the combined visible list
+    fetchCanDeleteFlags(combined.map(c => c.id)).catch(() => {});
+    // Hydrate rollups for combined list
+    fetchAccountRollups(combined.map(c => c.id)).catch(() => {});
+
+    // Expand all ancestor paths of matches
+    const toExpand = new Set<string>();
+    for (const m of matches) {
+      const { data: anc } = await supabase.rpc('get_account_ancestors', {
+        p_org_id: orgId,
+        p_account_id: m.id,
+      });
+      (anc || []).forEach((r: any) => toExpand.add(r.id));
+    }
+    setExpanded(toExpand);
+  }, [fetchAccountRollups, fetchCanDeleteFlags, loadChildren, orgId, searchTerm, selectedProject]);
+
+  useEffect(() => {
+    // When org or project changes or search cleared, reload roots
+    if (!orgId) return;
+    if (!searchTerm) {
+      loadRoots().catch(() => {});
+    } else {
+      performSearch().catch(() => {});
+    }
+  }, [orgId, selectedProject, balanceMode, searchTerm, loadRoots, performSearch]);
 
   function mapRow(row: Record<string, unknown>): AccountItem {
     return {
@@ -410,7 +509,8 @@ const AccountsTreePage: React.FC = () => {
   };
 
   const handleTopLevelAdd = () => {
-    if (!orgId) {
+    const helpScreenshotsBypass = import.meta.env.VITE_HELP_SCREENSHOTS === 'true';
+    if (!orgId && !helpScreenshotsBypass) {
       showToast('يرجى اختيار منظمة أولاً', { severity: 'warning' });
       return;
     }
@@ -532,6 +632,12 @@ const AccountsTreePage: React.FC = () => {
   };
 
 
+  function uniqueById(items: AccountItem[]): AccountItem[] {
+    const map = new Map<string, AccountItem>();
+    for (const it of items) map.set(it.id, it);
+    return Array.from(map.values());
+  }
+
   async function loadProjects() {
     const { data, error } = await supabase
       .from('projects')
@@ -539,152 +645,6 @@ const AccountsTreePage: React.FC = () => {
       .eq('status', 'active')
       .order('code', { ascending: true });
     if (!error) setProjects(data || []);
-  }
-
-  function uniqueById(items: AccountItem[]): AccountItem[] {
-    const map = new Map<string, AccountItem>();
-    for (const it of items) map.set(it.id, it);
-    return Array.from(map.values());
-  }
-
-  async function performSearch() {
-    // Fetch matches by code/name/name_ar and include project filter
-    let query = supabase
-      .from('v_accounts_tree_ui')
-      .select('*')
-      .eq('org_id', orgId)
-      .or(`code.ilike.%${searchTerm}%,name.ilike.%${searchTerm}%,name_ar.ilike.%${searchTerm}%`)
-      .order('path_text', { ascending: true })
-      .limit(200);
-    if (selectedProject) query = query.eq('project_id', selectedProject);
-    const { data, error } = await query;
-    if (error) return;
-    const matches = (data || []).map(mapRow);
-
-    // For each match, fetch ancestors for context
-    const ancestorSets: AccountItem[][] = [];
-    for (const m of matches) {
-      const { data: anc, error: ancErr } = await supabase.rpc('get_account_ancestors', {
-        p_org_id: orgId,
-        p_account_id: m.id,
-      });
-      if (!ancErr) {
-        const rows = (anc || []) as AncestorItem[];
-        // We need full items; refetch by ids in one go would be better, but keep simple
-        // Merge using existing mapRow via another query on v_accounts_tree_ui filtered by ids
-        const ids = rows.map(r => r.id);
-        if (ids.length) {
-          const { data: ancRows } = await supabase
-            .from('v_accounts_tree_ui')
-            .select('*')
-            .in('id', ids);
-          const mapped = (ancRows || []).map(mapRow);
-          ancestorSets.push(mapped);
-        }
-      }
-    }
-
-    // Optionally load immediate children of matches for better context
-    const childrenSets: AccountItem[][] = [];
-    for (const m of matches) {
-      const kids = await loadChildren(m.id);
-      if (kids.length) childrenSets.push(kids);
-    }
-
-    const combined = uniqueById([
-      ...matches,
-      ...ancestorSets.flat(),
-      ...childrenSets.flat(),
-    ]);
-    setAccounts(combined);
-
-    // Hydrate delete flags for the combined visible list
-    fetchCanDeleteFlags(combined.map(c => c.id)).catch(() => {});
-    // Hydrate rollups for combined list
-    fetchAccountRollups(combined.map(c => c.id)).catch(() => {});
-
-    // Expand all ancestor paths of matches
-    const toExpand = new Set<string>();
-    for (const m of matches) {
-      const { data: anc } = await supabase.rpc('get_account_ancestors', {
-        p_org_id: orgId,
-        p_account_id: m.id,
-      });
-      (anc || []).forEach((r: any) => toExpand.add(r.id));
-    }
-    setExpanded(toExpand);
-  }
-
-  async function fetchAccountRollups(accountIds: string[]) {
-    if (!orgId || accountIds.length === 0) return;
-    const unique = Array.from(new Set(accountIds));
-    
-    console.log('Fetching rollups for accounts:', unique, 'orgId:', orgId, 'project:', selectedProject, 'balanceMode:', balanceMode);
-    
-    let rollupData: any[] = [];
-    let dataSource = 'unknown';
-    
-    // Use view-based query to avoid RPC dependency
-    try {
-      const viewQuery = supabase
-        .from('v_accounts_activity_rollups')
-        .select('id, org_id, has_transactions, net_amount, total_debit_amount, total_credit_amount, child_count')
-        .eq('org_id', orgId);
-      const { data: viewData, error: viewError } = await viewQuery;
-      if (viewError) {
-        console.error('❌ Error fetching from view:', viewError);
-        return;
-      }
-      rollupData = viewData || [];
-      dataSource = 'VIEW';
-      console.log('✅ Fetched rollups from view:', rollupData.length);
-    } catch (err) {
-      console.error('❌ Failed to fetch rollups:', err);
-      return;
-    }
-    
-    console.log('📊 Raw rollup data from', dataSource, ':', rollupData.slice(0, 3));
-    
-    if (!rollupData || rollupData.length === 0) {
-      console.warn('⚠️ No rollups data found for org:', orgId);
-      // Set default values for accounts that have no rollups
-      const defaultMap: Record<string, { has_transactions: boolean; net_amount: number }> = {};
-      unique.forEach(id => {
-        defaultMap[id] = { has_transactions: false, net_amount: 0 };
-      });
-      setRollups(prev => ({ ...prev, ...defaultMap }));
-      return;
-    }
-    
-    // Filter data to only the accounts we requested
-    const filteredData = rollupData.filter((r: any) => unique.includes(r.id));
-    console.log('🔍 Filtered to requested accounts:', filteredData.length, 'of', rollupData.length);
-    
-    const map: Record<string, { has_transactions: boolean; net_amount: number }> = {};
-    filteredData.forEach((r: any) => {
-      const hasTransactions = !!r.has_transactions;
-      const netAmount = Number(r.net_amount || 0);
-      map[r.id] = { 
-        has_transactions: hasTransactions, 
-        net_amount: netAmount 
-      };
-      console.log(`📈 Account ${r.id}: has_transactions=${hasTransactions}, net_amount=${netAmount}`);
-    });
-    
-    // Add default values for accounts not found in the rollups
-    unique.forEach(id => {
-      if (!map[id]) {
-        map[id] = { has_transactions: false, net_amount: 0 };
-        console.log(`🔄 Account ${id}: defaulted to no transactions`);
-      }
-    });
-    
-    console.log('✅ Final processed rollups map:', map);
-    
-    if (Object.keys(map).length) {
-      setRollups(prev => ({ ...prev, ...map }));
-      setAccounts(prev => prev.map(a => map[a.id] ? { ...(a as any), ...map[a.id] } : a));
-    }
   }
 
   const filteredAndSorted = useMemo(() => {
@@ -729,7 +689,7 @@ const AccountsTreePage: React.FC = () => {
       net_amount: rollups[r.id]?.net_amount ?? 0,
     }));
     return prepareTableData(columns, rows);
-  }, [filteredAndSorted]);
+  }, [filteredAndSorted, rollups]);
 
   if (loading) {
     return (
@@ -760,6 +720,7 @@ const AccountsTreePage: React.FC = () => {
             className="ultimate-btn ultimate-btn-add" 
             title="إضافة حساب جديد" 
             onClick={handleTopLevelAdd}
+            data-tour="accounts-tree-add-top"
           >
             <div className="btn-content"><span className="btn-text">إضافة حساب جديد</span></div>
           </button>
@@ -769,6 +730,7 @@ const AccountsTreePage: React.FC = () => {
             title="تعديل الحساب المحدد" 
             onClick={handleEditSelected}
             disabled={!selectedAccountId}
+            data-tour="accounts-tree-edit-selected"
           >
             <div className="btn-content"><span className="btn-text">تعديل الحساب المحدد</span></div>
           </button>
@@ -798,39 +760,43 @@ const AccountsTreePage: React.FC = () => {
                 return;
               }
               try {
-                console.log('=== ENHANCED ROLLUPS DEBUG START ===');
-                const debugInfo = await debugAccountRollups(orgId);
-                console.log('🔍 Basic Debug Results:', debugInfo);
+                if (import.meta.env.DEV) {
+                  console.log('=== ENHANCED ROLLUPS DEBUG START ===');
+                  const debugInfo = await debugAccountRollups(orgId);
+                  console.log('🔍 Basic Debug Results:', debugInfo);
+                }
                 
                 // Test view directly with visible accounts
                 const visibleAccountIds = accounts.slice(0, 5).map(a => a.id);
-                console.log('\n--- Testing View Directly ---');
+                if (import.meta.env.DEV) console.log('\n--- Testing View Directly ---');
                 const viewResults = await testViewDirectly(orgId, visibleAccountIds);
                 
                 // Manual calculation for comparison
                 if (visibleAccountIds.length > 0) {
-                  console.log('\n--- Manual Calculation ---');
+                  if (import.meta.env.DEV) console.log('\n--- Manual Calculation ---');
                   const manualResults = await manualRollupsCalculation(orgId, visibleAccountIds);
                   
                   // Compare results
                   if (viewResults && manualResults) {
-                    console.log('\n--- Results Comparison ---');
-                    visibleAccountIds.forEach(id => {
-                      const viewData = viewResults.find(v => v.id === id);
-                      const manualData = manualResults[id];
-                      console.log(`Account ${id}:`);
-                      console.log('  View:', { has_transactions: viewData?.has_transactions, net_amount: viewData?.net_amount });
-                      console.log('  Manual:', { has_transactions: manualData?.has_transactions, net_amount: manualData?.net_amount });
-                      console.log('  Match:', viewData?.has_transactions === manualData?.has_transactions && Number(viewData?.net_amount || 0) === (manualData?.net_amount || 0));
-                    });
+                    if (import.meta.env.DEV) {
+                      console.log('\n--- Results Comparison ---');
+                      visibleAccountIds.forEach(id => {
+                        const viewData = viewResults.find(v => v.id === id);
+                        const manualData = manualResults[id];
+                        console.log(`Account ${id}:`);
+                        console.log('  View:', { has_transactions: viewData?.has_transactions, net_amount: viewData?.net_amount });
+                        console.log('  Manual:', { has_transactions: manualData?.has_transactions, net_amount: manualData?.net_amount });
+                        console.log('  Match:', viewData?.has_transactions === manualData?.has_transactions && Number(viewData?.net_amount || 0) === (manualData?.net_amount || 0));
+                      });
+                    }
                   }
                 }
                 
                 // Also test RPC modes if available
                 try {
-                  console.log('\n--- RPC Mode Testing ---');
+                  if (import.meta.env.DEV) console.log('\n--- RPC Mode Testing ---');
                   await testRollupModes(orgId);
-                } catch (rpcErr) {
+                } catch {
                   console.log('⚠️ RPC test skipped (function may not exist yet)');
                 }
                 
@@ -907,13 +873,7 @@ const AccountsTreePage: React.FC = () => {
           {/* Organization selector */}
           <select value={orgId} onChange={(e) => {
             setOrgId(e.target.value);
-            (async () => {
-              try {
-                const { setActiveOrgId } = await import('../../utils/org');
-                setActiveOrgId?.(e.target.value);
-              } catch {}
-            })()
-          }} className="filter-select">
+          }} className="filter-select" data-tour="accounts-tree-org-select">
             <option value="">اختر المؤسسة</option>
             {organizations.map(o => (
               <option key={o.id} value={o.id}>{o.code} - {o.name}</option>
@@ -1062,7 +1022,7 @@ const AccountsTreePage: React.FC = () => {
                 <input type="checkbox" checked={rememberPanel} onChange={(e) => setRememberPanel(e.target.checked)} />
                 تذكر التخطيط
               </label>
-              <button className="ultimate-btn ultimate-btn-add" title="حفظ" onClick={() => formRef.current?.submit()}>
+              <button className="ultimate-btn ultimate-btn-add" title="حفظ" onClick={() => formRef.current?.submit()} data-tour="accounts-tree-save">
                 <div className="btn-content"><span className="btn-text">حفظ</span></div>
               </button>
               <button className="ultimate-btn ultimate-btn-delete" title="إلغاء" onClick={() => {

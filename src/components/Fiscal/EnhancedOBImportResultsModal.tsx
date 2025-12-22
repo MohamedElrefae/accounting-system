@@ -1,5 +1,5 @@
 import React from 'react'
-import { Box, Typography, Tabs, Tab, Button, Stack, Tooltip, CircularProgress, Table, TableBody, TableHead, TableRow, TableCell, TablePagination, useTheme, Checkbox, FormGroup, FormControlLabel, Drawer, TextField, Snackbar, Alert as MuiAlert, Alert } from '@mui/material'
+import { Box, Typography, Tabs, Tab, Button, Stack, CircularProgress, Table, TableBody, TableHead, TableRow, TableCell, TablePagination, useTheme, Checkbox, FormGroup, FormControlLabel, Drawer, TextField, Snackbar, Alert as MuiAlert } from '@mui/material'
 import * as XLSX from 'xlsx'
 import ErrorIcon from '@mui/icons-material/Error'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
@@ -39,6 +39,15 @@ function useImportStatus(importId: string, open: boolean) {
   return status
 }
 
+function useDebouncedFilters<T>(value: T, delay = 400) {
+  const [debounced, setDebounced] = React.useState<T>(value)
+  React.useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay)
+    return () => clearTimeout(timer)
+  }, [value, delay])
+  return debounced
+}
+
 export default function EnhancedOBImportResultsModal(props: Props) {
   const { open, onClose, importId, orgId, fiscalYearId, uploadHeaders } = props
   const theme = useTheme()
@@ -70,7 +79,9 @@ export default function EnhancedOBImportResultsModal(props: Props) {
 
   // Local snackbars for export results
   const [snack, setSnack] = React.useState<{open:boolean; message:string; severity:'success'|'error'|'info'}>({open:false,message:'',severity:'success'})
-  const openSnack = (message: string, severity: 'success'|'error'|'info'='success') => setSnack({open:true,message,severity})
+  const openSnack = React.useCallback((message: string, severity: 'success'|'error'|'info'='success') => {
+    setSnack({ open: true, message, severity })
+  }, [])
 
   // Column chooser
   const allColumns = React.useMemo(() => [
@@ -148,14 +159,14 @@ export default function EnhancedOBImportResultsModal(props: Props) {
   const [filterAccount, setFilterAccount] = React.useState('')
   const [filterProject, setFilterProject] = React.useState('')
   const [filterCC, setFilterCC] = React.useState('')
-  const debouncedFilters = (() => {
-    const [val, setVal] = React.useState({ account: '', project: '', cc: '' })
-    React.useEffect(() => {
-      const t = setTimeout(() => setVal({ account: filterAccount, project: filterProject, cc: filterCC }), 400)
-      return () => clearTimeout(t)
-    }, [filterAccount, filterProject, filterCC])
-    return val
-  })()
+  const debouncedFilters = useDebouncedFilters(
+    React.useMemo(() => ({
+      account: filterAccount,
+      project: filterProject,
+      cc: filterCC,
+    }), [filterAccount, filterProject, filterCC]),
+    400,
+  )
 
   const loadPage = React.useCallback(async (pageIndex: number, size: number) => {
     if (!importId || !orgId || !fiscalYearId) return
@@ -201,14 +212,17 @@ export default function EnhancedOBImportResultsModal(props: Props) {
       setRows(enriched)
       setTotal(totalCount)
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error(e)
+      openSnack(typeof e === 'object' ? 'Failed to load rows' : String(e), 'error')
     } finally {
       setLoadingRows(false)
     }
-  }, [importId, orgId, fiscalYearId])
+  }, [importId, orgId, fiscalYearId, debouncedFilters, openSnack])
 
-  React.useEffect(() => { if (open) loadPage(0, rowsPerPage) }, [open, loadPage, rowsPerPage, debouncedFilters])
+  React.useEffect(() => {
+    if (open) {
+      loadPage(0, rowsPerPage)
+    }
+  }, [open, loadPage, rowsPerPage])
 
   // Fetch and cache grand totals once per import
   React.useEffect(() => {

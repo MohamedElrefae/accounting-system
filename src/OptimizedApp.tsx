@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useIdleLogout } from './hooks/useIdleLogout';
 import { useAuthPerformance } from './hooks/useAuthPerformance';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import useAppStore from './store/useAppStore';
 import { ArabicLanguageService } from './services/ArabicLanguageService';
 import DashboardLayout from './components/layout/DashboardLayout';
@@ -13,6 +13,8 @@ import { preloadCriticalRoutes } from './routes/RouteGroups';
 // Core dashboard routes (lazy) loaded directly here
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const Welcome = React.lazy(() => import('./pages/Welcome'));
+const GettingStarted = React.lazy(() => import('./pages/GettingStarted'));
+const HelpCenter = React.lazy(() => import('./pages/HelpCenter'));
 
 // Lazy load route groups
 const MainDataRoutes = React.lazy(() => import('./routes/MainDataRoutes'));
@@ -32,13 +34,9 @@ import { RegisterForm } from './components/auth/RegisterForm';
 import { ForgotPassword } from './components/auth/ForgotPassword';
 import { ResetPassword } from './components/auth/ResetPassword';
 import OptimizedProtectedRoute from './components/routing/OptimizedProtectedRoute';
-import ErrorBoundary from './components/Common/ErrorBoundary';
 
 // Lazy load admin and other specialized routes
-const UserManagementSystem = React.lazy(() => import('./pages/admin/UserManagementSystem'));
-const Profile = React.lazy(() => import('./pages/admin/Profile'));
 const ProjectAttachmentsPage = React.lazy(() => import('./pages/Projects/ProjectAttachments'));
-const FontSettings = React.lazy(() => import('./components/Settings/FontSettings'));
 
 const OptimizedApp: React.FC = () => {
   useIdleLogout();
@@ -105,6 +103,22 @@ const OptimizedApp: React.FC = () => {
             element={
               <OptimizedSuspense>
                 <Welcome />
+              </OptimizedSuspense>
+            }
+          />
+          <Route
+            path="getting-started"
+            element={
+              <OptimizedSuspense>
+                <GettingStarted />
+              </OptimizedSuspense>
+            }
+          />
+          <Route
+            path="help"
+            element={
+              <OptimizedSuspense>
+                <HelpCenter />
               </OptimizedSuspense>
             }
           />

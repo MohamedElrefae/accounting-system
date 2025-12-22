@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { TextField, Button, MenuItem, FormControlLabel, Checkbox, Card, CardContent, Typography, Grid } from '@mui/material'
 import { setGLMappingByCode, type MovementType } from '@/services/inventory/config'
 import { useToast } from '@/contexts/ToastContext'
 import { useHasPermission } from '@/hooks/useHasPermission'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 
 const movementTypes: { value: MovementType; label: string }[] = [
   { value: 'receipt', label: 'Receipt / توريد' },
@@ -15,32 +16,19 @@ const movementTypes: { value: MovementType; label: string }[] = [
   { value: 'return_from_project', label: 'Return From Project / مرتجع من المشروع' },
 ]
 
-function getActiveOrgIdSafe(): string | null {
-  try {
-    const raw = localStorage.getItem('org_id')
-    return raw || null
-  } catch {
-    return null
-  }
-}
-
 const InventorySettingsPage: React.FC = () => {
   const { showToast } = useToast()
   const hasPerm = useHasPermission()
   const canManage = hasPerm('inventory.manage')
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
 
-  const [orgId, setOrgId] = useState<string>('')
   const [movementType, setMovementType] = useState<MovementType>('receipt')
   const [debitCode, setDebitCode] = useState('1300')
   const [creditCode, setCreditCode] = useState('2111')
   const [priority, setPriority] = useState<number>(10)
   const [isActive, setIsActive] = useState<boolean>(true)
   const [notes, setNotes] = useState<string>('')
-
-  useEffect(() => {
-    const current = getActiveOrgIdSafe()
-    if (current) setOrgId(current)
-  }, [])
 
   const onSave = async () => {
     if (!canManage) { showToast('Access denied', { severity: 'warning' }); return }

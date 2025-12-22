@@ -13,14 +13,13 @@ import { useArabicLanguage } from '@/services/ArabicLanguageService'
 import { INVENTORY_TEXTS } from '@/i18n/inventory'
 import { getDisplayName } from '@/utils/inventoryDisplay'
 import '../MainData/AccountsTree.css'
-
-function getActiveOrgIdSafe(): string | null {
-  try { return localStorage.getItem('org_id') } catch { return null }
-}
+import { useScopeOptional } from '@/contexts/ScopeContext'
 
 const LocationsPage: React.FC = () => {
   const { showToast } = useToast()
   const { t, isRTL } = useArabicLanguage()
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
   const [rows, setRows] = useState<InventoryLocationRow[]>([])
   const [loading, setLoading] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
@@ -96,8 +95,7 @@ const LocationsPage: React.FC = () => {
   }), [isRTL, t, projectOptions, costCenterOptions, locationTypeOptions])
 
   const fetchData = useCallback(async () => {
-    const orgId = getActiveOrgIdSafe()
-    if (!orgId) {
+    if (!scope?.currentOrg?.id) {
       showToast(isRTL ? 'الرجاء اختيار مؤسسة أولاً' : 'Please select an organization first', { severity: 'warning' })
       return
     }
@@ -105,9 +103,9 @@ const LocationsPage: React.FC = () => {
     setLoading(true)
     try {
       const [locs, projs, ccs] = await Promise.all([
-        listInventoryLocations(orgId),
-        getActiveProjectsByOrg(orgId).catch(() => [] as any),
-        getCostCentersList(orgId).catch(() => [] as any),
+        listInventoryLocations(scope.currentOrg.id),
+        getActiveProjectsByOrg(scope.currentOrg.id).catch(() => [] as any),
+        getCostCentersList(scope.currentOrg.id).catch(() => [] as any),
       ])
       setRows(locs)
       setProjects(projs as any)
@@ -118,7 +116,7 @@ const LocationsPage: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }, [showToast, isRTL])
+  }, [showToast, isRTL, scope])
 
   useEffect(() => {
     fetchData().catch(() => {})
@@ -173,8 +171,7 @@ const LocationsPage: React.FC = () => {
   }
 
   const handleFormSubmit = async (data: Record<string, unknown>) => {
-    const orgId = getActiveOrgIdSafe()
-    if (!orgId) {
+    if (!scope?.currentOrg?.id) {
       showToast(isRTL ? 'الرجاء اختيار مؤسسة أولاً' : 'Please select an organization first', { severity: 'warning' })
       return
     }

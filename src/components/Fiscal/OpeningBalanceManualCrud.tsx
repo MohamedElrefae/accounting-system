@@ -6,8 +6,8 @@ import { useArabicLanguage } from '@/services/ArabicLanguageService'
 import { useToast } from '@/contexts/ToastContext'
 import type { SearchableSelectOption } from '@/components/Common/SearchableSelect'
 import { OpeningBalanceImportService } from '@/services/OpeningBalanceImportService'
-import { getActiveOrgId, getActiveProjectId } from '@/utils/org'
 import { getProject } from '@/services/projects'
+import { useScopeOptional } from '@/contexts/ScopeContext'
 
 export interface ManualOBRow {
   account_code: string
@@ -28,11 +28,12 @@ interface OpeningBalanceManualCrudProps {
 const OpeningBalanceManualCrud: React.FC<OpeningBalanceManualCrudProps> = ({ open, onClose, onSubmit }) => {
   const { isRTL } = useArabicLanguage()
   const { showToast } = useToast?.() || { showToast: (msg:string,_opts?:any)=>{ try{ (window as any)?.toast?.info?.(msg) }catch{} } }
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
+  const projectId = scope?.currentProject?.id || ''
   const [rows, setRows] = useState<ManualOBRow[]>([])
   const [presetAnchor, setPresetAnchor] = useState<null | HTMLElement>(null)
 
-  // Defaults from local storage
-  const [orgId, setOrgId] = useState<string>(() => getActiveOrgId() || '')
   const [defaultProjectCode, setDefaultProjectCode] = useState<string>('')
 
   // Options for searchable selects (flat + tree for drilldown)
@@ -50,18 +51,14 @@ const OpeningBalanceManualCrud: React.FC<OpeningBalanceManualCrudProps> = ({ ope
     if (!open) return
     const load = async () => {
       try {
-        const activeOrg = getActiveOrgId() || ''
-        if (activeOrg && activeOrg !== orgId) setOrgId(activeOrg)
-        // Default project from localStorage (id -> code)
-        const projId = getActiveProjectId() || ''
-        if (projId) {
-          try { const p = await getProject(projId); if (p?.code) setDefaultProjectCode(p.code) } catch {}
+        if (projectId) {
+          try { const p = await getProject(projectId); if (p?.code) setDefaultProjectCode(p.code) } catch {}
         }
-        if (activeOrg) {
+        if (orgId) {
           const [acc, prj, cc] = await Promise.all([
-            OpeningBalanceImportService.listAccountsTreeForSelect(activeOrg, 3000),
-            OpeningBalanceImportService.listProjectsForSelect(activeOrg, 2000),
-            OpeningBalanceImportService.listCostCentersTreeForSelect(activeOrg, 3000),
+            OpeningBalanceImportService.listAccountsTreeForSelect(orgId, 3000),
+            OpeningBalanceImportService.listProjectsForSelect(orgId, 2000),
+            OpeningBalanceImportService.listCostCentersTreeForSelect(orgId, 3000),
           ])
           const toTree = (rows: any[]) => {
             const by = new Map<string, any>()
@@ -78,7 +75,7 @@ const OpeningBalanceManualCrud: React.FC<OpeningBalanceManualCrudProps> = ({ ope
       } catch {}
     }
     load()
-  }, [open, orgId])
+  }, [open, orgId, projectId])
 
   const formConfig: FormConfig = useMemo(() => ({
     title: isRTL ? 'إضافة سطر رصيد افتتاحي' : 'Add Opening Balance Row',

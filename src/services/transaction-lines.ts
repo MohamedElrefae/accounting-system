@@ -142,3 +142,54 @@ export async function getTransactionLines(transactionId: string) {
   if (error) throw error
   return data || []
 }
+
+/**
+ * Fetches transaction lines with enriched data AND aggregated cost analysis totals.
+ * Handles the merging of 'line_items_total' which is critical for the UI.
+ */
+export async function getTransactionLinesWithCosts(transactionId: string) {
+  // Use enriched view if possible for better data
+  const { data: lines, error } = await supabase
+    .from('v_transaction_lines_enriched')
+    .select('*')
+    .eq('transaction_id', transactionId)
+    .order('line_no', { ascending: true })
+
+  if (error) {
+    // Fallback to raw table if view fails (though view is preferred)
+    console.warn('⚠️ v_transaction_lines_enriched failed, falling back to transaction_lines', error)
+    return getTransactionLines(transactionId)
+  }
+
+  if (!lines || lines.length === 0) return []
+
+  // Fetch cost analysis summary for these lines
+  try {
+    const lineIds = lines.map(l => l.id)
+    if (lineIds.length > 0) {
+      const { data: costs } = await supabase
+        .from('transaction_line_items')
+        .select('transaction_line_id, total_amount')
+        .in('transaction_line_id', lineIds)
+
+      if (costs) {
+        const costMap = new Map<string, number>()
+        costs.forEach(c => {
+          const current = costMap.get(c.transaction_line_id) || 0
+          costMap.set(c.transaction_line_id, current + (c.total_amount || 0))
+        })
+        
+        // Merge costs into lines
+        return lines.map(line => ({
+          ...line,
+          line_items_total: costMap.get(line.id) || 0,
+          total_cost: costMap.get(line.id) || 0 
+        }))
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ Failed to fetch line costs, returning basic data:', err)
+  }
+
+  return lines
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { TextField, MenuItem, IconButton, CircularProgress } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 
@@ -27,7 +27,7 @@ const AsyncAutocomplete = <T,>({ label, value, onChange, loader, error, helperTe
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const debounceRef = useRef<number | null>(null)
 
-  const runLoad = (q: string) => {
+  const runLoad = useCallback((q: string) => {
     let cancelled = false
     setLoading(true)
     loader(q)
@@ -35,21 +35,21 @@ const AsyncAutocomplete = <T,>({ label, value, onChange, loader, error, helperTe
       .catch(() => { if (!cancelled) setOptions([]) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }
+  }, [loader])
 
   useEffect(() => {
     if (!open) return
     if (debounceRef.current) window.clearTimeout(debounceRef.current)
     debounceRef.current = window.setTimeout(() => { runLoad(query) }, debounceMs)
     return () => { if (debounceRef.current) { window.clearTimeout(debounceRef.current); debounceRef.current = null } }
-  }, [query, open, debounceMs])
+  }, [query, open, debounceMs, runLoad])
 
   useEffect(() => {
     // When opening, load with current label text to show initial options
     if (open && options.length === 0) runLoad(query)
     // Reset highlight when menu opens
     if (open) setHighlightIdx(-1)
-  }, [open])
+  }, [open, options.length, query, runLoad])
 
   const selectedLabel = useMemo(() => {
     const found = options.find(o => o.id === value)

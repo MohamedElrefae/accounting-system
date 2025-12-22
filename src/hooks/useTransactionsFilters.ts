@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { useFilterState, type FilterState } from './useFilterState'
-import { getActiveProjectId } from '../utils/org'
+import { useScopeOptional } from '../contexts/ScopeContext'
 
 const HEADER_STORAGE_KEY = 'transactions_filters'
 const LINE_STORAGE_KEY = 'transactions_lines_filters'
@@ -40,6 +40,9 @@ const createLineDefaults = (): FilterState => ({
 export const useTransactionsFilters = () => {
   const headerDefaultValues = useMemo(createHeaderDefaults, [])
   const lineDefaultValues = useMemo(createLineDefaults, [])
+  
+  // Get centralized scope from ScopeContext (optional - won't throw if outside provider)
+  const scope = useScopeOptional()
 
   const {
     filters: headerFilters,
@@ -62,16 +65,24 @@ export const useTransactionsFilters = () => {
   const [headerAppliedFilters, setHeaderAppliedFilters] = useState(headerFilters)
   const [headerFiltersDirty, setHeaderFiltersDirty] = useState(false)
   const headerInitRef = useRef(false)
+  const scopeSyncRef = useRef(false)
 
-  const [useGlobalProjectTx, setUseGlobalProjectTx] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('transactions:useGlobalProject') === '1'
-    } catch {
-      return false // Default to false - don't auto-sync with global project
+  // Sync with centralized scope when it changes
+  // This ensures transactions page uses the same org/project as TopBar
+  useEffect(() => {
+    if (!scope) return
+    
+    const scopeOrgId = scope.currentOrg?.id || ''
+    const scopeProjectId = scope.currentProject?.id || ''
+    
+    // Only sync if scope has changed and we have a valid org
+    if (scopeOrgId && (headerFilters.orgId !== scopeOrgId || headerFilters.projectId !== scopeProjectId)) {
+      console.log('[useTransactionsFilters] Syncing with ScopeContext:', { scopeOrgId, scopeProjectId })
+      updateHeaderFilter('orgId', scopeOrgId)
+      updateHeaderFilter('projectId', scopeProjectId)
+      scopeSyncRef.current = true
     }
-  })
-
-  const globalProjectSyncRef = useRef(false)
+  }, [scope?.currentOrg?.id, scope?.currentProject?.id, headerFilters.orgId, headerFilters.projectId, updateHeaderFilter, scope])
 
   const applyHeaderFilters = useCallback(() => {
     setHeaderAppliedFilters({ ...headerFilters })
@@ -80,67 +91,70 @@ export const useTransactionsFilters = () => {
 
   const resetHeaderFilters = useCallback(() => {
     resetHeaderFiltersInternal()
-    setHeaderAppliedFilters({ ...headerDefaultValues })
+    // When resetting, also sync back to scope values if available
+    if (scope?.currentOrg?.id) {
+      const scopeOrgId = scope.currentOrg.id
+      const scopeProjectId = scope.currentProject?.id || ''
+      setHeaderAppliedFilters({ 
+        ...headerDefaultValues, 
+        orgId: scopeOrgId, 
+        projectId: scopeProjectId 
+      })
+    } else {
+      setHeaderAppliedFilters({ ...headerDefaultValues })
+    }
     setHeaderFiltersDirty(false)
-  }, [resetHeaderFiltersInternal, headerDefaultValues])
+  }, [resetHeaderFiltersInternal, headerDefaultValues, scope])
 
   useEffect(() => {
     if (!headerInitRef.current) {
-      setHeaderAppliedFilters({ ...headerFilters })
+      // On initial load, prefer scope values if available
+      if (scope?.currentOrg?.id) {
+        const initialFilters = {
+          ...headerFilters,
+          orgId: scope.currentOrg.id,
+          projectId: scope.currentProject?.id || '',
+        }
+        setHeaderAppliedFilters(initialFilters)
+      } else {
+        setHeaderAppliedFilters({ ...headerFilters })
+      }
       headerInitRef.current = true
       return
     }
     setHeaderFiltersDirty(
       JSON.stringify(headerFilters) !== JSON.stringify(headerAppliedFilters),
     )
-  }, [headerFilters, headerAppliedFilters])
+  }, [headerFilters, headerAppliedFilters, scope])
 
-  useEffect(() => {
-    // Only sync with global project if explicitly enabled.
-    // Run at most once per enable-toggle and never override a user-selected project.
-    if (!useGlobalProjectTx) {
-      globalProjectSyncRef.current = false
-      return
+  // Compute effective filters that merge local filters with scope
+  const effectiveHeaderFilters = useMemo(() => {
+    if (!scope?.currentOrg?.id) return headerFilters
+    return {
+      ...headerFilters,
+      orgId: scope.currentOrg.id,
+      projectId: scope.currentProject?.id || headerFilters.projectId,
     }
+  }, [headerFilters, scope])
 
-    // If a project is already selected (from storage or user selection), treat it as user intent
-    // and never override it.
-    if (headerFilters.projectId) {
-      globalProjectSyncRef.current = true
-      return
+  const effectiveAppliedFilters = useMemo(() => {
+    if (!scope?.currentOrg?.id) return headerAppliedFilters
+    return {
+      ...headerAppliedFilters,
+      orgId: scope.currentOrg.id,
+      projectId: scope.currentProject?.id || headerAppliedFilters.projectId,
     }
-
-    // Prevent re-applying the global project after the user clears/resets the project filter.
-    if (globalProjectSyncRef.current) return
-    try {
-      const pid = getActiveProjectId() || ''
-      // Only update if there's a global project AND the filter is empty.
-      if (pid) {
-        updateHeaderFilter('projectId', pid)
-      }
-    } catch {
-      // ignore
-    }
-    globalProjectSyncRef.current = true
-  }, [useGlobalProjectTx, headerFilters.projectId, updateHeaderFilter])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('transactions:useGlobalProject', useGlobalProjectTx ? '1' : '0')
-    } catch {
-      // ignore
-    }
-  }, [useGlobalProjectTx])
+  }, [headerAppliedFilters, scope])
 
   return {
-    headerFilters,
-    headerAppliedFilters,
+    headerFilters: effectiveHeaderFilters,
+    headerAppliedFilters: effectiveAppliedFilters,
     headerFiltersDirty,
     updateHeaderFilter,
     applyHeaderFilters,
     resetHeaderFilters,
-    useGlobalProjectTx,
-    setUseGlobalProjectTx,
+    // Expose scope for components that need it
+    scope,
     lineFilters,
     updateLineFilter,
     resetLineFilters,

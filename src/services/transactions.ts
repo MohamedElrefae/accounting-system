@@ -48,27 +48,8 @@ export type CreateJournalUnifiedArgs = {
   }>;
 };
 
-// GL2 journal create/post removed — use transactions + transaction_lines flows instead.
-export async function createJournalUnified(_args: CreateJournalUnifiedArgs) {
-  throw new Error('Removed: GL2 journal creation disabled. Use transactions + transaction_lines.');
-}
-
-export async function postJournalUnified(_journalId: string, _postingDate?: string) {
-  throw new Error('Removed: GL2 journal posting disabled. Use post_transaction with transaction lines.');
-}
-
-// Removed: GL2 helpers — use unified transactions and transaction_lines.
-export async function getGL2JournalDetails(_journalId: string) {
-  throw new Error('Removed: GL2 journal details disabled. Use unified transactions + lines.');
-}
-
-export async function voidJournalGL2(_journalId: string) {
-  throw new Error('Removed: GL2 void disabled.');
-}
-
-export async function reverseJournalGL2(_journalId: string, _reverseDate?: string) {
-  throw new Error('Removed: GL2 reverse disabled.');
-}
+// GL2 journal create/post/void/reverse functions removed.
+// Use transactions + transaction_lines flows instead.
 
 // Helper: fetch a transaction header with its lines (for edit forms)
 import { getTransactionLines } from './transaction-lines'
@@ -300,10 +281,23 @@ export function parseDate(dateInput: string | Date): Date {
   return date
 }
 
-export async function getAccounts(): Promise<Account[]> {
+export async function getAccounts(orgId?: string | null): Promise<Account[]> {
+  // Debug: Log the orgId to see what type it is
+  if (import.meta.env.DEV) {
+    console.log('getAccounts called with orgId:', orgId, typeof orgId)
+  }
+  
+  // Defensive check: ensure orgId is a string, not an object
+  if (orgId && typeof orgId !== 'string') {
+    console.error('getAccounts: orgId is not a string:', orgId)
+    orgId = null
+  }
+  
   // Try to scope by current org to match the tree-of-accounts view
-  const { getActiveOrgId } = await import('../utils/org')
-  const orgId: string | null = getActiveOrgId()
+  const effectiveOrgId: string | null = orgId ?? null
+  if (import.meta.env.DEV) {
+    console.log('effectiveOrgId:', effectiveOrgId, typeof effectiveOrgId)
+  }
 
   let query = supabase
     .from('accounts')
@@ -311,8 +305,8 @@ export async function getAccounts(): Promise<Account[]> {
     .eq('status', 'active')
     .order('code', { ascending: true })
 
-  if (orgId) {
-    query = query.eq('org_id', orgId)
+  if (effectiveOrgId) {
+    query = query.eq('org_id', effectiveOrgId)
   }
 
   const { data, error } = await query
@@ -861,7 +855,9 @@ export async function submitTransaction(id: string, _note?: string | null): Prom
     throw error
   }
   
-  console.log('✅ Transaction submitted for line approval:', data)
+  if (import.meta.env.DEV) {
+    console.log('✅ Transaction submitted for line approval:', data)
+  }
 }
 
 export async function getUserDisplayMap(ids: string[]): Promise<Record<string, string>> {

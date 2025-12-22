@@ -19,6 +19,8 @@
 export type RoleSlug =
   | 'super_admin'
   | 'admin'
+  | 'hr'
+  | 'team_leader'
   | 'accountant'
   | 'manager'
   | 'auditor'
@@ -46,11 +48,15 @@ export type PermissionCode =
   | 'users.manage'
   | 'data.export'
   | 'settings.manage'
+  | 'settings.audit'
   | 'fiscal.manage'
   | 'approvals.manage'
   | 'approvals.review'
   | 'analysis.manage'
-  | 'analysis.view';
+  | 'analysis.view'
+  | 'presence.view.org'
+  | 'presence.view.team'
+  | 'presence.view.all';
 
 interface RoleDefinition {
   inherits?: RoleSlug[];
@@ -98,11 +104,15 @@ const MATRIX: Record<RoleSlug, RoleDefinition> = {
       'users.manage',
       'data.export',
       'settings.manage',
+      'settings.audit',
       'fiscal.manage',
       'approvals.manage',
       'approvals.review',
       'analysis.manage',
       'analysis.view',
+      'presence.view.all',
+      'presence.view.org',
+      'presence.view.team',
     ],
   },
   admin: {
@@ -140,11 +150,37 @@ const MATRIX: Record<RoleSlug, RoleDefinition> = {
       'users.manage',
       'data.export',
       'settings.manage',
+      'settings.audit',
       'fiscal.manage',
       'approvals.manage',
       'approvals.review',
       'analysis.manage',
       'analysis.view',
+      'presence.view.org',
+      'presence.view.team',
+    ],
+  },
+  hr: {
+    inherits: ['viewer'],
+    routes: [
+      '/',
+      '/dashboard',
+      '/settings/*',
+    ],
+    actions: [
+      'presence.view.org',
+      'presence.view.team',
+    ],
+  },
+  team_leader: {
+    inherits: ['viewer'],
+    routes: [
+      '/',
+      '/dashboard',
+      '/settings/*',
+    ],
+    actions: [
+      'presence.view.team',
     ],
   },
   manager: {
@@ -226,6 +262,7 @@ const MATRIX: Record<RoleSlug, RoleDefinition> = {
       '/documents',
       '/projects/*',
       '/main-data/*',
+      '/settings/audit',
     ],
     actions: [
       'accounts.view',
@@ -236,6 +273,7 @@ const MATRIX: Record<RoleSlug, RoleDefinition> = {
       'templates.view',
       'transaction_line_items.read',
       'analysis.view',
+      'settings.audit',
     ],
   },
   viewer: {
@@ -244,6 +282,7 @@ const MATRIX: Record<RoleSlug, RoleDefinition> = {
       '/dashboard',
       '/transactions/my',
       '/transactions/my-enriched',
+      '/transactions/my-lines',
       '/reports/trial-balance',
       '/reports/general-ledger',
       '/documents',

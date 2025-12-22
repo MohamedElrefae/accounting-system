@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import { Paperclip, X, Eye, Download, Trash2, FileText, Image, File } from 'lucide-react'
+import { Paperclip, Eye, Download, Trash2, FileText, Image, File } from 'lucide-react'
 
 interface Attachment {
   id: string
@@ -20,12 +20,12 @@ interface AttachmentsCellProps {
 }
 
 export const AttachmentsCell: React.FC<AttachmentsCellProps> = ({
-  lineId,
+  _lineId,
   attachments,
   onUpload,
   onDelete,
-  onView,
-  onDownload,
+  _onView,
+  _onDownload,
 }) => {
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -64,14 +64,6 @@ export const AttachmentsCell: React.FC<AttachmentsCellProps> = ({
     } else {
       return <File size={16} />
     }
-  }
-  
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
   
   return (

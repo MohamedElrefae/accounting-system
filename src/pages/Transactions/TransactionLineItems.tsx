@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { TransactionLineItemsSection } from '../../components/line-items/TransactionLineItemsSection'
-import { getTransactions } from '../../services/transactions'
+import { useScopeOptional } from '../../contexts/ScopeContext'
+import ScopeChips from '../../components/Scope/ScopeChips'
 
 // Utility: read query param from window.location
 function useQueryParam(name: string): string | null {
@@ -24,41 +25,21 @@ function useQueryParam(name: string): string | null {
 
 export const TransactionLineItemsPage: React.FC = () => {
   const transactionId = useQueryParam('id')
-  const [orgId, setOrgId] = useState<string>('')
+  const [manualId, setManualId] = useState<string>('')
   const [header, setHeader] = useState<null | { entry_number: string; description: string }>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    // Resolve active org id using existing util
-    let mounted = true
-    ;(async () => {
-      try {
-        const { getActiveOrgId } = await import('../../utils/org')
-        const id: string | null = getActiveOrgId()
-        if (mounted) setOrgId(id || '')
-      } catch {
-        if (mounted) setOrgId('')
-      }
-    })()
-    return () => { mounted = false }
-  }, [])
+  const scope = useScopeOptional()
+  const orgId = scope?.currentOrg?.id || ''
 
   useEffect(() => {
     let mounted = true
     const loadHeader = async () => {
-      if (!transactionId) return
+      if (!transactionId || !orgId) return
       setLoading(true)
       setError(null)
       try {
-        // Minimal header lookup using getTransactions filter
-        const { rows } = await getTransactions({
-          page: 1,
-          pageSize: 1,
-          filters: { search: '', scope: 'all' }
-        })
-        // If we had a direct fetch by id in services we would use it; fallback: ignore
-        // Better: run a direct Supabase query
         const { supabase } = await import('../../utils/supabase')
         const { data, error } = await supabase
           .from('transactions')
@@ -75,13 +56,25 @@ export const TransactionLineItemsPage: React.FC = () => {
     }
     loadHeader()
     return () => { mounted = false }
-  }, [transactionId])
+  }, [transactionId, orgId])
+
+  if (!orgId) {
+    return (
+      <div className="page-root flex-col gap-4">
+        <div className="page-header">
+          <h2 className="text-title">Transaction Line Items</h2>
+          <ScopeChips />
+        </div>
+        <div className="text-secondary">اختر مؤسسة من الشريط العلوي لعرض سطور المعاملات</div>
+      </div>
+    )
+  }
 
   if (!transactionId) {
-    const [manualId, setManualId] = useState<string>('')
     return (
       <div className="page-root flex-col gap-4">
         <h2 className="text-title">Transaction Line Items</h2>
+        <ScopeChips />
         <div className="text-secondary">اختر أو أدخل معرف المعاملة لعرض سطورها</div>
         <div className="flex-row gap-2">
           <input
@@ -124,6 +117,7 @@ export const TransactionLineItemsPage: React.FC = () => {
     <div className="page-root flex-col gap-4">
       <div className="page-header">
         <h2 className="text-title">Transaction Line Items</h2>
+        <ScopeChips />
         {header && (
           <div className="text-secondary">{header.entry_number} — {header.description}</div>
         )}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import DraggableResizablePanel from '../Common/DraggableResizablePanel'
 import { TabsContainer } from '../Common/TabsContainer'
 import { ExpandableSection } from '../Common/ExpandableSection'
@@ -60,12 +60,10 @@ export interface UnifiedTransactionDetailsPanelProps {
   onClose: () => void
   onUpdate?: (updatedTransaction: TransactionRecord) => Promise<void>
   onDelete?: (transactionId: string) => Promise<void>
-  onSubmitForReview?: (transactionId: string, note: string) => Promise<void>
-  onApprove?: (transactionId: string, reason?: string) => Promise<void>
-  onReject?: (transactionId: string, reason: string) => Promise<void>
-  onRequestRevision?: (transactionId: string, reason: string) => Promise<void>
   onPost?: (transactionId: string) => Promise<void>
   onEditWithWizard?: (transaction: TransactionRecord) => Promise<void>
+  onOpenEnhancedReview?: (transactionId: string) => void
+  onOpenLineReview?: (line: any) => void
 
   // Permissions
   canEdit?: boolean
@@ -101,12 +99,10 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
   onClose,
   onUpdate: _onUpdate,
   onDelete: _onDelete,
-  onSubmitForReview,
-  onApprove,
-  onReject,
-  onRequestRevision,
   onPost,
   onEditWithWizard,
+  onOpenEnhancedReview,
+  onOpenLineReview,
   canEdit = false,
   canDelete = false,
   canReview = false,
@@ -119,9 +115,9 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('view')
   const [isLoading, setIsLoading] = useState(false)
-  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isRefreshing, _setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [fetchedTransaction, setFetchedTransaction] = useState<TransactionRecord | null>(null)
+  const [fetchedTransaction, _setFetchedTransaction] = useState<TransactionRecord | null>(null)
   const [txLines, setTxLines] = useState<any[]>(propsTransactionLines || [])
   // Active tab state with persistence
   const [activeTab, setActiveTab] = useState<string>(() => {
@@ -134,7 +130,7 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
   })
 
   // Display settings from localStorage
-  const [displaySettings, setDisplaySettings] = useState(() => {
+  const [_displaySettings, setDisplaySettings] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('transactionSettings:display') || '{}')
     } catch {
@@ -224,11 +220,6 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
   })
 
   // Action modals
-  const [reviewModalOpen, setReviewModalOpen] = useState(false)
-  const [reviewAction, setReviewAction] = useState<'approve' | 'reject' | 'revise' | null>(null)
-  const [reviewReason, setReviewReason] = useState('')
-  const [submitModalOpen, setSubmitModalOpen] = useState(false)
-  const [submitNote, setSubmitNote] = useState('')
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
 
 
@@ -304,25 +295,6 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
     return fieldMap[fieldKey] || '—'
   }
 
-  // Line item value mapper - maps field keys to line item values
-  const getLineItemValue = (line: any, fieldKey: string, idx: number): any => {
-    const fieldMap: Record<string, any> = {
-      line_no: idx + 1,
-      account: getAccountLabel(line.account_id),
-      debit: parseFloat(line.debit || 0).toLocaleString('ar-EG'),
-      credit: parseFloat(line.credit || 0).toLocaleString('ar-EG'),
-      description: line.description || '—',
-      project: projects.find(p => p.id === line.project_id)?.name || '—',
-      cost_center: getCostCenterLabel(line.cost_center_id),
-      work_item: getWorkItemLabel(line.work_item_id),
-      category: (line as any).category_name || '—',
-      analysis_work_item: getAnalysisWorkItemLabel(line.analysis_work_item_id),
-      line_status: line.status || 'active',
-    }
-
-    return fieldMap[fieldKey] || '—'
-  }
-
   // Approval value mapper - maps field keys to approval values
   const getApprovalValue = (approval: ApprovalHistoryRow, fieldKey: string, idx: number): any => {
     const actionMap: Record<string, string> = {
@@ -354,13 +326,6 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
     }
 
     return fieldMap[fieldKey] || '—'
-  }
-
-  // Helper functions
-  const getAccountLabel = (accountId?: string | null) => {
-    if (!accountId) return '—'
-    const account = accounts.find(a => a.id === accountId)
-    return account ? `${account.code} - ${account.name}` : accountId
   }
 
   const getWorkItemLabel = (workItemId?: string | null) => {
@@ -529,50 +494,8 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
     }
   }
 
-  const handleReviewSubmit = async () => {
-    if (!reviewAction) return
 
-    setIsLoading(true)
-    try {
-      if (reviewAction === 'approve' && onApprove) {
-        await onApprove(effectiveTransaction.id, reviewReason || undefined)
-      } else if (reviewAction === 'reject' && onReject) {
-        if (!reviewReason.trim()) throw new Error('يرجى إدخال سبب الرفض')
-        await onReject(effectiveTransaction.id, reviewReason)
-      } else if (reviewAction === 'revise' && onRequestRevision) {
-        if (!reviewReason.trim()) throw new Error('يرجى إدخال سبب الإرجاع للتعديل')
-        await onRequestRevision(effectiveTransaction.id, reviewReason)
-      }
-      setReviewModalOpen(false)
-      setReviewAction(null)
-      setReviewReason('')
-      showToast('تم تنفيذ الإجراء بنجاح', { severity: 'success' })
-    } catch (err: any) {
-      setError(err.message)
-      showToast(err.message, { severity: 'error' })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleSubmitForReview = async () => {
-    if (!onSubmitForReview) return
-
-    setIsLoading(true)
-    try {
-      await onSubmitForReview(effectiveTransaction.id, submitNote)
-      setSubmitModalOpen(false)
-      setSubmitNote('')
-      showToast('تم إرسال المعاملة للمراجعة', { severity: 'success' })
-    } catch (err: any) {
-      setError(err.message)
-      showToast(err.message, { severity: 'error' })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handlePost = async () => {
+  const handlePost = useCallback(async () => {
     if (!onPost) return
 
     setIsLoading(true)
@@ -585,7 +508,7 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [effectiveTransaction.id, onPost, showToast])
 
   // Determine available actions
   const availableActions = useMemo(() => {
@@ -627,52 +550,25 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
     // Submit: Only if not posted AND not approved AND not already submitted (pending)
     // We check unifiedStatus.cls for 'status-submitted' to see if it's pending
     const isPending = unifiedStatus.cls === 'status-submitted'
-    if (!isPosted && !isApproved && !isPending && onSubmitForReview) {
+    if (!isPosted && !isApproved && !isPending && onOpenEnhancedReview) {
       if ((mode === 'my' && isOwner) || canManage) {
         actions.push({
           key: 'submit',
           label: 'إرسال للمراجعة',
           className: 'ultimate-btn ultimate-btn-success',
-          onClick: () => setSubmitModalOpen(true)
+          onClick: () => onOpenEnhancedReview(tx.id)
         })
       }
     }
 
     // Approval Actions: Only if pending AND not approved
-    if (mode === 'pending' && !isPosted && !isApproved && canReview && onApprove && onReject && onRequestRevision) {
+    if (mode === 'pending' && !isPosted && !isApproved && canReview && onOpenEnhancedReview) {
       actions.push({
         key: 'approve',
-        label: 'اعتماد',
+        label: 'مراجعة واعتماد وتعديل',
         className: 'ultimate-btn ultimate-btn-success',
-        onClick: () => {
-          setReviewAction('approve')
-          setReviewReason('')
-          setReviewModalOpen(true)
-        }
+        onClick: () => onOpenEnhancedReview(tx.id)
       })
-
-      actions.push(
-        {
-          key: 'revise',
-          label: 'إرجاع للتعديل',
-          className: 'ultimate-btn ultimate-btn-edit',
-          onClick: () => {
-            setReviewAction('revise')
-            setReviewReason('')
-            setReviewModalOpen(true)
-          }
-        },
-        {
-          key: 'reject',
-          label: 'رفض',
-          className: 'ultimate-btn ultimate-btn-delete',
-          onClick: () => {
-            setReviewAction('reject')
-            setReviewReason('')
-            setReviewModalOpen(true)
-          }
-        }
-      )
     }
 
     // Post: Only if approved AND not posted
@@ -686,7 +582,7 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
     }
 
     return actions
-  }, [effectiveTransaction, unifiedStatus, canEdit, canDelete, canReview, canPost, canManage, currentUserId, mode, onSubmitForReview, onApprove, onReject, onRequestRevision, onPost])
+  }, [effectiveTransaction, unifiedStatus, canEdit, canDelete, canReview, canPost, canManage, currentUserId, mode, onOpenEnhancedReview, onPost, handlePost, onEditWithWizard])
 
   // Define tabs
   const tabs = useMemo(() => [
@@ -838,6 +734,8 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
                               analysisItemsMap={analysisItemsMap}
                               orgId={transaction.org_id || ''}
                               projectId={transaction.project_id || undefined}
+                              canReview={canReview}
+                              onReview={() => onOpenLineReview?.(line)}
                             />
                           ))}
 
@@ -1092,110 +990,6 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
         </div>
       )}
 
-      {/* Review Modal */}
-      {reviewModalOpen && (
-        <div className="modal-overlay" onClick={() => !isLoading && setReviewModalOpen(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">
-                {reviewAction === 'approve' ? 'اعتماد المعاملة' :
-                  reviewAction === 'revise' ? 'إرجاع للتعديل' : 'رفض المعاملة'}
-              </h3>
-              <button className="ultimate-btn ultimate-btn-delete" onClick={() => !isLoading && setReviewModalOpen(false)}>
-                <div className="btn-content"><span className="btn-text">إغلاق</span></div>
-              </button>
-            </div>
-            <div className="modal-body">
-              <label className="modal-label">سبب الإجراء</label>
-              <textarea
-                className="textarea-field"
-                placeholder={reviewAction === 'approve' ? 'ملاحظات (اختياري)' : 'السبب (إلزامي)'}
-                value={reviewReason}
-                onChange={e => setReviewReason(e.target.value)}
-                style={{
-                  width: '100%',
-                  minHeight: '100px',
-                  padding: '12px',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--field_bg)',
-                  color: 'var(--text)',
-                  fontSize: '14px',
-                  fontFamily: 'inherit',
-                  resize: 'vertical'
-                }}
-              />
-              <div className="modal-actions">
-                <button
-                  className="ultimate-btn ultimate-btn-success"
-                  onClick={handleReviewSubmit}
-                  disabled={isLoading}
-                >
-                  <div className="btn-content"><span className="btn-text">تأكيد</span></div>
-                </button>
-                <button
-                  className="ultimate-btn ultimate-btn-warning"
-                  onClick={() => !isLoading && setReviewModalOpen(false)}
-                  disabled={isLoading}
-                >
-                  <div className="btn-content"><span className="btn-text">إلغاء</span></div>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Submit Modal */}
-      {submitModalOpen && (
-        <div className="modal-overlay" onClick={() => !isLoading && setSubmitModalOpen(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">إرسال للمراجعة</h3>
-              <button className="ultimate-btn ultimate-btn-delete" onClick={() => !isLoading && setSubmitModalOpen(false)}>
-                <div className="btn-content"><span className="btn-text">إغلاق</span></div>
-              </button>
-            </div>
-            <div className="modal-body">
-              <label className="modal-label">ملاحظات الإرسال (اختياري)</label>
-              <textarea
-                className="textarea-field"
-                placeholder="أدخل سبب/ملاحظات الإرسال"
-                value={submitNote}
-                onChange={e => setSubmitNote(e.target.value)}
-                style={{
-                  width: '100%',
-                  minHeight: '100px',
-                  padding: '12px',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--field_bg)',
-                  color: 'var(--text)',
-                  fontSize: '14px',
-                  fontFamily: 'inherit',
-                  resize: 'vertical'
-                }}
-              />
-              <div className="modal-actions">
-                <button
-                  className="ultimate-btn ultimate-btn-success"
-                  onClick={handleSubmitForReview}
-                  disabled={isLoading}
-                >
-                  <div className="btn-content"><span className="btn-text">تأكيد الإرسال</span></div>
-                </button>
-                <button
-                  className="ultimate-btn ultimate-btn-warning"
-                  onClick={() => !isLoading && setSubmitModalOpen(false)}
-                  disabled={isLoading}
-                >
-                  <div className="btn-content"><span className="btn-text">إلغاء</span></div>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Field Configuration Modals */}
       <ColumnConfiguration

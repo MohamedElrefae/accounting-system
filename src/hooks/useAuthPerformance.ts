@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useAuth } from './useAuth';
 
 /**
@@ -9,7 +9,7 @@ export const useAuthPerformance = () => {
   const authStartTime = useRef<number | null>(null);
   const permissionsStartTime = useRef<number | null>(null);
 
-  const getNetworkTier = (): 'fast' | 'medium' | 'slow' => {
+  const getNetworkTier = useCallback((): 'fast' | 'medium' | 'slow' => {
     try {
       const connection = (navigator as any)?.connection;
       const effectiveType = String(connection?.effectiveType || '').toLowerCase();
@@ -24,15 +24,15 @@ export const useAuthPerformance = () => {
     } catch {
       return 'fast';
     }
-  };
+  }, []);
 
-  const getWarnThreshold = (kind: 'auth' | 'permissions'): number => {
+  const getWarnThreshold = useCallback((kind: 'auth' | 'permissions'): number => {
     const tier = getNetworkTier();
     if (kind === 'auth') {
       return tier === 'slow' ? 5000 : tier === 'medium' ? 2500 : 1200;
     }
     return tier === 'slow' ? 2500 : tier === 'medium' ? 1200 : 700;
-  };
+  }, [getNetworkTier]);
 
   useEffect(() => {
     if (loading && !authStartTime.current) {
@@ -48,7 +48,7 @@ export const useAuthPerformance = () => {
       }
       authStartTime.current = null;
     }
-  }, [loading]);
+  }, [loading, getWarnThreshold]);
 
   useEffect(() => {
     if (permissionsLoading && !permissionsStartTime.current) {
@@ -64,7 +64,7 @@ export const useAuthPerformance = () => {
       }
       permissionsStartTime.current = null;
     }
-  }, [permissionsLoading]);
+  }, [permissionsLoading, getWarnThreshold]);
 
   useEffect(() => {
     if (user && roles.length > 0 && import.meta.env.DEV) {

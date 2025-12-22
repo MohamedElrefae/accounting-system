@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Box, Tabs, Tab, Card, CardContent, Typography, TextField, Button, Avatar, Stack, Alert, Divider, Switch, FormControlLabel, CircularProgress, List, ListItem, ListItemText } from '@mui/material';
-import Grid from '@mui/material/Grid';
+import { Box, Tabs, Tab, Card, CardContent, Typography, TextField, Button, Avatar, Stack, Alert, Divider, Switch, FormControlLabel, CircularProgress } from '@mui/material';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../utils/supabase';
+import { audit } from '../../utils/audit';
 import { useToast } from '../../contexts/ToastContext';
 import { useUserProfile as useUserProfileCtx } from '../../contexts/UserProfileContext';
-import type { DatabaseId } from '../../types/database';
+import { useAuditContext } from '../../hooks/useAuditContext';
+import { ProfileActivity } from '../../components/ProfileActivity';
 
 // Error interface for proper error handling
 interface AppError {
@@ -24,14 +25,6 @@ interface SecuritySettings {
   two_factor_enabled: boolean;
   login_alerts: boolean;
   session_timeout: number;
-}
-
-// Activity Log interface for user actions
-interface ActivityLog {
-  id: DatabaseId;
-  action: string;
-  created_at: string;
-  details?: unknown;
 }
 
 // User profile update payload
@@ -81,7 +74,7 @@ const Profile: React.FC = () => {
   const [prefs, setPrefs] = useState<NotificationPrefs>(defaultPrefs);
   const [sec, setSec] = useState<SecuritySettings>(defaultSecurity);
 
-  const [activity, setActivity] = useState<ActivityLog[]>([]);
+  useAuditContext({ pageName: 'Admin/Profile', moduleName: 'Profile' });
 
   useEffect(() => {
     if (profile) {
@@ -116,32 +109,6 @@ const Profile: React.FC = () => {
       }
     };
     loadExtras();
-  }, [user?.id]);
-
-  useEffect(() => {
-    const loadActivity = async () => {
-      try {
-        if (!user?.id) return;
-        // Check if audit_logs table exists and load activity
-        const { data, error } = await supabase
-          .from('audit_logs')
-          .select('id, action, created_at, details')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(20);
-        
-        if (error) {
-          console.warn('[Profile] Audit logs table not available:', error.message);
-          setActivity([]); // Set empty array if table doesn't exist
-        } else {
-          setActivity(data as ActivityLog[] || []);
-        }
-      } catch (e) {
-        console.warn('[Profile] Could not load activity logs:', e);
-        setActivity([]);
-      }
-    };
-    loadActivity();
   }, [user?.id]);
 
   const displayName = useMemo(() => {
@@ -197,7 +164,7 @@ const Profile: React.FC = () => {
         updated_at: new Date().toISOString(),
       };
       
-const { error: upErr } = await supabase
+      const { error: upErr } = await supabase
         .from('user_profiles')
         .update(update)
         .eq('id', user.id)
@@ -210,6 +177,27 @@ const { error: upErr } = await supabase
       // Refresh both contexts to ensure all components get updated data
       await refreshProfile(); // AuthContext
       await userProfileCtx.refreshProfile(); // UserProfileContext
+
+      const prev = (profile ?? {}) as Record<string, unknown>;
+      const norm = (v: unknown) => (v == null ? '' : String(v));
+      const updatedFields = [
+        ['first_name', firstName],
+        ['last_name', lastName],
+        ['full_name_ar', fullNameAr],
+        ['department', department],
+        ['phone', phone],
+        ['avatar_url', avatarUrl ?? ''],
+        ['bio', bio],
+      ]
+        .filter(([k, v]) => norm(prev[String(k)]) !== norm(v))
+        .map(([k]) => String(k));
+
+      await audit(supabase, 'profile.update', 'user', user.id, {
+        page: 'Admin/Profile',
+        table: 'user_profiles',
+        operation: 'update',
+        updated_fields: updatedFields,
+      });
       
       setSuccess('تم حفظ البيانات الشخصية');
       showToast('تم حفظ البيانات الشخصية', { severity: 'success' });
@@ -238,6 +226,13 @@ const { error: upErr } = await supabase
         })
         .eq('id', user.id);
       if (upErr) throw upErr;
+
+      await audit(supabase, 'profile.preferences_update', 'user', user.id, {
+        page: 'Admin/Profile',
+        table: 'user_profiles',
+        operation: 'update',
+        updated_fields: ['notification_preferences', 'security_settings'],
+      });
       setSuccess('تم حفظ التفضيلات الأمنية والإشعارات');
       showToast('تم حفظ التفضيلات', { severity: 'success' });
     } catch (e: unknown) {
@@ -267,6 +262,14 @@ const { error: upErr } = await supabase
       if (authErr) throw authErr;
       setNewPassword('');
       setConfirmPassword('');
+
+      if (user?.id) {
+        await audit(supabase, 'security.password_change', 'user', user.id, {
+          page: 'Admin/Profile',
+          table: 'auth.users',
+          operation: 'password_change',
+        });
+      }
       setSuccess('تم تغيير كلمة المرور');
       showToast('تم تغيير كلمة المرور', { severity: 'success' });
     } catch (e: unknown) {
@@ -290,6 +293,15 @@ const { error: upErr } = await supabase
       setSuccess(null);
       const { error: authErr } = await supabase.auth.updateUser({ email: emailChange });
       if (authErr) throw authErr;
+
+      if (user?.id) {
+        await audit(supabase, 'security.email_change_request', 'user', user.id, {
+          page: 'Admin/Profile',
+          table: 'auth.users',
+          operation: 'email_change_request',
+          new_email: emailChange,
+        });
+      }
       setSuccess('تم إرسال رسالة تأكيد إلى البريد الإلكتروني الجديد');
       showToast('تم إرسال رسالة تأكيد إلى البريد الإلكتروني الجديد', { severity: 'success' });
     } catch (e: unknown) {
@@ -324,8 +336,15 @@ const { error: upErr } = await supabase
       {tab === 'personal' && (
         <Card>
           <CardContent>
-            <Grid container spacing={3}>
-<Grid xs={12} md={3}>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', md: '280px 1fr' },
+                gap: 3,
+                alignItems: 'start',
+              }}
+            >
+              <Box>
                 <Stack alignItems="center" spacing={2}>
                   <Avatar src={avatarUrl || undefined} sx={{ width: 120, height: 120 }} />
                   <Button component="label" variant="outlined" disabled={uploading}>
@@ -333,30 +352,35 @@ const { error: upErr } = await supabase
                     <input type="file" accept="image/*" hidden onChange={handleAvatarChange} />
                   </Button>
                 </Stack>
-              </Grid>
-<Grid xs={12}>
-                <Grid container spacing={2}>
-<Grid xs={12} md={6}>
-                    <TextField fullWidth label="الاسم الأول" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-                  </Grid>
-<Grid xs={12} md={6}>
-                    <TextField fullWidth label="اسم العائلة" value={lastName} onChange={(e) => setLastName(e.target.value)} />
-                  </Grid>
-<Grid xs={12}>
-                    <TextField fullWidth label="الاسم الكامل بالعربية" value={fullNameAr} onChange={(e) => setFullNameAr(e.target.value)} />
-                  </Grid>
-<Grid xs={12} md={6}>
-                    <TextField fullWidth label="القسم" value={department} onChange={(e) => setDepartment(e.target.value)} />
-                  </Grid>
-<Grid xs={12} md={6}>
-                    <TextField fullWidth label="الهاتف" value={phone} onChange={(e) => setPhone(e.target.value)} />
-                  </Grid>
-                  <Grid xs={12}>
-                    <TextField fullWidth multiline minRows={3} label="نبذة" value={bio} onChange={(e) => setBio(e.target.value)} />
-                  </Grid>
-                </Grid>
-              </Grid>
-            </Grid>
+              </Box>
+
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' },
+                  gap: 2,
+                }}
+              >
+                <Box>
+                  <TextField fullWidth label="الاسم الأول" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                </Box>
+                <Box>
+                  <TextField fullWidth label="اسم العائلة" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                </Box>
+                <Box sx={{ gridColumn: '1 / -1' }}>
+                  <TextField fullWidth label="الاسم الكامل بالعربية" value={fullNameAr} onChange={(e) => setFullNameAr(e.target.value)} />
+                </Box>
+                <Box>
+                  <TextField fullWidth label="القسم" value={department} onChange={(e) => setDepartment(e.target.value)} />
+                </Box>
+                <Box>
+                  <TextField fullWidth label="الهاتف" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                </Box>
+                <Box sx={{ gridColumn: '1 / -1' }}>
+                  <TextField fullWidth multiline minRows={3} label="نبذة" value={bio} onChange={(e) => setBio(e.target.value)} />
+                </Box>
+              </Box>
+            </Box>
             <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
               <Button variant="contained" onClick={savePersonal} disabled={saving}>{saving ? 'جاري الحفظ...' : 'حفظ'}</Button>
             </Stack>
@@ -368,29 +392,43 @@ const { error: upErr } = await supabase
         <Card>
           <CardContent>
             <Typography variant="h6" sx={{ mb: 2 }}>تغيير كلمة المرور</Typography>
-            <Grid container spacing={2}>
-<Grid xs={12} md={4}>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 180px' },
+                gap: 2,
+                alignItems: 'stretch',
+              }}
+            >
+              <Box>
                 <TextField fullWidth label="كلمة المرور الجديدة" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
-              </Grid>
-<Grid xs={12} md={4}>
+              </Box>
+              <Box>
                 <TextField fullWidth label="تأكيد كلمة المرور" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
-              </Grid>
-              <Grid xs={12} md={4}>
-                <Button variant="outlined" onClick={changePassword} sx={{ height: '100%' }} disabled={saving}>تغيير</Button>
-              </Grid>
-            </Grid>
+              </Box>
+              <Box sx={{ display: 'flex' }}>
+                <Button variant="outlined" onClick={changePassword} sx={{ flex: 1 }} disabled={saving}>تغيير</Button>
+              </Box>
+            </Box>
 
             <Divider sx={{ my: 3 }} />
 
             <Typography variant="h6" sx={{ mb: 2 }}>تغيير البريد الإلكتروني</Typography>
-            <Grid container spacing={2}>
-<Grid xs={12} md={8}>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', md: '1fr 180px' },
+                gap: 2,
+                alignItems: 'stretch',
+              }}
+            >
+              <Box>
                 <TextField fullWidth label="البريد الإلكتروني الجديد" type="email" value={emailChange} onChange={(e) => setEmailChange(e.target.value)} />
-              </Grid>
-<Grid xs={12} md={4}>
-                <Button variant="outlined" onClick={changeEmail} sx={{ height: '100%' }} disabled={saving}>تغيير</Button>
-              </Grid>
-            </Grid>
+              </Box>
+              <Box sx={{ display: 'flex' }}>
+                <Button variant="outlined" onClick={changeEmail} sx={{ flex: 1 }} disabled={saving}>تغيير</Button>
+              </Box>
+            </Box>
           </CardContent>
         </Card>
       )}
@@ -420,27 +458,7 @@ const { error: upErr } = await supabase
         </Card>
       )}
 
-      {tab === 'activity' && (
-        <Card>
-          <CardContent>
-            <Typography variant="h6" sx={{ mb: 2 }}>آخر النشاطات</Typography>
-            {activity.length === 0 ? (
-              <Typography color="text.secondary">لا يوجد نشاط حديث</Typography>
-            ) : (
-              <List>
-                {activity.map((log) => (
-                  <ListItem key={log.id} divider>
-                    <ListItemText
-                      primary={log.action}
-                      secondary={new Date(log.created_at).toLocaleString('ar-SA')}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      {tab === 'activity' && <ProfileActivity locale="ar" />}
     </Box>
   );
 };

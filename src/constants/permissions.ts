@@ -17,6 +17,35 @@ export interface PermissionCategory {
 
 export const PERMISSION_CATEGORIES: PermissionCategory[] = [
   {
+    key: 'presence',
+    name: 'Presence',
+    nameAr: 'الحضور',
+    icon: 'People',
+    permissions: [
+      {
+        name: 'presence.view.org',
+        nameAr: 'عرض الحضور (المنظمة)',
+        description: 'View online/active users within the organization',
+        descriptionAr: 'عرض المستخدمين المتصلين/النشطين داخل المنظمة',
+        category: 'presence'
+      },
+      {
+        name: 'presence.view.team',
+        nameAr: 'عرض الحضور (الفريق)',
+        description: 'View online/active users within the team',
+        descriptionAr: 'عرض المستخدمين المتصلين/النشطين داخل الفريق',
+        category: 'presence'
+      },
+      {
+        name: 'presence.view.all',
+        nameAr: 'عرض الحضور (الكل)',
+        description: 'View online/active users across all organizations (super admin)',
+        descriptionAr: 'عرض المستخدمين المتصلين/النشطين عبر كل المنظمات (مدير عام)',
+        category: 'presence'
+      }
+    ]
+  },
+  {
     key: 'users',
     name: 'User Management',
     nameAr: 'إدارة المستخدمين',

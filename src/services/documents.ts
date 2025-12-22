@@ -24,6 +24,7 @@ export interface Document {
 export interface DocumentVersion {
   id: string;
   document_id: string;
+  org_id: string;
   version_number: number;
   storage_path: string;
   file_name: string;
@@ -145,6 +146,7 @@ export async function uploadDocument(params: {
     .from('document_versions')
     .insert({
       document_id: document.id,
+      org_id: orgId,
       version_number: versionNumber,
       storage_path: storagePath,
       file_name: name,
@@ -202,6 +204,7 @@ export async function createDocumentVersion(documentId: string, orgId: string, f
     .from('document_versions')
     .insert({
       document_id: documentId,
+      org_id: orgId,
       version_number: nextVersion,
       storage_path: storagePath,
       file_name: name,

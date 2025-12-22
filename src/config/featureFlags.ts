@@ -1,8 +1,8 @@
 // Unified mode configuration — GL2 and legacy flags removed
 // Always operate in unified, multi-line model.
 
-export type ReadMode = 'unified';
-export type WriteMode = 'unified';
+export type ReadMode = 'unified' | 'legacy';
+export type WriteMode = 'unified' | 'legacy';
 
 export interface FeatureFlags {
   READ_MODE: ReadMode;

@@ -1,13 +1,14 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 
 import { useLocation, useNavigate } from 'react-router-dom'
 import { getUserDisplayMap } from '../../services/transactions'
-import { getActiveProjectId } from '../../utils/org'
 import { useHasPermission } from '../../hooks/useHasPermission'
 import './Transactions.css'
 import { useTransactionsData } from '../../contexts/TransactionsDataContext'
+
 import ExportButtons from '../../components/Common/ExportButtons'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
+
 import PermissionBadge from '../../components/Common/PermissionBadge'
 import { WithPermission } from '../../components/Common/withPermission'
 import ResizableTable from '../../components/Common/ResizableTable'
@@ -15,11 +16,12 @@ import ColumnConfiguration from '../../components/Common/ColumnConfiguration'
 import type { ColumnConfig } from '../../components/Common/ColumnConfiguration'
 import useColumnPreferences from '../../hooks/useColumnPreferences'
 import { supabase } from '../../utils/supabase'
-import { getTransactionsEnrichedView } from '../../services/transactions-enriched'
-import { useFilterState, type FilterState } from '../../hooks/useFilterState'
+// import { getTransactionsEnrichedView } from '../../services/transactions-enriched' (Removed)
 import UnifiedFilterBar from '../../components/Common/UnifiedFilterBar'
+import { useTransactionsQuery } from '../../hooks/useTransactionsQuery'
+import { useTransactionsFilters } from '../../hooks/useTransactionsFilters'
 
-const TransactionsEnrichedPage: React.FC = () => {
+const TransactionsEnrichedPage = () => {
 
   // ========== DATA FROM CONTEXT (single source of truth) ==========
   const {
@@ -35,10 +37,11 @@ const TransactionsEnrichedPage: React.FC = () => {
     isLoading: contextLoading,
   } = useTransactionsData()
 
-  // Local state for this page only
-  const [rows, setRows] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // REACT QUERY REFACTOR: Local state replaced by hooks
+  // const [rows, setRows] = useState<any[]>([]) // Removed
+  // const [loading, setLoading] = useState(true) // Derived
+  // const [error, setError] = useState<string | null>(null) // Derived
+
   const [userNames, setUserNames] = useState<Record<string, string>>({})
   const [dimLists, setDimLists] = useState<Record<string, {
     projects?: string[]
@@ -48,171 +51,156 @@ const TransactionsEnrichedPage: React.FC = () => {
     costCenters?: string[]
   }>>({})
 
-  const defaultFilterValues = useMemo<FilterState>(() => ({
-    approvalStatus: '',
-    projectId: '',
-  }), [])
-
-  const globalProjectSyncRef = useRef(false)
-
   const {
-    filters: unifiedFilters,
-    updateFilter,
-    resetFilters,
-  } = useFilterState({
-    storageKey: 'transactions_enriched_filters',
-    defaultValues: defaultFilterValues,
-  })
+    headerFilters: unifiedFilters,
+    headerAppliedFilters: appliedFilters,
+    headerFiltersDirty: filtersDirty,
+    updateHeaderFilter: updateFilter,
+    applyHeaderFilters: handleApplyFilters,
+    resetHeaderFilters: handleResetFilters,
+  } = useTransactionsFilters()
+
   const [wrapMode, setWrapMode] = useState<boolean>(() => { try { return localStorage.getItem('transactions_enriched_table_wrap') === '1' } catch { return false } })
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
-  const [totalCount, setTotalCount] = useState(0)
-  const [appliedFilters, setAppliedFilters] = useState<FilterState>({ ...defaultFilterValues })
-  const hasInitializedAppliedFilters = useRef(false)
 
   const location = useLocation()
   const navigate = useNavigate()
   const hasPerm = useHasPermission()
 
-  useEffect(() => {
-    // Optional one-time sync with global active project.
-    // Never override user selection and do not re-apply after reset/clear.
-    const useGlobal = (() => {
-      try { return localStorage.getItem('transactions:useGlobalProject') === '1' } catch { return false }
-    })()
-
-    if (!useGlobal) {
-      globalProjectSyncRef.current = false
-      return
-    }
-
-    if (unifiedFilters.projectId) {
-      globalProjectSyncRef.current = true
-      return
-    }
-
-    if (globalProjectSyncRef.current) return
-
-    try {
-      const pid = getActiveProjectId() || ''
-      if (pid) updateFilter('projectId', pid)
-    } catch { }
-
-    globalProjectSyncRef.current = true
-  }, [unifiedFilters.projectId, updateFilter])
-
-  useEffect(() => {
-    if (!hasInitializedAppliedFilters.current) {
-      setAppliedFilters(unifiedFilters)
-      hasInitializedAppliedFilters.current = true
-    }
-  }, [unifiedFilters])
-
-  // Persist preferences
   useEffect(() => { try { localStorage.setItem('transactions_enriched_table_wrap', wrapMode ? '1' : '0') } catch { } }, [wrapMode])
   useEffect(() => { try { localStorage.setItem('transactions_enriched_approval_filter', unifiedFilters.approvalStatus || '') } catch { } }, [unifiedFilters.approvalStatus])
 
-  const filtersDirty = useMemo(() => JSON.stringify(unifiedFilters) !== JSON.stringify(appliedFilters), [unifiedFilters, appliedFilters])
-
-  const handleApplyFilters = useCallback(() => {
-    setAppliedFilters(unifiedFilters)
+  const handleApplyFiltersWithPaging = useCallback(() => {
+    handleApplyFilters()
     setPage(1)
-  }, [unifiedFilters])
+  }, [handleApplyFilters])
 
-  const handleResetFilters = useCallback(() => {
-    resetFilters()
-    setAppliedFilters({ ...defaultFilterValues })
+  const handleResetFiltersWithPaging = useCallback(() => {
+    handleResetFilters()
     setPage(1)
-  }, [resetFilters, defaultFilterValues])
+  }, [handleResetFilters])
 
-  const reload = useCallback(async () => {
-    // Determine mode from route: /transactions/my-enriched vs /transactions/all-enriched
-    const mode: 'my' | 'all' = location.pathname.includes('/transactions/my-enriched') ? 'my' : 'all'
+  // REACT QUERY REFACTOR START
+  // ---------------------------------------------------------------------------
 
-    const filtersToUse = {
-      scope: mode,
-      search: appliedFilters.search || undefined,
-      dateFrom: appliedFilters.dateFrom || undefined,
-      dateTo: appliedFilters.dateTo || undefined,
-      amountFrom: appliedFilters.amountFrom ? parseFloat(appliedFilters.amountFrom) : undefined,
-      amountTo: appliedFilters.amountTo ? parseFloat(appliedFilters.amountTo) : undefined,
-      debitAccountId: appliedFilters.debitAccountId || undefined,
-      creditAccountId: appliedFilters.creditAccountId || undefined,
-      orgId: appliedFilters.orgId || undefined,
-      projectId: appliedFilters.projectId || undefined,
-      classificationId: appliedFilters.classificationId || undefined,
-      expensesCategoryId: appliedFilters.expensesCategoryId || undefined,
-      workItemId: appliedFilters.workItemId || undefined,
-      analysisWorkItemId: appliedFilters.analysisWorkItemId || undefined,
-      costCenterId: appliedFilters.costCenterId || undefined,
-      approvalStatus: appliedFilters.approvalStatus || undefined,
-      // Only pass createdBy for 'my' mode to filter by current user
-      createdBy: mode === 'my' ? (currentUserId || undefined) : undefined,
-    } as any
+  const mode: 'my' | 'all' = location.pathname.includes('/transactions/my-enriched') ? 'my' : 'all'
 
-    const { rows, total } = await getTransactionsEnrichedView(filtersToUse, page, pageSize)
-    setRows(rows)
-    setTotalCount(total)
+  const filtersToUse = useMemo(() => ({
+    scope: mode,
+    search: appliedFilters.search || undefined,
+    dateFrom: appliedFilters.dateFrom || undefined,
+    dateTo: appliedFilters.dateTo || undefined,
+    amountFrom: appliedFilters.amountFrom ? parseFloat(appliedFilters.amountFrom) : undefined,
+    amountTo: appliedFilters.amountTo ? parseFloat(appliedFilters.amountTo) : undefined,
+    debitAccountId: appliedFilters.debitAccountId || undefined,
+    creditAccountId: appliedFilters.creditAccountId || undefined,
+    orgId: appliedFilters.orgId || undefined,
+    projectId: appliedFilters.projectId || undefined,
+    classificationId: appliedFilters.classificationId || undefined,
+    expensesCategoryId: appliedFilters.expensesCategoryId || undefined,
+    workItemId: appliedFilters.workItemId || undefined,
+    analysisWorkItemId: appliedFilters.analysisWorkItemId || undefined,
+    costCenterId: appliedFilters.costCenterId || undefined,
+    approvalStatus: appliedFilters.approvalStatus || undefined,
+    createdBy: mode === 'my' ? (currentUserId || undefined) : undefined,
+  }), [mode, appliedFilters, currentUserId])
 
-    // Preload dimension lists from transaction_lines for current page
-    try {
-      const ids: string[] = (rows || []).map((r: any) => r.transaction_id || r.id).filter(Boolean)
-      if (ids.length) {
-        const { data: lineRows } = await supabase
-          .from('transaction_lines')
-          .select('transaction_id, project_id, cost_center_id, work_item_id, analysis_work_item_id, sub_tree_id')
-          .in('transaction_id', ids as any)
-        const map: Record<string, any> = {}
-        ; (lineRows || []).forEach((lr: any) => {
-          const k = lr.transaction_id
-          if (!map[k]) map[k] = { projects: new Set<string>(), subTrees: new Set<string>(), workItems: new Set<string>(), analysis: new Set<string>(), costCenters: new Set<string>() }
-          if (lr.project_id) map[k].projects.add(lr.project_id)
-          if (lr.sub_tree_id) map[k].subTrees.add(lr.sub_tree_id)
-          if (lr.work_item_id) map[k].workItems.add(lr.work_item_id)
-          if (lr.analysis_work_item_id) map[k].analysis.add(lr.analysis_work_item_id)
-          if (lr.cost_center_id) map[k].costCenters.add(lr.cost_center_id)
-        })
-        const finalized: Record<string, any> = {}
-        Object.entries(map).forEach(([k, v]: any) => {
-          finalized[k] = {
-            projects: Array.from(v.projects || []),
-            subTrees: Array.from(v.subTrees || []),
-            workItems: Array.from(v.workItems || []),
-            analysis: Array.from(v.analysis || []),
-            costCenters: Array.from(v.costCenters || []),
-          }
-        })
-        setDimLists(finalized)
-      } else {
-        setDimLists({})
-      }
-    } catch { }
+  // Use the new hook for fetching
+  // It handles: data fetching, caching, and realtime invalidation automatically
+  // We rename data to 'queryData' to avoid conflict if any, and access rows/total from it
+  // We need to import useTransactionsQuery at top of file
+  const {
+    data: queryData,
+    isLoading: queryLoading,
+    error: queryError,
+    refetch
+  } = useTransactionsQuery({
+    filters: filtersToUse as any,
+    page,
+    pageSize,
+    enabled: !contextLoading, // Wait for context to be ready (user id etc)
+  })
 
-    // Note: categories, workItems, costCenters, analysisItemsMap now come from TransactionsDataContext
-    // No need to reload them here - they are loaded once at context initialization
+  const rows = useMemo(() => queryData?.rows ?? [], [queryData?.rows])
+  const totalCount = queryData?.total || 0
 
-    // resolve creator/poster names
-    const ids: string[] = []
-    rows.forEach(t => { if (t.created_by) ids.push(t.created_by); if (t.posted_by) ids.push(t.posted_by!) })
-    try { setUserNames(await getUserDisplayMap(ids)) } catch { }
-  }, [location.pathname, appliedFilters, page, pageSize, currentUserId])
+  // Use query loading state + context
+  // But wait, we used to have a local 'loading' state.
+  // Now we derive it.
+  const loading = queryLoading || contextLoading
 
-  // Initial load & refetch on filter changes
+  // Side-effect: Preload dimensions from transaction_lines (Legacy logic preserved)
+  // Ideally this should be a hook or part of the view, but for now we keep it here.
   useEffect(() => {
-    if (contextLoading) return
+    const currentRows = rows
+    if (!currentRows.length) {
+      setDimLists({})
+      return
+    }
 
-    setLoading(true)
-    reload()
-      .catch((e: any) => setError(e?.message || 'فشل تحميل البيانات'))
-      .finally(() => setLoading(false))
-  }, [contextLoading, reload])
+    let cancelled = false;
+    const loadDims = async () => {
+      try {
+        const ids: string[] = currentRows.map((r: any) => r.transaction_id || r.id).filter(Boolean)
+        if (ids.length) {
+          const { data: lineRows } = await supabase
+            .from('transaction_lines')
+            .select('transaction_id, project_id, cost_center_id, work_item_id, analysis_work_item_id, sub_tree_id')
+            .in('transaction_id', ids as any)
+
+          if (cancelled) return
+
+          const map: Record<string, any> = {}
+            ; (lineRows || []).forEach((lr: any) => {
+              const k = lr.transaction_id
+              if (!map[k]) map[k] = { projects: new Set<string>(), subTrees: new Set<string>(), workItems: new Set<string>(), analysis: new Set<string>(), costCenters: new Set<string>() }
+              if (lr.project_id) map[k].projects.add(lr.project_id)
+              if (lr.sub_tree_id) map[k].subTrees.add(lr.sub_tree_id)
+              if (lr.work_item_id) map[k].workItems.add(lr.work_item_id)
+              if (lr.analysis_work_item_id) map[k].analysis.add(lr.analysis_work_item_id)
+              if (lr.cost_center_id) map[k].costCenters.add(lr.cost_center_id)
+            })
+          const finalized: Record<string, any> = {}
+          Object.entries(map).forEach(([k, v]: any) => {
+            finalized[k] = {
+              projects: Array.from(v.projects || []),
+              subTrees: Array.from(v.subTrees || []),
+              workItems: Array.from(v.workItems || []),
+              analysis: Array.from(v.analysis || []),
+              costCenters: Array.from(v.costCenters || []),
+            }
+          })
+          setDimLists(finalized)
+        }
+      } catch { }
+    }
+
+    loadDims()
+    return () => { cancelled = true }
+  }, [rows, page, pageSize])
+
+  // Side-effect: resolve user names
+  useEffect(() => {
+    const currentRows = rows
+    if (!currentRows.length) return
+    const ids: string[] = []
+    currentRows.forEach((t: any) => { if (t.created_by) ids.push(t.created_by); if (t.posted_by) ids.push(t.posted_by!) })
+    if (ids.length) {
+      getUserDisplayMap(ids).then(setUserNames).catch(() => { })
+    }
+  }, [rows, page, pageSize])
 
   // Global refresh via CustomEvent (from details panel)
+  // NOW mapped to React Query refetch
   useEffect(() => {
-    const handler = () => { reload().catch(() => { }) }
+    const handler = () => { refetch().catch(() => { }) }
     window.addEventListener('transactions:refresh', handler)
     return () => window.removeEventListener('transactions:refresh', handler)
-  }, [reload])
+  }, [refetch])
+
+  // ---------------------------------------------------------------------------
+  // REACT QUERY REFACTOR END
 
   // Column configs (use separate storage keys for enriched page)
   const defaultColumns: ColumnConfig[] = useMemo(() => [
@@ -269,14 +257,14 @@ const TransactionsEnrichedPage: React.FC = () => {
       const dNames: string[] = Array.isArray(t.debit_accounts_names) ? t.debit_accounts_names : []
       const cCodes: string[] = Array.isArray(t.credit_accounts_codes) ? t.credit_accounts_codes : []
       const cNames: string[] = Array.isArray(t.credit_accounts_names) ? t.credit_accounts_names : []
-      
+
       // Transform names to use Arabic where available
       const debitList = dCodes.map((code, i) => {
         const account = accounts.find(a => a.code === code)
         const name = account ? (account.name_ar || account.name || dNames[i] || '') : (dNames[i] || '')
         return `${code} - ${name}`.trim()
       })
-      
+
       const creditList = cCodes.map((code, i) => {
         const account = accounts.find(a => a.code === code)
         const name = account ? (account.name_ar || account.name || cNames[i] || '') : (cNames[i] || '')
@@ -424,7 +412,8 @@ const TransactionsEnrichedPage: React.FC = () => {
   }, [columns, tableData])
 
   if (loading) return <div className="loading-container"><div className="loading-spinner" />جاري التحميل...</div>
-  if (error) return <div className="error-container">خطأ: {error}</div>
+  // Use queryError for error display
+  if (queryError) return <div className="error-container">خطأ: {(queryError as any)?.message || 'فشل تحميل البيانات'}</div>
 
   return (
     <div className="transactions-container" dir="rtl">
@@ -452,8 +441,8 @@ const TransactionsEnrichedPage: React.FC = () => {
       <UnifiedFilterBar
         values={unifiedFilters}
         onChange={(key, value) => { updateFilter(key, value) }}
-        onReset={handleResetFilters}
-        onApply={handleApplyFilters}
+        onReset={handleResetFiltersWithPaging}
+        onApply={handleApplyFiltersWithPaging}
         applyDisabled={!filtersDirty}
         preferencesKey="transactions_enriched_filterbar"
         config={{
@@ -466,8 +455,8 @@ const TransactionsEnrichedPage: React.FC = () => {
           <div className="transactions-toolbar">
             <span className="transactions-count">عدد السجلات: {totalCount}</span>
             <label className="wrap-toggle"><input type="checkbox" checked={wrapMode} onChange={(e) => setWrapMode(e.target.checked)} /><span>التفاف النص</span></label>
-            <button className="ultimate-btn" onClick={() => reload().catch(() => { })}><div className="btn-content"><span className="btn-text">تحديث</span></div></button>
-            <button className="ultimate-btn" onClick={() => window.dispatchEvent(new CustomEvent('transactions:refresh'))} title="تحديث سريع"><div className="btn-content"><span className="btn-text">تحديث 🔁</span></div></button>
+            <button className="ultimate-btn" onClick={() => refetch().catch(() => { })}><div className="btn-content"><span className="btn-text">تحديث</span></div></button>
+            <button className="ultimate-btn" onClick={() => refetch()} title="تحديث سريع"><div className="btn-content"><span className="btn-text">تحديث 🔁</span></div></button>
             <button className="ultimate-btn ultimate-btn-warning" onClick={() => { setWrapMode(false); try { localStorage.setItem('transactions_enriched_table_wrap', '0') } catch { }; resetToDefaults() }} title="استعادة الإعدادات الافتراضية"><div className="btn-content"><span className="btn-text">استعادة الافتراضي</span></div></button>
           </div>
           <div className="transactions-pagination">

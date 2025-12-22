@@ -1,5 +1,5 @@
 import React from 'react'
-import { Box, Container, Paper, Stack, Typography, List, ListItem, ListItemText } from '@mui/material'
+import { Box, Container, Paper, Typography, List, ListItem, ListItemText } from '@mui/material'
 import { ApplicationPerformanceMonitor } from '@/services/ApplicationPerformanceMonitor'
 
 export default function PerformanceDashboardPage() {

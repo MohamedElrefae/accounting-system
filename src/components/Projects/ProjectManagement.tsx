@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHasPermission } from '../../hooks/useHasPermission';
 import { getProjectDocumentCounts } from '../../services/documents';
@@ -15,7 +15,7 @@ interface ProjectFormData {
   name: string;
   description: string;
   org_id: string;
-  status: 'active' | 'inactive' | 'completed';
+  status: Project['status'];
   start_date: string;
   end_date: string;
   budget: number;
@@ -46,11 +46,7 @@ const [formData, setFormData] = useState<ProjectFormData>({
   const [docCounts, setDocCounts] = useState<Record<string, number>>({});
   const { language } = useAppStore();
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [projectsData, orgsData] = await Promise.all([
@@ -72,7 +68,11 @@ const [formData, setFormData] = useState<ProjectFormData>({
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleAdd = () => {
     setEditingProject(null);

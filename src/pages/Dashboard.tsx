@@ -16,8 +16,6 @@ import {
   Switch,
   FormControlLabel,
   CircularProgress,
-  Select,
-  MenuItem,
   TextField,
   Alert,
   Skeleton,
@@ -27,7 +25,6 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { dashboardQueryKeys, fetchCategoryTotals, fetchRecentActivity, prefetchDashboardQueries } from '../services/dashboard-queries';
-import { getActiveOrgId, getActiveProjectId } from '../utils/org';
 import useAppStore from '../store/useAppStore';
 import { useNavigate } from 'react-router-dom';
 import StatCard from '../components/ui/StatCard';
@@ -44,9 +41,9 @@ import {
   translations 
 } from '../data/mockData';
 import { supabase } from '../utils/supabase';
-import { getActiveProjects } from '../services/projects';
-import { getOrganizations } from '../services/organization';
 import { getCompanyConfig } from '../services/company-config';
+import { useScope } from '../contexts/ScopeContext';
+import { ScopeChips } from '../components/Scope/ScopeChips';
 import type { StatCard as StatCardType } from '../types';
 
 // Minimal shape for dashboard recent transactions
@@ -63,9 +60,12 @@ interface RecentRow {
 }
 
 const Dashboard: React.FC = () => {
-  const { language } = useAppStore();
+  const { language, demoMode } = useAppStore();
   const navigate = useNavigate();
   const t = translations[language];
+  
+  // Use centralized scope context for org/project selection
+  const { currentOrg, currentProject, getOrgId, getProjectId } = useScope();
 
   const [recent, setRecent] = React.useState<RecentRow[]>([]);
   const [loading, setLoading] = React.useState<boolean>(true);
@@ -82,19 +82,16 @@ const Dashboard: React.FC = () => {
   const [compactTicks, setCompactTicks] = React.useState<boolean>(true);
   const [customShortcuts, setCustomShortcuts] = React.useState<Array<{ label: string; path: string; icon?: string; accessKey?: string }>>([]);
   const [userShortcuts, setUserShortcuts] = React.useState<Array<{ label: string; path: string; icon?: string; accessKey?: string }>>([]);
-  // Filters
-  const [orgOptions, setOrgOptions] = React.useState<Array<{ id: string; code?: string; name: string }>>([]);
-  const [projectOptions, setProjectOptions] = React.useState<Array<{ id: string; code?: string; name: string }>>([]);
-  const [selectedOrgId, setSelectedOrgId] = React.useState<string>('');
-  const [selectedProjectId, setSelectedProjectId] = React.useState<string>('');
+  // Date filters (org/project now from ScopeContext)
   const [dateFrom, setDateFrom] = React.useState<string>('');
   const [dateTo, setDateTo] = React.useState<string>('');
   const [numbersOnlyDashboard, setNumbersOnlyDashboard] = React.useState<boolean>(false);
   const [showFilters, setShowFilters] = React.useState<boolean>(false);
   const [postedOnly, setPostedOnly] = React.useState<boolean>(false); // Default: show all transactions
-  // Query-driven, hydrated by prefetch
-  const orgIdForQuery = selectedOrgId || getActiveOrgId() || undefined;
-  const projectIdForQuery = selectedProjectId || getActiveProjectId() || undefined;
+  
+  // Query-driven, hydrated by prefetch - now using ScopeContext
+  const orgIdForQuery = getOrgId() || undefined;
+  const projectIdForQuery = getProjectId() || undefined;
   const { data: categoryTotalsQ } = useQuery({
     queryKey: dashboardQueryKeys.categoryTotals({ orgId: orgIdForQuery, projectId: projectIdForQuery, dateFrom, dateTo, postedOnly }),
     queryFn: () => fetchCategoryTotals({ orgId: orgIdForQuery, projectId: projectIdForQuery, dateFrom, dateTo, postedOnly }),
@@ -115,6 +112,19 @@ const Dashboard: React.FC = () => {
       setTimeout(prefetch, 0);
     }
   }, [qc, orgIdForQuery, projectIdForQuery, dateFrom, dateTo, postedOnly]);
+
+  const formatAmount = React.useCallback((amount: number) => {
+    if (amount === null || amount === undefined || isNaN(amount)) return '—';
+    // Format number with company number_format and optional currency symbol
+    const formatter = new Intl.NumberFormat(numberFormat || 'en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    const formatted = formatter.format(Math.abs(amount));
+    if (numbersOnlyDashboard) return formatted;
+    return currencySymbol && currencySymbol !== 'none' ? `${formatted} ${currencySymbol}` : formatted;
+  }, [currencySymbol, numberFormat, numbersOnlyDashboard]);
+
   React.useEffect(() => {
     if (categoryTotalsQ) {
       const totals = categoryTotalsQ as Record<string, number>;
@@ -135,7 +145,7 @@ const Dashboard: React.FC = () => {
       setStats(liveStats);
       setLastUpdated(new Date());
     }
-  }, [categoryTotalsQ, language, numberFormat, numbersOnlyDashboard]);
+  }, [categoryTotalsQ, formatAmount, language, numberFormat, numbersOnlyDashboard, t.totalExpenses, t.totalRevenue]);
   const axisNumberFormatter = React.useMemo(() => new Intl.NumberFormat(numberFormat || 'en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), [numberFormat]);
   const compactNumberFormatter = React.useMemo(() => new Intl.NumberFormat(numberFormat || 'en-US', { notation: 'compact', maximumFractionDigits: 1 }), [numberFormat]);
   const formatAxisTick = (v: number) => {
@@ -143,18 +153,6 @@ const Dashboard: React.FC = () => {
     const useCompact = compactTicks && num >= 1000;
     const s = useCompact ? compactNumberFormatter.format(num) : axisNumberFormatter.format(num);
     return currencySymbol && currencySymbol !== 'none' ? `${s} ${currencySymbol}` : s;
-  };
-
-  const formatAmount = (amount: number) => {
-    if (amount === null || amount === undefined || isNaN(amount)) return '—';
-    // Format number with company number_format and optional currency symbol
-    const formatter = new Intl.NumberFormat(numberFormat || 'en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-    const formatted = formatter.format(Math.abs(amount));
-    if (numbersOnlyDashboard) return formatted;
-    return currencySymbol && currencySymbol !== 'none' ? `${formatted} ${currencySymbol}` : formatted;
   };
 
   const formatDate = (dateString: string) => {
@@ -175,16 +173,16 @@ const Dashboard: React.FC = () => {
   };
 
   // Date helpers
-  const toDateStr = (d: Date) => {
+  const toDateStr = React.useCallback((d: Date) => {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
-  };
+  }, []);
 
   type PresetKey = 'today' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'ytd' | 'thisYear' | 'all';
 
-  const presetRange = (preset: PresetKey): { from: string; to: string } => {
+  const presetRange = React.useCallback((preset: PresetKey): { from: string; to: string } => {
     const now = new Date();
     if (preset === 'today') {
       const s = toDateStr(now);
@@ -221,7 +219,7 @@ const Dashboard: React.FC = () => {
     }
     // all
     return { from: '', to: '' };
-  };
+  }, [toDateStr]);
 
   const setPreset = (preset: PresetKey) => {
     const { from, to } = presetRange(preset);
@@ -240,7 +238,7 @@ const Dashboard: React.FC = () => {
       if ((r.from || '') === (dateFrom || '') && (r.to || '') === (dateTo || '')) return key;
     }
     return null;
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, presetRange]);
 
   // Persist compact tick preference
   React.useEffect(() => {
@@ -288,7 +286,7 @@ const Dashboard: React.FC = () => {
       if (!Array.isArray(parsed)) throw new Error('Not an array');
       setUserShortcuts(parsed);
       localStorage.setItem('dashboard_user_shortcuts', JSON.stringify(parsed));
-    } catch (e) {
+    } catch {
       alert(language === 'ar' ? 'صيغة غير صحيحة للاختصارات.' : 'Invalid shortcuts JSON.');
     }
   };
@@ -298,73 +296,63 @@ const Dashboard: React.FC = () => {
     switch ((name || '').toLowerCase()) {
       case 'accounttree':
       case 'tree':
-        return <AccountTreeIcon />;
+        return <AccountTree />;
       case 'receiptlong':
       case 'transactions':
-        return <ReceiptLongIcon />;
+        return <Receipt />;
       case 'menubook':
       case 'ledger':
-        return <MenuBookIcon />;
+        return <Assessment />;
       case 'balance':
       case 'scale':
-        return <BalanceIcon />;
+        return <AccountBalance />;
       case 'trendingup':
       case 'profit':
-        return <TrendingUpIcon />;
+        return <TrendingUp />;
       case 'accountbalance':
       case 'balancesheet':
-        return <AccountBalanceIcon />;
+        return <AccountBalance />;
       default:
         return undefined;
     }
   };
 
   // Load dashboard data from Supabase and derive type/category and aggregates
-  // Prime filters (org/project/date) from storage
+  // Prime date filters from storage (org/project now from ScopeContext)
   React.useEffect(() => {
     try {
-      const so = localStorage.getItem('dashboard_scope_org');
-      const sp = localStorage.getItem('dashboard_scope_project');
       const df = localStorage.getItem('dashboard_date_from');
       const dt = localStorage.getItem('dashboard_date_to');
       const no = localStorage.getItem('dashboard_numbers_only');
       const po = localStorage.getItem('dashboard_posted_only');
-      if (so) setSelectedOrgId(so);
-      if (sp) setSelectedProjectId(sp);
       if (df) setDateFrom(df);
       if (dt) setDateTo(dt);
       if (no) setNumbersOnlyDashboard(no === 'true');
       if (po) setPostedOnly(po === 'true');
     } catch {}
-    // load orgs and projects
-    (async () => {
-      try {
-        const [orgs, projs] = await Promise.all([
-          getOrganizations().catch(() => []),
-          getActiveProjects().catch(() => [])
-        ]);
-        setOrgOptions((orgs || []).map((o: any) => ({ id: o.id, code: o.code, name: o.name })));
-        setProjectOptions((projs || []).map((p: any) => ({ id: p.id, code: p.code, name: p.name })));
-      } catch {}
-    })();
   }, []);
 
   const load = React.useCallback(async () => {
+    if (demoMode) {
+      setError(null);
+      setLoading(false);
+      setLastUpdated(new Date());
+      // Provide a small demo chart dataset (no DB)
+      const now = new Date();
+      const months: string[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push(d.toLocaleString('en-US', { month: 'short', year: '2-digit' }));
+      }
+      setChartData(months.map((m, i) => ({ month: m, revenue: 120000 + i * 8000, expenses: 85000 + i * 5000 })));
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      // Optional scoping by org/project from localStorage
-      const { getActiveOrgId, getActiveProjectId } = await import('../utils/org');
-      let orgId: string | null = getActiveOrgId();
-      let projectId: string | null = getActiveProjectId();
-      // Override from local selections if set
-      if (selectedOrgId) orgId = selectedOrgId;
-      if (selectedProjectId) projectId = selectedProjectId;
-      // Remember last scope for dashboard
-      try {
-        if (orgId) localStorage.setItem('dashboard_scope_org', orgId);
-        if (projectId) localStorage.setItem('dashboard_scope_project', projectId);
-      } catch {}
+      // Use org/project from ScopeContext (centralized state)
+      const orgId = getOrgId();
+      const projectId = getProjectId();
 
       // Helper to apply filters
       const applyScope = (q: any) => {
@@ -526,11 +514,11 @@ const Dashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [language, postedOnly]);
+  }, [dateFrom, dateTo, demoMode, language, numberFormat, postedOnly, getOrgId, getProjectId]);
 
   React.useEffect(() => {
     void load();
-  }, [load, selectedOrgId, selectedProjectId, dateFrom, dateTo]);
+  }, [load, currentOrg, currentProject, dateFrom, dateTo]);
 
   // Global refresh from other parts of app (e.g., after deletion)
   React.useEffect(() => {
@@ -635,21 +623,11 @@ const Dashboard: React.FC = () => {
               control={<Switch size="small" checked={postedOnly} onChange={(e) => { setPostedOnly(e.target.checked); try { localStorage.setItem('dashboard_posted_only', String(e.target.checked)); } catch {} }} />}
               label={language === 'ar' ? 'المرحلة فقط' : 'Posted only'}
             />
-            <Select size="small" value={selectedOrgId} displayEmpty onChange={(e)=>{ setSelectedOrgId(e.target.value as string); try { localStorage.setItem('dashboard_scope_org', String(e.target.value||'')); } catch {} }}>
-              <MenuItem value="">{language === 'ar' ? 'كل المؤسسات' : 'All Orgs'}</MenuItem>
-              {orgOptions.map(o => (
-                <MenuItem key={o.id} value={o.id}>{o.code ? `${o.code} — ${o.name}` : o.name}</MenuItem>
-              ))}
-            </Select>
-            <Select size="small" value={selectedProjectId} displayEmpty onChange={(e)=>{ setSelectedProjectId(e.target.value as string); try { localStorage.setItem('dashboard_scope_project', String(e.target.value||'')); } catch {} }}>
-              <MenuItem value="">{language === 'ar' ? 'كل المشاريع' : 'All Projects'}</MenuItem>
-              {projectOptions.map(p => (
-                <MenuItem key={p.id} value={p.id}>{p.code ? `${p.code} — ${p.name}` : p.name}</MenuItem>
-              ))}
-            </Select>
-            <TextField label={language === 'ar' ? 'من' : 'From'} size="small" type="date" value={dateFrom} onChange={(e)=>{ setDateFrom(e.target.value); try { if (e.target.value) localStorage.setItem('dashboard_date_from', e.target.value); else localStorage.removeItem('dashboard_date_from'); } catch {} }} />
-            <TextField label={language === 'ar' ? 'إلى' : 'To'} size="small" type="date" value={dateTo} onChange={(e)=>{ setDateTo(e.target.value); try { if (e.target.value) localStorage.setItem('dashboard_date_to', e.target.value); else localStorage.removeItem('dashboard_date_to'); } catch {} }} />
-            <Button variant="text" size="small" onClick={() => { setSelectedOrgId(''); setSelectedProjectId(''); setDateFrom(''); setDateTo(''); try { localStorage.removeItem('dashboard_scope_org'); localStorage.removeItem('dashboard_scope_project'); localStorage.removeItem('dashboard_date_from'); localStorage.removeItem('dashboard_date_to'); } catch {} }}>{language === 'ar' ? 'إعادة التعيين' : 'Reset'}</Button>
+            {/* Org/Project selection is now in TopBar via ScopeContext */}
+            <ScopeChips showLabels={false} size="small" variant="outlined" />
+            <TextField label={language === 'ar' ? 'من' : 'From'} size="small" type="date" value={dateFrom} onChange={(e)=>{ setDateFrom(e.target.value); try { if (e.target.value) localStorage.setItem('dashboard_date_from', e.target.value); else localStorage.removeItem('dashboard_date_from'); } catch {} }} InputLabelProps={{ shrink: true }} />
+            <TextField label={language === 'ar' ? 'إلى' : 'To'} size="small" type="date" value={dateTo} onChange={(e)=>{ setDateTo(e.target.value); try { if (e.target.value) localStorage.setItem('dashboard_date_to', e.target.value); else localStorage.removeItem('dashboard_date_to'); } catch {} }} InputLabelProps={{ shrink: true }} />
+            <Button variant="text" size="small" onClick={() => { setDateFrom(''); setDateTo(''); try { localStorage.removeItem('dashboard_date_from'); localStorage.removeItem('dashboard_date_to'); } catch {} }}>{language === 'ar' ? 'إعادة التعيين' : 'Reset Dates'}</Button>
           </Box>
         </Box>
       </Collapse>

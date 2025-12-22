@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField, Typography } from '@mui/material';
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import { useToast } from '../../contexts/ToastContext';
 import { listTemplates, generatePdfFromTemplate, type DocumentTemplate } from '../../services/templates';
 import * as docs from '../../services/documents';
@@ -29,7 +29,7 @@ export default function GenerateFromTemplateDialog({ open, onClose, orgId, entit
         showToast(e?.message || 'فشل تحميل القوالب', { severity: 'error' });
       }
     })();
-  }, [open, orgId]);
+  }, [open, orgId, showToast]);
 
   const handleGenerate = async () => {
     if (!templateId) return;

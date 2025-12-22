@@ -8,7 +8,6 @@ import type { WorkItemRow } from '../../types/work-items';
 import { toWorkItemOptions } from '../../services/work-items';
 import { listAnalysisWorkItems } from '../../services/analysis-work-items';
 import type { SearchableSelectOption } from '../Common/SearchableSelect';
-import { transactionValidator } from '../../services/transaction-validation';
 
 import { getCurrentDate, DATE_FORMATS } from '../../utils/dateHelpers';
 
@@ -640,7 +639,7 @@ export const createTransactionFormConfig = (
     fields,
     submitLabel: isEditing ? '💾 حفظ التعديلات' : '✨ إضافة المعاملة',
     cancelLabel: '❌ إلغاء',
-    customValidator: async (_data: Record<string, unknown>) => {
+    customValidator: (_data: Record<string, unknown>) => {
       const errors: ValidationError[] = [];
       const warnings: ValidationError[] = [];
 
@@ -680,29 +679,33 @@ export const createTransactionFormConfig = (
   };
   
   // Debug: Log final configuration details
-  console.log('🌳 Final form config created:', {
-    title: finalConfig.title,
-    fieldsCount: finalConfig.fields.length,
-    fieldIds: finalConfig.fields.map(f => f.id),
-    hasSubTreeField: finalConfig.fields.some(f => f.id === 'sub_tree_id'),
-    layoutFieldsCount: finalConfig.layout?.columnBreakpoints?.length,
-    layoutFields: finalConfig.layout?.columnBreakpoints?.map(b => b.field)
-  });
+  if (import.meta.env.DEV) {
+    console.log('🌳 Final form config created:', {
+      title: finalConfig.title,
+      fieldsCount: finalConfig.fields.length,
+      fieldIds: finalConfig.fields.map(f => f.id),
+      hasSubTreeField: finalConfig.fields.some(f => f.id === 'sub_tree_id'),
+      layoutFieldsCount: finalConfig.layout?.columnBreakpoints?.length,
+      layoutFields: finalConfig.layout?.columnBreakpoints?.map(b => b.field)
+    });
+  }
   
   const subTreeField = finalConfig.fields.find(f => f.id === 'sub_tree_id');
   if (subTreeField) {
-    console.log('🌳 sub_tree_id field details:', {
-      id: subTreeField.id,
-      type: subTreeField.type,
-      label: subTreeField.label,
-      hasOptionsProvider: !!subTreeField.optionsProvider,
-      hasOptions: !!subTreeField.options,
-      position: subTreeField.position,
-      dependsOnAny: subTreeField.dependsOnAny
-    });
+    if (import.meta.env.DEV) {
+      console.log('🌳 sub_tree_id field details:', {
+        id: subTreeField.id,
+        type: subTreeField.type,
+        label: subTreeField.label,
+        hasOptionsProvider: !!subTreeField.optionsProvider,
+        hasOptions: !!subTreeField.options,
+        position: subTreeField.position,
+        dependsOnAny: subTreeField.dependsOnAny
+      });
+    }
   } else {
     if (options?.headerOnly) {
-      console.log('🌳 sub_tree_id omitted in header-only mode');
+      if (import.meta.env.DEV) console.log('🌳 sub_tree_id omitted in header-only mode');
     } else {
       console.warn('🌳 sub_tree_id field not present in final config');
     }

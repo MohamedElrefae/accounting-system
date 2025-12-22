@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
+
 import {
   Dialog,
   DialogTitle,
@@ -7,15 +8,12 @@ import {
   TextField,
   Button,
   Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   FormControlLabel,
   Switch,
   Alert,
   CircularProgress,
 } from '@mui/material'
+
 import { useArabicLanguage } from '@/services/ArabicLanguageService'
 import { useCreateFiscalYear } from '@/services/fiscal/hooks/useFiscalYear'
 import { useToast } from '@/contexts/ToastContext'
@@ -30,7 +28,13 @@ interface CreateFiscalYearModalProps {
 export default function CreateFiscalYearModal({ open, onClose, orgId }: CreateFiscalYearModalProps) {
   const { isRTL } = useArabicLanguage()
   const { showToast } = useToast()
+
   const createMutation = useCreateFiscalYear()
+  const errorMessage = createMutation.error
+    ? createMutation.error instanceof Error
+      ? createMutation.error.message
+      : String(createMutation.error)
+    : ''
 
   const [formData, setFormData] = useState({
     yearNumber: new Date().getFullYear(),
@@ -87,9 +91,10 @@ export default function CreateFiscalYearModal({ open, onClose, orgId }: CreateFi
         orgId,
         yearNumber: formData.yearNumber,
         nameEn: formData.nameEn.trim(),
-        nameAr: formData.nameAr.trim() || null,
-        descriptionEn: formData.descriptionEn.trim() || null,
-        descriptionAr: formData.descriptionAr.trim() || null,
+        nameAr: formData.nameAr.trim() || undefined,
+        descriptionEn: formData.descriptionEn.trim() || undefined,
+        descriptionAr: formData.descriptionAr.trim() || undefined,
+
         startDate: formData.startDate,
         endDate: formData.endDate,
         createMonthlyPeriods: formData.createMonthlyPeriods,
@@ -99,7 +104,7 @@ export default function CreateFiscalYearModal({ open, onClose, orgId }: CreateFi
       
       showToast(
         isRTL ? 'تم إنشاء السنة المالية بنجاح' : 'Fiscal year created successfully',
-        'success'
+        { severity: 'success' }
       )
       
       onClose()
@@ -118,7 +123,7 @@ export default function CreateFiscalYearModal({ open, onClose, orgId }: CreateFi
     } catch (error: any) {
       showToast(
         error.message || (isRTL ? 'فشل في إنشاء السنة المالية' : 'Failed to create fiscal year'),
-        'error'
+        { severity: 'error' }
       )
     }
   }
@@ -144,7 +149,7 @@ export default function CreateFiscalYearModal({ open, onClose, orgId }: CreateFi
       <DialogContent>
         {createMutation.error && (
           <Alert severity="error" sx={{ mb: 2 }}>
-            {createMutation.error.message}
+            {errorMessage}
           </Alert>
         )}
 

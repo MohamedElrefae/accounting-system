@@ -20,9 +20,8 @@ const PerformanceComparison: React.FC = () => {
     setIsOptimized(optimized);
 
     // Simulate performance metrics
-    const loadTime = performance.now();
     const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
-    
+
     if (navigation) {
       setMetrics({
         initialLoad: navigation.loadEventEnd - navigation.loadEventStart,
@@ -43,16 +42,6 @@ const PerformanceComparison: React.FC = () => {
       </Card>
     );
   }
-
-  const getImprovementColor = (improvement: number) => {
-    if (improvement > 70) return 'success';
-    if (improvement > 40) return 'warning';
-    return 'error';
-  };
-
-  const calculateImprovement = (before: number, after: number) => {
-    return Math.round(((before - after) / before) * 100);
-  };
 
   return (
     <Card sx={{ mb: 2 }}>

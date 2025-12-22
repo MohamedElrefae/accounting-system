@@ -652,13 +652,6 @@ export const ImportExportIcon: React.FC<SvgIconProps> = (props) => (
   </SvgIcon>
 );
 
-// Create a proxy for any missing icons
-const createMissingIconProxy = (name: string): React.FC<SvgIconProps> => (props) => (
-  <SvgIcon {...props}>
-    <circle cx="12" cy="12" r="10" />
-  </SvgIcon>
-);
-
 export const DeselectOutlinedIcon: React.FC<SvgIconProps> = (props) => (
   <SvgIcon {...props}>
     <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7zm-4 6h2v-2H3v2zm0 4h2v-2H3v2zM3 5v2h2V3h-2zm4 0h2V3H7v2zm4 0h2V3h-2v2zm4 0h2V3h-2v2z" />

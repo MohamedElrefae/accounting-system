@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { Building2, Plus, Edit, Trash2, MapPin, Phone, Mail, FileText, Eraser } from 'lucide-react';
 import { getOrganizations, createOrganization, updateOrganization, deleteOrganizationCascade, purgeOrganizationData, type Organization } from '../../services/organization';
 import { useToast } from '../../contexts/ToastContext';
@@ -34,11 +34,7 @@ const OrganizationManagement: React.FC = () => {
 
   const { showToast } = useToast();
 
-  useEffect(() => {
-    loadOrganizations();
-  }, []);
-
-  const loadOrganizations = async () => {
+  const loadOrganizations = useCallback(async () => {
     try {
       setLoading(true);
       const data = await getOrganizations();
@@ -49,7 +45,11 @@ const OrganizationManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => {
+    loadOrganizations();
+  }, [loadOrganizations]);
 
   const handleAdd = () => {
     setEditingOrg(null);
@@ -109,7 +109,7 @@ const OrganizationManagement: React.FC = () => {
   };
 
   const handlePurge = async (org: Organization) => {
-    const warning = `تنبيه مهم:\nسيتم حذف جميع البيانات المرتبطة بالمؤسسة \"${org.code} — ${org.name}\" (مشاريع، إعدادات، المخزون، التقارير ...)، مع الإبقاء على سجل المؤسسة.\nلا يمكن التراجع عن هذه العملية. هل تريد المتابعة؟`;
+    const warning = `تنبيه مهم:\nسيتم حذف جميع البيانات المرتبطة بالمؤسسة "${org.code} — ${org.name}" (مشاريع، إعدادات، المخزون، التقارير ...)، مع الإبقاء على سجل المؤسسة.\nلا يمكن التراجع عن هذه العملية. هل تريد المتابعة؟`;
     if (!window.confirm(warning)) return;
     setSaving(true);
     try {
@@ -126,7 +126,7 @@ const OrganizationManagement: React.FC = () => {
   };
 
   const handleDelete = async (org: Organization) => {
-    const warning = `تنبيه مهم:\nسيتم حذف المؤسسة \"${org.code} — ${org.name}\" وجميع البيانات المرتبطة بها نهائيًا (مشاريع، إعدادات، المخزون، التقارير ...).\nلا يمكن التراجع عن هذه العملية. هل تريد المتابعة؟`;
+    const warning = `تنبيه مهم:\nسيتم حذف المؤسسة "${org.code} — ${org.name}" وجميع البيانات المرتبطة بها نهائيًا (مشاريع، إعدادات، المخزون، التقارير ...).\nلا يمكن التراجع عن هذه العملية. هل تريد المتابعة؟`;
     if (!window.confirm(warning)) return;
 
     try {

@@ -45,7 +45,9 @@ function getCachedAuthData(userId: string): { profile: Profile | null; roles: Ro
     // Check if cache is for the same user and not expired
     if (entry.userId !== userId) return null;
     if (entry.cacheVersion !== CACHE_VERSION) {
+    if (import.meta.env.DEV) {
       console.log('[Auth] Cache version mismatch, clearing old cache');
+    }
       localStorage.removeItem(AUTH_CACHE_KEY);
       return null;
     }
@@ -59,7 +61,9 @@ function getCachedAuthData(userId: string): { profile: Profile | null; roles: Ro
       return null;
     }
     
-    console.log('[Auth] Using cached auth data with stampede protection');
+    if (import.meta.env.DEV) {
+      console.log('[Auth] Using cached auth data with stampede protection');
+    }
     return { profile: entry.profile, roles: entry.roles };
   } catch (error) {
     console.warn('[Auth] Cache read error:', error);
@@ -78,7 +82,9 @@ function setCachedAuthData(userId: string, profile: Profile | null, roles: RoleS
       cacheVersion: CACHE_VERSION
     };
     localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(entry));
-    console.log('[Auth] Saved auth data to cache');
+    if (import.meta.env.DEV) {
+      console.log('[Auth] Saved auth data to cache');
+    }
   } catch (error) {
     console.warn('[Auth] Cache write error:', error);
     // Ignore storage errors
@@ -94,7 +100,9 @@ export function clearAuthCache(): void {
         localStorage.removeItem(key);
       }
     });
-    console.log('[Auth] Cleared all auth cache versions');
+    if (import.meta.env.DEV) {
+      console.log('[Auth] Cleared all auth cache versions');
+    }
   } catch (error) {
     console.warn('[Auth] Cache clear error:', error);
     // Ignore
@@ -349,7 +357,9 @@ const loadAuthData = async (userId: string) => {
     notifyListeners();
     
     const cacheLoadTime = performance.now() - startTime;
-    console.log(`[Auth] Loaded from cache in ${cacheLoadTime.toFixed(0)}ms`);
+    if (import.meta.env.DEV) {
+      console.log(`[Auth] Loaded from cache in ${cacheLoadTime.toFixed(0)}ms`);
+    }
     
     // Log cache hit for monitoring
     logAuthPerformance({
@@ -399,6 +409,8 @@ const loadAuthData = async (userId: string) => {
           super_admin: 'super_admin',
           admin: 'admin',
           manager: 'manager',
+          hr: 'hr',
+          team_leader: 'team_leader',
           accountant: 'accountant',
           auditor: 'auditor',
           viewer: 'viewer',
@@ -481,7 +493,9 @@ const loadAuthData = async (userId: string) => {
     const { data: authData, error: rpcError } = await supabase.rpc('get_user_auth_data', { p_user_id: userId });
     
     if (!rpcError && authData) {
-      console.log(`[Auth] RPC get_user_auth_data took ${(performance.now() - startTime).toFixed(0)}ms`);
+      if (import.meta.env.DEV) {
+        console.log(`[Auth] RPC get_user_auth_data took ${(performance.now() - startTime).toFixed(0)}ms`);
+      }
       
       // Process profile
       if (authData.profile) {
@@ -511,11 +525,13 @@ const loadAuthData = async (userId: string) => {
       const finalRoles: RoleSlug[] = shouldBeSuperAdmin || extractedRoles.length === 0 ? defaultRoles : extractedRoles;
       
       if (shouldBeSuperAdmin || extractedRoles.length === 0) {
-        console.log('🔧 Granting superadmin or fallback roles due to:', {
-          noRoles: extractedRoles.length === 0,
-          isSuperAdmin: shouldBeSuperAdmin,
-          email: currentEmail,
-        });
+        if (import.meta.env.DEV) {
+          console.log('🔧 Granting superadmin or fallback roles due to:', {
+            noRoles: extractedRoles.length === 0,
+            isSuperAdmin: shouldBeSuperAdmin,
+            email: currentEmail,
+          });
+        }
       }
       
       authState.roles = finalRoles;
@@ -525,7 +541,9 @@ const loadAuthData = async (userId: string) => {
       setCachedAuthData(userId, authState.profile, finalRoles);
       
       const totalLoadTime = performance.now() - startTime;
-      console.log(`[Auth] RPC load completed in ${totalLoadTime.toFixed(0)}ms`);
+      if (import.meta.env.DEV) {
+        console.log(`[Auth] RPC load completed in ${totalLoadTime.toFixed(0)}ms`);
+      }
       
       // Log performance metrics
       logAuthPerformance({
@@ -577,11 +595,13 @@ const loadAuthData = async (userId: string) => {
     const finalRoles = shouldBeSuperAdmin || extractedRoles.length === 0 ? defaultRoles : extractedRoles;
 
     if (shouldBeSuperAdmin || extractedRoles.length === 0) {
-      console.log('🔧 Granting superadmin or fallback roles due to:', {
-        noRoles: extractedRoles.length === 0,
-        isSuperAdmin: shouldBeSuperAdmin,
-        email: currentEmail,
-      });
+      if (import.meta.env.DEV) {
+        console.log('🔧 Granting superadmin or fallback roles due to:', {
+          noRoles: extractedRoles.length === 0,
+          isSuperAdmin: shouldBeSuperAdmin,
+          email: currentEmail,
+        });
+      }
     }
 
     authState.roles = finalRoles;
@@ -591,7 +611,9 @@ const loadAuthData = async (userId: string) => {
     setCachedAuthData(userId, authState.profile, finalRoles);
     
     const fallbackLoadTime = performance.now() - startTime;
-    console.log(`[Auth] Fallback queries took ${fallbackLoadTime.toFixed(0)}ms`);
+    if (import.meta.env.DEV) {
+      console.log(`[Auth] Fallback queries took ${fallbackLoadTime.toFixed(0)}ms`);
+    }
     
     // Log performance metrics for fallback
     logAuthPerformance({
@@ -610,7 +632,9 @@ const loadAuthData = async (userId: string) => {
 
   } catch (error) {
     console.error('Failed to load auth data:', error);
-    console.log('🔧 Emergency fallback: Granting superadmin access');
+    if (import.meta.env.DEV) {
+      console.log('🔧 Emergency fallback: Granting superadmin access');
+    }
     authState.roles = defaultRoles;
     authState.resolvedPermissions = defaultPermissions;
     clearCaches();
@@ -647,7 +671,9 @@ const fetchAndCacheAuthData = async (userId: string, defaultRoles: RoleSlug[]) =
       
       // Update cache silently
       setCachedAuthData(userId, profile, finalRoles);
-      console.log('[Auth] Background cache updated');
+      if (import.meta.env.DEV) {
+        console.log('[Auth] Background cache updated');
+      }
     }
   } catch (e) {
     console.warn('[Auth] Background cache update failed:', e);

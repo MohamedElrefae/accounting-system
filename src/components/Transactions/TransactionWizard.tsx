@@ -248,7 +248,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       initialDataLoadedRef.current = true
       console.log('✅ Transaction data loaded successfully')
     }
-  }, [mode, open, transactionId])
+  }, [mode, open, transactionId, initialData])
 
   const saveColumnConfig = (config: Record<string, ColumnConfig>) => {
     localStorage.setItem('transaction_wizard_column_config', JSON.stringify(config))
@@ -758,6 +758,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
           notes_ar: ''
         })
         setLines([])
+        onEditComplete?.()
         onClose()
       }, 1500)
     } catch (error: any) {
@@ -855,6 +856,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         ])
         setCurrentStep('basic')
         setErrors({})
+        onEditComplete?.()
         onClose()
       }, 2000)
     } catch (err: any) {
@@ -950,7 +952,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
             placeholder="بدون تصنيف"
           />
         )
-      case 'sub_tree_id':
+      case 'sub_tree_id': {
         const subTreeOptions = effectiveCategories
           .filter(c => c.org_id === (line.org_id || headerData.org_id))
           .map(c => ({ value: c.id, label: `${c.code} - ${c.description}` }))
@@ -962,6 +964,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
             placeholder="بدون شجرة فرعية"
           />
         )
+      }
       default:
         return null
     }
