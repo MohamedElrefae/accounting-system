@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
+export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey)
+
 if (import.meta.env.DEV) {
   console.log('🔍 Supabase URL:', supabaseUrl ? 'SET' : 'MISSING')
   console.log('🔍 Supabase Key:', supabaseAnonKey ? 'SET' : 'MISSING')
@@ -57,12 +59,20 @@ VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY</code></pre>
   })
   
   // Don't throw error immediately, let the error message show
-  setTimeout(() => {
-    throw new Error('Missing Supabase environment variables')
-  }, 100)
+  // Also don't throw during build or test to prevent CI/CD pipeline failures
+  if (typeof window !== 'undefined' && !import.meta.env.SSR) {
+    setTimeout(() => {
+      throw new Error('Missing Supabase environment variables')
+    }, 100)
+  } else {
+    console.warn('⚠️ [Supabase] Environment variables are missing. This will cause failures at runtime.')
+  }
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder-key',
+  {
   auth: {
     persistSession: true, // Persists session using browser storage by default (typically localStorage)
     autoRefreshToken: true,

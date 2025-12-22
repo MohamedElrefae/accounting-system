@@ -1,4 +1,4 @@
-import { supabase } from '../src/utils/supabase'
+import { supabase, isSupabaseConfigured } from '../src/utils/supabase'
 
 // Simple console helpers
 const ok = (msg: string) => console.log(`✅ ${msg}`)
@@ -59,6 +59,10 @@ async function checkRPC(name: string, args: Record<string, any>): Promise<boolea
 }
 
 async function run() {
+  if (!isSupabaseConfigured) {
+    warn('Supabase environment variables are missing. Skipping migration check.')
+    return
+  }
   console.log('--- Line Items Migration Check (using transaction_line_items as catalog) ---')
   const c1 = await checkColumns()
   const c2 = await checkView()
