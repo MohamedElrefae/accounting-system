@@ -2,54 +2,6 @@ import type { TourDefinition } from './types'
 
 export const TOURS: TourDefinition[] = [
   {
-    id: 'org_selector',
-    titleEn: 'Select Organization',
-    titleAr: 'اختيار المؤسسة',
-    steps: [
-      {
-        id: 'open_scope',
-        target: '[data-tour="topbar-scope-chip"]',
-        titleEn: 'Open Scope Panel',
-        titleAr: 'فتح نطاق المؤسسة',
-        bodyEn: 'Click here to open the scope panel. From there you can select the active organization (and project).',
-        bodyAr: 'اضغط هنا لفتح لوحة النطاق. من خلالها يمكنك اختيار المؤسسة الحالية (والمشروع).',
-        placement: 'bottom',
-        media: [
-          {
-            type: 'image',
-            titleEn: 'Scope chip example',
-            titleAr: 'مثال: زر النطاق',
-            href: '/help/images/tours/org-scope-chip.png',
-          },
-          {
-            type: 'video',
-            titleEn: 'Video: Selecting organization',
-            titleAr: 'فيديو: اختيار المؤسسة',
-            href: 'https://www.youtube.com/watch?v=ysz5S6PUM-U',
-          },
-        ],
-      },
-      {
-        id: 'select_org',
-        target: '[data-tour="topbar-org-selector"]',
-        autoOpenTarget: '[data-tour="topbar-scope-chip"]',
-        titleEn: 'Select Organization',
-        titleAr: 'اختر المؤسسة',
-        bodyEn: 'Choose the organization you want to work on. The whole app will filter data by this organization.',
-        bodyAr: 'اختر المؤسسة التي تريد العمل عليها. سيقوم النظام بتصفية البيانات حسب المؤسسة.',
-        placement: 'bottom',
-        media: [
-          {
-            type: 'image',
-            titleEn: 'Organization selector example',
-            titleAr: 'مثال: اختيار المؤسسة',
-            href: '/help/images/tours/org-selector.png',
-          },
-        ],
-      },
-    ],
-  },
-  {
     id: 'accounts_tree_edit',
     titleEn: 'Accounts Tree Editing',
     titleAr: 'تعديل شجرة الحسابات',

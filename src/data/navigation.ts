@@ -328,6 +328,14 @@ const baseNavigation: NavigationItem[] = [
         path: "/reports/general-ledger"
       },
       {
+        id: "running-balance",
+        label: "Running Balance",
+        titleEn: "Running Balance",
+        titleAr: "الرصيد الجاري",
+        icon: "trending-up",
+        path: "/reports/running-balance"
+      },
+      {
         id: "account-explorer",
         label: "Account Explorer",
         titleEn: "Account Explorer",
