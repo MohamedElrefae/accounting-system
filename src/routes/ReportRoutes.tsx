@@ -17,6 +17,7 @@ const TrialBalanceOriginalPage = React.lazy(() => import('../pages/Reports/Trial
 
 const TransactionClassificationReportsPage = React.lazy(() => import('../pages/Reports/TransactionClassificationReports'));
 const RunningBalanceEnrichedPage = React.lazy(() => import('../pages/Reports/RunningBalanceEnriched'));
+const TransactionLinesReportPage = React.lazy(() => import('../pages/Reports/TransactionLinesReport'));
 
 const ReportRoutes: React.FC = () => {
   return (
@@ -107,6 +108,17 @@ const ReportRoutes: React.FC = () => {
           <OptimizedSuspense>
             <TransactionClassificationReportsPage />
           </OptimizedSuspense>
+        </ProtectedRoute>
+      } />
+
+      {/* Transaction Lines Report */}
+      <Route path="transaction-lines-report" element={
+        <ProtectedRoute>
+          <TransactionsDataProvider>
+            <OptimizedSuspense>
+              <TransactionLinesReportPage />
+            </OptimizedSuspense>
+          </TransactionsDataProvider>
         </ProtectedRoute>
       } />
 

@@ -360,6 +360,14 @@ const baseNavigation: NavigationItem[] = [
         path: "/reports/balance-sheet"
       },
       {
+        id: "transaction-lines-report",
+        label: "Transaction Lines Report",
+        titleEn: "Transaction Lines Report",
+        titleAr: "تقرير سطور المعاملات",
+        icon: "LineChart",
+        path: "/reports/transaction-lines-report"
+      },
+      {
         id: "custom-reports",
         label: "Custom Reports Builder",
         titleEn: "Custom Reports Builder",

@@ -1,0 +1,104 @@
+.report-grouping-panel {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.grouping-label-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.grouping-label {
+    font-weight: 600;
+    color: var(--heading);
+    font-size: 14px;
+}
+
+.grouping-select {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 14px;
+    background-color: var(--field_bg);
+    color: var(--text);
+    min-width: 220px;
+    transition: all 0.2s ease;
+}
+
+.grouping-select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 25%, transparent);
+}
+
+.grouping-help {
+    font-size: 13px;
+    color: var(--muted_text);
+    margin-right: auto;
+}
+
+.report-summary-bar {
+    display: flex;
+    gap: 32px;
+    padding: 24px;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.summary-item-label {
+    font-size: 13px;
+    color: var(--muted_text);
+    font-weight: 600;
+}
+
+.summary-item-value {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--text);
+}
+
+.summary-item-value--positive {
+    color: var(--success-strong, #059669);
+}
+
+.summary-item-value--negative {
+    color: var(--error-strong, #dc2626);
+}
+
+.summary-item--count {
+    margin-right: auto;
+}
+
+/* RTL Support for help text and count */
+[dir="rtl"] .grouping-help,
+[dir="rtl"] .summary-item--count {
+    margin-right: 0;
+    margin-left: auto;
+}
+
+.grouped-table {
+    flex: none !important;
+    height: auto !important;
+    overflow-y: visible !important;
+    overflow-x: auto !important;
+    min-width: 100%;
+}

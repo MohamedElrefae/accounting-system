@@ -832,6 +832,7 @@ export class UniversalExportManager {
             color: #7f8c8d;
             border-top: 1px solid #ddd;
             padding-top: 15px;
+            page-break-inside: avoid;
         }
         
         /* Currency and number alignment */
@@ -841,6 +842,21 @@ export class UniversalExportManager {
             font-family: 'Roboto', Arial, sans-serif;
         }
         
+        /* Row types styling */
+        .export-table tr.group-header {
+            background-color: #f1f3f5 !important;
+            font-weight: 700;
+        }
+        .export-table tr.subtotal {
+            background-color: #f8f9fa !important;
+            font-weight: 600;
+        }
+        .export-table tr.grand-total {
+            background-color: #e9ecef !important;
+            font-weight: 700;
+            border-top: 2px solid #2c3e50;
+        }
+
         /* Print-specific styles */
         @media print {
             body {
@@ -855,7 +871,10 @@ export class UniversalExportManager {
             }
             
             .export-table {
-                page-break-inside: avoid;
+                /* Removed page-break-inside: avoid to prevent table jumping to new page */
+                page-break-inside: auto;
+                width: 100%;
+                table-layout: auto;
             }
             
             .export-table thead {
@@ -870,34 +889,47 @@ export class UniversalExportManager {
                 page-break-inside: avoid;
                 page-break-after: auto;
             }
+
+            .export-header-repeat {
+                display: table-row-group;
+            }
         }
     </style>
 </head>
 <body>
     <div class="export-container">
-        ${options.includeHeader !== false ? `
-        <div class="export-header">
-            <h1 class="export-title">${options.title}</h1>
-            ${options.subtitle ? `<p class="export-subtitle">${options.subtitle}</p>` : ''}
-        </div>
-        ` : ''}
-        
         <table class="export-table">
             <thead>
+                ${options.includeHeader !== false ? `
+                <tr class="header-repeat-row">
+                    <th colspan="${data.columns.length}" style="border: none; padding: 0 0 15px 0; background: transparent;">
+                        <div class="export-header" style="margin-bottom: 0; border-bottom: 2px solid #2c3e50;">
+                            <h1 class="export-title" style="margin: 0 0 5px 0;">${options.title}</h1>
+                            ${options.subtitle ? `<p class="export-subtitle">${options.subtitle}</p>` : ''}
+                        </div>
+                    </th>
+                </tr>
+                ` : ''}
                 <tr>
                     ${data.columns.map(col => `<th>${col.header}</th>`).join('')}
                 </tr>
             </thead>
             <tbody>
-                ${data.rows.map(row => `
-                <tr>
+                ${data.rows.map(row => {
+                  let rowClass = '';
+                  if (row._isGroupHeader || row._isHeader) rowClass = ' class="group-header"';
+                  else if (row._isSubtotal || row._isTotal) rowClass = ' class="subtotal"';
+                  else if (row._isGrandTotal) rowClass = ' class="grand-total"';
+                  
+                  return `
+                <tr${rowClass}>
                     ${data.columns.map(col => {
                       const value = row[col.key] || '';
                       const cellClass = col.type === 'currency' || col.type === 'number' ? ` class="${col.type}"` : '';
                       return `<td${cellClass}>${this.formatValueForHTML(value, col, options)}</td>`;
                     }).join('')}
-                </tr>
-                `).join('')}
+                </tr>`;
+                }).join('')}
             </tbody>
         </table>
         
