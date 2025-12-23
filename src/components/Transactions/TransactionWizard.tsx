@@ -543,20 +543,20 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   // Cleanup wizard draft when closing without saving (prevents orphan records)
   const cleanupWizardDraft = async () => {
     if (!draftTransactionId) return
-    
+
     // Only cleanup if this is a wizard-created draft (not edit mode)
     if (mode === 'edit') return
-    
+
     try {
       const { supabase } = await import('../../utils/supabase')
-      
+
       // Delete the wizard draft transaction (cascade will delete lines)
       const { error } = await supabase
         .from('transactions')
         .delete()
         .eq('id', draftTransactionId)
         .eq('is_wizard_draft', true) // Safety: only delete if it's a wizard draft
-      
+
       if (error) {
         console.error('Failed to cleanup wizard draft:', error)
       } else {
@@ -570,10 +570,10 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   // Convert wizard draft to real transaction (remove draft flag)
   const finalizeWizardDraft = async () => {
     if (!draftTransactionId) return
-    
+
     try {
       const { supabase } = await import('../../utils/supabase')
-      
+
       // Remove wizard draft flag - transaction becomes permanent
       const { error } = await supabase
         .from('transactions')
@@ -582,7 +582,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
           wizard_draft_created_at: null
         })
         .eq('id', draftTransactionId)
-      
+
       if (error) {
         console.error('Failed to finalize wizard draft:', error)
       } else {
@@ -597,11 +597,11 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   const handleCloseWithCleanup = async () => {
     // Cleanup any wizard draft before closing
     await cleanupWizardDraft()
-    
+
     // Reset state
     setDraftTransactionId(null)
     setDraftLineIds({})
-    
+
     // Call the original onClose
     onClose()
   }
@@ -734,7 +734,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       await onSubmit(finalData)
       // Finalize wizard draft (remove draft flag) if one was created
       await finalizeWizardDraft()
-      
+
       setErrors({ success: '✅ تم حفظ المعاملة كمسودة بنجاح!' })
 
       setTimeout(() => {
@@ -955,13 +955,21 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       case 'sub_tree_id': {
         const subTreeOptions = effectiveCategories
           .filter(c => c.org_id === (line.org_id || headerData.org_id))
+          .filter(c => {
+            // Strictly filter by account if an account is selected on this line
+            // User requested to hide generic categories if an account is selected to prevent confusion.
+            if (!line.account_id) return true;
+            return c.linked_account_id === line.account_id;
+          })
           .map(c => ({ value: c.id, label: `${c.code} - ${c.description}` }))
+
         return (
           <SearchableSelect
             options={subTreeOptions}
             value={line.sub_tree_id || ''}
             onChange={(val) => updateLine(idx, { sub_tree_id: val || undefined })}
-            placeholder="بدون شجرة فرعية"
+            placeholder={subTreeOptions.length === 0 && line.account_id ? "لا توجد فئات مرتبطة بهذا الحساب" : "بدون شجرة فرعية"}
+            disabled={line.account_id && subTreeOptions.length === 0}
           />
         )
       }
@@ -1278,7 +1286,17 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                                 <SearchableSelect
                                   options={accountOptions}
                                   value={line.account_id}
-                                  onChange={(val) => updateLine(idx, { account_id: val })}
+                                  onChange={(val) => {
+                                    const updates: Partial<TxLine> = { account_id: val }
+                                    // Automatically clear sub_tree_id if it's not linked to the new account
+                                    if (val && line.sub_tree_id) {
+                                      const category = effectiveCategories.find(c => c.id === line.sub_tree_id)
+                                      if (category && category.linked_account_id && category.linked_account_id !== val) {
+                                        updates.sub_tree_id = undefined
+                                      }
+                                    }
+                                    updateLine(idx, updates)
+                                  }}
                                   placeholder="اختر الحساب..."
                                   error={!!errors[`line_${idx}_account`]}
                                 />
@@ -1466,14 +1484,14 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                                           <AttachFile sx={{ fontSize: 18 }} />
                                           مرفقات السطر {idx + 1}
                                         </Typography>
-                                        
+
                                         {/* Show staged files */}
                                         {lineAttachments[idx] && lineAttachments[idx].length > 0 && (
                                           <Box sx={{ marginBottom: '12px' }}>
                                             {lineAttachments[idx].map((file, fileIdx) => (
-                                              <Box key={fileIdx} sx={{ 
-                                                display: 'flex', 
-                                                alignItems: 'center', 
+                                              <Box key={fileIdx} sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
                                                 justifyContent: 'space-between',
                                                 padding: '8px 12px',
                                                 background: '#1e293b',
@@ -1499,7 +1517,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                                             ))}
                                           </Box>
                                         )}
-                                        
+
                                         {/* Two options: Quick upload OR Full document management */}
                                         <Box sx={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
                                           {/* Option 1: Quick file upload (staged) */}
@@ -1534,7 +1552,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                                               رفع ملف جديد
                                             </Button>
                                           </label>
-                                          
+
                                           {/* Option 2: Enable full document management (link existing, templates, etc.) */}
                                           <Button
                                             variant="contained"
@@ -1550,7 +1568,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                                             🔗 ربط مستند موجود
                                           </Button>
                                         </Box>
-                                        
+
                                         <Typography variant="caption" sx={{ display: 'block', color: '#64748b', marginTop: '8px', textAlign: 'center' }}>
                                           رفع ملف جديد: سيتم الرفع عند الحفظ | ربط مستند موجود: يفتح إدارة المستندات الكاملة
                                         </Typography>
