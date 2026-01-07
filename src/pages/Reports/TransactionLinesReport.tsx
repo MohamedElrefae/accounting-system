@@ -422,71 +422,110 @@ const TransactionLinesReportPage = () => {
 
     // Export data
     const exportData = useMemo(() => {
-        const visibleCols = (columns || []).filter(c => c.visible)
+        let visibleCols = (columns || []).filter(c => c.visible)
+
+        if (isSummaryMode && isGrouped) {
+            // In summary mode, we only want: Dimension Name, Debit, Credit, Balance
+            const mapping: Record<string, string> = {
+                org_id: 'organization_label',
+                project_id: 'project_label',
+                account_id: 'account_label',
+                cost_center_id: 'cost_center_label',
+                work_item_id: 'work_item_label',
+                analysis_work_item_id: 'analysis_work_item_label',
+                sub_tree_id: 'sub_tree_label',
+                classification_id: 'classification_label',
+            }
+            const labelKey = mapping[grouping] || (grouping.includes('_id') ? grouping.replace('_id', '_label') : grouping)
+            const primaryCol = columns.find(c => c.key === labelKey) || visibleCols[0]
+
+            visibleCols = [
+                { ...primaryCol, label: primaryCol.label },
+                columns.find(c => c.key === 'debit_amount')!,
+                columns.find(c => c.key === 'credit_amount')!,
+            ].filter(Boolean)
+        }
+
         const defs = visibleCols.map(col => ({
             key: col.key,
             header: col.label,
             type: (col.type === 'currency' ? 'currency' : col.type === 'date' ? 'date' : col.type === 'number' ? 'number' : 'text') as any,
         }))
 
+        // Add calculated Balance column in Summary Mode
+        if (isSummaryMode && isGrouped) {
+            defs.push({ key: 'balance', header: 'الرصيد', type: 'currency' as any })
+        }
+
         const finalExportRows: any[] = []
 
         if (isGrouped && groupedData) {
             groupedData.forEach(group => {
-                // Add group header row
-                const headerRow: any = {}
-                visibleCols.forEach(col => {
-                    if (col.key === visibleCols[0].key) headerRow[col.key] = `📂 ${group.groupName}`
-                    else headerRow[col.key] = ''
-                })
-                headerRow._isGroupHeader = true
-                finalExportRows.push(headerRow)
+                if (isSummaryMode) {
+                    // Professional Summary: One row per group
+                    const summaryRow: any = {}
+                    summaryRow[visibleCols[0].key] = group.groupName
+                    summaryRow['debit_amount'] = group.subtotal.debit
+                    summaryRow['credit_amount'] = group.subtotal.credit
+                    summaryRow['balance'] = group.subtotal.balance
+                    finalExportRows.push(summaryRow)
+                } else {
+                    // Standard Detailed Grouped Report
+                    const headerRow: any = {}
+                    visibleCols.forEach(col => {
+                        if (col.key === visibleCols[0].key) headerRow[col.key] = `📂 ${group.groupName}`
+                        else headerRow[col.key] = ''
+                    })
+                    headerRow._isGroupHeader = true
+                    finalExportRows.push(headerRow)
 
-                // Add group lines - Skip if in Summary Mode
-                if (!isSummaryMode) {
                     const groupLines = getTableDataForLines(group.lines)
                     groupLines.forEach(line => {
                         const out: any = {}
                         visibleCols.forEach(col => { out[col.key] = (line as any)[col.key] })
                         finalExportRows.push(out)
                     })
-                }
 
-                // Add subtotal row
-                const subtotalRow: any = {}
-                visibleCols.forEach(col => {
-                    if (col.key === 'debit_amount') subtotalRow[col.key] = group.subtotal.debit
-                    else if (col.key === 'credit_amount') subtotalRow[col.key] = group.subtotal.credit
-                    else if (col.key === visibleCols[0].key) subtotalRow[col.key] = `إجمالي: ${group.groupName}`
-                    else subtotalRow[col.key] = ''
-                })
-                subtotalRow._isSubtotal = true
-                finalExportRows.push(subtotalRow)
-                finalExportRows.push({}) // spacing
+                    const subtotalRow: any = {}
+                    visibleCols.forEach(col => {
+                        if (col.key === 'debit_amount') subtotalRow[col.key] = group.subtotal.debit
+                        else if (col.key === 'credit_amount') subtotalRow[col.key] = group.subtotal.credit
+                        else if (col.key === visibleCols[0].key) subtotalRow[col.key] = `إجمالي: ${group.groupName}`
+                        else subtotalRow[col.key] = ''
+                    })
+                    subtotalRow._isSubtotal = true
+                    finalExportRows.push(subtotalRow)
+                    finalExportRows.push({}) // spacing
+                }
             })
 
             // Add grand total
             const grandRow: any = {}
-            visibleCols.forEach(col => {
-                if (col.key === 'debit_amount') grandRow[col.key] = grandTotal.debit
-                else if (col.key === 'credit_amount') grandRow[col.key] = grandTotal.credit
-                else if (col.key === visibleCols[0].key) grandRow[col.key] = 'الإجمالي العام'
-                else grandRow[col.key] = ''
-            })
+            if (isSummaryMode) {
+                grandRow[visibleCols[0].key] = 'الإجمالي العام'
+                grandRow['debit_amount'] = grandTotal.debit
+                grandRow['credit_amount'] = grandTotal.credit
+                grandRow['balance'] = grandTotal.balance
+            } else {
+                visibleCols.forEach(col => {
+                    if (col.key === 'debit_amount') grandRow[col.key] = grandTotal.debit
+                    else if (col.key === 'credit_amount') grandRow[col.key] = grandTotal.credit
+                    else if (col.key === visibleCols[0].key) grandRow[col.key] = 'الإجمالي العام'
+                    else grandRow[col.key] = ''
+                })
+            }
             grandRow._isGrandTotal = true
             finalExportRows.push(grandRow)
         } else {
             tableData.forEach((row: any) => {
                 const out: any = {}
-                visibleCols.forEach(col => {
-                    out[col.key] = row[col.key]
-                })
+                visibleCols.forEach(col => { out[col.key] = row[col.key] })
                 finalExportRows.push(out)
             })
         }
 
         return prepareTableData(createStandardColumns(defs as any), finalExportRows)
-    }, [columns, isGrouped, groupedData, getTableDataForLines, isSummaryMode, grandTotal.debit, grandTotal.credit, tableData])
+    }, [columns, isGrouped, groupedData, getTableDataForLines, isSummaryMode, grandTotal.debit, grandTotal.credit, grandTotal.balance, tableData, grouping])
 
     // Global refresh handler
     useEffect(() => {
