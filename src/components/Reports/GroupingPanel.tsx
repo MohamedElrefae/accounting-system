@@ -1,4 +1,3 @@
-
 interface ReportControlsProps {
     selectedGrouping: string
     onGroupingChange: (grouping: string) => void
@@ -6,6 +5,8 @@ interface ReportControlsProps {
     onSortFieldChange: (field: string) => void
     sortOrder: 'asc' | 'desc'
     onSortOrderChange: (order: 'asc' | 'desc') => void
+    isSummaryMode?: boolean
+    onSummaryModeChange?: (mode: boolean) => void
 }
 
 const groupingOptions = [
@@ -40,9 +41,31 @@ export function ReportControls({
     onSortFieldChange,
     sortOrder,
     onSortOrderChange,
+    isSummaryMode = false,
+    onSummaryModeChange,
 }: ReportControlsProps) {
     return (
         <div className="report-grouping-panel" style={{ flexWrap: 'wrap', gap: '24px' }}>
+            {/* View Mode Toggle */}
+            <div className="grouping-label-container" style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: '24px' }}>
+                <span className="grouping-label">نمط العرض:</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                        className={`ultimate-btn ${!isSummaryMode ? 'ultimate-btn-success' : 'ultimate-btn-neutral'}`}
+                        onClick={() => onSummaryModeChange?.(false)}
+                        style={{ padding: '4px 12px', height: '32px', minHeight: 'unset', fontSize: '12px' }}
+                    >
+                        تفصيلي
+                    </button>
+                    <button
+                        className={`ultimate-btn ${isSummaryMode ? 'ultimate-btn-success' : 'ultimate-btn-neutral'}`}
+                        onClick={() => onSummaryModeChange?.(true)}
+                        style={{ padding: '4px 12px', height: '32px', minHeight: 'unset', fontSize: '12px' }}
+                    >
+                        ملخص
+                    </button>
+                </div>
+            </div>
             <div className="grouping-label-container">
                 <span className="grouping-label">تجميع حسب:</span>
                 <select

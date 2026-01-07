@@ -58,6 +58,9 @@ const TransactionLinesReportPage = () => {
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
         try { return (localStorage.getItem('transaction_lines_report_sort_order') as 'asc' | 'desc') || 'desc' } catch { return 'desc' }
     })
+    const [isSummaryMode, setIsSummaryMode] = useState<boolean>(() => {
+        try { return localStorage.getItem('transaction_lines_report_summary_mode') === '1' } catch { return false }
+    })
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
 
     const toggleGroup = useCallback((groupKey: string) => {
@@ -82,6 +85,12 @@ const TransactionLinesReportPage = () => {
             localStorage.setItem('transaction_lines_report_sort_order', sortOrder)
         } catch { }
     }, [sortField, sortOrder])
+
+    useEffect(() => {
+        try { localStorage.setItem('transaction_lines_report_summary_mode', isSummaryMode ? '1' : '0') } catch { }
+        // Clear expanded state when switching modes to apply defaults
+        setExpandedGroups({})
+    }, [isSummaryMode])
 
     const handleApplyFiltersWithPaging = useCallback(() => {
         handleApplyFilters()
@@ -433,13 +442,15 @@ const TransactionLinesReportPage = () => {
                 headerRow._isGroupHeader = true
                 finalExportRows.push(headerRow)
 
-                // Add group lines
-                const groupLines = getTableDataForLines(group.lines)
-                groupLines.forEach(line => {
-                    const out: any = {}
-                    visibleCols.forEach(col => { out[col.key] = (line as any)[col.key] })
-                    finalExportRows.push(out)
-                })
+                // Add group lines - Skip if in Summary Mode
+                if (!isSummaryMode) {
+                    const groupLines = getTableDataForLines(group.lines)
+                    groupLines.forEach(line => {
+                        const out: any = {}
+                        visibleCols.forEach(col => { out[col.key] = (line as any)[col.key] })
+                        finalExportRows.push(out)
+                    })
+                }
 
                 // Add subtotal row
                 const subtotalRow: any = {}
@@ -475,7 +486,7 @@ const TransactionLinesReportPage = () => {
         }
 
         return prepareTableData(createStandardColumns(defs as any), finalExportRows)
-    }, [columns, tableData, isGrouped, groupedData, grandTotal, getTableDataForLines])
+    }, [columns, isGrouped, groupedData, getTableDataForLines, isSummaryMode, grandTotal.debit, grandTotal.credit, tableData])
 
     // Global refresh handler
     useEffect(() => {
@@ -531,13 +542,17 @@ const TransactionLinesReportPage = () => {
                 onSortFieldChange={setSortField}
                 sortOrder={sortOrder}
                 onSortOrderChange={setSortOrder}
+                isSummaryMode={isSummaryMode}
+                onSummaryModeChange={setIsSummaryMode}
             />
 
             <div className="transactions-content" style={{ display: 'flex', flexDirection: 'column', gap: '20px', overflow: 'auto', paddingBottom: '40px' }}>
                 {isGrouped && groupedData ? (
                     <div className="grouped-view" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                         {groupedData.map(group => {
-                            const isExpanded = expandedGroups[group.groupKey] !== false
+                            const isExpanded = isSummaryMode
+                                ? (expandedGroups[group.groupKey] === true)
+                                : (expandedGroups[group.groupKey] !== false)
                             return (
                                 <div key={group.groupKey} className="group-container" style={{
                                     border: '1px solid #e5e7eb',
