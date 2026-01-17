@@ -24,7 +24,7 @@ export interface OrgMemberWithUser {
 }
 
 // Feature flag to allow using mock in development without touching DB
-const USE_MOCK = (import.meta as { env?: { VITE_USE_MOCK_ORG?: string } }).env?.VITE_USE_MOCK_ORG === '1';
+const USE_MOCK = import.meta.env.DEV && (import.meta as { env?: { VITE_USE_MOCK_ORG?: string } }).env?.VITE_USE_MOCK_ORG === '1';
 
 // In-memory mock store (dev only)
 const mockStore: { memberships: OrgMemberWithUser[] } = {
@@ -33,10 +33,16 @@ const mockStore: { memberships: OrgMemberWithUser[] } = {
 
 export async function listOrgMembers(orgId: string): Promise<OrgMemberWithUser[]> {
   if (USE_MOCK) {
+    console.log('[org-memberships] Using MOCK data for listOrgMembers');
     return mockStore.memberships.filter(m => m.org_id === orgId);
   }
+  console.log('[org-memberships] Using SUPABASE for listOrgMembers', { orgId });
   const { data, error } = await supabase.rpc('org_members_list', { p_org_id: orgId });
-  if (error) throw error;
+  if (error) {
+    console.error('[org-memberships] Error in org_members_list:', error);
+    throw error;
+  }
+  console.log('[org-memberships] org_members_list result:', { count: data?.length });
   return (data || []).map((r: any) => ({
     org_id: r.org_id,
     user_id: r.user_id,
@@ -85,6 +91,7 @@ export async function removeOrgMember(orgId: string, userId: string): Promise<vo
 
 export async function searchUsersNotInOrg(orgId: string, query: string, limit = 20) {
   if (USE_MOCK) {
+    console.log('[org-memberships] Using MOCK data for searchUsersNotInOrg');
     const pool = Array.from({ length: 20 }).map((_, i) => ({
       id: `mock-user-${i+1}`,
       email: `mock${i+1}@example.com`,
@@ -98,7 +105,12 @@ export async function searchUsersNotInOrg(orgId: string, query: string, limit = 
     return pool.filter(u => !existing.has(u.id) && (!query || u.email.includes(query))).slice(0, limit);
   }
 
+  console.log('[org-memberships] Using SUPABASE for searchUsersNotInOrg', { orgId, query, limit });
   const { data, error } = await supabase.rpc('org_users_not_in', { p_org_id: orgId, p_query: query || '', p_limit: limit });
-  if (error) throw error;
+  if (error) {
+    console.error('[org-memberships] Error in org_users_not_in:', error);
+    throw error;
+  }
+  console.log('[org-memberships] org_users_not_in result:', { count: data?.length });
   return data as any[];
 }
