@@ -20,9 +20,13 @@ interface PerformanceMetric {
 
 // Check if Sentry is available and should be active
 const isSentryEnabled = (): boolean => {
-  // Only enable Sentry if DSN is set AND we are NOT in development
-  // This prevents ad-blockers from cluttering the console with ERR_BLOCKED_BY_CLIENT
-  return !!(import.meta.env.VITE_SENTRY_DSN && typeof window !== 'undefined' && import.meta.env.PROD);
+  // DISABLED: Sentry is causing ERR_BLOCKED_BY_CLIENT errors due to ad-blockers
+  // CSP is correctly configured, but browser extensions block Sentry requests
+  // This creates console noise without providing benefits
+  return false;
+  
+  // Original logic (commented out):
+  // return !!(import.meta.env.VITE_SENTRY_DSN && typeof window !== 'undefined' && import.meta.env.PROD);
 };
 
 // Initialize error tracking (call this in main.tsx)
