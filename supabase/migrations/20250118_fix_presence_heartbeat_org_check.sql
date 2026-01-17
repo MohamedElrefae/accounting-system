@@ -2,6 +2,9 @@
 -- Fix presence heartbeat to use user's default org if no org_id provided
 SET search_path = public;
 
+-- Drop existing function first (it has different return type)
+DROP FUNCTION IF EXISTS public.rpc_presence_heartbeat(uuid, jsonb);
+
 -- Update the presence heartbeat function to handle cases where org_id is not provided
 -- or user is not a member of the specified org
 CREATE OR REPLACE FUNCTION public.rpc_presence_heartbeat(
