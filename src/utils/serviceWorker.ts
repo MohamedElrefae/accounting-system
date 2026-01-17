@@ -1,4 +1,5 @@
 // Service Worker Registration for Performance Optimization
+// Version: 2.0.1 - Updated CSP for Google Fonts
 
 const isLocalhost = Boolean(
   window.location.hostname === 'localhost' ||
