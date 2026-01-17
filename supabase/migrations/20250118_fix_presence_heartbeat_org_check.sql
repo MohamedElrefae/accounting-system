@@ -11,13 +11,7 @@ CREATE OR REPLACE FUNCTION public.rpc_presence_heartbeat(
   p_org_id uuid DEFAULT NULL,
   p_metadata jsonb DEFAULT '{}'::jsonb
 )
-RETURNS TABLE (
-  success boolean,
-  message text,
-  user_id uuid,
-  org_id uuid,
-  last_active_at timestamptz
-)
+RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_catalog
@@ -65,14 +59,6 @@ BEGIN
   DO UPDATE SET
     last_active_at = NOW(),
     metadata = p_metadata;
-  
-  -- Return success response
-  RETURN QUERY SELECT 
-    true as success,
-    'Heartbeat recorded' as message,
-    v_user_id as user_id,
-    v_effective_org_id as org_id,
-    NOW() as last_active_at;
 END;
 $$;
 
