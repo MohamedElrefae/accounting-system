@@ -46,7 +46,7 @@ BEGIN
   -- Check if user can access organization
   BEGIN
     v_can_access := public.is_super_admin() 
-      OR public.fn_is_org_member(v_effective_org_id);
+      OR public.fn_is_org_member(v_effective_org_id, v_user_id);
   EXCEPTION WHEN OTHERS THEN
     -- If permission check fails, assume no access
     v_can_access := false;
@@ -72,7 +72,7 @@ BEGIN
     INSERT INTO public.user_presence_heartbeats (
       user_id,
       org_id,
-      last_active_at,
+      last_seen_at,
       metadata
     ) VALUES (
       v_user_id,
@@ -82,7 +82,7 @@ BEGIN
     )
     ON CONFLICT (user_id, org_id) 
     DO UPDATE SET
-      last_active_at = NOW(),
+      last_seen_at = NOW(),
       metadata = p_metadata;
   EXCEPTION WHEN OTHERS THEN
     -- Silently fail on heartbeat errors to avoid breaking app
