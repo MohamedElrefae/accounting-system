@@ -118,7 +118,7 @@ let authState: OptimizedAuthState = {
   resolvedPermissions: null,
 };
 
-let authListeners: Set<(state: OptimizedAuthState) => void> = new Set();
+const authListeners: Set<(state: OptimizedAuthState) => void> = new Set();
 let authInitialized = false;
 
 // Permission caches for ultra-fast lookups
@@ -367,7 +367,7 @@ const loadAuthData = async (userId: string) => {
       cacheHit: true,
       rpcSuccess: false,
       profileSuccess: false,
-      networkType: navigator.connection?.effectiveType
+      networkType: 'unknown' // navigator.connection is not available in all browsers
     });
     
     // Still fetch fresh data in background to update cache
@@ -381,16 +381,14 @@ const loadAuthData = async (userId: string) => {
       const parallelStart = performance.now();
 
       const [profileResult, rpcResult] = await Promise.allSettled([
-        withTimeout(
-          supabase.from('user_profiles').select('*').eq('id', userId).single(),
-          3000,
-          'Profile query timeout'
-        ),
-        withTimeout(
-          supabase.rpc('get_user_auth_data', { p_user_id: userId }),
-          3000,
-          'RPC query timeout'
-        ),
+        (async () => {
+          const result = await supabase.from('user_profiles').select('*').eq('id', userId).single();
+          return result;
+        })(),
+        (async () => {
+          const result = await supabase.rpc('get_user_auth_data', { p_user_id: userId });
+          return result;
+        })()
       ]);
 
       const tryUseRpc = () => {
@@ -434,7 +432,7 @@ const loadAuthData = async (userId: string) => {
           cacheHit: false,
           rpcSuccess: true,
           profileSuccess: false,
-          networkType: navigator.connection?.effectiveType,
+          networkType: 'unknown'
         });
 
         clearCaches();
@@ -471,7 +469,7 @@ const loadAuthData = async (userId: string) => {
           cacheHit: false,
           rpcSuccess: false,
           profileSuccess: true,
-          networkType: navigator.connection?.effectiveType,
+          networkType: 'unknown'
         });
 
         clearCaches();
@@ -551,7 +549,7 @@ const loadAuthData = async (userId: string) => {
         cacheHit: false,
         rpcSuccess: true,
         profileSuccess: false,
-        networkType: navigator.connection?.effectiveType
+        networkType: 'unknown'
       });
       
       clearCaches();
@@ -621,7 +619,7 @@ const loadAuthData = async (userId: string) => {
       cacheHit: false,
       rpcSuccess: false,
       profileSuccess: true,
-      networkType: navigator.connection?.effectiveType
+      networkType: 'unknown'
     });
     
     clearCaches();
@@ -860,6 +858,127 @@ const signOut = async () => {
   notifyListeners();
 };
 
+const signUp = async (email: string, password: string) => {
+  try {
+    console.log('🔍 Checking approval for email:', email.toLowerCase());
+    
+    // First check if email is approved - use case-insensitive query
+    const { data: approvedRequests, error: approvalError } = await supabase
+      .from('access_requests')
+      .select('email, status, full_name_ar, phone, department, job_title, assigned_role')
+      .ilike('email', email.toLowerCase())
+      .eq('status', 'approved');
+
+    console.log('📊 Approval query result:', { data: approvedRequests, error: approvalError });
+
+    if (approvalError) {
+      console.error('❌ Approval query error:', approvalError);
+      // Try alternative query if ilike doesn't work
+      const { data: fallbackRequests, error: fallbackError } = await supabase
+        .from('access_requests')
+        .select('email, status, full_name_ar, phone, department, job_title, assigned_role')
+        .eq('email', email)
+        .eq('status', 'approved');
+      
+      console.log('🔄 Fallback query result:', { data: fallbackRequests, error: fallbackError });
+      
+      if (fallbackError || !fallbackRequests || fallbackRequests.length === 0) {
+        throw new Error(`خطأ في التحقق من الموافقة: ${approvalError.message}`);
+      }
+      
+      // Use fallback results
+      return await processApprovedRequest(fallbackRequests[0], email, password);
+    }
+
+    if (!approvedRequests || approvedRequests.length === 0) {
+      console.log('❌ No approved request found for email:', email.toLowerCase());
+      
+      // Debug: Check what emails are actually approved
+      const { data: allApproved } = await supabase
+        .from('access_requests')
+        .select('email, status')
+        .eq('status', 'approved');
+      
+      console.log('🔍 All approved emails in database:', allApproved);
+      
+      throw new Error('هذا البريد الإلكتروني غير معتمد للتسجيل. يرجى طلب الوصول أولاً.');
+    }
+
+    return await processApprovedRequest(approvedRequests[0], email, password);
+  } catch (error) {
+    console.error('❌ Signup error:', error);
+    throw error;
+  }
+};
+
+// Helper function to process approved request and create user
+const processApprovedRequest = async (approvedRequest: any, email: string, password: string) => {
+  console.log('✅ Found approved request:', approvedRequest);
+
+  // Create the user account
+  const { data, error } = await supabase.auth.signUp({ 
+    email, 
+    password,
+    options: {
+      data: {
+        full_name: approvedRequest.full_name_ar,
+        phone: approvedRequest.phone,
+        department: approvedRequest.department,
+        job_title: approvedRequest.job_title,
+      }
+    }
+  });
+
+  if (error) {
+    console.error('❌ Supabase auth signup error:', error);
+    throw error;
+  }
+
+  console.log('✅ Supabase auth signup successful:', data);
+
+  // If user creation successful, create user profile
+  if (data.user) {
+    const { error: profileError } = await supabase
+      .from('user_profiles')
+      .upsert({
+        id: data.user.id,
+        email: data.user.email,
+        full_name_ar: approvedRequest.full_name_ar,
+        phone: approvedRequest.phone,
+        department: approvedRequest.department,
+        job_title: approvedRequest.job_title,
+        role: approvedRequest.assigned_role || 'user',
+        is_super_admin: approvedRequest.assigned_role === 'admin',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+    if (profileError) {
+      console.warn('⚠️ Profile creation failed, but user was created:', profileError);
+      // Don't throw error - user account exists, profile can be fixed later
+    } else {
+      console.log('✅ User profile created successfully');
+    }
+  }
+
+  return data;
+};
+
+// Refresh profile function for manual profile reload
+const refreshProfile = async () => {
+  if (!authState.user?.id) {
+    console.warn('[Auth] Cannot refresh profile: no user ID');
+    return;
+  }
+  
+  try {
+    await loadAuthData(authState.user.id);
+  } catch (error) {
+    console.error('[Auth] Failed to refresh profile:', error);
+    throw error;
+  }
+};
+
 // Optimized auth hook
 export const useOptimizedAuth = () => {
   const [state, setState] = useState(authState);
@@ -896,6 +1015,8 @@ export const useOptimizedAuth = () => {
     hasActionAccess: hasActionAccessMemo,
     signIn,
     signOut,
+    signUp,
+    refreshProfile,
   };
 };
 

@@ -1,5 +1,5 @@
 -- ============================================================================
--- Add Missing Datasets: المعاملات and القيود التفصيلية
+-- Add Missing Datasets: المعاملات, القيود التفصيلية, تحليل سطور المعاملات
 -- Run this in Supabase SQL Editor
 -- ============================================================================
 
@@ -18,11 +18,23 @@ WHERE NOT EXISTS (
   SELECT 1 FROM report_datasets WHERE table_name = 'transactions'
 );
 
--- Add القيود التفصيلية (transaction_line_items) if not exists
+-- Add القيود التفصيلية (transaction_lines) if not exists
 INSERT INTO report_datasets (name, description, table_name, allowed_fields, is_active)
 SELECT 
   'القيود التفصيلية', 
-  'تحليل سطور المعاملات والقيود المحاسبية التفصيلية', 
+  'القيود المحاسبية التفصيلية لكل معاملة', 
+  'transaction_lines', 
+  ARRAY['id', 'transaction_id', 'line_number', 'account_id', 'debit_amount', 'credit_amount', 'description', 'work_item_id', 'cost_center_id', 'classification_id', 'expenses_category_id', 'project_id', 'status', 'created_at', 'updated_at', 'org_id'], 
+  true
+WHERE NOT EXISTS (
+  SELECT 1 FROM report_datasets WHERE table_name = 'transaction_lines'
+);
+
+-- Add تحليل سطور المعاملات (transaction_line_items) if not exists
+INSERT INTO report_datasets (name, description, table_name, allowed_fields, is_active)
+SELECT 
+  'تحليل سطور المعاملات', 
+  'تحليل وتفاصيل سطور المعاملات المالية', 
   'transaction_line_items', 
   ARRAY['id', 'transaction_id', 'line_number', 'account_id', 'debit_amount', 'credit_amount', 'description', 'work_item_id', 'cost_center_id', 'classification_id', 'expenses_category_id', 'project_id', 'status', 'created_at', 'updated_at', 'org_id'], 
   true

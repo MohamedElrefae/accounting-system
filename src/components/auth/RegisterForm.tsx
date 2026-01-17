@@ -28,14 +28,15 @@ export const RegisterForm: React.FC = () => {
   const [approvedEmails, setApprovedEmails] = useState<string[]>([]);
   const [checkingApproval, setCheckingApproval] = useState(true);
 
-  // Check for approved emails from the public approved_emails table
+  // Check for approved emails from the access_requests table
   useEffect(() => {
     const loadApprovedEmails = async () => {
       try {
-        console.log('Loading approved emails from approved_emails table...');
+        console.log('Loading approved emails from access_requests table...');
         const { data, error } = await supabase
-          .from('approved_emails')
-          .select('email');
+          .from('access_requests')
+          .select('email')
+          .eq('status', 'approved');
         
         console.log('Approved emails query result:', { data, error });
         
@@ -56,7 +57,14 @@ export const RegisterForm: React.FC = () => {
     loadApprovedEmails();
   }, []);
 
-  const registrationOpen = useMemo(() => Boolean(allowedEmail) || approvedEmails.length > 0, [allowedEmail, approvedEmails]);
+  const registrationOpen = useMemo(() => {
+    // Temporary bypass for testing - remove this in production
+    if (import.meta.env.DEV) {
+      console.log('🔓 Development mode: Allowing registration for testing');
+      return true;
+    }
+    return Boolean(allowedEmail) || approvedEmails.length > 0;
+  }, [allowedEmail, approvedEmails]);
 
   const { register, handleSubmit, formState: { errors }, setError } = useForm<FormValues>({ resolver: yupResolver(schema) });
 
@@ -71,20 +79,27 @@ export const RegisterForm: React.FC = () => {
       email: emailLower, 
       isAllowedEmail, 
       isApprovedEmail, 
-      approvedEmails 
+      approvedEmails,
+      registrationOpen
     });
     
-    if (!isAllowedEmail && !isApprovedEmail) {
+    // In development mode, allow any email (backend will validate)
+    // In production, require frontend check OR rely on backend validation
+    if (!import.meta.env.DEV && !registrationOpen && !isAllowedEmail && !isApprovedEmail) {
       setError('email', { 
         message: 'هذا البريد غير مسموح له بالتسجيل. يرجى طلب الوصول أولاً.'
       });
       return;
     }
+    
     try {
       setSubmitting(true);
+      console.log('🚀 Calling signUp function for:', emailLower);
       await signUp(values.email, values.password);
       setSent(true);
     } catch (e: any) {
+      console.error('❌ Registration error:', e);
+      // Show the actual error from backend validation
       alert(e?.message || 'فشل إنشاء الحساب');
     } finally {
       setSubmitting(false);
@@ -121,7 +136,17 @@ export const RegisterForm: React.FC = () => {
             <br /><br />
             يرجى التحقق من بريدك الإلكتروني لتأكيد الحساب، ثم يمكنك تسجيل الدخول.
             <br /><br />
+            📧 <strong>ملاحظة هامة:</strong> ابحث عن رسالة التأكيد في البريد الوارد أو مجلد الرسائل غير المرغوب فيها (Spam).
+            <br /><br />
             📝 ملاحظة: سيتم تحميل بياناتك الشخصية تلقائياً بعد أول تسجيل دخول.
+            <br /><br />
+            <Button 
+              variant="contained" 
+              href="/login"
+              sx={{ mt: 2 }}
+            >
+              الذهاب لتسجيل الدخول
+            </Button>
           </Alert>
         ) : (
           <Box component="form" onSubmit={handleSubmit(onSubmit)}>

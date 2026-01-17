@@ -319,7 +319,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
         }
       }
     }
-  }, [config, formData]); // Trigger on full form data to satisfy exhaustive-deps
+  }, [config, formData, initialData]);
 
   // Handle async options loading for fields with optionsProvider
   useEffect(() => {

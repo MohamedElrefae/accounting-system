@@ -1,18 +1,18 @@
-import { useState, useEffect } from 'react'
-import { useArabicLanguage } from '@/services/ArabicLanguageService'
-import './FiscalPages.css'
-
-interface FiscalYear {
-  id: string
-  code: string
-  name: string
-  startDate: string
-  endDate: string
-  status: 'draft' | 'active' | 'closed'
-  totalPeriods: number
-  totalTransactions: number
-  totalRevenue: number
-  totalExpenses: number
+import { useState } from 'react'
+import { 
+  IconButton, 
+  Menu, 
+  MenuItem, 
+  Dialog, 
+  DialogTitle, 
+  DialogContent, 
+  DialogActions, 
+  Button, 
+  Typography,
+  Chip,
+  Alert
+} from '@mui/material'
+import { MoreVert, Edit, Delete, Pla
 }
 
 export default function FiscalYearDashboardRefactored() {

@@ -28,10 +28,6 @@ const FontSettings: React.FC = () => {
 
   const { showToast } = useToast()
 
-  useEffect(() => {
-    loadPreferences()
-  }, [loadPreferences])
-
   const loadPreferences = useCallback(async () => {
     try {
       const userPrefs = await getUserFontPreferences()
@@ -53,6 +49,10 @@ const FontSettings: React.FC = () => {
       setLoading(false)
     }
   }, [showToast])
+
+  useEffect(() => {
+    loadPreferences()
+  }, [loadPreferences])
 
   const handlePreviewUpdate = (updates: Partial<typeof formData>) => {
     const newFormData = { ...formData, ...updates }
