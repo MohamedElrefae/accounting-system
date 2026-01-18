@@ -13,7 +13,6 @@ import { tokens } from '../../theme/tokens';
 import { useHasPermission } from '../../hooks/useHasPermission';
 import { debugAccountRollups, testRollupModes, testViewDirectly, manualRollupsCalculation } from '../../utils/debug-rollups';
 import { useScope } from '../../contexts/ScopeContext';
-import ScopeChips from '../../components/Scope/ScopeChips';
 
 interface AccountItem {
   id: string;
@@ -798,9 +797,6 @@ const AccountsTreePage: React.FC = () => {
       <div className="controls-container">
         <div className="controls-section">
         <div className="filters-row">
-          {/* Current Scope Display - Shows org/project from TopBar */}
-          <ScopeChips showLabels={false} size="small" variant="filled" />
-
           <input
             type="text"
             placeholder="بحث بالكود أو الاسم..."
