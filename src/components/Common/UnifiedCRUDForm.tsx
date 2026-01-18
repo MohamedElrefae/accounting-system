@@ -142,6 +142,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   const [showPasswordFields, setShowPasswordFields] = useState<{ [key: string]: boolean }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+  const lastInitialRecordKeyRef = useRef<string | null>(null);
   const storageKeyPrefix = React.useMemo(() => {
     const base = config.formId || config.title || 'default';
     return `unifiedForm:${base}:`;
@@ -264,17 +265,32 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   // Initialize form data
   useEffect(() => {
     // Only reset when explicitly allowed (default true to preserve existing consumers)
-    if (resetOnInitialDataChange) {
+    if (!resetOnInitialDataChange) return;
+
+    const nextKey = (initialData as Record<string, unknown>)?.id
+      ? String((initialData as Record<string, unknown>).id)
+      : null;
+    const prevKey = lastInitialRecordKeyRef.current;
+    const isRecordChange = nextKey !== prevKey;
+    const hasUserEdits = touchedFields.size > 0;
+
+    // Don't overwrite user edits just because the parent re-rendered and passed a new object.
+    // Only re-seed when switching to a different record (id changed) or when the user hasn't edited yet.
+    if (isRecordChange || !hasUserEdits) {
       setFormData(initialData);
       setValidationErrors([]);
       setAutoFilledFields([]);
       setTouchedFields(new Set());
+      lastInitialRecordKeyRef.current = nextKey;
     }
-  }, [initialData, resetOnInitialDataChange]);
+  }, [initialData, resetOnInitialDataChange, touchedFields.size]);
 
   // On first mount, always seed the form data from initialData
   useEffect(() => {
     setFormData(initialData);
+    lastInitialRecordKeyRef.current = (initialData as Record<string, unknown>)?.id
+      ? String((initialData as Record<string, unknown>).id)
+      : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
