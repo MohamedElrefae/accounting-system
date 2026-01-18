@@ -333,6 +333,35 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     setAutoFilledFields(prev => Array.from(new Set([...prev, ...fieldsAutoFilled])));
   }, [config.autoFillLogic, formData]);
 
+  // Check if field should be shown
+  const shouldShowField = useCallback((field: FormField): boolean => {
+    // Check visibility setting first
+    const isVisible = visibleFields.has(field.id);
+    if (!isVisible) {
+      // Debug logging for sub_tree_id specifically
+      if (field.id === 'sub_tree_id' && import.meta.env.DEV) {
+        console.log('🌳 sub_tree_id field not visible - visibleFields:', Array.from(visibleFields));
+        console.log('🌳 Form title:', config.title);
+      }
+      return false;
+    }
+    // Then check conditional logic
+    if (field.conditionalLogic) {
+      const conditionalResult = field.conditionalLogic(formData);
+      if (field.id === 'sub_tree_id' && import.meta.env.DEV) {
+        console.log('🌳 sub_tree_id conditional logic result:', conditionalResult);
+      }
+      return conditionalResult;
+    }
+
+    // Debug logging for sub_tree_id when it should be visible
+    if (field.id === 'sub_tree_id' && import.meta.env.DEV) {
+      console.log('🌳 sub_tree_id field should be visible');
+    }
+
+    return true;
+  }, [visibleFields, config.title, formData]);
+
   // Handle async options loading for fields with optionsProvider
   useEffect(() => {
     const loadAsyncOptions = async (field: FormField) => {
@@ -400,35 +429,6 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   const isFieldRequired = (field: FormField): boolean => {
     return field.required === true;
   };
-
-  // Check if field should be shown
-  const shouldShowField = useCallback((field: FormField): boolean => {
-    // Check visibility setting first
-    const isVisible = visibleFields.has(field.id);
-    if (!isVisible) {
-      // Debug logging for sub_tree_id specifically
-      if (field.id === 'sub_tree_id' && import.meta.env.DEV) {
-        console.log('🌳 sub_tree_id field not visible - visibleFields:', Array.from(visibleFields));
-        console.log('🌳 Form title:', config.title);
-      }
-      return false;
-    }
-    // Then check conditional logic
-    if (field.conditionalLogic) {
-      const conditionalResult = field.conditionalLogic(formData);
-      if (field.id === 'sub_tree_id' && import.meta.env.DEV) {
-        console.log('🌳 sub_tree_id conditional logic result:', conditionalResult);
-      }
-      return conditionalResult;
-    }
-
-    // Debug logging for sub_tree_id when it should be visible
-    if (field.id === 'sub_tree_id' && import.meta.env.DEV) {
-      console.log('🌳 sub_tree_id field should be visible');
-    }
-
-    return true;
-  }, [visibleFields, config.title, formData]);
 
   // Check if field is disabled due to unmet dependencies
   const isDisabledByDependency = useCallback((field: FormField): boolean => {
