@@ -63,6 +63,7 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
   const queryClient = useQueryClient();
   const mountedRef = useRef(true);
   const connectionHealthRef = useRef<ConnectionHealth | null>(null);
+  const connectionIssueRef = useRef<boolean>(false);
   
   // State
   const [currentOrg, setCurrentOrg] = useState<Organization | null>(null);
@@ -73,7 +74,7 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [connectionIssue, setConnectionIssue] = useState<boolean>(false);
+  const [_connectionIssue, setConnectionIssue] = useState<boolean>(false);
 
   // Load projects for a specific org with retry mechanism
   const loadProjectsForOrg = useCallback(async (orgId: string, retryCount = 0): Promise<Project[]> => {
@@ -203,13 +204,15 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
       connectionHealthRef.current = health;
       
       // If connection is restored and we have issues, try to reload
-      if (health.isOnline && connectionIssue) {
+      if (health.isOnline && connectionIssueRef.current) {
         if (import.meta.env.DEV) console.log('[ScopeProvider] Connection restored, reloading data...');
         loadOrganizations();
       }
       
       // Update connection issue state
-      setConnectionIssue(!health.isOnline);
+      const nextIssue = !health.isOnline;
+      connectionIssueRef.current = nextIssue;
+      setConnectionIssue(nextIssue);
     });
     
     // Initial load
@@ -219,7 +222,7 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
       mountedRef.current = false;
       unsubscribe();
     };
-  }, [loadOrganizations, connectionIssue]);
+  }, [loadOrganizations]);
 
   // Set organization - CLEARS PROJECT
   const setOrganization = useCallback(async (orgId: string | null) => {
