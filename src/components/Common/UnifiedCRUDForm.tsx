@@ -297,29 +297,41 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
 
   // Auto-fill logic - runs when formData changes or initially when config has auto-fill
   useEffect(() => {
-    if (config.autoFillLogic) {
-      const autoFilledData = config.autoFillLogic(formData);
-      if (Object.keys(autoFilledData).length > 0) {
-        // Only apply auto-fill if the field is empty or undefined
-        const fieldsToFill: Record<string, unknown> = {};
-        const fieldsAutoFilled: string[] = [];
+    const autoFillLogic = config.autoFillLogic;
+    if (!autoFillLogic) return;
 
-        Object.entries(autoFilledData).forEach(([key, value]) => {
-          const current = (formData as Record<string, unknown>)[key];
-          const isUnset = current === undefined || current === null || (typeof current === 'string' && current === '');
-          if (isUnset) {
-            (fieldsToFill as Record<string, unknown>)[key] = value as unknown;
-            fieldsAutoFilled.push(key);
-          }
-        });
+    const autoFilledData = autoFillLogic(formData);
+    if (!autoFilledData || Object.keys(autoFilledData).length === 0) return;
 
-        if (Object.keys(fieldsToFill).length > 0) {
-          setFormData((prev) => ({ ...prev, ...fieldsToFill }));
-          setAutoFilledFields(prev => Array.from(new Set([...prev, ...fieldsAutoFilled])));
-        }
+    // Only apply auto-fill if the field is empty or undefined
+    const fieldsToFill: Record<string, unknown> = {};
+    const fieldsAutoFilled: string[] = [];
+
+    Object.entries(autoFilledData).forEach(([key, value]) => {
+      const current = (formData as Record<string, unknown>)[key];
+      const isUnset = current === undefined || current === null || (typeof current === 'string' && current === '');
+      if (isUnset) {
+        (fieldsToFill as Record<string, unknown>)[key] = value as unknown;
+        fieldsAutoFilled.push(key);
+      }
+    });
+
+    if (Object.keys(fieldsToFill).length === 0) return;
+
+    // Guard: avoid triggering render loops if the computed merge doesn't change anything
+    let willChange = false;
+    for (const [k, v] of Object.entries(fieldsToFill)) {
+      const prevVal = (formData as Record<string, unknown>)[k];
+      if (prevVal !== v) {
+        willChange = true;
+        break;
       }
     }
-  }, [config, formData, initialData]);
+    if (!willChange) return;
+
+    setFormData((prev) => ({ ...prev, ...fieldsToFill }));
+    setAutoFilledFields(prev => Array.from(new Set([...prev, ...fieldsAutoFilled])));
+  }, [config.autoFillLogic, formData]);
 
   // Handle async options loading for fields with optionsProvider
   useEffect(() => {
@@ -372,7 +384,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       .forEach(field => {
         loadAsyncOptions(field);
       });
-  }, [config, fieldOptionKeys, fieldOptions, formData, visibleFields]);
+  }, [config, fieldOptionKeys, fieldOptions, formData, visibleFields, shouldShowField]);
 
   // Get field error
   const getFieldError = (fieldId: string): ValidationError | null => {

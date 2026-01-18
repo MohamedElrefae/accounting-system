@@ -6,7 +6,7 @@ import './AccountsTree.css';
 import { supabase } from '../../utils/supabase';
 import CurrencyFormatter from '../../components/Common/CurrencyFormatter';
 import { useToast } from '../../contexts/ToastContext';
-import UnifiedCRUDForm, { type UnifiedCRUDFormHandle } from '../../components/Common/UnifiedCRUDForm';
+import UnifiedCRUDForm from '../../components/Common/UnifiedCRUDForm';
 import { createAccountFormConfig } from '../../components/Accounts/AccountFormConfig';
 import DraggableResizablePanel from '../../components/Common/DraggableResizablePanel';
 import { tokens } from '../../theme/tokens';
@@ -137,7 +137,22 @@ const AccountsTreePage: React.FC = () => {
     }));
   }, [accounts]);
 
-  const formRef = React.useRef<UnifiedCRUDFormHandle>(null);
+  const formRef = useRef<any>(null);
+
+  const formInitialData = useMemo(() => ({
+    code: draft?.code || '',
+    name_ar: (draft?.name_ar || draft?.name || '') as string,
+    name_en: (draft as any)?.name || '',
+    account_type: (draft as any)?.account_type || (draft as any)?.category || '',
+    statement_type: '',
+    parent_id: (draft?.parent_id as string) || '',
+    is_active: ((draft?.status || 'active') === 'active'),
+    allow_transactions: (typeof (draft as any)?.allow_transactions === 'boolean')
+      ? (draft as any).allow_transactions
+      : (((draft?.level as number) || 1) >= 3),
+    level: (draft?.level as number) ?? 1,
+    is_standard: (draft as any)?.is_standard ?? false,
+  }), [draft]);
 
   // Persist config options
   useEffect(() => {
@@ -1005,20 +1020,7 @@ const AccountsTreePage: React.FC = () => {
             <UnifiedCRUDForm
               ref={formRef}
               config={unifiedConfig}
-              initialData={{
-                code: draft.code || '',
-                name_ar: (draft.name_ar || draft.name || '') as string,
-                name_en: (draft as any).name || '',
-                account_type: (draft.account_type || '') as string,
-                statement_type: '',
-                parent_id: (draft.parent_id as string) || '',
-                is_active: ((draft.status || 'active') === 'active'),
-                allow_transactions: (typeof (draft as any).allow_transactions === 'boolean')
-                  ? (draft as any).allow_transactions
-                  : (((draft.level as number) || 1) >= 3),
-                level: (draft.level as number) ?? 1,
-                is_standard: (draft as any).is_standard ?? false,
-              }}
+              initialData={formInitialData}
             isLoading={saving}
             onSubmit={async (form) => {
               setSaving(true);
@@ -1140,9 +1142,18 @@ const AccountsTreePage: React.FC = () => {
                 setDialogOpen(false);
               } catch (e: any) {
                 const msg = e?.message || e?.error_description || e?.hint || e?.details || '';
+                const errCode = e?.code || e?.error?.code;
+                const isDuplicateCode = (errCode === '23505') || (typeof msg === 'string' && msg.includes('accounts_code_unique_per_org'));
+
                 console.error('save failed', e, msg);
+
+                if (isDuplicateCode) {
+                  showToast('فشل حفظ التغييرات: هذا الكود مستخدم بالفعل داخل نفس المؤسسة. الرجاء اختيار كود مختلف.', { severity: 'error' });
+                  return;
+                }
+
                 showToast(`فشل حفظ التغييرات${msg ? `: ${msg}` : ''}`, { severity: 'error' });
-                throw e;
+                return;
               } finally {
                 setSaving(false);
               }
