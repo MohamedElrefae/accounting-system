@@ -10,9 +10,10 @@ import UnifiedCRUDForm, { type UnifiedCRUDFormHandle } from '../../components/Co
 import { createAccountFormConfig } from '../../components/Accounts/AccountFormConfig';
 import DraggableResizablePanel from '../../components/Common/DraggableResizablePanel';
 import { tokens } from '../../theme/tokens';
-import { getOrganizations } from '../../services/organization';
 import { useHasPermission } from '../../hooks/useHasPermission';
 import { debugAccountRollups, testRollupModes, testViewDirectly, manualRollupsCalculation } from '../../utils/debug-rollups';
+import { useScope } from '../../contexts/ScopeContext';
+import ScopeChips from '../../components/Scope/ScopeChips';
 
 interface AccountItem {
   id: string;
@@ -59,14 +60,13 @@ const AccountsTreePage: React.FC = () => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [breadcrumbs, setBreadcrumbs] = useState<AncestorItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [projects, setProjects] = useState<{ id: string; code: string; name: string; name_ar?: string }[]>([]);
-  const [selectedProject, setSelectedProject] = useState<string>('');
   const [balanceMode, setBalanceMode] = useState<'posted' | 'all'>('all');
   const [rollups, setRollups] = useState<Record<string, { has_transactions: boolean; net_amount: number }>>({});
 
-  // Organizations selector
-  const [organizations, setOrganizations] = useState<{ id: string; code: string; name: string }[]>([]);
-  const [orgId, setOrgId] = useState<string>('');
+  // Use centralized scope from TopBar
+  const { getOrgId, getProjectId } = useScope();
+  const orgId = getOrgId() || '';
+  const selectedProject = getProjectId() || '';
 
   // Edit/Add dialog state (must be before unifiedConfig)
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -255,29 +255,6 @@ const AccountsTreePage: React.FC = () => {
     _setDeleteFlags(prev => ({ ...prev, ...updates }));
     // Also merge onto accounts so UI logic sees them immediately
     setAccounts(prev => prev.map(a => updates[a.id] ? { ...a, ...updates[a.id] } : a));
-  }, [orgId]);
-
-  useEffect(() => {
-    // Load organizations first
-    (async () => {
-      try {
-        const orgs = await getOrganizations();
-        setOrganizations(orgs.map(o => ({ id: o.id, code: o.code, name: o.name })));
-        if (orgs.length > 0) {
-          const first = orgs[0].id;
-          setOrgId(prev => prev || first);
-        }
-      } catch (e) {
-        console.error('Failed to load organizations:', e);
-      }
-    })();
-  }, []);
-
-  // Load projects when orgId changes
-  useEffect(() => {
-    if (orgId) {
-      loadProjects().catch(console.error);
-    }
   }, [orgId]);
 
   const fetchAccountRollups = useCallback(async (accountIds: string[]) => {
@@ -638,15 +615,6 @@ const AccountsTreePage: React.FC = () => {
     return Array.from(map.values());
   }
 
-  async function loadProjects() {
-    const { data, error } = await supabase
-      .from('projects')
-      .select('id, code, name, name_ar')
-      .eq('status', 'active')
-      .order('code', { ascending: true });
-    if (!error) setProjects(data || []);
-  }
-
   const filteredAndSorted = useMemo(() => {
     const data = accounts.filter((acc) => {
       const nameDisp = (acc.name_ar || acc.name || '').toLowerCase();
@@ -828,17 +796,19 @@ const AccountsTreePage: React.FC = () => {
       )}
 
       <div className="controls-container">
-        <div className="search-and-filters">
-          <div className="search-input-wrapper">
-            <input
-              type="text"
-              placeholder="البحث في الحسابات..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
-            <span className="icon">🔍</span>
-          </div>
+        <div className="controls-section">
+        <div className="filters-row">
+          {/* Current Scope Display - Shows org/project from TopBar */}
+          <ScopeChips showLabels={false} size="small" variant="filled" />
+
+          <input
+            type="text"
+            placeholder="بحث بالكود أو الاسم..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="search-input"
+            data-tour="accounts-tree-search"
+          />
 
           <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value === '' ? '' : Number(e.target.value))} className="filter-select">
             <option value="">جميع المستويات</option>
@@ -854,14 +824,6 @@ const AccountsTreePage: React.FC = () => {
             <option value="level">ترتيب حسب المستوى</option>
           </select>
 
-          {/* Project Filter */}
-          <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className="filter-select">
-            <option value="">جميع المشاريع</option>
-            {projects.map(p => (
-              <option key={p.id} value={p.id}>{p.code} - {p.name_ar || p.name}</option>
-            ))}
-          </select>
-
           {/* Balance Mode (reserved for future RPC usage) */}
           <select value={balanceMode} onChange={(e) => setBalanceMode(e.target.value as 'posted' | 'all')} className="filter-select">
             <option value="posted">المنشورة فقط</option>
@@ -870,15 +832,6 @@ const AccountsTreePage: React.FC = () => {
         </div>
 
         <div className="view-mode-toggle">
-          {/* Organization selector */}
-          <select value={orgId} onChange={(e) => {
-            setOrgId(e.target.value);
-          }} className="filter-select" data-tour="accounts-tree-org-select">
-            <option value="">اختر المؤسسة</option>
-            {organizations.map(o => (
-              <option key={o.id} value={o.id}>{o.code} - {o.name}</option>
-            ))}
-          </select>
           <button className={`view-mode-btn ${viewMode === 'tree' ? 'active' : ''}`} onClick={() => setViewMode('tree')}>عرض شجرة</button>
           <button className={`view-mode-btn ${viewMode === 'table' ? 'active' : ''}`} onClick={() => setViewMode('table')}>عرض جدول</button>
         </div>
@@ -1342,6 +1295,7 @@ const AccountsTreePage: React.FC = () => {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 };
