@@ -1061,16 +1061,27 @@ const AccountsTreePage: React.FC = () => {
                     if (allowErr) console.warn('allow_transactions update warning:', allowErr);
                   } catch {}
                   
-                  // Update core fields in local state
+                  // Update core fields in local state - FIXED: Use form data as primary source
                   setAccounts(prev => prev.map(a => (a.id === draft.id ? {
                     ...a,
-                    code: updated.code || form.code,
-                    name: updated.name || updated.name_ar || form.name_ar,
-                    name_ar: updated.name_ar || form.name_ar,
-                    level: updated.level || form.level,
-                    status: updated.status || (form.is_active ? 'active' : 'inactive'),
-                    account_type: updated.category || updated.account_type || accountType,
+                    // Use form data (user's current input) as primary source
+                    code: form.code,
+                    name: form.name_en || form.name_ar,
+                    name_ar: form.name_ar || form.name_en,
+                    level: parseInt(String(form.level)) || 1,
+                    status: form.is_active ? 'active' : 'inactive',
+                    account_type: accountType,
+                    // Only use server response for fields that should come from server
+                    parent_id: updated.parent_id || a.parent_id,
+                    org_id: updated.org_id || a.org_id,
+                    is_postable: updated.is_postable !== undefined ? updated.is_postable : a.is_postable,
+                    created_at: updated.created_at || a.created_at,
+                    updated_at: updated.updated_at || new Date().toISOString(),
                   } : a)));
+
+                  // ADDITIONAL FIX: Clear form after successful save to prevent data reversion
+                  setDialogMode('view');
+                  setDraft(null);
 
                   // Handle is_standard update separately (if permission and value changed)
                   if (hasAccountsUpdate && (form.is_standard ?? false) !== ((draft as any).is_standard ?? false)) {
