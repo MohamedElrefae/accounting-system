@@ -326,7 +326,9 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     Object.entries(autoFilledData).forEach(([key, value]) => {
       const current = (formData as Record<string, unknown>)[key];
       const isUnset = current === undefined || current === null || (typeof current === 'string' && current === '');
-      if (isUnset) {
+      const wasTouched = touchedFields.has(key);
+      // If the user interacted with a field (including clearing it), do not re-populate it.
+      if (isUnset && !wasTouched) {
         (fieldsToFill as Record<string, unknown>)[key] = value as unknown;
         fieldsAutoFilled.push(key);
       }
@@ -347,7 +349,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
 
     setFormData((prev) => ({ ...prev, ...fieldsToFill }));
     setAutoFilledFields(prev => Array.from(new Set([...prev, ...fieldsAutoFilled])));
-  }, [config.autoFillLogic, formData]);
+  }, [config.autoFillLogic, formData, touchedFields]);
 
   // Check if field should be shown
   const shouldShowField = useCallback((field: FormField): boolean => {
