@@ -794,41 +794,38 @@ const AccountsTreePage: React.FC = () => {
         </div>
       )}
 
-      <div className="controls-container">
-        <div className="controls-section">
-        <div className="filters-row">
-          <input
-            type="text"
-            placeholder="بحث بالكود أو الاسم..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
-            data-tour="accounts-tree-search"
-          />
+      <div className="filters-row">
+        <input
+          type="text"
+          placeholder="بحث بالكود أو الاسم..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="search-input"
+          data-tour="accounts-tree-search"
+        />
 
-          <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value === '' ? '' : Number(e.target.value))} className="filter-select">
-            <option value="">جميع المستويات</option>
-            <option value="1">المستوى 1</option>
-            <option value="2">المستوى 2</option>
-            <option value="3">المستوى 3</option>
-            <option value="4">المستوى 4</option>
-          </select>
+        <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value === '' ? '' : Number(e.target.value))} className="filter-select">
+          <option value="">جميع المستويات</option>
+          <option value="1">المستوى 1</option>
+          <option value="2">المستوى 2</option>
+          <option value="3">المستوى 3</option>
+          <option value="4">المستوى 4</option>
+        </select>
 
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'code' | 'name' | 'level')} className="filter-select">
-            <option value="code">ترتيب حسب الكود</option>
-            <option value="name">ترتيب حسب الاسم</option>
-            <option value="level">ترتيب حسب المستوى</option>
-          </select>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'code' | 'name' | 'level')} className="filter-select">
+          <option value="code">ترتيب حسب الكود</option>
+          <option value="name">ترتيب حسب الاسم</option>
+          <option value="level">ترتيب حسب المستوى</option>
+        </select>
 
-          {/* Balance Mode (reserved for future RPC usage) */}
-          <select value={balanceMode} onChange={(e) => setBalanceMode(e.target.value as 'posted' | 'all')} className="filter-select">
-            <option value="posted">المنشورة فقط</option>
-            <option value="all">جميع العمليات</option>
-          </select>
+        {/* Balance Mode (reserved for future RPC usage) */}
+        <select value={balanceMode} onChange={(e) => setBalanceMode(e.target.value as 'posted' | 'all')} className="filter-select">
+          <option value="posted">المنشورة فقط</option>
+          <option value="all">جميع العمليات</option>
+        </select>
 
-          <button className={`view-mode-btn ${viewMode === 'tree' ? 'active' : ''}`} onClick={() => setViewMode('tree')}>عرض شجرة</button>
-          <button className={`view-mode-btn ${viewMode === 'table' ? 'active' : ''}`} onClick={() => setViewMode('table')}>عرض جدول</button>
-        </div>
+        <button className={`view-mode-btn ${viewMode === 'tree' ? 'active' : ''}`} onClick={() => setViewMode('tree')}>عرض شجرة</button>
+        <button className={`view-mode-btn ${viewMode === 'table' ? 'active' : ''}`} onClick={() => setViewMode('table')}>عرض جدول</button>
       </div>
 
       <div className="content-area">
@@ -1289,7 +1286,6 @@ const AccountsTreePage: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
     </div>
   );
 };
