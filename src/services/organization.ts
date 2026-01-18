@@ -18,6 +18,11 @@ function validateCacheEntry(entry: CacheEntry): boolean {
   if (!Array.isArray(entry.data)) return false;
   if (typeof entry.timestamp !== 'number') return false;
   if (Date.now() - entry.timestamp > CACHE_DURATION) return false;
+
+  // Never treat an empty org list as a valid cache entry.
+  // This avoids getting permanently stuck when a transient auth/RLS/network issue
+  // results in an empty response being cached.
+  if (entry.data.length === 0) return false;
   
   // Validate data structure
   const isValidData = entry.data.every(item => 
@@ -57,6 +62,7 @@ function getCachedOrganizations(): Organization[] | null {
 // Save organizations to localStorage cache
 function setCachedOrganizations(data: Organization[]): void {
   try {
+    if (!Array.isArray(data) || data.length === 0) return;
     const entry: CacheEntry = {
       data,
       timestamp: Date.now()
