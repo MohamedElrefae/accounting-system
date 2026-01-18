@@ -652,6 +652,19 @@ export const ImportExportIcon: React.FC<SvgIconProps> = (props) => (
   </SvgIcon>
 );
 
+// WiFi icons for connection status
+export const Wifi: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.03 2.93 1 9zm8 8l3 3 3-3c-1.65-1.65-4.35-1.65-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z" /></SvgIcon>
+);
+
+export const WifiOff: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}><path d="M23.64 7c-.45-.34-4.93-4-11.64-4C6.48 3 2.52 6.82 2.35 7l-.35.36L.71 8.16l.35.35C1.23 9.09 5.48 12.83 12 12.83c1.25 0 2.42-.19 3.51-.53l-1.44-1.44c-.67.2-1.36.31-2.07.31-4.97 0-9.14-3.03-11-4.88l1.42-1.42L1 23l1.41 1.41L23 4l-1.36-1.36zM12 10c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm0-8c2.92 0 5.86.92 8.39 2.71l1.42-1.42C18.86.86 15.43-.17 12-.17c-2.43 0-4.86 1.03-7.39 2.71l1.42 1.42C6.14 2.92 9.08 2 12 2z" /></SvgIcon>
+);
+
+export const SignalCellularConnectedNoInternet4Bar: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}><path d="M22 18V2h-2v16h2zm-4 0V6h-2v12h2zm-4 0v-4h-2v4h2zm-4 0V2H8v16h2z" /></SvgIcon>
+);
+
 export const DeselectOutlinedIcon: React.FC<SvgIconProps> = (props) => (
   <SvgIcon {...props}>
     <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7zm-4 6h2v-2H3v2zm0 4h2v-2H3v2zM3 5v2h2V3h-2zm4 0h2V3H7v2zm4 0h2V3h-2v2zm4 0h2V3h-2v2z" />
@@ -794,7 +807,7 @@ export {
   AttachMoneyIcon as AttachMoney,
   ImportExportIcon as ImportExport,
   DeselectOutlinedIcon as DeselectOutlined,
-  BugReportIcon as BugReport,
+  BugReportIcon as BugReport
 };
 
 // Default export for compatibility with default imports
@@ -926,6 +939,7 @@ const icons = {
   AttachMoney: AttachMoneyIcon,
   ImportExport: ImportExportIcon,
   DeselectOutlined: DeselectOutlinedIcon,
+  BugReport: BugReportIcon
 };
 
 export default icons;

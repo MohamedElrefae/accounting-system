@@ -20,6 +20,7 @@ export const useAppSync = (options?: UseAppSyncOptions) => {
   // Hook into ScopeContext for org/project refresh
   const scopeContext = useContext(ScopeContext);
   const refreshScopeContext = scopeContext?.refreshScope;
+  const manualRefreshScope = scopeContext?.manualRefresh;
 
   const refreshAll = useCallback(async () => {
     setIsRefreshing(true);
@@ -44,8 +45,10 @@ export const useAppSync = (options?: UseAppSyncOptions) => {
         queryClient.invalidateQueries({ queryKey: key })
       );
 
-      // 2. Refresh ScopeContext (org/project)
-      if (refreshScopeContext) {
+      // 2. Refresh ScopeContext (org/project) - use manual refresh for better error handling
+      if (manualRefreshScope) {
+        promises.push(manualRefreshScope());
+      } else if (refreshScopeContext) {
         promises.push(refreshScopeContext());
       }
 
@@ -70,7 +73,7 @@ export const useAppSync = (options?: UseAppSyncOptions) => {
     } finally {
       setIsRefreshing(false);
     }
-  }, [queryClient, refreshScopeContext, refreshTransactionsContext, options]);
+  }, [queryClient, refreshScopeContext, manualRefreshScope, refreshTransactionsContext, options]);
 
   return { refreshAll, isRefreshing };
 };

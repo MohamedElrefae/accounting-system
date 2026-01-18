@@ -14,6 +14,7 @@ import { ScopeContext, type ScopeContextValue } from './ScopeContext';
 import { getOrganizations, type Organization } from '../services/organization';
 import { getActiveProjectsByOrg, type Project } from '../services/projects';
 import { queryKeys } from '../lib/queryKeys';
+import { getConnectionMonitor, type ConnectionHealth } from '../utils/connectionMonitor';
 
 // localStorage keys
 const ORG_KEY = 'org_id';
@@ -61,6 +62,7 @@ interface ScopeProviderProps {
 export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
   const queryClient = useQueryClient();
   const mountedRef = useRef(true);
+  const connectionHealthRef = useRef<ConnectionHealth | null>(null);
   
   // State
   const [currentOrg, setCurrentOrg] = useState<Organization | null>(null);
@@ -71,10 +73,11 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [connectionIssue, setConnectionIssue] = useState<boolean>(false);
 
-  // Load projects for a specific org
-  const loadProjectsForOrg = useCallback(async (orgId: string): Promise<Project[]> => {
-    if (import.meta.env.DEV) console.log('[ScopeProvider] Loading projects for org:', orgId);
+  // Load projects for a specific org with retry mechanism
+  const loadProjectsForOrg = useCallback(async (orgId: string, retryCount = 0): Promise<Project[]> => {
+    if (import.meta.env.DEV) console.log('[ScopeProvider] Loading projects for org:', orgId, { retryCount });
     setIsLoadingProjects(true);
     
     try {
@@ -100,6 +103,14 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
       return projects;
     } catch (err) {
       console.error('[ScopeProvider] Failed to load projects:', err);
+      
+      // Implement retry logic for projects
+      if (retryCount < 2) {
+        if (import.meta.env.DEV) console.log(`[ScopeProvider] Retrying projects load (${retryCount + 1}/3)`);
+        setTimeout(() => loadProjectsForOrg(orgId, retryCount + 1), 1000 * (retryCount + 1));
+        return [];
+      }
+      
       if (mountedRef.current) {
         setAvailableProjects([]);
         setCurrentProject(null);
@@ -112,11 +123,22 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // Load organizations
-  const loadOrganizations = useCallback(async () => {
-    if (import.meta.env.DEV) console.log('[ScopeProvider] Loading organizations...');
+  // Load organizations with retry mechanism and connection awareness
+  const loadOrganizations = useCallback(async (retryCount = 0) => {
+    if (import.meta.env.DEV) console.log('[ScopeProvider] Loading organizations...', { retryCount });
+    
+    // Check connection health first
+    const connectionHealth = connectionHealthRef.current;
+    if (connectionHealth && !connectionHealth.isOnline) {
+      console.warn('[ScopeProvider] Skipping load due to connection issues');
+      setConnectionIssue(true);
+      setError('Connection issues detected. Retrying when connection is restored...');
+      return;
+    }
+    
     setIsLoadingOrgs(true);
     setError(null);
+    setConnectionIssue(false);
     
     try {
       const orgs = await getOrganizations();
@@ -145,8 +167,21 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
       setLastUpdated(new Date());
     } catch (err) {
       console.error('[ScopeProvider] Failed to load organizations:', err);
+      
+      // Implement retry logic
+      if (retryCount < 2) {
+        if (import.meta.env.DEV) console.log(`[ScopeProvider] Retrying organizations load (${retryCount + 1}/3)`);
+        setTimeout(() => loadOrganizations(retryCount + 1), 1000 * (retryCount + 1));
+        return;
+      }
+      
       if (mountedRef.current) {
-        setError('Failed to load organizations');
+        setError('Failed to load organizations after multiple attempts');
+        // Set fallback state to prevent app from being unusable
+        setAvailableOrgs([]);
+        setCurrentOrg(null);
+        setCurrentProject(null);
+        setAvailableProjects([]);
       }
     } finally {
       if (mountedRef.current) {
@@ -155,16 +190,36 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
     }
   }, [loadProjectsForOrg]);
 
-  // Load organizations on mount
+  // Load organizations on mount and monitor connection
   useEffect(() => {
     mountedRef.current = true;
     if (import.meta.env.DEV) console.log('[ScopeProvider] Mounting, loading organizations...');
+    
+    // Set up connection monitoring
+    const monitor = getConnectionMonitor();
+    connectionHealthRef.current = monitor.getHealth();
+    
+    const unsubscribe = monitor.subscribe((health) => {
+      connectionHealthRef.current = health;
+      
+      // If connection is restored and we have issues, try to reload
+      if (health.isOnline && connectionIssue) {
+        if (import.meta.env.DEV) console.log('[ScopeProvider] Connection restored, reloading data...');
+        loadOrganizations();
+      }
+      
+      // Update connection issue state
+      setConnectionIssue(!health.isOnline);
+    });
+    
+    // Initial load
     loadOrganizations();
     
     return () => {
       mountedRef.current = false;
+      unsubscribe();
     };
-  }, [loadOrganizations]);
+  }, [loadOrganizations, connectionIssue]);
 
   // Set organization - CLEARS PROJECT
   const setOrganization = useCallback(async (orgId: string | null) => {
@@ -245,14 +300,27 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
     setStoredProjectId(null);
   }, []);
 
-  // Refresh scope
+  // Refresh scope with error handling
   const refreshScope = useCallback(async () => {
-    await loadOrganizations();
+    try {
+      await loadOrganizations();
+    } catch (err) {
+      console.error('[ScopeProvider] Refresh failed:', err);
+      setError('Failed to refresh data');
+    }
   }, [loadOrganizations]);
 
   // Getters
   const getOrgId = useCallback(() => currentOrg?.id ?? null, [currentOrg]);
   const getProjectId = useCallback(() => currentProject?.id ?? null, [currentProject]);
+
+  // Manual refresh function for topbar
+  const manualRefresh = useCallback(async () => {
+    if (import.meta.env.DEV) console.log('[ScopeProvider] Manual refresh triggered');
+    setError(null);
+    setConnectionIssue(false);
+    await loadOrganizations();
+  }, [loadOrganizations]);
 
   // Context value
   const value: ScopeContextValue = useMemo(() => ({
@@ -271,6 +339,7 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
     setProject,
     clearScope,
     refreshScope,
+    manualRefresh,
     getOrgId,
     getProjectId,
   }), [
@@ -286,6 +355,7 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
     setProject,
     clearScope,
     refreshScope,
+    manualRefresh,
     getOrgId,
     getProjectId,
   ]);

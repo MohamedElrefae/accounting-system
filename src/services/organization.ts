@@ -12,6 +12,25 @@ interface CacheEntry {
   timestamp: number;
 }
 
+// Enhanced cache validation
+function validateCacheEntry(entry: CacheEntry): boolean {
+  if (!entry || typeof entry !== 'object') return false;
+  if (!Array.isArray(entry.data)) return false;
+  if (typeof entry.timestamp !== 'number') return false;
+  if (Date.now() - entry.timestamp > CACHE_DURATION) return false;
+  
+  // Validate data structure
+  const isValidData = entry.data.every(item => 
+    item && 
+    typeof item === 'object' && 
+    typeof item.id === 'string' && 
+    typeof item.code === 'string' && 
+    typeof item.name === 'string'
+  );
+  
+  return isValidData;
+}
+
 // Get cached organizations from localStorage
 function getCachedOrganizations(): Organization[] | null {
   try {
@@ -19,15 +38,18 @@ function getCachedOrganizations(): Organization[] | null {
     if (!cached) return null;
     
     const entry: CacheEntry = JSON.parse(cached);
-    const isExpired = Date.now() - entry.timestamp > CACHE_DURATION;
     
-    if (isExpired) {
+    if (!validateCacheEntry(entry)) {
       localStorage.removeItem(CACHE_KEY);
       return null;
     }
     
     return entry.data;
-  } catch {
+  } catch (error) {
+    console.warn('[getCachedOrganizations] Cache read error:', error);
+    try {
+      localStorage.removeItem(CACHE_KEY);
+    } catch {}
     return null;
   }
 }
@@ -54,6 +76,37 @@ export function clearOrganizationsCache(): void {
   }
 }
 
+// Network retry helper
+const withRetry = async <T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  baseDelay = 1000
+): Promise<T> => {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      console.warn(`[withRetry] Attempt ${attempt + 1} failed:`, error?.message || error);
+      
+      // Don't retry on client errors (4xx)
+      if (error?.status >= 400 && error?.status < 500) {
+        throw error;
+      }
+      
+      // If this is the last attempt, throw the error
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      // Exponential backoff with jitter
+      const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw new Error('Max retries exceeded');
+};
+
 export async function getOrganizations(): Promise<Organization[]> {
   const startTime = performance.now();
   
@@ -66,30 +119,42 @@ export async function getOrganizations(): Promise<Organization[]> {
   
   console.log('[getOrganizations] Cache miss, fetching from API...');
   
-  // Use direct REST query - faster than RPC
-  const { data, error } = await supabase
-    .from('organizations')
-    .select('id, code, name, name_ar, is_active, created_at')
-    .eq('is_active', true)
-    .order('code', { ascending: true })
-    .limit(50);
-  
-  console.log(`[getOrganizations] REST took ${(performance.now() - startTime).toFixed(0)}ms`, { 
-    error: error?.message,
-    count: data?.length 
-  });
-  
-  if (error) {
-    console.error('[getOrganizations] Error fetching organizations:', error);
+  try {
+    // Use retry mechanism for network resilience
+    const { data, error } = await withRetry(
+      () => supabase
+        .from('organizations')
+        .select('id, code, name, name_ar, is_active, created_at')
+        .eq('is_active', true)
+        .order('code', { ascending: true })
+        .limit(50),
+      3, // max retries
+      1000 // base delay
+    );
+    
+    console.log(`[getOrganizations] REST took ${(performance.now() - startTime).toFixed(0)}ms`, { 
+      error: error?.message,
+      count: data?.length 
+    });
+    
+    if (error) {
+      console.error('[getOrganizations] Error fetching organizations:', error);
+      throw new Error(`Failed to fetch organizations: ${error.message}`);
+    }
+    
+    const organizations = (data as Organization[]) || [];
+    
+    // Cache the result
+    setCachedOrganizations(organizations);
+    
+    return organizations;
+  } catch (error: any) {
+    console.error('[getOrganizations] All retry attempts failed:', error);
+    
+    // Return empty array as fallback to prevent app from breaking
+    console.warn('[getOrganizations] Returning empty array as fallback');
     return [];
   }
-  
-  const organizations = (data as Organization[]) || [];
-  
-  // Cache the result
-  setCachedOrganizations(organizations);
-  
-  return organizations;
 }
 
 export async function getOrganization(id: string): Promise<Organization | null> {

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense } from 'react';
 import { useIdleLogout } from './hooks/useIdleLogout';
 import { useAuthPerformance } from './hooks/useAuthPerformance';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
@@ -6,6 +6,10 @@ import useAppStore from './store/useAppStore';
 import { ArabicLanguageService } from './services/ArabicLanguageService';
 import DashboardLayout from './components/layout/DashboardLayout';
 import { OptimizedSuspense } from './components/Common/PerformanceOptimizer';
+import DataLoadingErrorBoundary from './components/Common/DataLoadingErrorBoundary';
+import DataLoadingState from './components/Common/DataLoadingState';
+import { Box, Typography } from '@mui/material';
+import PerformanceOptimizer from './components/Common/PerformanceOptimizer';
 
 // Import route groups instead of individual components
 import { preloadCriticalRoutes } from './routes/RouteGroups';
@@ -34,7 +38,6 @@ import OptimizedProtectedRoute from './components/routing/OptimizedProtectedRout
 const _UserManagementSystem = React.lazy(() => import('./pages/admin/UserManagementSystem'));
 const _Profile = React.lazy(() => import('./pages/admin/Profile'));
 const ProjectAttachmentsPage = React.lazy(() => import('./pages/Projects/ProjectAttachments'));
-const FontSettings = React.lazy(() => import('./components/Settings/FontSettings'));
 
 const OptimizedApp: React.FC = () => {
   useIdleLogout();
@@ -77,7 +80,15 @@ const OptimizedApp: React.FC = () => {
         {/* Protected App Routes */}
         <Route path="/" element={
           <OptimizedProtectedRoute>
-            <DashboardLayout />
+            <DataLoadingErrorBoundary>
+              <Suspense fallback={
+                <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+                  <DataLoadingState message="جاري تحميل التطبيق..." showProgress={false} />
+                </Box>
+              }>
+                <DashboardLayout />
+              </Suspense>
+            </DataLoadingErrorBoundary>
           </OptimizedProtectedRoute>
         }>
           {/* Core Routes (Dashboard, Landing) - flattened here for clarity */}

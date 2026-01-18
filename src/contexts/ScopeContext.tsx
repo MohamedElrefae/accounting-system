@@ -40,6 +40,7 @@ export interface ScopeActions {
   // Utility actions
   clearScope: () => void;
   refreshScope: () => Promise<void>;
+  manualRefresh: () => Promise<void>;
   
   // Getters for convenience
   getOrgId: () => string | null;

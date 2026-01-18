@@ -76,39 +76,110 @@ export async function getProjects(options?: ProjectListOptions): Promise<PagedRe
 
 // Get active projects for dropdown/selection
 export async function getActiveProjects(): Promise<Project[]> {
-  const { data, error } = await supabase
-    .from('projects')
-    .select('*')
-    .eq('status', 'active')
-    .order('code', { ascending: true })
+  try {
+    const { data, error } = await withRetry(
+      () => supabase
+        .from('projects')
+        .select('*')
+        .eq('status', 'active')
+        .order('code', { ascending: true }),
+      3,
+      1000
+    );
 
-  if (error) throw error
-  return (data as Project[]) || []
+    if (error) {
+      console.error('[getActiveProjects] Error:', error);
+      throw new Error(`Failed to load active projects: ${error.message}`);
+    }
+    
+    return (data as Project[]) || [];
+  } catch (error: any) {
+    console.error('[getActiveProjects] All attempts failed:', error);
+    return [];
+  }
 }
 
-export async function getActiveProjectsByOrg(orgId: string): Promise<Project[]> {
-  // Try to use the new RPC that respects project_memberships
-  // Falls back to direct query if RPC doesn't exist
-  try {
-    const { data, error } = await supabase
-      .rpc('get_user_accessible_projects', { p_org_id: orgId });
-    
-    if (!error && data) {
-      return (data as Project[]) || [];
+// Network retry helper
+const withRetry = async <T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  baseDelay = 1000
+): Promise<T> => {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      console.warn(`[withRetry] Attempt ${attempt + 1} failed:`, error?.message || error);
+      
+      // Don't retry on client errors (4xx)
+      if (error?.status >= 400 && error?.status < 500) {
+        throw error;
+      }
+      
+      // If this is the last attempt, throw the error
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      // Exponential backoff with jitter
+      const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
-  } catch {
-    // RPC doesn't exist yet, fall back to direct query
   }
   
-  // Fallback: direct query (for backward compatibility)
-  const { data, error } = await supabase
-    .from('projects')
-    .select('*')
-    .eq('status', 'active')
-    .eq('org_id', orgId)
-    .order('code', { ascending: true });
-  if (error) throw error;
-  return (data as Project[]) || [];
+  throw new Error('Max retries exceeded');
+};
+
+export async function getActiveProjectsByOrg(orgId: string): Promise<Project[]> {
+  console.log(`[getActiveProjectsByOrg] Loading projects for org: ${orgId}`);
+  
+  try {
+    // Try to use the new RPC that respects project_memberships
+    // Falls back to direct query if RPC doesn't exist
+    try {
+      const { data, error } = await withRetry(
+        () => supabase.rpc('get_user_accessible_projects', { p_org_id: orgId }),
+        2, // fewer retries for RPC
+        500
+      );
+      
+      if (!error && data) {
+        console.log(`[getActiveProjectsByOrg] RPC returned ${data.length} projects`);
+        return (data as Project[]) || [];
+      }
+    } catch (rpcError) {
+      console.warn('[getActiveProjectsByOrg] RPC failed, falling back to direct query:', rpcError);
+    }
+    
+    // Fallback: direct query (for backward compatibility)
+    console.log('[getActiveProjectsByOrg] Using direct query fallback');
+    const { data, error } = await withRetry(
+      () => supabase
+        .from('projects')
+        .select('*')
+        .eq('status', 'active')
+        .eq('org_id', orgId)
+        .order('code', { ascending: true }),
+      3,
+      1000
+    );
+    
+    if (error) {
+      console.error('[getActiveProjectsByOrg] Direct query failed:', error);
+      throw new Error(`Failed to load projects: ${error.message}`);
+    }
+    
+    const projects = (data as Project[]) || [];
+    console.log(`[getActiveProjectsByOrg] Direct query returned ${projects.length} projects`);
+    return projects;
+    
+  } catch (error: any) {
+    console.error('[getActiveProjectsByOrg] All attempts failed:', error);
+    
+    // Return empty array as fallback to prevent app from breaking
+    console.warn('[getActiveProjectsByOrg] Returning empty array as fallback');
+    return [];
+  }
 }
 
 // Get user's project memberships

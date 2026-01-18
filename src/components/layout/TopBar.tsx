@@ -23,7 +23,10 @@ import {
   VisibilityIcon,
   VisibilityOffIcon,
   LightbulbIcon,
-  Refresh,
+  RefreshIcon,
+  WifiOff,
+  Wifi,
+  SignalCellularConnectedNoInternet4Bar as NoInternetIcon,
 } from '../icons/SimpleIcons';
 import useAppStore from '../../store/useAppStore';
 import { useCustomTheme } from '../../contexts/ThemeContext';
@@ -36,6 +39,47 @@ import { mergedTranslations as translations } from '../../data/mockData';
 import { ScopedOrgSelector, ScopedProjectSelector } from '../Scope';
 import { useNavigate } from 'react-router-dom';
 import GlobalSearch from './GlobalSearch';
+import { useConnectionHealth } from '../../utils/connectionMonitor';
+import { useScope } from '../../contexts/ScopeContext';
+
+
+// Inline Connection Status Component
+const ConnectionStatusInline: React.FC = () => {
+  const connectionHealth = useConnectionHealth();
+  const { error: scopeError, isLoadingOrgs } = useScope();
+  
+  const getStatusColor = () => {
+    if (!connectionHealth.isOnline) return 'error';
+    if (connectionHealth.latency && connectionHealth.latency > 2000) return 'warning';
+    if (scopeError) return 'warning';
+    return 'success';
+  };
+  
+  const getStatusText = () => {
+    if (!connectionHealth.isOnline) return 'غير متصل';
+    if (scopeError && scopeError.includes('Connection')) return 'مشاكل في الاتصال';
+    if (isLoadingOrgs) return 'جاري التحميل...';
+    return 'متصل';
+  };
+  
+  const getStatusIcon = () => {
+    if (!connectionHealth.isOnline) return <WifiOff />;
+    if (connectionHealth.latency && connectionHealth.latency > 2000) return <NoInternetIcon />;
+    return <Wifi />;
+  };
+  
+  return (
+    <Tooltip title={`الحالة: ${getStatusText()}`}>
+      <Chip
+        icon={getStatusIcon()}
+        label={getStatusText()}
+        color={getStatusColor()}
+        size="small"
+        variant="outlined"
+      />
+    </Tooltip>
+  );
+};
 
 
 // Enterprise-grade styled button
@@ -286,13 +330,16 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
 
             <Divider orientation="vertical" flexItem sx={{ height: 24, alignSelf: 'center', mx: 0.5 }} />
 
+            {/* Connection Status Indicator */}
+            <ConnectionStatusInline />
+
             {/* Sync Button */}
             <Tooltip title={language === 'ar' ? 'مزامنة البيانات' : 'Sync Data'}>
               <StyledTopBarButton
                 onClick={() => refreshAll()}
                 disabled={isRefreshing}
                 startIcon={
-                  <Refresh
+                  <RefreshIcon
                     fontSize="small"
                     sx={{
                       animation: isRefreshing ? 'spin 1s linear infinite' : 'none',

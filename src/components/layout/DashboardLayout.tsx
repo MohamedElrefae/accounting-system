@@ -9,6 +9,7 @@ import useAppStore from '../../store/useAppStore';
 import { DRAWER_WIDTH, DRAWER_COLLAPSED_WIDTH } from './Sidebar';
 import { useSmartRoutePreloading } from '../../routes/RouteGroups';
 import { usePresenceHeartbeat } from '../../hooks/usePresenceHeartbeat';
+import DataLoadingErrorBoundary from '../Common/DataLoadingErrorBoundary';
 
 const DashboardLayout: React.FC = () => {
   const { sidebarCollapsed, toggleSidebar, language } = useAppStore();
@@ -81,7 +82,9 @@ const DashboardLayout: React.FC = () => {
             p: 3,
             overflow: 'auto',
           }}>
-            <Outlet />
+            <DataLoadingErrorBoundary>
+              <Outlet />
+            </DataLoadingErrorBoundary>
           </Box>
         </Box>
       </Box>
