@@ -825,9 +825,7 @@ const AccountsTreePage: React.FC = () => {
             <option value="posted">المنشورة فقط</option>
             <option value="all">جميع العمليات</option>
           </select>
-        </div>
 
-        <div className="view-mode-toggle">
           <button className={`view-mode-btn ${viewMode === 'tree' ? 'active' : ''}`} onClick={() => setViewMode('tree')}>عرض شجرة</button>
           <button className={`view-mode-btn ${viewMode === 'table' ? 'active' : ''}`} onClick={() => setViewMode('table')}>عرض جدول</button>
         </div>
