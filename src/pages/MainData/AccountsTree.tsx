@@ -1034,8 +1034,8 @@ const AccountsTreePage: React.FC = () => {
                     p_org_id: orgId,
                     p_id: draft.id,
                     p_code: form.code,
-                    p_name: form.name_en || form.name_ar,
-                    p_name_ar: form.name_ar,
+                    p_name: form.name_ar || form.name_en || 'Unnamed Account', // Ensure name is never empty
+                    p_name_ar: form.name_ar || form.name_en || 'Unnamed Account', // Ensure name_ar is never empty
                     p_account_type: accountType,
                     p_level: parseInt(String(form.level)) || 1,
                     p_status: status,
