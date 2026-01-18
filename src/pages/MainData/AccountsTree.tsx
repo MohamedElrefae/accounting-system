@@ -1081,7 +1081,7 @@ const AccountsTreePage: React.FC = () => {
               try {
                 if (dialogMode === 'edit' && draft.id) {
                   // Map frontend enum values to database enum types
-                  const accountType = mapAccountTypeToDbEnum(String((form as any).account_type || ''));
+                  const accountType = mapAccountTypeToDbEnum(String((form as any).category || ''));
                   const status = mapStatusToDbEnum(!!(form as any).is_active);
                   
                   // Prepare account update data
@@ -1142,7 +1142,7 @@ const AccountsTreePage: React.FC = () => {
                   showToast('تم تحديث الحساب بنجاح', { severity: 'success' });
                 } else {
                   // Map frontend enum values to database enum types
-                  const accountType = mapAccountTypeToDbEnum(String((form as any).account_type || ''));
+                  const accountType = mapAccountTypeToDbEnum(String((form as any).category || ''));
                   const status = mapStatusToDbEnum(!!(form as any).is_active);
                   
                   const { data, error } = await supabase.rpc('account_insert_child', {
