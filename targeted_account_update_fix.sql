@@ -56,7 +56,7 @@ BEGIN
             is_postable = (p_level >= 3),
             updated_at = now()
         WHERE id = p_id AND org_id = p_org_id
-        RETURNING 
+        RETURNING
             id,
             code,
             name,
@@ -77,7 +77,7 @@ BEGIN
         END IF;
         
     EXCEPTION WHEN OTHERS THEN
-        GET STACKED DIAGNOSTICS v_error_message;
+        v_error_message := SQLERRM;
         RAISE EXCEPTION 'Update failed: %', v_error_message;
     END;
     
@@ -127,9 +127,9 @@ BEGIN
         'TEST001',
         'Test Account',
         'Test Account Arabic',
-        'asset'::public.account_category,
+        'asset',
         1,
-        'active'::public.account_status
+        'active'
     ) INTO test_result;
     
     RAISE NOTICE 'Test completed. Result: %', test_result::text;
