@@ -1,0 +1,72 @@
+================================================================================
+                    QUICK FIX - expenses_categories Error
+================================================================================
+
+ERROR: relation "public.expenses_categories" does not exist
+
+ROOT CAUSE:
+  Old migration files (039-047) still exist in database
+  They create functions/views that reference non-existent expenses_categories table
+  When you try to create sub-tree, trigger tries to query expenses_categories
+  Result: Error "relation does not exist"
+
+SOLUTION: 3 Steps (6 minutes)
+
+STEP 1: Run Cleanup SQL (2 minutes)
+  1. Open Supabase SQL Editor
+  2. Copy all content from: sql/fix_expenses_categories_references.sql
+  3. Paste into SQL Editor
+  4. Click "Run"
+  5. Wait for "Success" message
+
+STEP 2: Delete Old Migration Files (2 minutes)
+  Delete these files from your codebase:
+    src/database/migrations/039_expenses_categories_core.sql
+    src/database/migrations/040_expenses_categories_rls.sql
+    src/database/migrations/041_expenses_categories_rpcs.sql
+    src/database/migrations/042_expenses_categories_view.sql
+    src/database/migrations/043_expenses_categories_rollups.sql
+    src/database/migrations/044_expenses_categories_permissions.sql
+    src/database/migrations/045_expenses_categories_materialized.sql
+    src/database/migrations/046_expenses_categories_full.sql
+    src/database/migrations/047_expenses_categories_delete_v2.sql
+
+STEP 3: Clear Cache & Test (2 minutes)
+  1. Press: Ctrl+Shift+Delete (Windows) or Cmd+Shift+Delete (Mac)
+  2. Select: "All time"
+  3. Check: "Cookies and other site data"
+  4. Click: "Clear data"
+  5. Close browser completely
+  6. Reopen browser
+  7. Go to MainData > SubTree
+  8. Try to create category
+  9. Should work ✅
+
+WHAT GETS FIXED:
+  ✅ Removes all references to expenses_categories
+  ✅ Drops old functions/views/triggers
+  ✅ Drops old expenses_categories table
+  ✅ Keeps sub_tree table and functions
+  ✅ Error completely resolved
+
+VERIFICATION:
+  After running cleanup SQL, you should see:
+    ✅ sub_tree table EXISTS
+    ✅ sub_tree_full view EXISTS
+    ✅ create_sub_tree function EXISTS
+    ✅ No functions reference expenses_categories
+    ✅ expenses_categories table removed
+
+TIMELINE:
+  Run cleanup SQL:        2 min
+  Delete old files:       2 min
+  Clear cache & test:     2 min
+  TOTAL:                  6 min
+
+NEXT ACTION:
+  👉 Open: sql/fix_expenses_categories_references.sql
+  👉 Copy all content
+  👉 Paste into Supabase SQL Editor
+  👉 Click Run
+
+================================================================================
