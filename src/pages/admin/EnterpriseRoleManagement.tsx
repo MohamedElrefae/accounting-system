@@ -71,7 +71,6 @@ import CheckIcon from '@mui/icons-material/CheckCircle';
 import MoreIcon from '@mui/icons-material/MoreVert';
 import PermissionIcon from '@mui/icons-material/Assignment';
 import { supabase } from '../../utils/supabase';
-import { PERMISSION_CATEGORIES } from '../../constants/permissions';
 import EnhancedQuickPermissionAssignment from '../../components/EnhancedQuickPermissionAssignment';
 
 interface Role {
@@ -95,6 +94,7 @@ export default function EnterpriseRoleManagement() {
   const theme = useTheme();
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissions, setPermissions] = useState<any[]>([]);
+  const [allPermissionsFromDB, setAllPermissionsFromDB] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
@@ -141,7 +141,7 @@ export default function EnterpriseRoleManagement() {
         return;
       }
 
-      // Load all permissions for the enhanced component
+      // Load all permissions from database (for both components)
       const { data: allPermissionsData, error: allPermissionsError } = await supabase
         .from('permissions')
         .select('*')
@@ -150,7 +150,9 @@ export default function EnterpriseRoleManagement() {
       if (allPermissionsError) {
         console.warn('Warning loading permissions:', allPermissionsError);
       } else {
+        console.log(`✅ Loaded ${allPermissionsData?.length || 0} permissions from database`);
         setPermissions(allPermissionsData || []);
+        setAllPermissionsFromDB(allPermissionsData || []);
       }
 
       // Then load role permissions separately
@@ -360,6 +362,9 @@ export default function EnterpriseRoleManagement() {
     try {
       setSavingPerms(true);
 
+      console.log(`🔄 Saving ${formData.permissions.length} permissions for role ${selectedRole.id}...`);
+      console.log('📋 Permissions to save:', formData.permissions);
+
       const { data, error } = await supabase.rpc('save_role_permissions', {
         p_role_id: selectedRole.id,
         p_permission_names: formData.permissions
@@ -367,12 +372,25 @@ export default function EnterpriseRoleManagement() {
 
       if (error) throw error;
 
-      console.log('Permissions saved:', data);
-      alert('تم حفظ الصلاحيات بنجاح');
+      console.log('✅ RPC Response:', data);
+
+      // Verify the save by checking database
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('role_permissions')
+        .select('permission_id, permissions(name)')
+        .eq('role_id', selectedRole.id);
+
+      if (!verifyError && verifyData) {
+        console.log(`✅ Role ${selectedRole.id} now has ${verifyData.length} permissions in database:`, 
+          verifyData.map((rp: any) => rp.permissions?.name).filter(Boolean)
+        );
+      }
+
+      alert(`✅ تم حفظ ${data?.permissions_assigned || 0} صلاحية بنجاح`);
       await loadRoles();
       setEditDialogOpen(false);
     } catch (error: any) {
-      console.error('Error saving permissions:', error);
+      console.error('❌ Error saving permissions:', error);
       alert('فشل حفظ الصلاحيات: ' + (error.message || 'خطأ غير معروف'));
     } finally {
       setSavingPerms(false);
@@ -1070,14 +1088,15 @@ export default function EnterpriseRoleManagement() {
                     selectedRoleId={selectedRole?.id}
                     allRoles={roles}
                     allPermissions={permissions}
-                    onAssignmentComplete={(result) => {
-                      console.log('Assignment result:', result);
+                    onAssignmentComplete={async (result) => {
+                      console.log('✅ Assignment result:', result);
                       if (result.success) {
-                        loadRoles(); // Refresh roles data
+                        await loadRoles(); // Refresh roles data
                         // Update form data with current role permissions
                         if (selectedRole) {
                           const updatedRole = roles.find(r => r.id === selectedRole.id);
                           if (updatedRole) {
+                            console.log(`✅ Updating form with ${updatedRole.permissions?.length || 0} permissions`);
                             setFormData(prev => ({
                               ...prev,
                               permissions: updatedRole.permissions || []
@@ -1086,56 +1105,77 @@ export default function EnterpriseRoleManagement() {
                         }
                       }
                     }}
-                    onRefreshNeeded={() => {
-                      loadRoles(); // Refresh when needed
+                    onRefreshNeeded={async () => {
+                      console.log('🔄 Refresh requested, reloading roles...');
+                      await loadRoles(); // Refresh when needed
                     }}
                   />
                   
                   <Divider sx={{ my: 3 }}>
-                    <Chip label="تعيين تقليدي" variant="outlined" />
+                    <Chip label="تعيين تقليدي (جميع الصلاحيات من قاعدة البيانات)" variant="outlined" />
                   </Divider>
                 </Box>
                 
-                {/* Original Permission Assignment */}
+                {/* Dynamic Permission Assignment - Load ALL permissions from database */}
                 <Stack spacing={2}>
-                  {PERMISSION_CATEGORIES.map(category => (
-                    <Accordion key={category.key}>
-                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                        <Stack direction="row" alignItems="center" spacing={2}>
-                          <Typography>{category.nameAr}</Typography>
-                          <Chip
-                            label={`${category.permissions.filter(p => formData.permissions.includes(p.name)).length}/${category.permissions.length}`}
-                            size="small"
-                            color="primary"
-                          />
-                        </Stack>
-                      </AccordionSummary>
-                      <AccordionDetails>
-                        <Grid container spacing={1}>
-                          {category.permissions.map(permission => (
-                            <Grid item xs={12} md={6} key={permission.name}>
-                              <FormControlLabel
-                                control={
-                                  <Checkbox
-                                    checked={formData.permissions.includes(permission.name)}
-                                    onChange={() => handlePermissionToggle(permission.name)}
-                                  />
-                                }
-                                label={
-                                  <Box>
-                                    <Typography variant="body2">{permission.nameAr}</Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      {permission.descriptionAr}
-                                    </Typography>
-                                  </Box>
-                                }
+                  {allPermissionsFromDB.length === 0 ? (
+                    <Alert severity="warning">
+                      لا توجد صلاحيات في قاعدة البيانات. يرجى إضافة صلاحيات أولاً.
+                    </Alert>
+                  ) : (
+                    (() => {
+                      // Group permissions by resource dynamically
+                      const groupedPerms: { [key: string]: any[] } = {};
+                      allPermissionsFromDB.forEach(perm => {
+                        const resource = perm.resource || 'other';
+                        if (!groupedPerms[resource]) {
+                          groupedPerms[resource] = [];
+                        }
+                        groupedPerms[resource].push(perm);
+                      });
+
+                      return Object.entries(groupedPerms).map(([resource, perms]) => (
+                        <Accordion key={resource}>
+                          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Stack direction="row" alignItems="center" spacing={2}>
+                              <Typography>{resource}</Typography>
+                              <Chip
+                                label={`${perms.filter(p => formData.permissions.includes(p.name)).length}/${perms.length}`}
+                                size="small"
+                                color="primary"
                               />
+                            </Stack>
+                          </AccordionSummary>
+                          <AccordionDetails>
+                            <Grid container spacing={1}>
+                              {perms.map(permission => (
+                                <Grid item xs={12} md={6} key={permission.id}>
+                                  <FormControlLabel
+                                    control={
+                                      <Checkbox
+                                        checked={formData.permissions.includes(permission.name)}
+                                        onChange={() => handlePermissionToggle(permission.name)}
+                                      />
+                                    }
+                                    label={
+                                      <Box>
+                                        <Typography variant="body2">
+                                          {permission.name_ar || permission.name}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                          {permission.description_ar || permission.description || `${permission.resource}.${permission.action}`}
+                                        </Typography>
+                                      </Box>
+                                    }
+                                  />
+                                </Grid>
+                              ))}
                             </Grid>
-                          ))}
-                        </Grid>
-                      </AccordionDetails>
-                    </Accordion>
-                  ))}
+                          </AccordionDetails>
+                        </Accordion>
+                      ));
+                    })()
+                  )}
                 </Stack>
               </Box>
             )}

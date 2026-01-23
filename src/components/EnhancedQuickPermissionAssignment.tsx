@@ -214,24 +214,48 @@ export default function EnhancedQuickPermissionAssignment({
 
       // Assign permissions to each selected role
       for (const roleId of selectedRoleIds) {
+        console.log(`🔄 Assigning ${selectedPermissionNames.length} permissions to role ${roleId}...`);
+        
         const { data, error } = await supabase.rpc('save_role_permissions', {
           p_role_id: roleId,
           p_permission_names: selectedPermissionNames
         });
 
         if (error) {
-          console.error(`Error assigning permissions to role ${roleId}:`, error);
+          console.error(`❌ Error assigning permissions to role ${roleId}:`, error);
           overallResult.success = false;
           overallResult.errors_count = (overallResult.errors_count || 0) + 1;
         } else {
+          console.log(`✅ RPC Response for role ${roleId}:`, data);
           overallResult.permissions_assigned = (overallResult.permissions_assigned || 0) + (data?.permissions_assigned || 0);
           overallResult.total_permissions = (overallResult.total_permissions || 0) + (data?.total_permissions || 0);
+        }
+      }
+
+      // Verify the save by checking database
+      console.log('🔍 Verifying permissions were saved...');
+      for (const roleId of selectedRoleIds) {
+        const { data: verifyData, error: verifyError } = await supabase
+          .from('role_permissions')
+          .select('permission_id, permissions(name)')
+          .eq('role_id', roleId);
+
+        if (!verifyError && verifyData) {
+          console.log(`✅ Role ${roleId} now has ${verifyData.length} permissions in database:`, 
+            verifyData.map((rp: any) => rp.permissions?.name).filter(Boolean)
+          );
+        } else {
+          console.error(`❌ Failed to verify role ${roleId}:`, verifyError);
         }
       }
 
       overallResult.message = `تم تعيين ${overallResult.permissions_assigned} صلاحية لـ ${selectedRoleIds.length} دور`;
       
       setLastResult(overallResult);
+      
+      // Refresh data BEFORE calling callbacks
+      await loadRoles();
+      await loadPermissions();
       
       if (onAssignmentComplete) {
         onAssignmentComplete(overallResult);
@@ -250,7 +274,7 @@ export default function EnhancedQuickPermissionAssignment({
       }
 
     } catch (error) {
-      console.error('Error in permission assignment:', error);
+      console.error('❌ Error in permission assignment:', error);
       const errorResult: AssignmentResult = {
         success: false,
         message: 'فشل في تعيين الصلاحيات',
