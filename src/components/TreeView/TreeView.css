@@ -8,7 +8,8 @@
   background-color: var(--content-bg);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-light);
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
   height: 100%;
   max-height: 100%;
   display: flex;
@@ -47,13 +48,15 @@
 /* Tree Node */
 .tree-node {
   display: grid;
-  grid-template-columns: auto auto 8px 120px minmax(200px, 1fr) 160px 80px 450px;
+  grid-template-columns: auto auto 8px 100px 150px 120px 80px 80px 1fr;
   align-items: center;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border-light);
   transition: background-color var(--transition-fast), box-shadow .15s ease, transform .05s ease;
   font-size: var(--font-size-sm);
   gap: 0.5rem;
+  white-space: nowrap;
+  min-width: min-content;
 }
 
 /* Extra columns cell */
@@ -64,12 +67,24 @@
 }
 
 /* Variants for extra columns count (adds extra cells before actions) */
-.tree-view-container.tree-has-extras-5 .tree-node {
-  grid-template-columns: auto auto 8px 120px minmax(220px, 1fr) 130px 80px 120px 110px 210px 110px 110px 450px;
+.tree-view-container.tree-has-extras-1 .tree-node {
+  grid-template-columns: auto auto 8px 100px 150px 120px 80px 80px 80px 1fr;
+}
+
+.tree-view-container.tree-has-extras-2 .tree-node {
+  grid-template-columns: auto auto 8px 100px 150px 120px 80px 80px 80px 80px 1fr;
+}
+
+.tree-view-container.tree-has-extras-3 .tree-node {
+  grid-template-columns: auto auto 8px 100px 150px 120px 80px 80px 80px 80px 80px 1fr;
 }
 
 .tree-view-container.tree-has-extras-4 .tree-node {
-  grid-template-columns: auto auto 8px 120px minmax(220px, 1fr) 130px 80px 140px 140px 140px 140px 450px;
+  grid-template-columns: auto auto 8px 100px 150px 120px 80px 80px 80px 80px 80px 80px 1fr;
+}
+
+.tree-view-container.tree-has-extras-5 .tree-node {
+  grid-template-columns: auto auto 8px 100px 150px 120px 80px 80px 80px 80px 80px 80px 80px 1fr;
 }
 
 .tree-node:hover {
