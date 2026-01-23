@@ -332,8 +332,10 @@ const TransactionDetailsPage: React.FC = () => {
           transactionId={tx.id}
           onApprovalComplete={() => {
             setApprovalModalOpen(false)
-            // Reload transaction to get updated status
-            window.location.reload()
+            // Refresh transaction data instead of full page reload
+            if (typeof onTransactionUpdate === 'function') {
+              onTransactionUpdate()
+            }
           }}
           onApprovalFailed={(error) => {
             console.error('Approval failed:', error)

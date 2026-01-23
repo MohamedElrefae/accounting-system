@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import styles from './WorkItems.module.css'
-import { getOrganizations, type Organization } from '../../services/organization'
 import { getActiveProjects, type Project } from '../../services/projects'
 import { useToast } from '../../contexts/ToastContext'
-import { useScopeOptional } from '../../contexts/ScopeContext'
+import { useScope } from '../../contexts/ScopeContext'
 import WorkItemsTree from '../../components/WorkItems/WorkItemsTree'
 import type { WorkItemRow, WorkItemTreeNode } from '../../types/work-items'
 import { listWorkItemsUnion, listWorkItemsAll, buildTreeFromUnion, createWorkItem, updateWorkItem, deleteWorkItem, toggleWorkItemActive, suggestWorkItemCode } from '../../services/work-items'
@@ -15,13 +14,10 @@ const MAX_LEVEL = 5
 
 const WorkItemsPage: React.FC = () => {
   const { showToast } = useToast()
-  const scope = useScopeOptional()
-  const initialOrgId = scope?.currentOrg?.id || ''
-  const initialProjectId = scope?.currentProject?.id || ''
-  const [orgs, setOrgs] = useState<Organization[]>([])
+  const { currentOrg, currentProject } = useScope()
   const [projects, setProjects] = useState<Project[]>([])
-  const [orgId, setOrgId] = useState<string>('')
-  const [projectId, setProjectId] = useState<string>('')
+  const orgId = currentOrg?.id || ''
+  const projectId = currentProject?.id || ''
   const [search, setSearch] = useState('')
   const [items, setItems] = useState<WorkItemRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -82,22 +78,44 @@ const WorkItemsPage: React.FC = () => {
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
+    // Load projects for the current organization
+    if (!orgId) {
+      setLoading(false);
+      return;
+    }
+    
     (async () => {
       setLoading(true)
       try {
-        const orgList = await getOrganizations().catch(() => [])
-        setOrgs(orgList)
-        const chosenOrg = initialOrgId || orgList[0]?.id || ''
-        setOrgId(prev => prev || chosenOrg)
         const projs = await getActiveProjects().catch(() => [])
         setProjects(projs)
-        const chosenProject = initialProjectId || (projs.length > 0 ? projs[0].id : '')
-        setProjectId(prev => prev || chosenProject)
       } finally {
         setLoading(false)
       }
     })()
-  }, [initialOrgId, initialProjectId])
+  }, [orgId])
+
+  useEffect(() => {
+    // Load work items when organization or project changes
+    if (!orgId) {
+      setLoading(false);
+      return;
+    }
+    
+    setLoading(true);
+    (async () => {
+      try {
+        const list = (!projectId)
+          ? await listWorkItemsAll(orgId, true)
+          : await listWorkItemsUnion(orgId, projectId || null, true)
+        setItems(list)
+      } catch (e: unknown) {
+        showToast((e as Error).message || 'Failed to load work items', { severity: 'error' })
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [orgId, projectId, showToast])
 
   const reload = async () => {
     setLoading(true)
@@ -143,13 +161,14 @@ const WorkItemsPage: React.FC = () => {
     setEditingId(null)
     setParentId(parent?.id || null)
     // Set form org and project based on parent or current selection
-    setFormOrgId(orgId)
     if (parent) {
       // When adding sub-item, inherit parent's project scope
+      setFormOrgId(currentOrg?.id || '')
       setFormProjectId(parent.project_id || '')
     } else {
-      // When adding root item, use current project selection or default to first project
-      setFormProjectId(projectId || projects[0]?.id || '')
+      // When adding root item, use current project selection
+      setFormOrgId(currentOrg?.id || '')
+      setFormProjectId(currentProject?.id || '')
     }
     setForm({ code: '', name: '', name_ar: '', description: '', unit: '', is_active: true })
     setCodeTouched(false)
@@ -183,9 +202,9 @@ const WorkItemsPage: React.FC = () => {
   const openEdit = (row: WorkItemRow) => {
     setEditingId(row.id)
     setParentId(row.parent_id)
-    // Set form org and project based on the item being edited
-    setFormOrgId(row.org_id)
-    setFormProjectId(row.project_id || '')
+    // Set form org and project based on current scope
+    setFormOrgId(currentOrg?.id || '')
+    setFormProjectId(currentProject?.id || '')
     setForm({
       code: row.code,
       name: row.name,
@@ -433,7 +452,6 @@ const WorkItemsPage: React.FC = () => {
 
   // Export current items (org/project union) to Excel
   const handleExportExcel = () => {
-    const orgMap = new Map(orgs.map(o => [o.id, o]))
     const projMap = new Map(projects.map(p => [p.id, p]))
     const rows = [
       ['code', 'name', 'name_ar', 'unit_of_measure', 'description', 'is_active', 'project_code', 'position'],
@@ -451,14 +469,13 @@ const WorkItemsPage: React.FC = () => {
     const ws = XLSX.utils.aoa_to_sheet(rows)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'WorkItems')
-    const orgCode = orgId ? (orgMap.get(orgId)?.code || 'ORG') : 'ORG'
-    const projCode = projectId ? (projMap.get(projectId)?.code || 'PROJ') : 'CATALOG'
+    const orgCode = currentOrg?.code || 'ORG'
+    const projCode = currentProject?.code || 'CATALOG'
     XLSX.writeFile(wb, `work_items_export_${orgCode}_${projCode}.xlsx`)
   }
 
   // Export current items (org/project union) to CSV (round-trip)
   const handleExportCSV = () => {
-    const orgMap = new Map(orgs.map(o => [o.id, o]))
     const projMap = new Map(projects.map(p => [p.id, p]))
     const rows = [
       ['code', 'name', 'name_ar', 'unit_of_measure', 'description', 'is_active', 'project_code', 'position'],
@@ -476,8 +493,8 @@ const WorkItemsPage: React.FC = () => {
     const ws = XLSX.utils.aoa_to_sheet(rows)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'WorkItems')
-    const orgCode = orgId ? (orgMap.get(orgId)?.code || 'ORG') : 'ORG'
-    const projCode = projectId ? (projMap.get(projectId)?.code || 'PROJ') : 'CATALOG'
+    const orgCode = currentOrg?.code || 'ORG'
+    const projCode = currentProject?.code || 'CATALOG'
     XLSX.writeFile(wb, `work_items_export_${orgCode}_${projCode}.csv`, { bookType: 'csv' })
   }
 
@@ -492,39 +509,62 @@ const WorkItemsPage: React.FC = () => {
     }
   }
 
+  // Show message if no organization is selected
+  if (!currentOrg) {
+    return (
+      <div className={styles.container} dir="rtl">
+        <div className={styles.header}>
+          <div className={styles.title}>Work Items / عناصر الأعمال</div>
+        </div>
+        
+        <div className={styles.content}>
+          <div className={styles.tableContainer}>
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '3rem',
+              backgroundColor: '#f9f9f9',
+              borderRadius: '8px',
+              border: '1px solid #e0e0e0'
+            }}>
+              <div style={{ fontSize: '64px', marginBottom: '1rem', color: '#999' }}>📋</div>
+              <h3 style={{ color: '#666', marginBottom: '0.5rem' }}>يرجى اختيار مؤسسة أولاً</h3>
+              <p style={{ color: '#999' }}>اختر مؤسسة من شريط الأدوات العلوي لعرض عناصر الأعمال التابعة لها</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.container} dir="rtl">
       <div className={styles.header}>
         <div className={styles.title}>Work Items / عناصر الأعمال</div>
         <div className={styles.toolbar}>
-          <select
-            className={`${styles.select}`}
-            value={orgId}
-            onChange={async (e) => {
-              const v = String(e.target.value)
-              setOrgId(v)
-              await reload()
-            }}
-          >
-            <option value="">اختر المؤسسة</option>
-            {orgs.map(o => (
-              <option key={o.id} value={o.id}>{o.code} - {o.name}</option>
-            ))}
-          </select>
-          <select
-            className={`${styles.select}`}
-            value={projectId}
-            onChange={async (e) => {
-              const v = String(e.target.value)
-              setProjectId(v)
-              await reload()
-            }}
-          >
-            <option value="">بدون مشروع (كتالوج المؤسسة)</option>
-            {projects.map(p => (
-              <option key={p.id} value={p.id}>{p.code} - {p.name}</option>
-            ))}
-          </select>
+          <div className="current-org-display" style={{ 
+            padding: '8px 12px', 
+            backgroundColor: '#f0f0f0', 
+            borderRadius: '4px',
+            fontSize: '14px',
+            color: '#666',
+            minWidth: '200px',
+            textAlign: 'center',
+            marginLeft: '8px'
+          }}>
+            {currentOrg ? `${currentOrg.code} - ${currentOrg.name}` : 'لم يتم تحديد مؤسسة'}
+          </div>
+          <div className="current-project-display" style={{ 
+            padding: '8px 12px', 
+            backgroundColor: '#f0f0f0', 
+            borderRadius: '4px',
+            fontSize: '14px',
+            color: '#666',
+            minWidth: '200px',
+            textAlign: 'center',
+            marginLeft: '8px'
+          }}>
+            {currentProject ? `${currentProject.code} - ${currentProject.name}` : 'بدون مشروع (كتالوج المؤسسة)'}
+          </div>
           <input
             className={styles.input}
             type="text"
@@ -734,29 +774,31 @@ const WorkItemsPage: React.FC = () => {
         </div>
         <div className={styles.controlsRow}>
           <label>المؤسسة</label>
-          <select
-            className={styles.select}
-            value={formOrgId}
-            onChange={(e) => { const v = e.target.value || ''; setFormOrgId(v); }}
-            disabled={!!parentId}
-            title={parentId ? 'تم تحديد المؤسسة من الأب' : undefined}
-          >
-            <option value="">اختر المؤسسة</option>
-            {orgs.map(o => (<option key={o.id} value={o.id}>{o.code} - {o.name}</option>))}
-          </select>
+          <div className="current-org-display" style={{ 
+            padding: '8px 12px', 
+            backgroundColor: '#f0f0f0', 
+            borderRadius: '4px',
+            fontSize: '14px',
+            color: '#666',
+            width: '100%',
+            textAlign: 'center'
+          }}>
+            {currentOrg ? `${currentOrg.code} - ${currentOrg.name}` : 'لم يتم تحديد مؤسسة'}
+          </div>
         </div>
         <div className={styles.controlsRow}>
           <label>المشروع</label>
-          <select
-            className={styles.select}
-            value={formProjectId}
-            onChange={(e) => { const v = e.target.value || ''; setFormProjectId(v); }}
-            disabled={!!parentId}
-            title={parentId ? 'يرث الفرعي نطاق المشروع من الأب' : undefined}
-          >
-            <option value="">مؤسسة (بدون مشروع)</option>
-            {projects.map(p => (<option key={p.id} value={p.id}>{p.code} - {p.name}</option>))}
-          </select>
+          <div className="current-project-display" style={{ 
+            padding: '8px 12px', 
+            backgroundColor: '#f0f0f0', 
+            borderRadius: '4px',
+            fontSize: '14px',
+            color: '#666',
+            width: '100%',
+            textAlign: 'center'
+          }}>
+            {currentProject ? `${currentProject.code} - ${currentProject.name}` : 'مؤسسة (بدون مشروع)'}
+          </div>
         </div>
         <div className={styles.controlsRow}>
           <label>نشط؟</label>

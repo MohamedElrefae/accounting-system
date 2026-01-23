@@ -64,8 +64,8 @@ class DataLoadingErrorBoundary extends Component<Props, State> {
 
   handleRetry = () => {
     if (this.state.retryCount >= this.maxRetries) {
-      // Hard reload if max retries exceeded
-      window.location.reload();
+      // Show permanent error instead of hard reload
+      console.warn('[DataLoadingErrorBoundary] Max retries exceeded, showing permanent error');
       return;
     }
 

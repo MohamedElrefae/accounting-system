@@ -5,7 +5,7 @@ import { ApplicationPerformanceMonitor } from '@/services/ApplicationPerformance
 export default function PerformanceDashboardPage() {
   const [events, setEvents] = React.useState(ApplicationPerformanceMonitor.list())
   React.useEffect(()=>{
-    const id = setInterval(()=> setEvents([...ApplicationPerformanceMonitor.list()]), 2000)
+    const id = setInterval(()=> setEvents([...ApplicationPerformanceMonitor.list()]), 10000) // Reduced from 2s to 10s
     return ()=> clearInterval(id)
   }, [])
   return (

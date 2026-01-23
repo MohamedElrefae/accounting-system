@@ -2,9 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import styles from './CostCenters.module.css'
 import { useHasPermission } from '../../hooks/useHasPermission'
 import { useToast } from '../../contexts/ToastContext'
-import { useScopeOptional } from '../../contexts/ScopeContext'
-import { getOrganizations, type Organization } from '../../services/organization'
-import { getProjects, type Project } from '../../services/projects'
+import { useScope } from '../../contexts/ScopeContext'
 import {
   getCostCentersList,
   createCostCenter,
@@ -14,8 +12,8 @@ import {
   type CostCenterRow,
 } from '../../services/cost-centers'
 import ExportButtons from '../../components/Common/ExportButtons'
-import TreeView from '../../components/TreeView/TreeView'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
+import TreeView from '../../components/TreeView/TreeView'
 import UnifiedCRUDForm, { type FormConfig } from '../../components/Common/UnifiedCRUDForm'
 import DraggablePanelContainer from '../../components/Common/DraggablePanelContainer'
 import TextField from '@mui/material/TextField'
@@ -24,10 +22,6 @@ import {
   Button,
   Card,
   CardContent,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
   Tab,
   Tabs,
   Typography,
@@ -41,18 +35,14 @@ import {
 
 const CostCentersPage: React.FC = () => {
   const { showToast } = useToast()
+  const { currentOrg } = useScope()
   const hasPermission = useHasPermission()
-  const scope = useScopeOptional()
-  const initialOrgId = scope?.currentOrg?.id || ''
   const canCreate = hasPermission('cost_centers.create')
   const canUpdate = hasPermission('cost_centers.update')
   const canDelete = hasPermission('cost_centers.delete')
 
+  const orgId = currentOrg?.id || ''
   const [tab, setTab] = useState(0)
-  const [orgs, setOrgs] = useState<Organization[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
-  const [orgId, setOrgId] = useState<string>('')
-
   const [list, setList] = useState<CostCenterRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -82,38 +72,22 @@ const CostCentersPage: React.FC = () => {
     position: 0
   })
 
-  const reload = useCallback(async (chosen: string) => {
-    if (!chosen) return
+  const reload = useCallback(async () => {
+    if (!orgId) return
     setLoading(true)
     try {
-      const costCenterList = await getCostCentersList(chosen, true)
+      const costCenterList = await getCostCentersList(orgId, true)
       setList(costCenterList)
     } catch (e: unknown) {
       showToast((e as Error).message || 'Failed to reload', { severity: 'error' })
     } finally {
       setLoading(false)
     }
-  }, [showToast])
-
-  useEffect(() => {
-    (async () => {
-      setLoading(true)
-      try {
-        const orgList = await getOrganizations().catch(() => [])
-        setOrgs(orgList)
-        const chosen = initialOrgId || orgList[0]?.id || ''
-        setOrgId(chosen)
-        const projs = await getProjects().catch(() => ({ rows: [], total: 0 }))
-        setProjects(projs.rows || [])
-      } finally {
-        setLoading(false)
-      }
-    })()
-  }, [initialOrgId])
+  }, [orgId, showToast])
 
   useEffect(() => {
     if (!orgId) return
-    void reload(orgId)
+    void reload()
   }, [orgId, reload])
 
   const filteredList = useMemo(() => {
@@ -151,12 +125,12 @@ const CostCentersPage: React.FC = () => {
       name_ar: r.name_ar || '',
       level: r.level,
       is_active: r.is_active,
-      project_code: projects.find(p => p.id === r.project_id)?.code || '',
+      project_code: '',
       child_count: r.child_count ?? 0,
       has_transactions: !!r.has_transactions,
     }))
     return prepareTableData(columns, rows)
-  }, [filteredList, projects])
+  }, [filteredList])
 
   // Fetch next code from server to ensure concurrency safety, with UI fallback
   const getNextCode = async (parentId?: string | null) => {
@@ -183,7 +157,6 @@ const CostCentersPage: React.FC = () => {
       name_ar: '', 
       description: '', 
       parent_id: '', 
-      project_id: '', 
       is_active: true, 
       position: 0 
     })
@@ -198,7 +171,6 @@ const CostCentersPage: React.FC = () => {
       name_ar: row.name_ar || '',
       description: row.description || '',
       parent_id: row.parent_id || '',
-      project_id: row.project_id || '',
       is_active: row.is_active,
       position: row.position
     })
@@ -211,7 +183,6 @@ const CostCentersPage: React.FC = () => {
     name_ar: string
     description: string
     parent_id: string | ''
-    project_id: string | ''
     is_active: boolean
     position: number
   }) => {
@@ -226,7 +197,7 @@ const CostCentersPage: React.FC = () => {
           name_ar: payload.name_ar || null,
           description: payload.description || null,
           parent_id: payload.parent_id || null,
-          project_id: payload.project_id || null,
+          project_id: null,
           is_active: payload.is_active,
           position: payload.position,
           org_id: orgId,
@@ -240,7 +211,7 @@ const CostCentersPage: React.FC = () => {
           name_ar: payload.name_ar || null,
           description: payload.description || null,
           parent_id: payload.parent_id || null,
-          project_id: payload.project_id || null,
+          project_id: null,
           is_active: payload.is_active,
           position: payload.position,
         })
@@ -264,7 +235,6 @@ const CostCentersPage: React.FC = () => {
       name_ar: '',
       description: '',
       parent_id: parentId,
-      project_id: parent.project_id || '',
       is_active: true,
       position: 0
     })
@@ -293,26 +263,52 @@ const CostCentersPage: React.FC = () => {
     }
   }
 
+  // Show message if no organization is selected
+  if (!currentOrg) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.header}>
+          <Typography className={styles.title}>Cost Centers / مراكز التكلفة</Typography>
+        </div>
+        
+        <div className={styles.content}>
+          <Card className={styles.card}>
+            <CardContent className={styles.cardBody}>
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '3rem',
+                backgroundColor: '#f9f9f9',
+                borderRadius: '8px',
+                border: '1px solid #e0e0e0'
+              }}>
+                <div style={{ fontSize: '64px', marginBottom: '1rem', color: '#999' }}>🏢</div>
+                <h3 style={{ color: '#666', marginBottom: '0.5rem' }}>يرجى اختيار مؤسسة أولاً</h3>
+                <p style={{ color: '#999' }}>اختر مؤسسة من شريط الأدوات العلوي لعرض مراكز التكلفة التابعة لها</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
         <Typography className={styles.title}>Cost Centers / مراكز التكلفة</Typography>
         <div className={styles.toolbar}>
-          <FormControl size="small">
-            <InputLabel>Organization</InputLabel>
-            <Select
-              label="Organization"
-              value={orgId}
-              onChange={async (e) => {
-                const v = String(e.target.value)
-                setOrgId(v)
-              }}
-            >
-              {orgs.map(o => (
-                <MenuItem key={o.id} value={o.id}>{o.code} - {o.name}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <div className="current-org-display" style={{ 
+            padding: '8px 12px', 
+            backgroundColor: '#f0f0f0', 
+            borderRadius: '4px',
+            fontSize: '14px',
+            color: '#666',
+            minWidth: '200px',
+            textAlign: 'center',
+            marginLeft: '8px'
+          }}>
+            {currentOrg ? `${currentOrg.code} - ${currentOrg.name}` : 'لم يتم تحديد مؤسسة'}
+          </div>
           <TextField 
             size="small" 
             label="Search / بحث" 
@@ -352,18 +348,11 @@ const CostCentersPage: React.FC = () => {
                       parent_id: r.parent_id,
                       is_active: r.is_active,
                       account_type: r.project_id ? 'project' : 'global',
-                      project_name: projects.find(p => p.id === r.project_id)?.name || '',
+                      project_name: '',
                       child_count: r.child_count ?? 0,
                       has_transactions: !!r.has_transactions,
                     }))}
                     extraColumns={[
-                      { 
-                        key: 'project', 
-                        header: 'Project', 
-                        render: (n) => (
-                          <span>{n.project_name || 'Global'}</span>
-                        )
-                      },
                       { 
                         key: 'is_active', 
                         header: 'Active', 
@@ -433,21 +422,13 @@ const CostCentersPage: React.FC = () => {
                             <TableCell>{r.name}</TableCell>
                             <TableCell>{r.name_ar || ''}</TableCell>
                             <TableCell>{r.level}</TableCell>
-                            <TableCell>
-                              {projects.find(p => p.id === r.project_id)?.name || 'Global'}
-                            </TableCell>
+                            <TableCell></TableCell>
                             <TableCell><Checkbox checked={r.is_active} disabled /></TableCell>
                             <TableCell>{r.child_count ?? 0}</TableCell>
                             <TableCell><Checkbox checked={!!r.has_transactions} disabled /></TableCell>
                             <TableCell align="right">
-                              {canUpdate && r.level < 4 && (
-                                <Button size="small" onClick={() => handleAddChild(r.id)}>Add Sub</Button>
-                              )}
-                              {canUpdate && (
-                                <Button size="small" onClick={() => handleToggleActive(r)}>
-                                  {r.is_active ? 'Disable' : 'Enable'}
-                                </Button>
-                              )}
+                              {canUpdate && r.level < 4 && <Button size="small" onClick={() => handleAddChild(r.id)}>Add Sub</Button>}
+                              {canUpdate && <Button size="small" onClick={() => handleToggleActive(r)}>{r.is_active ? 'Disable' : 'Enable'}</Button>}
                               {canUpdate && <Button size="small" onClick={() => openEdit(r)}>Edit</Button>}
                               {canDelete && <Button size="small" color="error" onClick={() => handleDelete(r)}>Delete</Button>}
                             </TableCell>
@@ -511,22 +492,6 @@ const CostCentersPage: React.FC = () => {
                 ],
                 clearable: true,
               },
-              {
-                id: 'project_id',
-                type: 'searchable-select',
-                label: 'Project (optional) / المشروع',
-                optionsProvider: async () => [
-                  { value: '', label: 'Global (All Projects) / عام', searchText: 'global عام' },
-                  ...projects
-                    .filter(p => p.org_id === orgId)
-                    .map(p => ({
-                      value: p.id,
-                      label: `${p.code} - ${p.name}`,
-                      searchText: `${p.code} ${p.name}`,
-                    })),
-                ],
-                clearable: true,
-              },
               { id: 'position', type: 'number', label: 'Position / الترتيب', required: false, defaultValue: 0 },
               { id: 'is_active', type: 'checkbox', label: 'Active / نشط', defaultValue: true },
             ],
@@ -537,7 +502,6 @@ const CostCentersPage: React.FC = () => {
             name_ar: form.name_ar,
             description: form.description,
             parent_id: form.parent_id,
-            project_id: form.project_id,
             is_active: form.is_active,
             position: form.position,
           }}
@@ -548,7 +512,6 @@ const CostCentersPage: React.FC = () => {
               name_ar: String(data.name_ar ?? ''),
               description: String(data.description ?? ''),
               parent_id: data.parent_id ? String(data.parent_id) : '',
-              project_id: data.project_id ? String(data.project_id) : '',
               is_active: data.is_active === undefined ? true : !!data.is_active,
               position: Number.isFinite(Number(data.position)) ? Number(data.position) : 0,
             }

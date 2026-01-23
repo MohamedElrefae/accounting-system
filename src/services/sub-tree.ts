@@ -103,7 +103,6 @@ export async function getExpensesCategoriesList(orgId: string, force = false): P
         linked_account_id, created_at, updated_at, created_by, updated_by
       `)
       .eq('org_id', orgId)
-      .eq('is_active', true)
       .order('code', { ascending: true })
     
     if (directResult.error) throw directResult.error
@@ -126,12 +125,36 @@ export async function getExpensesCategoriesList(orgId: string, force = false): P
 }
 
 export async function fetchNextExpensesCategoryCode(orgId: string, parentId: string | null): Promise<string> {
-  const { data, error } = await supabase.rpc('rpc_sub_tree_next_code', {
-    p_org_id: orgId,
-    p_parent_id: parentId,
+  // Use local generation - RPC may not be available or have permission issues
+  console.log('📝 Generating next code locally for:', { orgId, parentId })
+  return generateNextCodeLocally(orgId, parentId)
+}
+
+function generateNextCodeLocally(orgId: string, parentId: string | null): string {
+  // Get cached list for this org
+  const list = cache.list.get(orgId) || []
+  
+  let prefix = ''
+  if (parentId) {
+    const parent = list.find(r => r.id === parentId)
+    if (parent) {
+      prefix = parent.code + '.'
+    }
+  }
+  
+  // Find max numeric code at this level
+  const regex = new RegExp(`^${prefix.replace(/\./g, '\\.')}(\\d+)$`)
+  let maxNum = 0
+  
+  list.forEach(r => {
+    const match = r.code.match(regex)
+    if (match) {
+      const num = parseInt(match[1], 10)
+      if (num > maxNum) maxNum = num
+    }
   })
-  if (error) throw error
-  return data as string
+  
+  return prefix + String(maxNum + 1).padStart(3, '0')
 }
 
 export async function createExpensesCategory(payload: CreateSubTreePayload): Promise<string> {
@@ -140,19 +163,54 @@ export async function createExpensesCategory(payload: CreateSubTreePayload): Pro
   if (desc.length < 1) {
     throw new Error('الوصف مطلوب (1..300)')
   }
-  const { data, error } = await supabase.rpc('create_sub_tree', {
-    p_org_id: payload.org_id,
-    p_code: String(payload.code ?? '').trim(),
-    p_description: desc,
-    p_add_to_cost: payload.add_to_cost ?? false,
-    p_parent_id: payload.parent_id ?? null,
-    p_linked_account_id: payload.linked_account_id ?? null,
-  })
-  if (error) throw error
-  // Invalidate cache
-  cache.tree.delete(payload.org_id)
-  cache.list.delete(payload.org_id)
-  return data as string
+  
+  try {
+    console.log('📝 Creating sub_tree with payload:', payload)
+    
+    // Determine level and path
+    let level = 1
+    let path = payload.code
+    
+    if (payload.parent_id) {
+      const parentList = cache.list.get(payload.org_id) || []
+      const parent = parentList.find(r => r.id === payload.parent_id)
+      if (parent) {
+        level = parent.level + 1
+        path = parent.path ? `${parent.path}.${payload.code}` : `${parent.code}.${payload.code}`
+      }
+    }
+    
+    // Insert directly into the table
+    const { data, error } = await supabase
+      .from('sub_tree')
+      .insert({
+        org_id: payload.org_id,
+        code: String(payload.code ?? '').trim(),
+        description: desc,
+        add_to_cost: payload.add_to_cost ?? false,
+        parent_id: payload.parent_id ?? null,
+        linked_account_id: payload.linked_account_id ?? null,
+        level,
+        path,
+        is_active: true,
+      })
+      .select('id')
+      .single()
+    
+    if (error) {
+      console.error('❌ Insert error:', error)
+      throw error
+    }
+    
+    console.log('✅ Sub_tree created with ID:', data?.id)
+    // Invalidate cache
+    cache.tree.delete(payload.org_id)
+    cache.list.delete(payload.org_id)
+    return data?.id as string
+  } catch (err) {
+    console.error('❌ createExpensesCategory failed:', err)
+    throw err
+  }
 }
 
 export async function updateExpensesCategory(payload: UpdateSubTreePayload & { org_id?: string }): Promise<boolean> {
@@ -161,31 +219,73 @@ export async function updateExpensesCategory(payload: UpdateSubTreePayload & { o
   if (desc !== undefined && desc.length < 1) {
     throw new Error('الوصف مطلوب (1..300)')
   }
-  const { data, error } = await supabase.rpc('update_sub_tree', {
-    p_id: payload.id,
-    p_code: payload.code ? String(payload.code).trim() : null,
-    p_description: desc ?? null,
-    p_add_to_cost: payload.add_to_cost ?? null,
-    p_is_active: payload.is_active ?? null,
-    p_linked_account_id: payload.linked_account_id ?? null,
-    p_clear_linked_account: (payload.linked_account_id === null ? true : null),
-  })
-  if (error) throw error
-  if (payload.org_id) {
-    cache.tree.delete(payload.org_id)
-    cache.list.delete(payload.org_id)
-  } else {
-    // if org unknown, clear all
-    cache.tree.clear(); cache.list.clear()
+  
+  try {
+    console.log('📝 Updating sub_tree:', payload)
+    
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    }
+    
+    if (payload.code !== undefined) updateData.code = String(payload.code).trim()
+    if (desc !== undefined) updateData.description = desc
+    if (payload.add_to_cost !== undefined) updateData.add_to_cost = payload.add_to_cost
+    if (payload.is_active !== undefined) updateData.is_active = payload.is_active
+    if (payload.linked_account_id !== undefined) updateData.linked_account_id = payload.linked_account_id
+    
+    const { error } = await supabase
+      .from('sub_tree')
+      .update(updateData)
+      .eq('id', payload.id)
+    
+    if (error) {
+      console.error('❌ Update error:', error)
+      throw error
+    }
+    
+    console.log('✅ Sub_tree updated')
+    if (payload.org_id) {
+      console.log('🗑️ Clearing cache for org:', payload.org_id)
+      cache.tree.delete(payload.org_id)
+      cache.list.delete(payload.org_id)
+      console.log('✅ Cache cleared')
+    } else {
+      console.log('⚠️ No org_id provided, clearing all caches')
+      cache.tree.clear(); cache.list.clear()
+    }
+    return true
+  } catch (err) {
+    console.error('❌ updateExpensesCategory failed:', err)
+    throw err
   }
-  return data as boolean
 }
 
 export async function deleteExpensesCategory(id: string, orgId?: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('delete_sub_tree', { p_id: id })
-  if (error) throw error
-  if (orgId) { cache.tree.delete(orgId); cache.list.delete(orgId) } else { cache.tree.clear(); cache.list.clear() }
-  return data as boolean
+  try {
+    console.log('🗑️ Deleting sub_tree:', id)
+    const { error } = await supabase
+      .from('sub_tree')
+      .delete()
+      .eq('id', id)
+    
+    if (error) {
+      console.error('❌ Delete error:', error)
+      throw error
+    }
+    
+    console.log('✅ Sub_tree deleted')
+    if (orgId) { 
+      cache.tree.delete(orgId)
+      cache.list.delete(orgId)
+    } else { 
+      cache.tree.clear()
+      cache.list.clear()
+    }
+    return true
+  } catch (err) {
+    console.error('❌ deleteExpensesCategory failed:', err)
+    throw err
+  }
 }
 
 export async function listAccountsForOrg(orgId: string): Promise<AccountLite[]> {

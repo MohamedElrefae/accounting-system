@@ -2,8 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import styles from './AnalysisWorkItems.module.css'
 import './AccountsTree.css'
 import { useToast } from '../../contexts/ToastContext'
-import { getOrganizations, type Organization } from '../../services/organization'
-import { getActiveProjects, type Project } from '../../services/projects'
 import { useHasPermission } from '../../hooks/useHasPermission'
 import {
   listAnalysisWorkItems,
@@ -19,37 +17,29 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
+  TextField,
   Table,
   TableHead,
   TableRow,
   TableCell,
   TableBody,
-  TextField,
   Checkbox,
   Typography,
 } from '@mui/material'
 import ExportButtons from '../../components/Common/ExportButtons'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
-import { useScopeOptional } from '../../contexts/ScopeContext'
+import { useScope } from '../../contexts/ScopeContext'
 
 const AnalysisWorkItemsPage: React.FC = () => {
   const { showToast } = useToast()
-  const scope = useScopeOptional()
-  const initialOrgId = scope?.currentOrg?.id || ''
-  const initialProjectId = scope?.currentProject?.id || ''
+  const { currentOrg, currentProject } = useScope()
   const hasPermission = useHasPermission()
   const canCreate = hasPermission('work_items.create')
   const canUpdate = hasPermission('work_items.update')
   const canDelete = hasPermission('work_items.delete')
 
-  const [orgs, setOrgs] = useState<Organization[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
-  const [orgId, setOrgId] = useState<string>('')
-  const [projectId, setProjectId] = useState<string>('')
+  const orgId = currentOrg?.id || ''
+  const projectId = currentProject?.id || ''
 
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
@@ -63,22 +53,14 @@ const AnalysisWorkItemsPage: React.FC = () => {
   })
 
   useEffect(() => {
-    (async () => {
-      setLoading(true)
-      try {
-        const orgList = await getOrganizations().catch(() => [])
-        setOrgs(orgList)
-        const chosenOrg = orgId || initialOrgId || orgList[0]?.id || ''
-        if (chosenOrg !== orgId) setOrgId(chosenOrg)
-        const projs = await getActiveProjects().catch(() => [])
-        setProjects(projs)
-        const chosenProject = projectId || initialProjectId || (projs.length > 0 ? projs[0].id : '')
-        if (chosenProject !== projectId) setProjectId(chosenProject)
-      } finally {
-        setLoading(false)
-      }
-    })()
-  }, [initialOrgId, initialProjectId, orgId, projectId])
+    // Load projects for the current organization
+    if (!orgId) {
+      setLoading(false);
+      return;
+    }
+    
+    setLoading(false);
+  }, [orgId])
 
   const reload = useCallback(async () => {
     if (!orgId) return
@@ -176,6 +158,37 @@ const AnalysisWorkItemsPage: React.FC = () => {
     }
   }
 
+  // Show message if no organization is selected
+  if (!currentOrg) {
+    return (
+      <div className="accounts-page" dir="rtl">
+        <div className="page-header">
+          <div className="page-header-left">
+            <h1 className="page-title">بنود الاعمال التحليلية</h1>
+          </div>
+        </div>
+        
+        <div className="content-area">
+          <div className={styles.card}>
+            <div className={styles.cardBody}>
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '3rem',
+                backgroundColor: '#f9f9f9',
+                borderRadius: '8px',
+                border: '1px solid #e0e0e0'
+              }}>
+                <div style={{ fontSize: '64px', marginBottom: '1rem', color: '#999' }}>📊</div>
+                <h3 style={{ color: '#666', marginBottom: '0.5rem' }}>يرجى اختيار مؤسسة أولاً</h3>
+                <p style={{ color: '#999' }}>اختر مؤسسة من شريط الأدوات العلوي لعرض بنود الاعمال التحليلية التابعة لها</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="accounts-page" dir="rtl">
       <div className="page-header">
@@ -205,28 +218,31 @@ const AnalysisWorkItemsPage: React.FC = () => {
             <span className="icon">🔍</span>
           </div>
 
-          <FormControl size="small">
-            <InputLabel>المؤسسة</InputLabel>
-            <Select label="المؤسسة" value={orgId} onChange={async (e) => { 
-              const v = String(e.target.value); 
-              setOrgId(v); 
-              await reload();
-            }}>
-              {orgs.map(o => (<MenuItem key={o.id} value={o.id}>{o.code} - {o.name}</MenuItem>))}
-            </Select>
-          </FormControl>
+          <div className="current-org-display" style={{ 
+            padding: '8px 12px', 
+            backgroundColor: '#f0f0f0', 
+            borderRadius: '4px',
+            fontSize: '14px',
+            color: '#666',
+            minWidth: '200px',
+            textAlign: 'center',
+            marginLeft: '8px'
+          }}>
+            {currentOrg ? `${currentOrg.code} - ${currentOrg.name}` : 'لم يتم تحديد مؤسسة'}
+          </div>
 
-          <FormControl size="small">
-            <InputLabel>المشروع (لنطاق الإجماليات)</InputLabel>
-            <Select label="المشروع (لنطاق الإجماليات)" value={projectId} onChange={async (e) => {
-              const v = String(e.target.value)
-              setProjectId(v)
-              await reload()
-            }}>
-              <MenuItem value="">كل المشروعات</MenuItem>
-              {projects.map(p => (<MenuItem key={p.id} value={p.id}>{p.code} - {p.name}</MenuItem>))}
-            </Select>
-          </FormControl>
+          <div className="current-project-display" style={{ 
+            padding: '8px 12px', 
+            backgroundColor: '#f0f0f0', 
+            borderRadius: '4px',
+            fontSize: '14px',
+            color: '#666',
+            minWidth: '200px',
+            textAlign: 'center',
+            marginLeft: '8px'
+          }}>
+            {currentProject ? `${currentProject.code} - ${currentProject.name}` : 'كل المشروعات'}
+          </div>
         </div>
         <div className="view-mode-toggle">
           <button className="view-mode-btn active">عرض جدول</button>

@@ -53,7 +53,22 @@
 }
 
 .tableContainer {
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.tableContainer table {
+  min-width: 100%;
+}
+
+.tableContainer thead th {
+  white-space: nowrap;
+  padding: 12px 8px;
+}
+
+.tableContainer tbody td {
+  white-space: nowrap;
+  padding: 8px;
 }
 
 .sectionTitle {

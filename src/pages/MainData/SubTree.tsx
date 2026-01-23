@@ -2,8 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import styles from './SubTree.module.css'
 import { useHasPermission } from '../../hooks/useHasPermission'
 import { useToast } from '../../contexts/ToastContext'
-import { useScopeOptional } from '../../contexts/ScopeContext'
-import { getOrganizations, type Organization } from '../../services/organization'
+import { useScope } from '../../contexts/ScopeContext'
 import {
   getExpensesCategoriesTree,
   getExpensesCategoriesList,
@@ -26,13 +25,9 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
+  TextField,
   Tab,
   Tabs,
-  TextField,
   Typography,
   Table,
   TableHead,
@@ -54,16 +49,14 @@ import DeleteIcon from '@mui/icons-material/Delete'
 const SubTreePage: React.FC = () => {
   const { showToast } = useToast()
   const hasPermission = useHasPermission()
-  const scope = useScopeOptional()
-  const initialOrgId = scope?.currentOrg?.id || ''
+  const { currentOrg } = useScope()
   // View-level permission is enforced by the route guard (ProtectedRoute with requiredAction="sub_tree.view")
   const canCreate = hasPermission('sub_tree.create')
   const canUpdate = hasPermission('sub_tree.update')
   const canDelete = hasPermission('sub_tree.delete')
 
   const [tab, setTab] = useState(0)
-  const [orgs, setOrgs] = useState<Organization[]>([])
-  const [orgId, setOrgId] = useState<string>('')
+  const orgId = currentOrg?.id || ''
 
   const [_tree, setTree] = useState<ExpensesCategoryTreeNode[]>([])
   const [list, setList] = useState<ExpensesCategoryRow[]>([])
@@ -81,46 +74,51 @@ const SubTreePage: React.FC = () => {
   })
 
   useEffect(() => {
+    // Load data when organization changes
+    if (!orgId) {
+      setLoading(false);
+      return;
+    }
+    
+    setLoading(true);
     (async () => {
-      setLoading(true)
       try {
-        const orgList = await getOrganizations().catch(() => [])
-        setOrgs(orgList)
-        const chosen = orgId || initialOrgId || orgList[0]?.id || ''
-        console.log('SubTree: chosen orgId:', chosen, typeof chosen, 'orgId:', orgId, typeof orgId, 'initialOrgId:', initialOrgId, typeof initialOrgId)
-        if (chosen !== orgId) setOrgId(chosen)
-        if (chosen) {
-          const [t, l, accs] = await Promise.all([
-            getExpensesCategoriesTree(chosen, true),
-            getExpensesCategoriesList(chosen, true),
-            listAccountsForOrg(chosen)
-          ])
-          setTree(t)
-          setList(l)
-          setAccounts(accs)
-        }
+        console.log('📥 Fetching sub-tree data for org:', orgId);
+        const [t, l, accs] = await Promise.all([
+          getExpensesCategoriesTree(orgId, true),
+          getExpensesCategoriesList(orgId, true),
+          listAccountsForOrg(orgId)
+        ]);
+        console.log('✅ Data loaded - tree:', t.length, 'list:', l.length, 'accounts:', accs.length);
+        setTree(t);
+        setList(l);
+        setAccounts(accs);
       } catch (e: unknown) {
-        showToast((e as Error).message || 'Failed to load data', { severity: 'error' })
+        console.error('❌ Failed to load data:', e);
+        showToast((e as Error).message || 'Failed to load data', { severity: 'error' });
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    })()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialOrgId])
+    })();
+  }, [orgId, showToast]);
 
   const reload = async (chosen: string) => {
     if (!chosen) return
+    console.log('🔄 Reload started for org:', chosen)
     setLoading(true)
     try {
+      console.log('📥 Fetching fresh data (force=true)...')
       const [t, l, accs] = await Promise.all([
         getExpensesCategoriesTree(chosen, true),
         getExpensesCategoriesList(chosen, true),
         listAccountsForOrg(chosen)
       ])
+      console.log('✅ Reload complete - tree:', t.length, 'list:', l.length, 'accounts:', accs.length)
       setTree(t)
       setList(l)
       setAccounts(accs)
     } catch (e: unknown) {
+      console.error('❌ Reload failed:', e)
       showToast((e as Error).message || 'Failed to reload', { severity: 'error' })
     } finally {
       setLoading(false)
@@ -174,9 +172,14 @@ const SubTreePage: React.FC = () => {
 
   const openCreate = async () => {
     setEditingId(null)
-    const code = await getNextCode(null)
-    setForm({ code, description: '', parent_id: '', add_to_cost: false, is_active: true, linked_account_id: '' })
-    setOpen(true)
+    try {
+      const code = await getNextCode(null)
+      setForm({ code, description: '', parent_id: '', add_to_cost: false, is_active: true, linked_account_id: '' })
+      setOpen(true)
+    } catch (err) {
+      console.error('❌ Failed to get next code:', err)
+      showToast('Failed to generate code: ' + ((err as Error).message || 'Unknown error'), { severity: 'error' })
+    }
   }
 
   const openEdit = (row: ExpensesCategoryRow) => {
@@ -217,6 +220,9 @@ const SubTreePage: React.FC = () => {
         })
         showToast('Created successfully', { severity: 'success' })
       }
+      // Reset form state before closing dialog to ensure clean state for next use
+      setForm({ code: '', description: '', parent_id: '', add_to_cost: false, is_active: true, linked_account_id: '' })
+      setEditingId(null)
       setOpen(false)
       await reload(orgId)
     } catch (e: unknown) {
@@ -228,16 +234,21 @@ const SubTreePage: React.FC = () => {
     const parent = list.find(r => r.id === parentId)
     if (!parent) return
     setEditingId(null)
-    const code = await getNextCode(parentId)
-    setForm({
-      code,
-      description: '',
-      parent_id: parentId,
-      add_to_cost: parent.add_to_cost,
-      is_active: true,
-      linked_account_id: ''
-    })
-    setOpen(true)
+    try {
+      const code = await getNextCode(parentId)
+      setForm({
+        code,
+        description: '',
+        parent_id: parentId,
+        add_to_cost: parent.add_to_cost,
+        is_active: true,
+        linked_account_id: ''
+      })
+      setOpen(true)
+    } catch (err) {
+      console.error('❌ Failed to get next code:', err)
+      showToast('Failed to generate code: ' + ((err as Error).message || 'Unknown error'), { severity: 'error' })
+    }
   }
 
   const handleToggleActive = async (row: ExpensesCategoryRow) => {
@@ -262,27 +273,51 @@ const SubTreePage: React.FC = () => {
     }
   }
 
+  // Show message if no organization is selected
+  if (!currentOrg) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.header}>
+          <Typography className={styles.title}>Sub Tree / الشجرة الفرعية</Typography>
+        </div>
+        
+        <div className={styles.content}>
+          <div className={styles.card}>
+            <CardContent className={styles.cardBody}>
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '3rem',
+                backgroundColor: '#f9f9f9',
+                borderRadius: '8px',
+                border: '1px solid #e0e0e0'
+              }}>
+                <div style={{ fontSize: '64px', marginBottom: '1rem', color: '#999' }}>📁</div>
+                <h3 style={{ color: '#666', marginBottom: '0.5rem' }}>يرجى اختيار مؤسسة أولاً</h3>
+                <p style={{ color: '#999' }}>اختر مؤسسة من شريط الأدوات العلوي لعرض الشجرة الفرعية التابعة لها</p>
+              </div>
+            </CardContent>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
         <Typography className={styles.title}>Sub Tree / الشجرة الفرعية</Typography>
         <div className={styles.toolbar}>
-          <FormControl size="small">
-            <InputLabel>Organization</InputLabel>
-            <Select
-              label="Organization"
-              value={orgId}
-              onChange={async (e) => {
-                const v = String(e.target.value)
-                setOrgId(v)
-                await reload(v)
-              }}
-            >
-              {orgs.map(o => (
-                <MenuItem key={o.id} value={o.id}>{o.code} - {o.name}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <div className="current-org-display" style={{ 
+            padding: '8px 12px', 
+            backgroundColor: '#f0f0f0', 
+            borderRadius: '4px',
+            fontSize: '14px',
+            color: '#666',
+            minWidth: '200px',
+            textAlign: 'center'
+          }}>
+            {currentOrg ? `${currentOrg.code} - ${currentOrg.name}` : 'لم يتم تحديد مؤسسة'}
+          </div>
           <TextField size="small" label="Search / بحث" value={search} onChange={(e) => setSearch(e.target.value)} />
           {canCreate && (
             <Button variant="contained" onClick={openCreate}>New / جديد</Button>
@@ -467,7 +502,12 @@ const SubTreePage: React.FC = () => {
         </Card>
       </div>
 
-      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="md">
+      <Dialog open={open} onClose={() => {
+        setOpen(false)
+        // Reset form state when dialog closes
+        setForm({ code: '', description: '', parent_id: '', add_to_cost: false, is_active: true, linked_account_id: '' })
+        setEditingId(null)
+      }} fullWidth maxWidth="md">
         <DialogTitle>{editingId ? 'Edit Node / تعديل العقدة' : 'New Node / عقدة جديدة'}</DialogTitle>
         <DialogContent>
           <UnifiedCRUDForm
@@ -501,8 +541,10 @@ const SubTreePage: React.FC = () => {
                   // Enforce DB constraint (1..300 chars)
                   validation: (v: unknown) => {
                     const s = String(v ?? '').trim();
-                    if (s.length < 1) return { field: 'description', message: 'الوصف مطلوب (على الأقل حرف واحد)' } as any;
-                    if (s.length > 300) return { field: 'description', message: 'الوصف يجب ألا يزيد عن 300 حرف' } as any;
+                    // Only validate if value is provided (required field will handle empty check)
+                    if (s.length > 0 && s.length > 300) {
+                      return { field: 'description', message: 'الوصف يجب ألا يزيد عن 300 حرف' } as any;
+                    }
                     return null;
                   }
                 },
@@ -529,13 +571,15 @@ const SubTreePage: React.FC = () => {
               linked_account_id: form.linked_account_id,
             }}
             onSubmit={async (data) => {
-              // Client-side enforcement of DB constraints
+              console.log('📋 Form submitted with data:', data)
+              
+              // Trim values for consistency
               const codeVal = String(data.code || '').trim();
               const descVal = String(data.description || '').trim();
-              if (descVal.length < 1 || descVal.length > 300) {
-                showToast('الوصف مطلوب وبحد أقصى 300 حرف', { severity: 'error' });
-                return;
-              }
+              
+              console.log('📝 Trimmed values - code:', codeVal, 'desc:', descVal, 'desc length:', descVal.length)
+              
+              // Note: Form validation already passed in UnifiedCRUDForm, so we just need to prepare the payload
               const payload = {
                 code: codeVal,
                 description: descVal,
@@ -544,6 +588,7 @@ const SubTreePage: React.FC = () => {
                 is_active: data.is_active === undefined ? true : !!data.is_active,
                 linked_account_id: data.linked_account_id ? String(data.linked_account_id) : '',
               };
+              console.log('✅ Payload ready:', payload)
               setForm(payload);
               await handleSave();
             }}

@@ -442,7 +442,7 @@ export default function EnhancedOpeningBalanceImport() {
   const navigate = useNavigate()
   const scope = useScopeOptional()
 
-  const enableManual = false
+  const enableManual = true
   const [searchParams] = useSearchParams()
 
   // State
@@ -524,20 +524,18 @@ export default function EnhancedOpeningBalanceImport() {
   const toggleLanguage = useCallback(() => {
     const newLang = ArabicLanguageService.getCurrentLanguage() === 'en' ? 'ar' : 'en'
     ArabicLanguageService.setLanguage(newLang)
-    window.location.reload() // Reload to apply changes
+    // Use state update instead of page reload for better UX
+    window.dispatchEvent(new CustomEvent('languageChanged', { detail: { language: newLang } }))
   }, [])
 
-  // Load templates prefs and currencies
+  // Load saved templates and force debit/credit mode
   useEffect(() => {
     try {
       const raw = localStorage.getItem('obi_manual_templates')
       if (raw) setTemplates(JSON.parse(raw))
-      const pref = localStorage.getItem('obi_manual_prefs')
-      if (pref) {
-        const p = JSON.parse(pref)
-        if (typeof p.useAmountMode==='boolean') setUseAmountMode(p.useAmountMode)
-        if (p.manualCols) setManualCols(p.manualCols)
-      }
+      // Force debit/credit mode - ignore saved preference
+      setUseAmountMode(false)
+      localStorage.removeItem('obi_manual_prefs') // Clear saved preference
     } catch {}
     // fetch currencies
     (async ()=>{
@@ -704,6 +702,15 @@ export default function EnhancedOpeningBalanceImport() {
           OpeningBalanceImportService.listProjectsForSelect(orgId, 2000),
           OpeningBalanceImportService.listCostCentersTreeForSelect(orgId, 5000),
         ])
+        
+        // Debug: Log what data we got
+        console.log('Debug - Loaded data:', { 
+          accountsCount: acc.length, 
+          projectsCount: prj.length, 
+          costCentersCount: cc.length,
+          projects: prj.slice(0, 3), // Show first 3 projects
+          costCenters: cc.slice(0, 3) // Show first 3 cost centers
+        })
         // Build hierarchy from parent links for SearchableSelect drilldown
         const buildTree = (rows: any[]) => {
           const byValue = new Map<string, any>()
@@ -734,10 +741,10 @@ export default function EnhancedOpeningBalanceImport() {
     })()
   }, [enableManual, showManual, orgId])
 
-  // Persist prefs
+  // Persist prefs (but not useAmountMode - keep it always false for debit/credit)
   useEffect(()=>{
-    try { localStorage.setItem('obi_manual_prefs', JSON.stringify({ useAmountMode, manualCols })) } catch {}
-  }, [useAmountMode, manualCols])
+    try { localStorage.setItem('obi_manual_prefs', JSON.stringify({ useAmountMode: false, manualCols })) } catch {}
+  }, [manualCols])
 
   // Initialize manual column config, respecting saved config and amount/debit-credit mode
   useEffect(() => {
@@ -1815,7 +1822,7 @@ export default function EnhancedOpeningBalanceImport() {
                         {c.key === 'project_code' && (
                           <SearchableSelect
                             id={`manual-project-${idx}`}
-                            value={row.project_code || ''}
+                            value={row.project_code || undefined}
                             options={projectFlatOptions}
                             onChange={(val)=> setManualRows(r=>{ const cc=[...r]; cc[idx]={...cc[idx], project_code:val}; return cc })}
                             placeholder={isRTL ? 'اختر المشروع' : 'Select project'}
@@ -1828,7 +1835,7 @@ export default function EnhancedOpeningBalanceImport() {
                         {c.key === 'cost_center_code' && (
                           <SearchableSelect
                             id={`manual-cc-${idx}`}
-                            value={row.cost_center_code || ''}
+                            value={row.cost_center_code || undefined}
                             options={ccFlatOptions}
                             onChange={(val)=> setManualRows(r=>{ const cc=[...r]; cc[idx]={...cc[idx], cost_center_code:val}; return cc })}
                             placeholder={isRTL ? 'اختر مركز التكلفة' : 'Select cost center'}
@@ -1837,6 +1844,22 @@ export default function EnhancedOpeningBalanceImport() {
                             treeOptions={ccTreeOptions}
                             compact
                           />
+                        )}
+                        
+                        {/* Debug info */}
+                        {idx === 0 && c.key === 'project_code' && (
+                          <TableCell>
+                            <Typography variant="caption" color="text.secondary">
+                              Debug: {projectFlatOptions.length} projects loaded
+                            </Typography>
+                          </TableCell>
+                        )}
+                        {idx === 0 && c.key === 'cost_center_code' && (
+                          <TableCell>
+                            <Typography variant="caption" color="text.secondary">
+                              Debug: {ccFlatOptions.length} cost centers loaded
+                            </Typography>
+                          </TableCell>
                         )}
                         {c.key === 'currency_code' && (
                           <SearchableSelect
@@ -2279,9 +2302,9 @@ export default function EnhancedOpeningBalanceImport() {
                         {c.key==='amount' ? (r.amount || '')
                           : c.key==='opening_balance_debit' ? (r.opening_balance_debit || '')
                           : c.key==='opening_balance_credit' ? (r.opening_balance_credit || '')
-                          : c.key==='project_code' ? (r.project_code || '')
-                          : c.key==='cost_center_code' ? (r.cost_center_code || '')
-                          : c.key==='currency_code' ? (r.currency_code || '')
+                          : c.key==='project_code' ? (r.project_code || undefined)
+                          : c.key==='cost_center_code' ? (r.cost_center_code || undefined)
+                          : c.key==='currency_code' ? (r.currency_code || undefined)
                           : r.account_code}
                       </TableCell>
                     ))}

@@ -265,7 +265,7 @@ export class OpeningBalanceImportService {
     if (!session?.user) throw new Error('Not signed in — Authorization header missing')
 
     const { data: importId, error } = await supabase
-      .rpc('import_opening_balances', {
+      .rpc('import_opening_balances_no_approval', {
         p_org_id: orgId,
         p_fiscal_year_id: fiscalYearId,
         p_import_data: payload,
@@ -470,7 +470,7 @@ export class OpeningBalanceImportService {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) throw new Error('Not signed in')
     const { data: importId, error } = await supabase
-      .rpc('import_opening_balances', {
+      .rpc('import_opening_balances_no_approval', {
         p_org_id: orgId,
         p_fiscal_year_id: fiscalYearId,
         p_import_data: payload,
@@ -605,8 +605,7 @@ export class OpeningBalanceImportService {
     }
 
     const ws = XLSX.utils.aoa_to_sheet(aoa)
-    // Basic sheet protection (note: fine-grained unlock may not be supported in this build)
-    ;(ws as any)['!protect'] = { password: 'obi' }
+    // Note: Removed sheet protection to allow users to edit the template
 
     // Best-effort column widths
     ;(ws as any)['!cols'] = [
@@ -923,20 +922,19 @@ export class OpeningBalanceImportService {
 
   // 7) Create approval request for an opening balance import
   static async requestApproval(args: { orgId: string; importId: string; submittedBy?: string }) {
-    const { orgId, importId } = args
-    // Allow trigger to resolve workflow_id. We just set target_table and target_id.
-    const payload: any = {
-      target_table: 'opening_balances',
-      target_id: importId,
-      org_id: orgId,
-    }
-    if (args.submittedBy) payload.submitted_by = args.submittedBy
-
+    const { orgId, importId, submittedBy } = args
+    
+    // Use the proper database function that handles workflow_id resolution
     const { data, error } = await supabase
-      .from('approval_requests')
-      .insert(payload)
-      .select('*')
-      .single()
+      .rpc('fn_create_approval_request', {
+        p_org_id: orgId,
+        p_target_table: 'opening_balances',
+        p_target_id: importId,
+        p_requested_by: submittedBy || null,
+        p_workflow_id: null, // Let the function resolve it
+        p_metadata: {}
+      })
+
     if (error) throw new Error(`requestApproval failed: ${error.message}`)
     return data
   }

@@ -2,9 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import styles from './TransactionLineItems.module.css'
 import { useHasPermission } from '../../hooks/useHasPermission'
 import { useToast } from '../../contexts/ToastContext'
-import { getOrganizations, type Organization } from '../../services/organization'
 import { lineItemsCatalogService, type CatalogItem } from '../../services/line-items-catalog'
-import { useScopeOptional } from '../../contexts/ScopeContext'
+import { useScope } from '../../contexts/ScopeContext'
 
 import ExportButtons from '../../components/Common/ExportButtons'
 import TreeView from '../../components/TreeView/TreeView'
@@ -17,10 +16,6 @@ import {
   Button,
   Card,
   CardContent,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
   Tab,
   Tabs,
   Typography,
@@ -35,8 +30,8 @@ import {
 const TransactionLineItemsPage: React.FC = () => {
   const { showToast } = useToast()
   const hasPermission = useHasPermission()
-  const scope = useScopeOptional()
-  const initialOrgId = scope?.currentOrg?.id || ''
+  const { currentOrg, currentProject } = useScope()
+  const orgId = currentOrg?.id || ''
   const canCreate = hasPermission('transaction_line_items.create')
   const canUpdate = hasPermission('transaction_line_items.update')
   const canDelete = hasPermission('transaction_line_items.delete')
@@ -57,8 +52,6 @@ const TransactionLineItemsPage: React.FC = () => {
   }
 
   const [tab, setTab] = useState(0)
-  const [orgs, setOrgs] = useState<Organization[]>([])
-  const [orgId, setOrgId] = useState<string>('')
 
   const [list, setList] = useState<TransactionLineItemRow[]>([])
 
@@ -102,11 +95,11 @@ const TransactionLineItemsPage: React.FC = () => {
     position: 0
   })
 
-  const reload = useCallback(async (chosen: string) => {
-    if (!chosen) return
+  const reload = useCallback(async () => {
+    if (!orgId) return
     setLoading(true)
     try {
-      const catalogItems: CatalogItem[] = await lineItemsCatalogService.list(chosen, true)
+      const catalogItems: CatalogItem[] = await lineItemsCatalogService.list(orgId, true)
 
       const itemsWithMeta: TransactionLineItemRow[] = catalogItems.map(item => ({
         id: item.id,
@@ -134,26 +127,15 @@ const TransactionLineItemsPage: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [orgId, showToast])
 
   useEffect(() => {
-    (async () => {
-      setLoading(true)
-      try {
-        const orgList = await getOrganizations().catch(() => [])
-        setOrgs(orgList)
-        const chosen = orgId || initialOrgId || orgList[0]?.id || ''
-        if (chosen !== orgId) setOrgId(chosen)
-        if (chosen) {
-          await reload(chosen)
-        }
-      } catch (e: unknown) {
-        showToast((e as Error).message || 'Failed to load data', { severity: 'error' })
-      } finally {
-        setLoading(false)
-      }
-    })()
-  }, [initialOrgId, orgId, reload, showToast])
+    if (orgId) {
+      reload()
+    } else {
+      setLoading(false)
+    }
+  }, [orgId, reload])
 
   // Calculate level from item code (1000=1, 1100=2, etc.)
   const calculateLevelFromCode = (code: string): number => {
@@ -303,7 +285,7 @@ const TransactionLineItemsPage: React.FC = () => {
       }
 
       setOpen(false)
-      await reload(orgId)
+      await reload()
     } catch (e: unknown) {
       showToast((e as Error).message || 'Save failed', { severity: 'error' })
     }
@@ -335,7 +317,7 @@ const TransactionLineItemsPage: React.FC = () => {
         is_active: !row.is_active,
       })
       showToast(row.is_active ? 'تم التعطيل' : 'تم التفعيل', { severity: 'success' })
-      await reload(orgId)
+      await reload()
     } catch (e: unknown) {
       showToast((e as Error).message || 'Toggle failed', { severity: 'error' })
     }
@@ -347,10 +329,41 @@ const TransactionLineItemsPage: React.FC = () => {
     try {
       await lineItemsCatalogService.remove(row.id, orgId)
       showToast('تم الحذف بنجاح', { severity: 'success' })
-      await reload(orgId)
+      await reload()
     } catch (e: unknown) {
       showToast((e as Error).message || 'Delete failed', { severity: 'error' })
     }
+  }
+
+  // Show message if no organization is selected
+  if (!currentOrg) {
+    return (
+      <div className="accounts-page" dir="rtl">
+        <div className="page-header">
+          <div className="page-header-left">
+            <h1 className="page-title">بنود التكلفة التفصيلية</h1>
+          </div>
+        </div>
+        
+        <div className="content-area">
+          <div className={styles.card}>
+            <div className={styles.cardBody}>
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '3rem',
+                backgroundColor: '#f9f9f9',
+                borderRadius: '8px',
+                border: '1px solid #e0e0e0'
+              }}>
+                <div style={{ fontSize: '64px', marginBottom: '1rem', color: '#999' }}>📦</div>
+                <h3 style={{ color: '#666', marginBottom: '0.5rem' }}>يرجى اختيار مؤسسة أولاً</h3>
+                <p style={{ color: '#999' }}>اختر مؤسسة من شريط الأدوات العلوي لعرض بنود التكلفة التابعة لها</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -358,22 +371,6 @@ const TransactionLineItemsPage: React.FC = () => {
       <div className={styles.header}>
         <Typography className={styles.title}>Transaction Line Items Catalog / بنود التكلفة التفصيلية</Typography>
         <div className={styles.toolbar}>
-          <FormControl size="small">
-            <InputLabel>Organization</InputLabel>
-            <Select
-              label="Organization"
-              value={orgId}
-              onChange={async (e) => {
-                const v = String(e.target.value)
-                setOrgId(v)
-                await reload(v)
-              }}
-            >
-              {orgs.map(o => (
-                <MenuItem key={o.id} value={o.id}>{o.code} - {o.name}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
           <TextField 
             size="small" 
             label="Search / بحث" 
@@ -388,6 +385,37 @@ const TransactionLineItemsPage: React.FC = () => {
             config={{ title: 'Transaction Line Items Catalog', rtlLayout: true }} 
             size="small" 
           />
+        </div>
+      </div>
+
+      {/* Organization and Project Display */}
+      <div className="controls-container">
+        <div className="search-and-filters">
+          <div className="current-org-display" style={{ 
+            padding: '8px 12px', 
+            backgroundColor: '#f0f0f0', 
+            borderRadius: '4px',
+            fontSize: '14px',
+            color: '#666',
+            minWidth: '200px',
+            textAlign: 'center',
+            marginLeft: '8px'
+          }}>
+            {currentOrg ? `${currentOrg.code} - ${currentOrg.name}` : 'لم يتم تحديد مؤسسة'}
+          </div>
+
+          <div className="current-project-display" style={{ 
+            padding: '8px 12px', 
+            backgroundColor: '#f0f0f0', 
+            borderRadius: '4px',
+            fontSize: '14px',
+            color: '#666',
+            minWidth: '200px',
+            textAlign: 'center',
+            marginLeft: '8px'
+          }}>
+            {currentProject ? `${currentProject.code} - ${currentProject.name}` : 'كل المشروعات'}
+          </div>
         </div>
       </div>
 

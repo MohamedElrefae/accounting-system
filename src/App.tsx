@@ -1,6 +1,7 @@
 import React, { useEffect, Suspense } from 'react';
 import { useIdleLogout } from './hooks/useIdleLogout';
 import { useAuthPerformance } from './hooks/useAuthPerformance';
+import { useRefreshPrevention } from './hooks/useRefreshPrevention';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import useAppStore from './store/useAppStore';
 import { ArabicLanguageService } from './services/ArabicLanguageService';
@@ -10,6 +11,7 @@ import DataLoadingErrorBoundary from './components/Common/DataLoadingErrorBounda
 import DataLoadingState from './components/Common/DataLoadingState';
 import { Box, Typography } from '@mui/material';
 import PerformanceOptimizer from './components/Common/PerformanceOptimizer';
+import RefreshMonitor from './components/Debug/RefreshMonitor';
 
 // Import route groups instead of individual components
 import { preloadCriticalRoutes } from './routes/RouteGroups';
@@ -42,6 +44,12 @@ const ProjectAttachmentsPage = React.lazy(() => import('./pages/Projects/Project
 const OptimizedApp: React.FC = () => {
   useIdleLogout();
   useAuthPerformance();
+  useRefreshPrevention({
+    preventOnError: true,
+    preventOnLanguageChange: true,
+    preventOnDataUpdate: true,
+    maxErrorRetries: 3
+  });
   const { language } = useAppStore();
 
   // Set document direction and language
@@ -64,6 +72,7 @@ const OptimizedApp: React.FC = () => {
       }}
     >
       <PerformanceOptimizer>
+        <RefreshMonitor />
         <Routes>
         {/* Auth Routes */}
         <Route path="/login" element={<LoginForm />} />

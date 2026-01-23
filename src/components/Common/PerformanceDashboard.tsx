@@ -37,9 +37,9 @@ const PerformanceDashboard: React.FC = () => {
       setMetrics(data);
     };
 
-    // Update metrics every 5 seconds
+    // Update metrics every 15 seconds instead of 5
     updateMetrics();
-    const interval = setInterval(updateMetrics, 5000);
+    const interval = setInterval(updateMetrics, 15000);
 
     return () => clearInterval(interval);
   }, []);

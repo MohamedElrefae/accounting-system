@@ -401,7 +401,8 @@ export default function EnhancedFiscalYearDashboard() {
   const toggleLanguage = useCallback(() => {
     const newLang = ArabicLanguageService.getCurrentLanguage() === 'en' ? 'ar' : 'en'
     ArabicLanguageService.setLanguage(newLang)
-    window.location.reload()
+    // Use state update instead of page reload for better UX
+    window.dispatchEvent(new CustomEvent('languageChanged', { detail: { language: newLang } }))
   }, [])
 
   // Load dashboard data

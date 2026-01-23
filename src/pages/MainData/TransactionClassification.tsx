@@ -1,12 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ExportButtons from '../../components/Common/ExportButtons';
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport';
-import './AccountsTree.css'; // Reuse the same CSS for consistency
+import './AccountsTree.css'; // Reuse same CSS for consistency
 import { useToast } from '../../contexts/ToastContext';
 import UnifiedCRUDForm, { type UnifiedCRUDFormHandle } from '../../components/Common/UnifiedCRUDForm';
 import { createTransactionClassificationFormConfig } from '../../components/TransactionClassification/TransactionClassificationFormConfig';
 import DraggableResizablePanel from '../../components/Common/DraggableResizablePanel';
-import { getOrganizations } from '../../services/organization';
 import {
   getTransactionClassifications,
   createTransactionClassification,
@@ -14,7 +13,8 @@ import {
   deleteTransactionClassification,
   getNextTransactionClassificationCode,
 } from '../../services/transaction-classification';
-import { useScopeOptional } from '../../contexts/ScopeContext';
+import { useScope } from '../../contexts/ScopeContext';
+import { Building } from 'lucide-react';
 
 interface TransactionClassificationItem {
   id: string;
@@ -28,16 +28,13 @@ interface TransactionClassificationItem {
 
 const TransactionClassificationPage: React.FC = () => {
   const { showToast } = useToast()
-  const scope = useScopeOptional()
-  const initialOrgId = scope?.currentOrg?.id || ''
+  const { currentOrg } = useScope()
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'code' | 'name'>('code');
   const [classifications, setClassifications] = useState<TransactionClassificationItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Organizations selector
-  const [organizations, setOrganizations] = useState<{ id: string; code: string; name: string }[]>([]);
-  const [orgId, setOrgId] = useState<string>('');
+  const orgId = currentOrg?.id || ''
 
   // Edit/Add dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -128,21 +125,6 @@ const TransactionClassificationPage: React.FC = () => {
     return createTransactionClassificationFormConfig(dialogMode === 'edit', existing);
   }, [dialogMode, draft]);
 
-  useEffect(() => {
-    // Load organizations first
-    (async () => {
-      try {
-        const orgs = await getOrganizations();
-        setOrganizations(orgs.map(o => ({ id: o.id, code: o.code, name: o.name })));
-        setOrgId(prev => {
-          if (initialOrgId && prev !== initialOrgId) return initialOrgId;
-          if (!prev && !initialOrgId && orgs.length > 0) return orgs[0].id;
-          return prev;
-        });
-      } catch {}
-    })();
-  }, [initialOrgId]);
-
   const loadClassifications = useCallback(async () => {
     setLoading(true);
     if (!orgId) { 
@@ -162,8 +144,7 @@ const TransactionClassificationPage: React.FC = () => {
   }, [orgId, showToast]);
 
   useEffect(() => {
-    // When org changes, reload classifications
-    if (!orgId) return;
+    // Load classifications when organization changes
     loadClassifications().catch(() => {});
   }, [orgId, loadClassifications]);
 
@@ -251,6 +232,33 @@ const TransactionClassificationPage: React.FC = () => {
     );
   }
 
+  // Show message if no organization is selected
+  if (!currentOrg) {
+    return (
+      <div className="accounts-page" dir="rtl" style={{ padding: '2rem' }}>
+        <div className="page-header">
+          <div className="page-header-left">
+            <h1 className="page-title">تصنيفات المعاملات</h1>
+          </div>
+        </div>
+        
+        <div className="content-area">
+          <div className="empty-state" style={{ 
+            textAlign: 'center', 
+            padding: '3rem',
+            backgroundColor: '#f9f9f9',
+            borderRadius: '8px',
+            border: '1px solid #e0e0e0'
+          }}>
+            <Building size={64} style={{ color: '#999', marginBottom: '1rem' }} />
+            <h3 style={{ color: '#666', marginBottom: '0.5rem' }}>يرجى اختيار مؤسسة أولاً</h3>
+            <p style={{ color: '#999' }}>اختر مؤسسة من شريط الأدوات العلوي لعرض تصنيفات المعاملات التابعة لها</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="accounts-page" dir="rtl">
       <div className="page-header">
@@ -290,15 +298,18 @@ const TransactionClassificationPage: React.FC = () => {
         </div>
 
         <div className="view-mode-toggle">
-          {/* Organization selector */}
-          <select value={orgId} onChange={(e) => {
-            setOrgId(e.target.value);
-          }} className="filter-select">
-            <option value="">اختر المؤسسة</option>
-            {organizations.map(o => (
-              <option key={o.id} value={o.id}>{o.code} - {o.name}</option>
-            ))}
-          </select>
+          {/* Current organization display */}
+          <div className="current-org-display" style={{ 
+            padding: '8px 12px', 
+            backgroundColor: '#f0f0f0', 
+            borderRadius: '4px',
+            fontSize: '14px',
+            color: '#666',
+            minWidth: '200px',
+            textAlign: 'center'
+          }}>
+            {currentOrg ? `${currentOrg.code} - ${currentOrg.name}` : 'لم يتم تحديد مؤسسة'}
+          </div>
           <button className={`view-mode-btn active`}>عرض جدول</button>
         </div>
       </div>

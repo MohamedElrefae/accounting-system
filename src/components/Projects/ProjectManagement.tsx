@@ -5,9 +5,10 @@ import { getProjectDocumentCounts } from '../../services/documents';
 import { Tooltip } from '@mui/material';
 import useAppStore from '../../store/useAppStore';
 import { FolderOpen, Plus, Edit, Trash2, Building, Calendar, DollarSign } from 'lucide-react';
-import { getActiveProjects, createProject, updateProject, deleteProject, type Project } from '../../services/projects';
+import { getActiveProjects, getActiveProjectsByOrg, createProject, updateProject, deleteProject, type Project } from '../../services/projects';
 import { getOrganizations, type Organization } from '../../services/organization';
 import { useToast } from '../../contexts/ToastContext';
+import { useScope } from '../../contexts/ScopeContext';
 import styles from './ProjectManagement.module.css';
 
 interface ProjectFormData {
@@ -45,14 +46,26 @@ const [formData, setFormData] = useState<ProjectFormData>({
   const canViewDocs = hasPerm('documents.view');
   const [docCounts, setDocCounts] = useState<Record<string, number>>({});
   const { language } = useAppStore();
+  const { currentOrg, getOrgId } = useScope();
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [projectsData, orgsData] = await Promise.all([
-        getActiveProjects(),
+      const orgId = getOrgId();
+      
+      let projectsData: Project[];
+      if (orgId) {
+        // Load projects for the selected organization only
+        projectsData = await getActiveProjectsByOrg(orgId);
+      } else {
+        // Fallback to all projects if no org selected (shouldn't happen in normal flow)
+        projectsData = await getActiveProjects();
+      }
+      
+      const [orgsData] = await Promise.all([
         getOrganizations()
       ]);
+      
       setProjects(projectsData);
       setOrganizations(orgsData);
       try {
@@ -68,11 +81,18 @@ const [formData, setFormData] = useState<ProjectFormData>({
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, getOrgId]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Reload projects when organization changes
+  useEffect(() => {
+    if (currentOrg?.id) {
+      loadData();
+    }
+  }, [currentOrg?.id, loadData]);
 
   const handleAdd = () => {
     setEditingProject(null);
@@ -80,7 +100,7 @@ setFormData({
       code: '',
       name: '',
       description: '',
-      org_id: '',
+      org_id: currentOrg?.id || '',
       status: 'active',
       start_date: '',
       end_date: '',
@@ -182,6 +202,37 @@ org_id: (project as any).org_id || '',
     );
   }
 
+  // Show message if no organization is selected
+  if (!currentOrg) {
+    return (
+      <div className={styles.container} dir="rtl">
+        <div className={styles.header}>
+          <div className={styles.headerContent}>
+            <div className={styles.headerLeft}>
+              <div className={styles.headerIcon}>
+                <FolderOpen size={32} />
+              </div>
+              <div className={styles.headerText}>
+                <h1>إدارة المشاريع</h1>
+                <p>إدارة المشاريع والأنشطة في النظام</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className={styles.main}>
+          <div className={styles.content}>
+            <div className={styles.emptyState}>
+              <Building size={64} />
+              <h3>يرجى اختيار مؤسسة أولاً</h3>
+              <p>اختر مؤسسة من شريط الأدوات العلوي لعرض المشاريع التابعة لها</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.container} dir="rtl">
       <div className={styles.header}>
@@ -207,8 +258,8 @@ org_id: (project as any).org_id || '',
           {projects.length === 0 ? (
             <div className={styles.emptyState}>
               <FolderOpen size={64} />
-              <h3>لا توجد مشاريع</h3>
-              <p>ابدأ بإضافة مشروع جديد لإدارة أعمالك</p>
+              <h3>لا توجد مشاريع في {currentOrg?.name || 'المؤسسة المحددة'}</h3>
+              <p>ابدأ بإضافة مشروع جديد لإدارة أعمالك في هذه المؤسسة</p>
               <button className={styles.addButton} onClick={handleAdd}>
                 <Plus size={20} />
                 إضافة مشروع
