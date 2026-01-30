@@ -218,3 +218,45 @@ export async function purgeOrganizationData(id: string): Promise<void> {
   if (error) throw error;
   clearOrganizationsCache(); // Clear cache after purge
 }
+
+
+// Get all users in an organization
+export async function getOrganizationUsers(orgId: string): Promise<Array<{ id: string; name?: string; email: string }>> {
+  try {
+    // First get org members
+    const { data: members, error: membersError } = await supabase
+      .from('org_memberships')
+      .select('user_id')
+      .eq('org_id', orgId)
+
+    if (membersError) {
+      console.error('[getOrganizationUsers] Error fetching org members:', membersError)
+      throw membersError
+    }
+
+    if (!members || members.length === 0) {
+      return []
+    }
+
+    // Then get user profiles for those members
+    const userIds = members.map(m => m.user_id)
+    const { data: profiles, error: profilesError } = await supabase
+      .from('user_profiles')
+      .select('id, first_name, last_name, full_name_ar, email')
+      .in('id', userIds)
+
+    if (profilesError) {
+      console.error('[getOrganizationUsers] Error fetching user profiles:', profilesError)
+      throw profilesError
+    }
+
+    return (profiles as any[])?.map(profile => ({
+      id: profile.id,
+      name: profile.full_name_ar || [profile.first_name, profile.last_name].filter(Boolean).join(' ') || profile.email,
+      email: profile.email,
+    })) || []
+  } catch (error) {
+    console.error('[getOrganizationUsers] Error:', error)
+    throw error
+  }
+}

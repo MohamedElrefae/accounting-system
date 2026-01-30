@@ -55,6 +55,7 @@ export interface NavigationItem {
   icon?: string;
   path?: string;
   requiredPermission?: string;
+  scope?: 'global' | 'org' | 'project';
   superAdminOnly?: boolean;
   children?: NavigationItem[];
   badge?: {

@@ -228,3 +228,68 @@
   .headerContent { flex-direction: column; align-items: stretch; gap: 1rem; }
   .headerActions { justify-content: space-between; }
 }
+
+/* Checkbox styles */
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: var(--field_bg);
+  border: 2px solid var(--border);
+  transition: all 0.2s ease;
+}
+
+.checkboxLabel:hover {
+  background: var(--hover-bg);
+  border-color: var(--accent);
+}
+
+.checkbox {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.checkboxLabel span {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.helpText {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted_text);
+  padding: 0 0.5rem;
+  line-height: 1.4;
+}
+
+/* Access badges */
+.accessBadgeAll,
+.accessBadgeSpecific {
+  display: inline-block;
+  padding: 0.35rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.accessBadgeAll {
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.15), rgba(76, 175, 80, 0.25));
+  color: #4caf50;
+  border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.accessBadgeSpecific {
+  background: linear-gradient(135deg, rgba(255, 152, 0, 0.15), rgba(255, 152, 0, 0.25));
+  color: #ff9800;
+  border: 1px solid rgba(255, 152, 0, 0.3);
+}
+
+/* Make form field full width when it contains checkbox */
+.formField:has(.checkboxLabel) {
+  grid-column: 1 / -1;
+}

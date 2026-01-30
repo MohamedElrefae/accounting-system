@@ -27,33 +27,78 @@ export type RoleSlug =
   | 'viewer';
 
 export type PermissionCode =
+  // Account Management
   | 'accounts.manage'
   | 'accounts.view'
+  
+  // Transactions - Granular Access
   | 'transactions.create'
   | 'transactions.review'
   | 'transactions.manage'
   | 'transactions.cost_analysis'
+  | 'transactions.view.own'      // NEW: View own transactions
+  | 'transactions.view.all'      // NEW: View all transactions
+  
+  // Reports
   | 'reports.view'
   | 'reports.manage'
-  | 'sub_tree.view'
+  
+  // Documents & Templates
+  | 'documents.view'
+  | 'documents.manage'
   | 'templates.view'
   | 'templates.manage'
   | 'templates.generate'
-  | 'documents.view'
-  | 'documents.manage'
+  
+  // Sub Tree & Analysis
+  | 'sub_tree.view'
+  | 'sub_tree.manage'
+  | 'analysis.view'
+  | 'analysis.manage'
+  
+  // Organizations & Projects - NEW
+  | 'organizations.view'
+  | 'organizations.manage'
+  | 'projects.view'
+  | 'projects.manage'
+  
+  // Cost Centers & Work Items - NEW
+  | 'cost_centers.view'
+  | 'cost_centers.manage'
+  | 'work_items.view'
+  | 'work_items.manage'
+  
+  // Classifications - NEW
+  | 'classification.view'
+  | 'classification.manage'
+  
+  // Inventory
   | 'inventory.view'
   | 'inventory.manage'
+  | 'inventory.transfer'         // NEW
+  | 'inventory.adjust'           // NEW
+  
+  // Transaction Line Items
   | 'transaction_line_items.read'
+  
+  // Users & Settings
   | 'users.view'
   | 'users.manage'
-  | 'data.export'
   | 'settings.manage'
   | 'settings.audit'
-  | 'fiscal.manage'
+  | 'settings.preferences'       // NEW: All users can access preferences
+  | 'data.export'
+  
+  // Approvals - NEW view permission
+  | 'approvals.view'
   | 'approvals.manage'
   | 'approvals.review'
-  | 'analysis.manage'
-  | 'analysis.view'
+  
+  // Fiscal - NEW view permission
+  | 'fiscal.view'
+  | 'fiscal.manage'
+  
+  // Presence
   | 'presence.view.org'
   | 'presence.view.team'
   | 'presence.view.all';
@@ -76,7 +121,7 @@ export interface PermissionSnapshot {
   actions: PermissionCode[];
 }
 
-export const PERMISSION_SCHEMA_VERSION = '2025-11-07T00:00:00Z';
+export const PERMISSION_SCHEMA_VERSION = '2026-01-28T00:00:00Z'; // Bumped for granular entity permissions
 
 const MATRIX: Record<RoleSlug, RoleDefinition> = {
   super_admin: {
@@ -89,25 +134,43 @@ const MATRIX: Record<RoleSlug, RoleDefinition> = {
       'transactions.review',
       'transactions.manage',
       'transactions.cost_analysis',
+      'transactions.view.own',
+      'transactions.view.all',
       'reports.view',
       'reports.manage',
       'documents.view',
       'documents.manage',
       'sub_tree.view',
+      'sub_tree.manage',
       'templates.view',
       'templates.manage',
       'templates.generate',
       'transaction_line_items.read',
+      'organizations.view',
+      'organizations.manage',
+      'projects.view',
+      'projects.manage',
+      'cost_centers.view',
+      'cost_centers.manage',
+      'work_items.view',
+      'work_items.manage',
+      'classification.view',
+      'classification.manage',
       'inventory.view',
       'inventory.manage',
+      'inventory.transfer',
+      'inventory.adjust',
       'users.view',
       'users.manage',
       'data.export',
       'settings.manage',
       'settings.audit',
-      'fiscal.manage',
+      'settings.preferences',
+      'approvals.view',
       'approvals.manage',
       'approvals.review',
+      'fiscal.view',
+      'fiscal.manage',
       'analysis.manage',
       'analysis.view',
       'presence.view.all',
@@ -154,8 +217,27 @@ const MATRIX: Record<RoleSlug, RoleDefinition> = {
       'fiscal.manage',
       'approvals.manage',
       'approvals.review',
+      'approvals.view',
       'analysis.manage',
       'analysis.view',
+      'sub_tree.view',
+      'sub_tree.manage',
+      'transactions.view.own',
+      'transactions.view.all',
+      'organizations.view',
+      'organizations.manage',
+      'projects.view',
+      'projects.manage',
+      'cost_centers.view',
+      'cost_centers.manage',
+      'work_items.view',
+      'work_items.manage',
+      'classification.view',
+      'classification.manage',
+      'inventory.transfer',
+      'inventory.adjust',
+      'fiscal.view',
+      'settings.preferences',
       'presence.view.org',
       'presence.view.team',
     ],
@@ -184,7 +266,7 @@ const MATRIX: Record<RoleSlug, RoleDefinition> = {
     ],
   },
   manager: {
-    inherits: ['accountant'],
+    inherits: ['accountant', 'auditor'],
     routes: [
       '/',
       '/dashboard',
@@ -204,50 +286,50 @@ const MATRIX: Record<RoleSlug, RoleDefinition> = {
       'transactions.review',
       'transactions.manage',
       'transactions.cost_analysis',
+      'transactions.view.own',
+      'transactions.view.all',
       'reports.view',
       'documents.view',
       'documents.manage',
       'sub_tree.view',
+      'sub_tree.manage',
       'templates.view',
       'templates.manage',
       'templates.generate',
       'transaction_line_items.read',
+      'organizations.view',
+      'projects.view',
+      'cost_centers.view',
+      'work_items.view',
+      'classification.view',
       'inventory.view',
       'analysis.view',
       'analysis.manage',
+      'approvals.view',
       'approvals.review',
+      'fiscal.view',
+      'settings.preferences',
     ],
   },
   accountant: {
-    inherits: ['auditor'],
+    inherits: [],
     routes: [
       '/',
       '/dashboard',
       '/transactions/*',
-      '/documents/*',
-      '/documents',
-      '/projects/*',
-      '/fiscal/*',
       '/main-data/accounts-tree',
-      '/main-data/sub-tree',
-      '/main-data/work-items',
-      '/main-data/transaction-line-items',
-      '/reports/trial-balance',
-      '/reports/general-ledger',
-      '/reports/profit-loss',
-      '/reports/balance-sheet',
+      '/settings/font-preferences',
     ],
     actions: [
       'accounts.view',
       'transactions.create',
       'transactions.cost_analysis',
-      'reports.view',
-      'documents.view',
-      'sub_tree.view',
-      'templates.view',
+      'transactions.view.own',
+      'transactions.view.all', // Allow viewing all transactions read-only
       'transaction_line_items.read',
-      'analysis.view',
-      'fiscal.manage',
+      'transactions.review',
+      'sub_tree.view', // Needed for Sub Tree
+      'settings.preferences',
     ],
   },
   auditor: {
@@ -287,6 +369,7 @@ const MATRIX: Record<RoleSlug, RoleDefinition> = {
       '/reports/general-ledger',
       '/documents',
       '/main-data/accounts-tree',
+      '/settings/font-preferences',
     ],
     actions: [
       'accounts.view',
@@ -295,6 +378,10 @@ const MATRIX: Record<RoleSlug, RoleDefinition> = {
       'sub_tree.view',
       'templates.view',
       'analysis.view',
+      'sub_tree.view',
+      'sub_tree.manage',
+      'transactions.view.own',
+      'settings.preferences',
     ],
   },
 };
@@ -400,4 +487,64 @@ export function hasRouteInSnapshot(snapshot: ResolvedRole, pathname: string): bo
 
 export function hasActionInSnapshot(snapshot: ResolvedRole, action: PermissionCode): boolean {
   return snapshot.actions.has(action);
+}
+
+/**
+ * Convention-based permission derivation.
+ * Converts navigation item ID to permission code.
+ * 
+ * @param itemId - The navigation item ID (e.g., "organizations", "sub-tree")
+ * @param action - The action (default: "view")
+ * @returns Derived permission code (e.g., "organizations.view")
+ */
+export function derivePermissionFromId(
+  itemId: string, 
+  action: 'view' | 'manage' | 'create' = 'view'
+): string {
+  // Normalize: kebab-case → snake_case
+  const normalized = itemId
+    .replace(/-/g, '_')           // sub-tree → sub_tree
+    .replace(/\s+/g, '_')        // spaces → underscores
+    .toLowerCase();
+  
+  // Apply aliases for backward compatibility with existing permission codes
+  const ALIASES: Record<string, string> = {
+    'accounts_tree': 'accounts',
+    'transaction_classification': 'classification',
+    'document_templates': 'templates',
+    'analysis_work_items': 'analysis',
+    'fiscal_dashboard': 'fiscal',
+    'fiscal_periods': 'fiscal',
+    'opening_balance_import': 'fiscal',
+    'user_management': 'users',
+    'online_users': 'presence.view.team',  // Special: Returns full permission
+    'org_management': 'settings',
+    'account_prefix_mapping': 'settings',
+    'font_preferences': 'settings.preferences', // Special: Returns full permission
+    'export_database': 'data.export', // Special: Returns full permission
+    'enterprise_audit': 'settings.audit', // Special: Returns full permission
+    'audit_management': 'settings.audit', // Special: Returns full permission
+
+    // Reports aliases
+    'trial_balance': 'reports.view',
+    'trial_balance_all_levels': 'reports.view',
+    'general_ledger': 'reports.view',
+    'running_balance': 'reports.view',
+    'account_explorer': 'reports.view',
+    'profit_loss': 'reports.view',
+    'balance_sheet': 'reports.view',
+    'transaction_lines_report': 'reports.view',
+    'custom_reports': 'reports.view',
+    'main_data_reports': 'reports.view',
+    'transaction_classification_reports': 'reports.view',
+  };
+  
+  // Check if alias returns a full permission (contains a dot)
+  const aliasValue = ALIASES[normalized];
+  if (aliasValue && aliasValue.includes('.') && aliasValue.split('.').length >= 2) {
+    return aliasValue; // Return as-is, it's already a complete permission code
+  }
+  
+  const entity = aliasValue || normalized;
+  return `${entity}.${action}`;
 }

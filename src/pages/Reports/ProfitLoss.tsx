@@ -9,8 +9,9 @@ import html2canvas from 'html2canvas'
 import { getCompanyConfig } from '../../services/company-config'
 import { fetchTransactionsDateRange } from '../../services/reports/common';
 import { getProfitLoss, type UnifiedFilters, type ProfitLossRow as PLRow, type ProfitLossSummary as PLSummary } from '../../services/reports/unified-financial-query'
-import { getActiveOrgId, getActiveProjectId } from '../../utils/org'
-import { fetchOrganizations, type LookupOption } from '../../services/lookups'
+// import { getActiveOrgId, getActiveProjectId } from '../../utils/org' // Deprecated
+// import { fetchOrganizations, type LookupOption } from '../../services/lookups' // Deprecated
+import { useScope } from '../../contexts/ScopeContext'
 import Visibility from '@mui/icons-material/Visibility'
 import VisibilityOff from '@mui/icons-material/VisibilityOff'
 import Bolt from '@mui/icons-material/Bolt'
@@ -46,6 +47,7 @@ interface GroupedPLData {
 }
 
 export default function ProfitLoss() {
+  const { currentOrg, currentProject } = useScope()
   const [dateFrom, setDateFrom] = useState<string>(startOfYearISO())
   const [dateTo, setDateTo] = useState<string>(todayISO())
   const [loading, setLoading] = useState<boolean>(false)
@@ -54,43 +56,36 @@ export default function ProfitLoss() {
   const [error, setError] = useState<string>('')
   const [includeZeros, setIncludeZeros] = useState<boolean>(false)
   const [uiLang, setUiLang] = useState<'ar' | 'en'>('ar')
-  const [projects, setProjects] = useState<{ id: string; code: string; name: string }[]>([])
-  const [projectId, setProjectId] = useState<string>(() => { try { return getActiveProjectId() || '' } catch { return '' } })
+  // const [projects, setProjects] = useState<{ id: string; code: string; name: string }[]>([]) // Removed
+  // const [projectId, setProjectId] = useState<string>(() => { try { return getActiveProjectId() || '' } catch { return '' } }) // Removed
   const [companyName, setCompanyName] = useState<string>('')
-  const [orgId, setOrgId] = useState<string>('')
-  const [_orgOptions, _setOrgOptions] = useState<LookupOption[]>([])
+  // const [orgId, setOrgId] = useState<string>('') // Removed
+  // const [_orgOptions, _setOrgOptions] = useState<LookupOption[]>([]) // Removed
   const [detailedView, setDetailedView] = useState<boolean>(true)
   const [postedOnly, setPostedOnly] = useState<boolean>(false)
   // Numbers-only setting (hide currency symbol)
   const [numbersOnly, setNumbersOnly] = useState<boolean>(true)
   // Collapse/expand state for account groups
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
-  
+
   useEffect(() => {
     try {
       const v = localStorage.getItem('pl_numbersOnly')
       if (v !== null) setNumbersOnly(v === 'true')
-    } catch {}
+    } catch { }
   }, [])
-  
-  useEffect(() => {
-    try { localStorage.setItem('pl_numbersOnly', String(numbersOnly)) } catch {}
-  }, [numbersOnly])
 
   useEffect(() => {
-    try { const v = localStorage.getItem('pl:useGlobalProject'); if (v !== null) setPostedOnly(postedOnly) } catch {}
-  }, [])
-  useEffect(() => {
-    // Auto-sync with global project if enabled
-    const useGlobal = (()=>{ try { return localStorage.getItem('pl:useGlobalProject') === '1' } catch { return true } })()
-    if (useGlobal) { try { setProjectId(getActiveProjectId() || '') } catch {} }
-  }, [orgId])
+    try { localStorage.setItem('pl_numbersOnly', String(numbersOnly)) } catch { }
+  }, [numbersOnly])
+
+  // Removed legacy effect sync
 
   // Group rows by account type for better presentation
   const grouped = useMemo((): GroupedPLData[] => {
     const groups: GroupedPLData[] = []
     const typeOrder = ['revenue', 'cost_of_sales', 'expenses', 'other_income', 'other_expenses']
-    
+
     const titles = {
       revenue: { ar: 'الإيرادات', en: 'Revenue' },
       cost_of_sales: { ar: 'تكلفة المبيعات', en: 'Cost of Sales' },
@@ -120,7 +115,7 @@ export default function ProfitLoss() {
 
   useEffect(() => {
     // Auto-load once
-    loadProjects().then(() => load())
+    loadInitialData().then(() => load())
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -130,38 +125,23 @@ export default function ProfitLoss() {
       try {
         const r = await fetchTransactionsDateRange({
           orgId: null,
-          projectId: projectId || null,
+          projectId: currentProject?.id || null,
           postedOnly: postedOnly,
         })
         if (r) {
           if (r.min_date) setDateFrom(r.min_date)
           if (r.max_date) setDateTo(r.max_date)
         }
-      } catch {}
+      } catch { }
     })()
-  }, [projectId, postedOnly])
+  }, [currentProject?.id, postedOnly])
 
-  async function loadProjects() {
-    const { data } = await supabase.from('projects').select('id, code, name').eq('status', 'active').order('code')
-    setProjects(data || [])
-    
-    // Load organizations and set default
-    try { 
-      const orgs = await fetchOrganizations(); 
-      _setOrgOptions(orgs || [])
-      // Set default org from localStorage or first available
-      const storedOrgId = getActiveOrgId()
-      if (storedOrgId) {
-        setOrgId(storedOrgId)
-      } else if (orgs && orgs.length > 0) {
-        setOrgId(orgs[0].id)
-      }
-    } catch {}
-    
-    try { 
+  async function loadInitialData() {
+    // Only load company config now, no projects list needed
+    try {
       const cfg = await getCompanyConfig()
       setCompanyName(cfg.company_name || '')
-    } catch {}
+    } catch { }
   }
 
   async function load() {
@@ -178,7 +158,7 @@ export default function ProfitLoss() {
       }
 
       const result = await getProfitLoss(filters)
-      
+
       let filteredRows = result.rows
       if (!includeZeros) {
         filteredRows = result.rows.filter(r => r.amount !== 0)
@@ -213,7 +193,7 @@ export default function ProfitLoss() {
 
     // Build export data with sections and calculations
     const exportRows: any[] = []
-    
+
     // Revenue section
     const revenueRows = grouped.find(g => g.key === 'revenue')
     if (revenueRows) {
@@ -305,12 +285,12 @@ export default function ProfitLoss() {
         ]
       }
     }
-    
-    const opts = { 
-      title: uiLang === 'ar' ? 'قائمة الدخل (الأرباح والخسائر)' : 'Profit & Loss Statement', 
-      rtlLayout: uiLang === 'ar' 
+
+    const opts = {
+      title: uiLang === 'ar' ? 'قائمة الدخل (الأرباح والخسائر)' : 'Profit & Loss Statement',
+      rtlLayout: uiLang === 'ar'
     }
-    
+
     if (kind === 'excel') return exportToExcel(data as any, opts as any)
     return exportToCSV(data as any, opts as any)
   }
@@ -337,8 +317,8 @@ export default function ProfitLoss() {
             el.style.fontSize = '14px'
             el.style.lineHeight = '1.5'
             el.style.color = '#000000'
-            ;(el.style as any).WebkitFontSmoothing = 'antialiased'
-            ;(el.style as any).MozOsxFontSmoothing = 'grayscale'
+              ; (el.style as any).WebkitFontSmoothing = 'antialiased'
+              ; (el.style as any).MozOsxFontSmoothing = 'grayscale'
             // Show the statement header for PDF capture
             const header = el.querySelector('[class*="reportHeader"]') as HTMLElement
             if (header) {
@@ -387,7 +367,7 @@ export default function ProfitLoss() {
     // Prepare report data
     const currentDate = new Date().toLocaleDateString('ar-EG')
     const projectName = projectId ? projects.find(p => p.id === projectId)?.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
-    
+
     // Build professional commercial report HTML
     const reportHTML = `
       <!DOCTYPE html>
@@ -737,10 +717,10 @@ export default function ProfitLoss() {
         </body>
       </html>
     `
-    
+
     printWindow.document.write(reportHTML)
     printWindow.document.close()
-    
+
     // Wait for content to load, then print
     setTimeout(() => {
       printWindow.focus()
@@ -748,13 +728,13 @@ export default function ProfitLoss() {
       printWindow.close()
     }, 500)
   }
-  
+
   // Generate print content with proper commercial formatting
   function generatePrintContent(): string {
     if (!summary) return '<p>لا توجد بيانات للعرض</p>'
-    
+
     let html = ''
-    
+
     // Profit & Loss Table
     html += `
       <table class="profit-loss-table">
@@ -767,7 +747,7 @@ export default function ProfitLoss() {
         </thead>
         <tbody>
     `
-    
+
     // Generate grouped content
     grouped.forEach(group => {
       // Section Header
@@ -776,12 +756,12 @@ export default function ProfitLoss() {
           <td colspan="3">${uiLang === 'ar' ? group.titleAr : group.titleEn}</td>
         </tr>
       `
-      
+
       // Section Accounts (if detailed view)
       if (detailedView) {
         group.rows.forEach(row => {
           const accountName = uiLang === 'ar' ? (row.account_name_ar || row.account_name_en) : (row.account_name_en || row.account_name_ar)
-          
+
           html += `
             <tr class="account-row">
               <td class="account-code">${row.account_code}</td>
@@ -791,7 +771,7 @@ export default function ProfitLoss() {
           `
         })
       }
-      
+
       // Section Subtotal
       html += `
         <tr class="section-subtotal">
@@ -800,12 +780,12 @@ export default function ProfitLoss() {
         </tr>
       `
     })
-    
+
     html += `
         </tbody>
       </table>
     `
-    
+
     // Calculations Section
     html += `
       <div class="calculations-section">
@@ -830,7 +810,7 @@ export default function ProfitLoss() {
         </div>
       </div>
     `
-    
+
     // Financial Ratios Section
     html += `
       <div class="ratios-section">
@@ -849,7 +829,7 @@ export default function ProfitLoss() {
         </div>
       </div>
     `
-    
+
     return html
   }
 
@@ -893,7 +873,7 @@ export default function ProfitLoss() {
   // Performance status
   const performanceStatus = useMemo(() => {
     if (!summary) return null
-    
+
     if (summary.net_income > 0) {
       return {
         status: 'profit',
@@ -921,10 +901,10 @@ export default function ProfitLoss() {
       <div className={`${styles.professionalFilterBar} ${styles.noPrint}`}>
         {/* Left Section: Date Filters */}
         <div className={styles.filterSection}>
-          <select 
-            className={styles.filterSelect} 
-            value={projectId} 
-            onChange={e => setProjectId(e.target.value)} 
+          <select
+            className={styles.filterSelect}
+            value={projectId}
+            onChange={e => setProjectId(e.target.value)}
             aria-label={uiLang === 'ar' ? 'المشروع' : 'Project'}
             title={uiLang === 'ar' ? 'اختر مشروع للتصفية' : 'Select project to filter'}
           >
@@ -933,20 +913,20 @@ export default function ProfitLoss() {
               <option key={p.id} value={p.id}>{p.code} — {p.name}</option>
             ))}
           </select>
-          <input 
-            className={styles.filterInput} 
-            type="date" 
-            value={dateFrom} 
-            onChange={e => setDateFrom(e.target.value)} 
-            aria-label={uiLang === 'ar' ? 'من' : 'From'} 
+          <input
+            className={styles.filterInput}
+            type="date"
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+            aria-label={uiLang === 'ar' ? 'من' : 'From'}
             title={uiLang === 'ar' ? 'تاريخ بداية الفترة' : 'Period start date'}
           />
-          <input 
-            className={styles.filterInput} 
-            type="date" 
-            value={dateTo} 
-            onChange={e => setDateTo(e.target.value)} 
-            aria-label={uiLang === 'ar' ? 'إلى' : 'To'} 
+          <input
+            className={styles.filterInput}
+            type="date"
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+            aria-label={uiLang === 'ar' ? 'إلى' : 'To'}
             title={uiLang === 'ar' ? 'تاريخ نهاية الفترة' : 'Period end date'}
           />
         </div>
@@ -957,10 +937,10 @@ export default function ProfitLoss() {
             <button type="button" className={`${styles.languageOption} ${uiLang === 'ar' ? styles.active : ''}`} onClick={() => setUiLang('ar')}>ع</button>
             <button type="button" className={`${styles.languageOption} ${uiLang === 'en' ? styles.active : ''}`} onClick={() => setUiLang('en')}>En</button>
           </div>
-          
+
           <div className={styles.groupControls}>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className={styles.groupControlButton}
               onClick={expandAllGroups}
               disabled={loading || grouped.length === 0}
@@ -969,8 +949,8 @@ export default function ProfitLoss() {
             >
               <UnfoldMore fontSize="small" />
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className={styles.groupControlButton}
               onClick={collapseAllGroups}
               disabled={loading || grouped.length === 0}
@@ -1070,22 +1050,22 @@ export default function ProfitLoss() {
           >
             🗂️ {uiLang === 'ar' ? 'عرض الكل' : 'Show All'}
           </button>
-          
+
           <div className={styles.exportGroup}>
-            <button 
-              type="button" 
-              className={styles.exportButton} 
-              onClick={() => doExport('excel')} 
+            <button
+              type="button"
+              className={styles.exportButton}
+              onClick={() => doExport('excel')}
               disabled={loading || rows.length === 0}
               title={uiLang === 'ar' ? 'تصدير إلى Excel' : 'Export to Excel'}
               aria-label={uiLang === 'ar' ? 'تصدير قائمة الدخل إلى Excel' : 'Export profit & loss to Excel'}
             >
               <IosShare fontSize="small" /> Excel
             </button>
-            <button 
-              type="button" 
-              className={styles.exportButton} 
-              onClick={() => doExport('csv')} 
+            <button
+              type="button"
+              className={styles.exportButton}
+              onClick={() => doExport('csv')}
               disabled={loading || rows.length === 0}
               title={uiLang === 'ar' ? 'تصدير إلى CSV' : 'Export to CSV'}
               aria-label={uiLang === 'ar' ? 'تصدير قائمة الدخل إلى CSV' : 'Export profit & loss to CSV'}
@@ -1093,20 +1073,20 @@ export default function ProfitLoss() {
               <TableView fontSize="small" /> CSV
             </button>
           </div>
-          <button 
-            type="button" 
-            className={`${styles.actionButton} ${styles.secondary}`} 
-            onClick={printReport} 
+          <button
+            type="button"
+            className={`${styles.actionButton} ${styles.secondary}`}
+            onClick={printReport}
             disabled={loading || grouped.length === 0}
             title={uiLang === 'ar' ? 'طباعة التقرير' : 'Print the report'}
             aria-label={uiLang === 'ar' ? 'طباعة قائمة الدخل' : 'Print profit & loss report'}
           >
             <Print fontSize="small" /> {uiLang === 'ar' ? 'طباعة' : 'Print'}
           </button>
-          <button 
-            type="button" 
-            className={`${styles.actionButton} ${styles.primary}`} 
-            onClick={load} 
+          <button
+            type="button"
+            className={`${styles.actionButton} ${styles.primary}`}
+            onClick={load}
             disabled={loading}
             title={uiLang === 'ar' ? 'تحديث البيانات' : 'Refresh the data'}
             aria-label={uiLang === 'ar' ? 'تحديث بيانات قائمة الدخل' : 'Refresh profit & loss data'}
@@ -1129,9 +1109,9 @@ export default function ProfitLoss() {
             {uiLang === 'ar' ? 'تصدير PDF' : 'Export PDF'}
           </button>
         </div>
-        
+
         <div id="financial-report-content" className="financial-report-content">
-          <div className={styles.reportHeader} style={{display: 'none'}}>
+          <div className={styles.reportHeader} style={{ display: 'none' }}>
             <h2>{companyName || (uiLang === 'ar' ? 'الشركة' : 'Company')}</h2>
             <div className={styles.statementTitle}>{uiLang === 'ar' ? 'قائمة الدخل' : 'Profit & Loss Statement'}</div>
             <div className={styles.statementMeta}>
@@ -1171,15 +1151,15 @@ export default function ProfitLoss() {
                           onClick={() => toggleGroupCollapse(group.key)}
                           aria-expanded={!isCollapsed}
                           aria-controls={`group-content-${group.key}`}
-                          title={isCollapsed 
+                          title={isCollapsed
                             ? (uiLang === 'ar' ? `توسيع ${uiLang === 'ar' ? group.titleAr : group.titleEn}` : `Expand ${group.titleEn}`)
                             : (uiLang === 'ar' ? `طي ${uiLang === 'ar' ? group.titleAr : group.titleEn}` : `Collapse ${group.titleEn}`)
                           }
                         >
                           {isCollapsed ? <ExpandMore fontSize="small" /> : <ExpandLess fontSize="small" />}
                         </button>
-                        <h3 
-                          className="group-title clickable" 
+                        <h3
+                          className="group-title clickable"
                           onClick={() => toggleGroupCollapse(group.key)}
                           onKeyDown={(e) => handleGroupKeyDown(e, group.key)}
                           tabIndex={0}

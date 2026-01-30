@@ -4,18 +4,21 @@ import { Settings as SettingsIcon, Users as UsersIcon, Building2 as OrgsIcon } f
 import OrganizationSettings from './OrganizationSettings';
 import OrgMembersManagement from './OrgMembersManagement';
 import OrganizationManagement from './OrganizationManagement';
-import { usePermissions } from '../../hooks/usePermissions';
+import { useOptimizedAuth } from '../../hooks/useOptimizedAuth';
 
 const OrganizationManagementTabs: React.FC = () => {
-  const { permissions, loading } = usePermissions();
-  const isSuperAdmin = permissions.includes('*');
-  const [tab, setTab] = useState<'orgs' | 'settings' | 'members'>(isSuperAdmin ? 'orgs' : 'settings');
+  const { hasActionAccess, loading } = useOptimizedAuth();
+  
+  // Check if user can manage organizations (create/update/delete)
+  // All users can VIEW organizations, but only admins can manage them
+  const canManageOrgs = hasActionAccess('settings.manage') || hasActionAccess('users.manage');
+  
+  const [tab, setTab] = useState<'orgs' | 'settings' | 'members'>('settings');
 
   useEffect(() => {
-    if (!loading && !isSuperAdmin && tab === 'orgs') {
-      setTab('settings');
-    }
-  }, [loading, isSuperAdmin, tab]);
+    // No need to redirect - all users can access all tabs
+    // Organizations tab shows read-only view for non-admins
+  }, [loading]);
 
   return (
     <div className={styles.container} dir="rtl">
@@ -23,16 +26,15 @@ const OrganizationManagementTabs: React.FC = () => {
         <div className={styles.headerContent}>
           <h1>إدارة المؤسسة</h1>
           <div className={styles.tabs}>
-            {isSuperAdmin && (
-              <button
-                className={`${styles.tab} ${tab === 'orgs' ? styles.active : ''}`}
-                onClick={() => setTab('orgs')}
-                aria-selected={tab === 'orgs'}
-              >
-                <OrgsIcon size={16} />
-                قائمة المؤسسات
-              </button>
-            )}
+            {/* Show Organizations tab to all users - they'll see read-only view if not admin */}
+            <button
+              className={`${styles.tab} ${tab === 'orgs' ? styles.active : ''}`}
+              onClick={() => setTab('orgs')}
+              aria-selected={tab === 'orgs'}
+            >
+              <OrgsIcon size={16} />
+              قائمة المؤسسات
+            </button>
             <button
               className={`${styles.tab} ${tab === 'settings' ? styles.active : ''}`}
               onClick={() => setTab('settings')}
@@ -54,7 +56,7 @@ const OrganizationManagementTabs: React.FC = () => {
       </div>
 
       <div className={styles.content}>
-        {tab === 'orgs' && isSuperAdmin ? <OrganizationManagement /> : tab === 'settings' ? <OrganizationSettings /> : <OrgMembersManagement />}
+        {tab === 'orgs' ? <OrganizationManagement /> : tab === 'settings' ? <OrganizationSettings /> : <OrgMembersManagement />}
       </div>
     </div>
   );

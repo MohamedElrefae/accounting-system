@@ -12,7 +12,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query';
 import { ScopeContext, type ScopeContextValue } from './ScopeContext';
 import { getOrganizations, type Organization } from '../services/organization';
-import { getActiveProjectsByOrg, type Project } from '../services/projects';
+import { getActiveProjectsByOrg, validateProjectAccess, type Project } from '../services/projects';
 import { queryKeys } from '../lib/queryKeys';
 import { getConnectionMonitor, type ConnectionHealth } from '../utils/connectionMonitor';
 
@@ -82,14 +82,19 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
     setIsLoadingProjects(true);
     
     try {
+      // Load projects using RPC (already filtered by access control)
+      // The RPC get_user_accessible_projects() handles:
+      // - org_memberships.can_access_all_projects = true → ALL projects
+      // - org_memberships.can_access_all_projects = false → Only project_memberships
       const projects = await getActiveProjectsByOrg(orgId);
       if (import.meta.env.DEV) console.log('[ScopeProvider] Loaded projects:', projects.length);
       
       if (!mountedRef.current) return projects;
       
+      // Set available projects (no additional filtering needed - RPC already did it)
       setAvailableProjects(projects);
       
-      // Restore project from localStorage if valid
+      // Restore project from localStorage if still valid
       const storedProjectId = getStoredProjectId();
       const matchingProject = projects.find(p => p.id === storedProjectId);
       
@@ -264,7 +269,7 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
     setLastUpdated(new Date());
   }, [availableOrgs, loadProjectsForOrg, queryClient]);
 
-  // Set project - validates org ownership
+  // Set project - validates org ownership (access already validated by RPC)
   const setProject = useCallback(async (projectId: string | null) => {
     if (import.meta.env.DEV) console.log('[ScopeProvider] setProject:', projectId);
     
@@ -274,22 +279,29 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
       return;
     }
     
-    // Validate project belongs to current org
+    // 1. Validate project is in available projects (already filtered by RPC)
     const project = availableProjects.find(p => p.id === projectId);
     if (!project) {
-      console.error('[ScopeProvider] Invalid project ID or project not in current org:', projectId);
+      console.error('[ScopeProvider] Invalid project ID or no access:', projectId);
+      setError('Project not found or no access');
       return;
     }
     
+    // 2. Validate org is selected
+    if (!currentOrg) {
+      console.error('[ScopeProvider] No organization selected');
+      setError('Organization required');
+      return;
+    }
+    
+    // 3. Set project (access already validated by RPC get_user_accessible_projects)
     setCurrentProject(project);
     setStoredProjectId(projectId);
     
     // Invalidate project-scoped queries
-    if (currentOrg) {
-      queryClient.invalidateQueries({ 
-        queryKey: queryKeys.costCenters.byOrg(currentOrg.id, projectId) 
-      });
-    }
+    queryClient.invalidateQueries({ 
+      queryKey: queryKeys.costCenters.byOrg(currentOrg.id, projectId) 
+    });
     
     setLastUpdated(new Date());
   }, [availableProjects, currentOrg, queryClient]);

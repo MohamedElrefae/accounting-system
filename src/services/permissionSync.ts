@@ -1,4 +1,5 @@
 import { supabase } from '../utils/supabase';
+import { permissionAuditService } from './permissionAuditService';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 interface PermissionChangeCallback {
@@ -241,6 +242,32 @@ class PermissionSyncService {
 
       console.log('✅ RPC Response:', data);
 
+      // Log the permission assignment to audit trail
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: userOrgs } = await supabase
+          .from('org_memberships')
+          .select('org_id')
+          .eq('user_id', user?.id)
+          .limit(1)
+          .single();
+
+        if (userOrgs?.org_id) {
+          await permissionAuditService.logPermissionChange(
+            userOrgs.org_id,
+            'ASSIGN',
+            'role_permissions',
+            String(roleId),
+            null,
+            { role_id: roleId, permissions: permissionNames },
+            `Assigned ${permissionNames.length} permissions to role ${roleId}`
+          );
+        }
+      } catch (auditError) {
+        console.warn('⚠️ Failed to log permission assignment:', auditError);
+        // Don't fail the main operation if audit logging fails
+      }
+
       // Verify the assignment
       const verification = await this.verifyPermissionsSaved(roleId, permissionNames);
 
@@ -320,12 +347,41 @@ class PermissionSyncService {
     try {
       console.log(`🗑️ Clearing permissions for role ${roleId}...`);
       
+      // Get current permissions before clearing (for audit trail)
+      const currentPerms = await this.refreshRolePermissions(roleId);
+
       const { error } = await supabase
         .from('role_permissions')
         .delete()
         .eq('role_id', roleId);
 
       if (error) throw error;
+
+      // Log the permission revocation to audit trail
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: userOrgs } = await supabase
+          .from('org_memberships')
+          .select('org_id')
+          .eq('user_id', user?.id)
+          .limit(1)
+          .single();
+
+        if (userOrgs?.org_id) {
+          await permissionAuditService.logPermissionChange(
+            userOrgs.org_id,
+            'REVOKE',
+            'role_permissions',
+            String(roleId),
+            { role_id: roleId, permissions: currentPerms },
+            { role_id: roleId, permissions: [] },
+            `Revoked all ${currentPerms.length} permissions from role ${roleId}`
+          );
+        }
+      } catch (auditError) {
+        console.warn('⚠️ Failed to log permission revocation:', auditError);
+        // Don't fail the main operation if audit logging fails
+      }
 
       console.log(`✅ Cleared permissions for role ${roleId}`);
       return true;

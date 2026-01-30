@@ -51,9 +51,11 @@ const SubTreePage: React.FC = () => {
   const hasPermission = useHasPermission()
   const { currentOrg } = useScope()
   // View-level permission is enforced by the route guard (ProtectedRoute with requiredAction="sub_tree.view")
-  const canCreate = hasPermission('sub_tree.create')
-  const canUpdate = hasPermission('sub_tree.update')
-  const canDelete = hasPermission('sub_tree.delete')
+  const canManage = hasPermission('sub_tree.manage')
+  // Map granular actions to manage permission for now
+  const canCreate = canManage
+  const canUpdate = canManage
+  const canDelete = canManage
 
   const [tab, setTab] = useState(0)
   const orgId = currentOrg?.id || ''
@@ -69,7 +71,7 @@ const SubTreePage: React.FC = () => {
   // Form dialog
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState<{ code: string; description: string; parent_id: string | ''; add_to_cost: boolean; is_active: boolean; linked_account_id: string | ''}>({
+  const [form, setForm] = useState<{ code: string; description: string; parent_id: string | ''; add_to_cost: boolean; is_active: boolean; linked_account_id: string | '' }>({
     code: '', description: '', parent_id: '', add_to_cost: false, is_active: true, linked_account_id: ''
   })
 
@@ -79,7 +81,7 @@ const SubTreePage: React.FC = () => {
       setLoading(false);
       return;
     }
-    
+
     setLoading(true);
     (async () => {
       try {
@@ -280,12 +282,12 @@ const SubTreePage: React.FC = () => {
         <div className={styles.header}>
           <Typography className={styles.title}>Sub Tree / الشجرة الفرعية</Typography>
         </div>
-        
+
         <div className={styles.content}>
           <div className={styles.card}>
             <CardContent className={styles.cardBody}>
-              <div style={{ 
-                textAlign: 'center', 
+              <div style={{
+                textAlign: 'center',
                 padding: '3rem',
                 backgroundColor: '#f9f9f9',
                 borderRadius: '8px',
@@ -307,9 +309,9 @@ const SubTreePage: React.FC = () => {
       <div className={styles.header}>
         <Typography className={styles.title}>Sub Tree / الشجرة الفرعية</Typography>
         <div className={styles.toolbar}>
-          <div className="current-org-display" style={{ 
-            padding: '8px 12px', 
-            backgroundColor: '#f0f0f0', 
+          <div className="current-org-display" style={{
+            padding: '8px 12px',
+            backgroundColor: '#f0f0f0',
             borderRadius: '4px',
             fontSize: '14px',
             color: '#666',
@@ -354,21 +356,31 @@ const SubTreePage: React.FC = () => {
                       has_transactions: !!r.has_transactions,
                     }))}
                     extraColumns={[
-                      { key: 'add_to_cost', header: 'Add to Cost', render: (n: ExpensesCategoryTreeNode) => (
-                        <input type="checkbox" checked={!!n.add_to_cost} readOnly aria-label="add_to_cost" />
-                      )},
-                      { key: 'is_active', header: 'Active', render: (n: ExpensesCategoryTreeNode) => (
-                        <input type="checkbox" checked={!!n.is_active} readOnly aria-label="is_active" />
-                      )},
-                      { key: 'linked', header: 'Linked Account', render: (n: ExpensesCategoryTreeNode & { linked_account_label?: string }) => (
-                        <span>{n.linked_account_label || '—'}</span>
-                      )},
-                      { key: 'children', header: 'Children', render: (n: ExpensesCategoryTreeNode & { child_count?: number }) => (
-                        <span>{Number.isFinite(n.child_count) ? n.child_count : ''}</span>
-                      )},
-                      { key: 'has_tx', header: 'Has Tx', render: (n: ExpensesCategoryTreeNode & { has_transactions?: boolean }) => (
-                        <input type="checkbox" checked={!!n.has_transactions} readOnly aria-label="has_transactions" />
-                      )},
+                      {
+                        key: 'add_to_cost', header: 'Add to Cost', render: (n: ExpensesCategoryTreeNode) => (
+                          <input type="checkbox" checked={!!n.add_to_cost} readOnly aria-label="add_to_cost" />
+                        )
+                      },
+                      {
+                        key: 'is_active', header: 'Active', render: (n: ExpensesCategoryTreeNode) => (
+                          <input type="checkbox" checked={!!n.is_active} readOnly aria-label="is_active" />
+                        )
+                      },
+                      {
+                        key: 'linked', header: 'Linked Account', render: (n: ExpensesCategoryTreeNode & { linked_account_label?: string }) => (
+                          <span>{n.linked_account_label || '—'}</span>
+                        )
+                      },
+                      {
+                        key: 'children', header: 'Children', render: (n: ExpensesCategoryTreeNode & { child_count?: number }) => (
+                          <span>{Number.isFinite(n.child_count) ? n.child_count : ''}</span>
+                        )
+                      },
+                      {
+                        key: 'has_tx', header: 'Has Tx', render: (n: ExpensesCategoryTreeNode & { has_transactions?: boolean }) => (
+                          <input type="checkbox" checked={!!n.has_transactions} readOnly aria-label="has_transactions" />
+                        )
+                      },
                     ]}
                     onEdit={(node: any) => {
                       const row = list.find(r => r.id === node.id)
@@ -397,7 +409,7 @@ const SubTreePage: React.FC = () => {
                 ) : (
                   <div className={styles.tableWrapper}>
                     <div className={styles.tableScrollArea}>
-<Table
+                      <Table
                         size="small"
                         stickyHeader
                         className={styles.dataTable}
@@ -431,7 +443,7 @@ const SubTreePage: React.FC = () => {
                         </TableHead>
                         <TableBody>
                           {pagedList.map(r => (
-<TableRow
+                            <TableRow
                               key={r.id}
                               className={styles.tableRow}
                               sx={{
@@ -447,8 +459,8 @@ const SubTreePage: React.FC = () => {
                               <TableCell className={styles.tableCell}>{r.linked_account_code ? `${r.linked_account_code}${r.linked_account_name ? ' - ' + r.linked_account_name : ''}` : ''}</TableCell>
                               <TableCell className={styles.tableCell}>{r.child_count ?? 0}</TableCell>
                               <TableCell className={styles.tableCell}><Checkbox checked={!!r.has_transactions} disabled /></TableCell>
-<TableCell align="right" className={styles.tableCell}>
-<Box data-actions="1" className={styles.actionButtons} sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                              <TableCell align="right" className={styles.tableCell}>
+                                <Box data-actions="1" className={styles.actionButtons} sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
                                   {canUpdate && (
                                     <Tooltip title="Edit">
                                       <IconButton size="small" color="primary" onClick={() => openEdit(r)}>
@@ -532,11 +544,11 @@ const SubTreePage: React.FC = () => {
                   colSpan: 2,
                 },
                 { id: 'code', type: 'text', label: 'Code / الكود', required: true },
-                { 
-                  id: 'description', 
-                  type: 'textarea', 
-                  label: 'Description (AR) / الوصف', 
-                  rows: 2, 
+                {
+                  id: 'description',
+                  type: 'textarea',
+                  label: 'Description (AR) / الوصف',
+                  rows: 2,
                   required: true,
                   // Enforce DB constraint (1..300 chars)
                   validation: (v: unknown) => {
@@ -572,13 +584,13 @@ const SubTreePage: React.FC = () => {
             }}
             onSubmit={async (data) => {
               console.log('📋 Form submitted with data:', data)
-              
+
               // Trim values for consistency
               const codeVal = String(data.code || '').trim();
               const descVal = String(data.description || '').trim();
-              
+
               console.log('📝 Trimmed values - code:', codeVal, 'desc:', descVal, 'desc length:', descVal.length)
-              
+
               // Note: Form validation already passed in UnifiedCRUDForm, so we just need to prepare the payload
               const payload = {
                 code: codeVal,

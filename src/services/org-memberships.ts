@@ -4,12 +4,14 @@ export interface OrgMemberRecord {
   org_id: string;
   user_id: string;
   created_at?: string;
+  can_access_all_projects?: boolean;
 }
 
 export interface OrgMemberWithUser {
   org_id: string;
   user_id: string;
   created_at?: string;
+  can_access_all_projects?: boolean;
   user: {
     id: string;
     email: string;
@@ -47,6 +49,7 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberWithUser[]
     org_id: r.org_id,
     user_id: r.user_id,
     created_at: r.created_at,
+    can_access_all_projects: r.can_access_all_projects ?? true,
     user: {
       id: r.user_id,
       email: r.email,
@@ -61,7 +64,11 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberWithUser[]
   })) as OrgMemberWithUser[];
 }
 
-export async function addOrgMember(orgId: string, userId: string): Promise<void> {
+export async function addOrgMember(
+  orgId: string, 
+  userId: string, 
+  canAccessAllProjects: boolean = true
+): Promise<void> {
   if (USE_MOCK) {
     const exists = mockStore.memberships.find(m => m.org_id === orgId && m.user_id === userId);
     if (!exists) {
@@ -69,12 +76,18 @@ export async function addOrgMember(orgId: string, userId: string): Promise<void>
         org_id: orgId,
         user_id: userId,
         created_at: new Date().toISOString(),
+        can_access_all_projects: canAccessAllProjects,
         user: { id: userId, email: `${userId}@example.com`, first_name: 'User', last_name: userId.slice(0, 6), is_active: true, full_name_ar: 'مستخدم تجريبي' }
       });
     }
     return;
   }
-  const { error } = await supabase.rpc('org_member_add', { p_org_id: orgId, p_user_id: userId, p_is_default: false });
+  const { error } = await supabase.rpc('org_member_add', { 
+    p_org_id: orgId, 
+    p_user_id: userId, 
+    p_is_default: false,
+    p_can_access_all_projects: canAccessAllProjects
+  });
   if (error) throw error;
 }
 

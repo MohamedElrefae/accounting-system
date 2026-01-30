@@ -45,9 +45,10 @@ export const ScopedProjectSelector: React.FC<Props> = ({
   } = useScope();
 
   const defaultLabel = language === 'ar' ? 'المشروع' : 'Project';
-  const allLabel = language === 'ar' ? 'كل المشاريع' : 'All Projects';
+  const allLabel = language === 'ar' ? 'الكل' : 'All';
   const selectOrgFirst = language === 'ar' ? 'اختر المؤسسة أولاً' : 'Select org first';
-  const noProjectsText = language === 'ar' ? 'لا توجد مشاريع' : 'No projects';
+  const noProjectsText = language === 'ar' ? 'لا توجد مشاريع متاحة' : 'No projects available';
+  const noProjectsAssigned = language === 'ar' ? 'لا توجد مشاريع مخصصة لك في هذه المؤسسة' : 'No projects assigned to you in this organization';
   const loadingText = language === 'ar' ? 'جاري التحميل...' : 'Loading...';
 
   const handleChange = useCallback(async (event: any) => {
@@ -60,31 +61,46 @@ export const ScopedProjectSelector: React.FC<Props> = ({
     }
   }, [setProject]);
 
-  const isDisabled = !currentOrg || isLoadingProjects;
+  const hasProjects = availableProjects.length > 0;
+  const isDisabled = !currentOrg || isLoadingProjects || !hasProjects;
 
   return (
-    <FormControl size={size} sx={{ minWidth: 180, ...sx }} disabled={isDisabled}>
+    <FormControl 
+      size={size} 
+      sx={{ minWidth: 180, ...sx }} 
+      disabled={isDisabled}
+      error={currentOrg && !hasProjects && !isLoadingProjects}
+    >
       <InputLabel>{label || defaultLabel}</InputLabel>
       <Select
-        value={currentProject?.id || ''}
+        value={hasProjects ? (currentProject?.id || '') : ''}
         onChange={handleChange}
         label={label || defaultLabel}
         disabled={isDisabled}
         variant={variant}
         displayEmpty
+        sx={{
+          '& .MuiSelect-select': {
+            color: (currentOrg && !hasProjects && !isLoadingProjects) ? '#d32f2f' : undefined,
+          }
+        }}
         renderValue={(selected) => {
           // No org selected
           if (!currentOrg) {
             return <span style={{ color: '#999' }}>{selectOrgFirst}</span>;
           }
           // Loading projects
-          if (isLoadingProjects && !selected) {
+          if (isLoadingProjects) {
             return (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <CircularProgress size={14} />
                 <span style={{ color: '#999' }}>{loadingText}</span>
               </Box>
             );
+          }
+          // No projects available
+          if (!hasProjects) {
+            return <span style={{ color: '#d32f2f' }}>{noProjectsText}</span>;
           }
           // No project selected (All Projects)
           if (!selected) {
@@ -108,23 +124,30 @@ export const ScopedProjectSelector: React.FC<Props> = ({
           }
         }}
       >
-        {allowAll && (
-          <MenuItem value="">
-            {allLabel}
-          </MenuItem>
-        )}
-        {availableProjects.length === 0 && currentOrg ? (
+        {!hasProjects ? (
           <MenuItem value="" disabled>
             {isLoadingProjects ? loadingText : noProjectsText}
           </MenuItem>
         ) : (
-          availableProjects.map((project) => (
-            <MenuItem key={project.id} value={project.id}>
-              {project.code} - {project.name}
-            </MenuItem>
-          ))
+          [
+            allowAll && (
+              <MenuItem key="all" value="">
+                {allLabel}
+              </MenuItem>
+            ),
+            ...availableProjects.map((project) => (
+              <MenuItem key={project.id} value={project.id}>
+                {project.code} - {project.name}
+              </MenuItem>
+            ))
+          ].filter(Boolean)
         )}
       </Select>
+      {currentOrg && !hasProjects && !isLoadingProjects && (
+        <Box sx={{ fontSize: '0.75rem', color: '#d32f2f', mt: 0.5, px: 1.75 }}>
+          {noProjectsAssigned}
+        </Box>
+      )}
     </FormControl>
   );
 };

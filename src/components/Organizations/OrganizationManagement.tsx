@@ -2,6 +2,7 @@ import React, { useCallback, useState, useEffect } from 'react';
 import { Building2, Plus, Edit, Trash2, MapPin, Phone, Mail, FileText, Eraser } from 'lucide-react';
 import { getOrganizations, createOrganization, updateOrganization, deleteOrganizationCascade, purgeOrganizationData, type Organization } from '../../services/organization';
 import { useToast } from '../../contexts/ToastContext';
+import { useOptimizedAuth } from '../../hooks/useOptimizedAuth';
 import styles from './OrganizationManagement.module.css';
 
 interface OrganizationFormData {
@@ -33,6 +34,17 @@ const OrganizationManagement: React.FC = () => {
   });
 
   const { showToast } = useToast();
+  const { hasActionAccess } = useOptimizedAuth();
+  
+  // Check permissions - use existing permission codes
+  // Organizations are managed by users with settings.manage or users.manage permissions
+  const canCreate = hasActionAccess('settings.manage') || hasActionAccess('users.manage');
+  const canUpdate = hasActionAccess('settings.manage') || hasActionAccess('users.manage');
+  const canDelete = hasActionAccess('settings.manage') || hasActionAccess('users.manage');
+  
+  // Allow viewing organizations for all authenticated users
+  // Most users need to see organizations to select them for transactions
+  const hasAnyManagementPermission = canCreate || canUpdate || canDelete;
 
   const loadOrganizations = useCallback(async () => {
     try {
@@ -52,6 +64,11 @@ const OrganizationManagement: React.FC = () => {
   }, [loadOrganizations]);
 
   const handleAdd = () => {
+    if (!canCreate) {
+      showToast('ليس لديك صلاحية لإضافة مؤسسات', { severity: 'error' });
+      return;
+    }
+    
     setEditingOrg(null);
     setFormData({
       code: '',
@@ -67,6 +84,11 @@ const OrganizationManagement: React.FC = () => {
   };
 
   const handleEdit = (org: Organization) => {
+    if (!canUpdate) {
+      showToast('ليس لديك صلاحية لتعديل المؤسسات', { severity: 'error' });
+      return;
+    }
+    
     setEditingOrg(org);
     setFormData({
       code: org.code,
@@ -109,6 +131,11 @@ const OrganizationManagement: React.FC = () => {
   };
 
   const handlePurge = async (org: Organization) => {
+    if (!canDelete) {
+      showToast('ليس لديك صلاحية لتفريغ بيانات المؤسسات', { severity: 'error' });
+      return;
+    }
+    
     const warning = `تنبيه مهم:\nسيتم حذف جميع البيانات المرتبطة بالمؤسسة "${org.code} — ${org.name}" (مشاريع، إعدادات، المخزون، التقارير ...)، مع الإبقاء على سجل المؤسسة.\nلا يمكن التراجع عن هذه العملية. هل تريد المتابعة؟`;
     if (!window.confirm(warning)) return;
     setSaving(true);
@@ -126,6 +153,11 @@ const OrganizationManagement: React.FC = () => {
   };
 
   const handleDelete = async (org: Organization) => {
+    if (!canDelete) {
+      showToast('ليس لديك صلاحية لحذف المؤسسات', { severity: 'error' });
+      return;
+    }
+    
     const warning = `تنبيه مهم:\nسيتم حذف المؤسسة "${org.code} — ${org.name}" وجميع البيانات المرتبطة بها نهائيًا (مشاريع، إعدادات، المخزون، التقارير ...).\nلا يمكن التراجع عن هذه العملية. هل تريد المتابعة؟`;
     if (!window.confirm(warning)) return;
 
@@ -160,12 +192,19 @@ const OrganizationManagement: React.FC = () => {
             <div className={styles.headerText}>
               <h1>إدارة المؤسسات</h1>
               <p>إدارة المؤسسات والفروع في النظام</p>
+              {!hasAnyManagementPermission && (
+                <p style={{ color: '#f59e0b', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                  ⚠️ وضع القراءة فقط - ليس لديك صلاحية لتعديل المؤسسات
+                </p>
+              )}
             </div>
           </div>
-          <button className={styles.addButton} onClick={handleAdd}>
-            <Plus size={20} />
-            إضافة مؤسسة
-          </button>
+          {canCreate && (
+            <button className={styles.addButton} onClick={handleAdd}>
+              <Plus size={20} />
+              إضافة مؤسسة
+            </button>
+          )}
         </div>
       </div>
 
@@ -176,10 +215,12 @@ const OrganizationManagement: React.FC = () => {
               <Building2 size={64} />
               <h3>لا توجد مؤسسات</h3>
               <p>ابدأ بإضافة مؤسسة جديدة لإدارة أعمالك</p>
-              <button className={styles.addButton} onClick={handleAdd}>
-                <Plus size={20} />
-                إضافة مؤسسة
-              </button>
+              {canCreate && (
+                <button className={styles.addButton} onClick={handleAdd}>
+                  <Plus size={20} />
+                  إضافة مؤسسة
+                </button>
+              )}
             </div>
           ) : (
             <div className={styles.grid}>
@@ -227,18 +268,24 @@ const OrganizationManagement: React.FC = () => {
                   </div>
 
                   <div className={styles.actions}>
-                    <button className={`${styles.actionButton} ${styles.editButton}`} onClick={() => handleEdit(org)}>
-                      <Edit size={16} />
-                      تعديل
-                    </button>
-                    <button className={`${styles.actionButton} ${styles.deleteButton}`} onClick={() => handlePurge(org)}>
-                      <Eraser size={16} />
-                      تفريغ البيانات
-                    </button>
-                    <button className={`${styles.actionButton} ${styles.deleteButton}`} onClick={() => handleDelete(org)}>
-                      <Trash2 size={16} />
-                      حذف
-                    </button>
+                    {canUpdate && (
+                      <button className={`${styles.actionButton} ${styles.editButton}`} onClick={() => handleEdit(org)}>
+                        <Edit size={16} />
+                        تعديل
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button className={`${styles.actionButton} ${styles.deleteButton}`} onClick={() => handlePurge(org)}>
+                        <Eraser size={16} />
+                        تفريغ البيانات
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button className={`${styles.actionButton} ${styles.deleteButton}`} onClick={() => handleDelete(org)}>
+                        <Trash2 size={16} />
+                        حذف
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

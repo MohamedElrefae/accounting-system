@@ -221,6 +221,33 @@ export async function canAccessProject(projectId: string): Promise<boolean> {
   }
 }
 
+/**
+ * Validate if current user has access to a project
+ * Uses the check_project_access RPC function to validate permissions
+ */
+export async function validateProjectAccess(
+  projectId: string,
+  orgId: string
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .rpc('check_project_access', {
+        p_project_id: projectId,
+        p_org_id: orgId,
+      });
+    
+    if (error) {
+      console.error('Error checking project access:', error);
+      return false;
+    }
+    
+    return data?.[0]?.has_access ?? false;
+  } catch (err) {
+    console.error('Failed to validate project access:', err);
+    return false;
+  }
+}
+
 // Get project by ID
 export async function getProject(id: string): Promise<Project | null> {
   const { data, error } = await supabase

@@ -4,11 +4,12 @@ import { useHasPermission } from '../../hooks/useHasPermission';
 import { getProjectDocumentCounts } from '../../services/documents';
 import { Tooltip } from '@mui/material';
 import useAppStore from '../../store/useAppStore';
-import { FolderOpen, Plus, Edit, Trash2, Building, Calendar, DollarSign } from 'lucide-react';
+import { FolderOpen, Plus, Edit, Trash2, Building, Calendar, DollarSign, Users } from 'lucide-react';
 import { getActiveProjects, getActiveProjectsByOrg, createProject, updateProject, deleteProject, type Project } from '../../services/projects';
 import { getOrganizations, type Organization } from '../../services/organization';
 import { useToast } from '../../contexts/ToastContext';
 import { useScope } from '../../contexts/ScopeContext';
+import ProjectMembersManager from './ProjectMembersManager';
 import styles from './ProjectManagement.module.css';
 
 interface ProjectFormData {
@@ -29,7 +30,9 @@ const ProjectManagement: React.FC = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [saving, setSaving] = useState(false);
-const [formData, setFormData] = useState<ProjectFormData>({
+  const [activeTab, setActiveTab] = useState<'projects' | 'members'>('projects');
+  const [selectedProjectForMembers, setSelectedProjectForMembers] = useState<Project | null>(null);
+  const [formData, setFormData] = useState<ProjectFormData>({
     code: '',
     name: '',
     description: '',
@@ -44,6 +47,7 @@ const [formData, setFormData] = useState<ProjectFormData>({
   const navigate = useNavigate();
   const hasPerm = useHasPermission();
   const canViewDocs = hasPerm('documents.view');
+  const canCreateProject = hasPerm('projects.create');
   const [docCounts, setDocCounts] = useState<Record<string, number>>({});
   const { language } = useAppStore();
   const { currentOrg, getOrgId } = useScope();
@@ -169,6 +173,11 @@ org_id: (project as any).org_id || '',
     }
   };
 
+  const handleManageMembers = (project: Project) => {
+    setSelectedProjectForMembers(project);
+    setActiveTab('members');
+  };
+
   const getOrganizationName = (orgId?: string) => {
     if (!orgId) return 'غير محدد';
     const org = organizations.find(o => o.id === orgId);
@@ -246,103 +255,174 @@ org_id: (project as any).org_id || '',
               <p>إدارة المشاريع والأنشطة في النظام</p>
             </div>
           </div>
-          <button className={styles.addButton} onClick={handleAdd}>
-            <Plus size={20} />
-            إضافة مشروع
-          </button>
+          {activeTab === 'projects' && canCreateProject && (
+            <button className={styles.addButton} onClick={handleAdd}>
+              <Plus size={20} />
+              إضافة مشروع
+            </button>
+          )}
         </div>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className={styles.tabsContainer}>
+        <button
+          className={`${styles.tab} ${activeTab === 'projects' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('projects')}
+        >
+          <FolderOpen size={18} />
+          المشاريع
+        </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'members' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('members')}
+        >
+          <Users size={18} />
+          أعضاء المشروع
+        </button>
       </div>
 
       <div className={styles.main}>
         <div className={styles.content}>
-          {projects.length === 0 ? (
-            <div className={styles.emptyState}>
-              <FolderOpen size={64} />
-              <h3>لا توجد مشاريع في {currentOrg?.name || 'المؤسسة المحددة'}</h3>
-              <p>ابدأ بإضافة مشروع جديد لإدارة أعمالك في هذه المؤسسة</p>
-              <button className={styles.addButton} onClick={handleAdd}>
-                <Plus size={20} />
-                إضافة مشروع
-              </button>
-            </div>
-          ) : (
-            <div className={styles.grid}>
-              {projects.map(project => (
-                <div key={project.id} className={styles.card}>
-                  <div className={styles.cardHeader}>
-                    <div className={styles.projectInfo}>
-                      <h3>{project.code}</h3>
-                      <h4>{project.name} {canViewDocs && (docCounts[project.id] ? `• ${docCounts[project.id]} ${language === 'ar' ? 'مستند' : 'docs'}` : '')}</h4>
-                    </div>
-                    <div className={`${styles.statusBadge} ${getStatusColor(project.status) === 'status-active' ? styles.statusActive : getStatusColor(project.status) === 'status-completed' ? styles.statusCompleted : styles.statusInactive}`}>
-                      {getStatusText(project.status)}
-                    </div>
-                  </div>
-                  
-                  {(project as any).org_id && (
-                    <div className={styles.organizationInfo}>
-                      <Building className={styles.organizationIcon} size={16} />
-                      <span>{getOrganizationName((project as any).org_id)}</span>
-                    </div>
-                  )}
-                  
-                  {project.description && (
-                    <p className={styles.description}>{project.description}</p>
-                  )}
-                  
-                  <div className={styles.details}>
-                    {(project.start_date || project.end_date) && (
-                      <div className={styles.detailItem}>
-                        <Calendar className={styles.detailIcon} size={16} />
-                        <span>
-                          {project.start_date && project.end_date ? (
-                            `${new Date(project.start_date).toLocaleDateString('ar-SA')} - ${new Date(project.end_date).toLocaleDateString('ar-SA')}`
-                          ) : project.start_date ? (
-                            `يبدأ: ${new Date(project.start_date).toLocaleDateString('ar-SA')}`
-                          ) : (
-                            `ينتهي: ${new Date(project.end_date!).toLocaleDateString('ar-SA')}`
-                          )}
-                        </span>
-                      </div>
-                    )}
-                    
-                    {project.budget_amount && (
-                      <div className={styles.detailItem}>
-                        <DollarSign className={styles.detailIcon} size={16} />
-                        <span>الميزانية: </span>
-                        <span className={styles.budgetAmount}>
-                          {project.budget_amount.toLocaleString('ar-SA')} ر.س
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className={styles.actions}>
-                    <button className={`${styles.actionButton} ${styles.editButton}`} onClick={() => handleEdit(project)}>
-                      <Edit size={16} />
-                      تعديل
-                    </button>
-{canViewDocs ? (
-                      <button className={`${styles.actionButton}`} onClick={() => navigate(`/projects/${project.id}/attachments`)}>
-                        📎 المرفقات
+          {/* Projects Tab */}
+          {activeTab === 'projects' && (
+            <>
+              {projects.length === 0 ? (
+                <div className={styles.emptyState}>
+                  <FolderOpen size={64} />
+                  {canCreateProject ? (
+                    <>
+                      <h3>لا توجد مشاريع في {currentOrg?.name || 'المؤسسة المحددة'}</h3>
+                      <p>ابدأ بإضافة مشروع جديد لإدارة أعمالك في هذه المؤسسة</p>
+                      <button className={styles.addButton} onClick={handleAdd}>
+                        <Plus size={20} />
+                        إضافة مشروع
                       </button>
-                    ) : (
-                      <Tooltip title={language === 'ar' ? 'تحتاج لصلاحية documents.view' : 'Requires documents.view permission'}>
-                        <span>
-                          <button className={`${styles.actionButton}`} disabled>
+                    </>
+                  ) : (
+                    <>
+                      <h3>لا توجد مشاريع مخصصة لك في {currentOrg?.name || 'المؤسسة المحددة'}</h3>
+                      <p>لا يوجد لديك صلاحية الوصول إلى أي مشروع في هذه المؤسسة. يرجى التواصل مع المسؤول لمنحك الصلاحيات المطلوبة.</p>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className={styles.grid}>
+                  {projects.map(project => (
+                    <div key={project.id} className={styles.card}>
+                      <div className={styles.cardHeader}>
+                        <div className={styles.projectInfo}>
+                          <h3>{project.code}</h3>
+                          <h4>{project.name} {canViewDocs && (docCounts[project.id] ? `• ${docCounts[project.id]} ${language === 'ar' ? 'مستند' : 'docs'}` : '')}</h4>
+                        </div>
+                        <div className={`${styles.statusBadge} ${getStatusColor(project.status) === 'status-active' ? styles.statusActive : getStatusColor(project.status) === 'status-completed' ? styles.statusCompleted : styles.statusInactive}`}>
+                          {getStatusText(project.status)}
+                        </div>
+                      </div>
+                      
+                      {(project as any).org_id && (
+                        <div className={styles.organizationInfo}>
+                          <Building className={styles.organizationIcon} size={16} />
+                          <span>{getOrganizationName((project as any).org_id)}</span>
+                        </div>
+                      )}
+                      
+                      {project.description && (
+                        <p className={styles.description}>{project.description}</p>
+                      )}
+                      
+                      <div className={styles.details}>
+                        {(project.start_date || project.end_date) && (
+                          <div className={styles.detailItem}>
+                            <Calendar className={styles.detailIcon} size={16} />
+                            <span>
+                              {project.start_date && project.end_date ? (
+                                `${new Date(project.start_date).toLocaleDateString('ar-SA')} - ${new Date(project.end_date).toLocaleDateString('ar-SA')}`
+                              ) : project.start_date ? (
+                                `يبدأ: ${new Date(project.start_date).toLocaleDateString('ar-SA')}`
+                              ) : (
+                                `ينتهي: ${new Date(project.end_date!).toLocaleDateString('ar-SA')}`
+                              )}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {project.budget_amount && (
+                          <div className={styles.detailItem}>
+                            <DollarSign className={styles.detailIcon} size={16} />
+                            <span>الميزانية: </span>
+                            <span className={styles.budgetAmount}>
+                              {project.budget_amount.toLocaleString('ar-SA')} ر.س
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className={styles.actions}>
+                        <button className={`${styles.actionButton} ${styles.editButton}`} onClick={() => handleEdit(project)}>
+                          <Edit size={16} />
+                          تعديل
+                        </button>
+                        <button className={`${styles.actionButton}`} onClick={() => handleManageMembers(project)}>
+                          <Users size={16} />
+                          الأعضاء
+                        </button>
+                        {canViewDocs ? (
+                          <button className={`${styles.actionButton}`} onClick={() => navigate(`/projects/${project.id}/attachments`)}>
                             📎 المرفقات
                           </button>
-                        </span>
-                      </Tooltip>
-                    )}
-                    <button className={`${styles.actionButton} ${styles.deleteButton}`} onClick={() => handleDelete(project)}>
-                      <Trash2 size={16} />
-                      حذف
+                        ) : (
+                          <Tooltip title={language === 'ar' ? 'تحتاج لصلاحية documents.view' : 'Requires documents.view permission'}>
+                            <span>
+                              <button className={`${styles.actionButton}`} disabled>
+                                📎 المرفقات
+                              </button>
+                            </span>
+                          </Tooltip>
+                        )}
+                        <button className={`${styles.actionButton} ${styles.deleteButton}`} onClick={() => handleDelete(project)}>
+                          <Trash2 size={16} />
+                          حذف
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Members Tab */}
+          {activeTab === 'members' && (
+            <>
+              {selectedProjectForMembers ? (
+                <div className={styles.membersTabContainer}>
+                  <div className={styles.membersTabHeader}>
+                    <h2>إدارة أعضاء المشروع: {selectedProjectForMembers.name}</h2>
+                    <button 
+                      className={styles.backButton}
+                      onClick={() => setSelectedProjectForMembers(null)}
+                    >
+                      ← العودة للمشاريع
                     </button>
                   </div>
+                  <ProjectMembersManager 
+                    projectId={selectedProjectForMembers.id}
+                    orgId={currentOrg?.id || ''}
+                  />
                 </div>
-              ))}
-            </div>
+              ) : (
+                <div className={styles.emptyState}>
+                  <Users size={64} />
+                  <h3>اختر مشروعاً لإدارة أعضاؤه</h3>
+                  <p>انقر على زر "الأعضاء" في أي مشروع لإدارة أعضاء المشروع</p>
+                  <button className={styles.addButton} onClick={() => setActiveTab('projects')}>
+                    <FolderOpen size={20} />
+                    العودة للمشاريع
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

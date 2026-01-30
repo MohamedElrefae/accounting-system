@@ -46,6 +46,9 @@ import {
   alpha,
   useTheme
 } from '@mui/material';
+import { ScopedRoleAssignmentEnhanced } from '@/components/admin/ScopedRoleAssignment_Enhanced';
+import { OrgRoleAssignmentEnhanced } from '@/components/admin/OrgRoleAssignment_Enhanced';
+import { ProjectRoleAssignmentEnhanced } from '@/components/admin/ProjectRoleAssignment_Enhanced';
 import Grid from '@mui/material/Grid';
 import AddUserIcon from '@mui/icons-material/PersonAdd';
 import EditIcon from '@mui/icons-material/Edit';
@@ -101,11 +104,12 @@ interface Role {
   is_system?: boolean;
 }
 
-type ViewMode = 'cards' | 'table' | 'analytics';
+type ViewMode = 'cards' | 'table' | 'analytics' | 'scoped-roles';
 type SortField = 'name' | 'email' | 'role' | 'last_login' | 'created';
 type SortDirection = 'asc' | 'desc';
 type FilterStatus = 'all' | 'active' | 'inactive';
 type FilterRole = 'all' | string;
+type ScopedRolesTab = 'users' | 'org-roles' | 'project-roles';
 
 export default function EnterpriseUserManagement() {
   const theme = useTheme();
@@ -120,6 +124,14 @@ export default function EnterpriseUserManagement() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [filterRole, setFilterRole] = useState<FilterRole>('all');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+
+  // Scoped roles state
+  const [scopedRolesTab, setScopedRolesTab] = useState<ScopedRolesTab>('users');
+  const [selectedUserForScoped, setSelectedUserForScoped] = useState<string | null>(null);
+  const [selectedOrgForScoped, setSelectedOrgForScoped] = useState<string | null>(null);
+  const [selectedProjectForScoped, setSelectedProjectForScoped] = useState<string | null>(null);
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
 
   // Dialog states
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -137,15 +149,17 @@ export default function EnterpriseUserManagement() {
     department: '',
     job_title: '',
     phone: '',
+    password: '', // Only used for creation
     role_id: null as number | null,
     is_active: true
   });
+  const [dialogTab, setDialogTab] = useState(0); // 0: Basic Info, 1: Scoped Roles
   const [saving, setSaving] = useState(false);
 
   const loadUsers = useCallback(async () => {
     try {
       console.log('[EnterpriseUserManagement] Loading users...');
-      
+
       // Query user_profiles with all necessary fields
       const { data: usersData, error: usersError } = await supabase
         .from('user_profiles')
@@ -167,7 +181,7 @@ export default function EnterpriseUserManagement() {
         setUsers([]);
         return;
       }
-      
+
       console.log('[EnterpriseUserManagement] Found', usersData.length, 'users');
 
       // Load user roles with correct schema (user_roles -> roles join)
@@ -247,17 +261,41 @@ export default function EnterpriseUserManagement() {
     }
   }, []);
 
+  const loadOrganizationsAndProjects = useCallback(async () => {
+    try {
+      // Load organizations
+      const { data: orgsData, error: orgsError } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .order('name');
+
+      if (orgsError) throw orgsError;
+      setOrganizations(orgsData || []);
+
+      // Load projects
+      const { data: projsData, error: projsError } = await supabase
+        .from('projects')
+        .select('id, name, org_id')
+        .order('name');
+
+      if (projsError) throw projsError;
+      setProjects(projsData || []);
+    } catch (error) {
+      console.error('Error loading organizations and projects:', error);
+    }
+  }, []);
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      await Promise.all([loadUsers(), loadRoles()]);
+      await Promise.all([loadUsers(), loadRoles(), loadOrganizationsAndProjects()]);
     } catch (error) {
       console.error('Error loading data:', error);
       alert('فشل تحميل البيانات. يرجى المحاولة مرة أخرى.');
     } finally {
       setLoading(false);
     }
-  }, [loadRoles, loadUsers]);
+  }, [loadRoles, loadUsers, loadOrganizationsAndProjects]);
 
   useEffect(() => {
     // Load data on component mount
@@ -353,11 +391,13 @@ export default function EnterpriseUserManagement() {
       });
     }
     setEditDialogOpen(true);
+    setDialogTab(0);
   };
 
   const handleSaveUser = async () => {
     try {
       setSaving(true);
+      let newUserId = selectedUser?.id;
 
       if (selectedUser) {
         // Update existing user
@@ -379,10 +419,10 @@ export default function EnterpriseUserManagement() {
         // Update role assignment
         await handleRoleUpdate(selectedUser.id, formData.role_id);
       } else {
-        // Create new user via Edge Function (direct creation with temporary password)
+        // Create new user via Edge Function
         const payload = {
           email: formData.email,
-          password: 'TempPass123',
+          password: formData.password || 'TempPass123', // Fallback if empty, but UI should enforce
           profile: {
             first_name: formData.first_name,
             last_name: formData.last_name,
@@ -396,16 +436,62 @@ export default function EnterpriseUserManagement() {
           require_password_change: true
         };
 
-        const { error } = await supabase.functions.invoke('admin-create-user', { body: payload });
+        const { data, error } = await supabase.functions.invoke('admin-create-user', { body: payload });
         if (error) throw error;
+
+        // Assume the function returns the new user object or ID
+        if (data && data.user) {
+          newUserId = data.user.id;
+        }
       }
 
-      await loadUsers();
+      await loadUsers(); // Refresh list for background update
+
+      if (!selectedUser && newUserId) {
+        // If it was a new user creation, don't close, switch to scoped roles tab
+        // Construct the new user object manually to avoid stale state issues from 'users' array
+        const newUser: any = {
+          id: newUserId,
+          email: formData.email,
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          full_name_ar: formData.full_name_ar,
+          department: formData.department,
+          phone: formData.phone,
+          is_active: formData.is_active,
+          // Add other needed fields for display to avoid crashes
+          user_metadata: {
+            first_name: formData.first_name,
+            last_name: formData.last_name,
+            full_name_ar: formData.full_name_ar
+          }
+        };
+
+        setSelectedUser(newUser);
+        setDialogTab(1); // Switch to Scoped Roles
+        alert('تم إنشاء المستخدم بنجاح. يمكنك الآن تخصيص الأدوار المحدودة.');
+        return;
+      }
+
       setEditDialogOpen(false);
       alert('تم حفظ بيانات المستخدم بنجاح');
     } catch (error: any) {
       console.error('Error saving user:', error);
-      alert('فشل حفظ بيانات المستخدم: ' + (error.message || 'خطأ غير معروف'));
+      let errorMessage = error.message || 'خطأ غير معروف';
+
+      // Try to extract specific error message from the function response
+      try {
+        if (error.context && error.context.json) {
+          const body = await error.context.json();
+          if (body && body.error) {
+            errorMessage = body.error;
+          }
+        }
+      } catch (e) {
+        // failed to parse body, keep generic message
+      }
+
+      alert('فشل حفظ بيانات المستخدم: ' + errorMessage);
     } finally {
       setSaving(false);
     }
@@ -673,6 +759,7 @@ export default function EnterpriseUserManagement() {
             <Tab icon={<GroupIcon />} value="cards" label="بطاقات" />
             <Tab icon={<ViewIcon />} value="table" label="جدول" />
             <Tab icon={<AnalyticsIcon />} value="analytics" label="تحليلات" />
+            <Tab icon={<PermissionIcon />} value="scoped-roles" label="الأدوار المحدودة" />
           </Tabs>
         </Stack>
 
@@ -1006,11 +1093,14 @@ export default function EnterpriseUserManagement() {
                         <IconButton size="small" onClick={() => handleEditUser(user)}>
                           <EditIcon />
                         </IconButton>
-                        <IconButton size="small" color="info" onClick={() => {
-                          setSelectedUser(user);
-                          // Permissions dialog not wired yet
-                          alert('عرض صلاحيات المستخدم قادم قريبًا');
-                        }}>
+                        <IconButton
+                          size="small"
+                          color="info"
+                          onClick={() => {
+                            handleEditUser(user);
+                            setDialogTab(1); // Switch to Scoped Roles tab
+                          }}
+                        >
                           <SecurityIcon />
                         </IconButton>
                         <IconButton
@@ -1103,6 +1193,152 @@ export default function EnterpriseUserManagement() {
             </Grid>
           </Grid>
         )}
+
+        {/* Scoped Roles Management */}
+        {viewMode === 'scoped-roles' && (
+          <Paper sx={{ p: 3 }}>
+            <Tabs
+              value={scopedRolesTab}
+              onChange={(_, newValue) => setScopedRolesTab(newValue)}
+              sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
+            >
+              <Tab label="إدارة أدوار المستخدمين" value="users" />
+              <Tab label="أدوار المنظمة" value="org-roles" />
+              <Tab label="أدوار المشروع" value="project-roles" />
+            </Tabs>
+
+            {/* Users Tab */}
+            {scopedRolesTab === 'users' && (
+              <Box>
+                <Typography variant="h6" mb={2}>تعيين الأدوار للمستخدمين</Typography>
+                <Grid container spacing={2} mb={3}>
+                  {users.map((user) => (
+                    <Grid item xs={12} md={6} lg={4} key={user.id}>
+                      <Card
+                        sx={{
+                          cursor: 'pointer',
+                          border: selectedUserForScoped === user.id ? 2 : 1,
+                          borderColor: selectedUserForScoped === user.id ? 'primary.main' : 'divider',
+                          '&:hover': { boxShadow: 2 }
+                        }}
+                        onClick={() => setSelectedUserForScoped(user.id)}
+                      >
+                        <CardContent>
+                          <Stack direction="row" alignItems="center" spacing={1}>
+                            <Avatar sx={{ bgcolor: 'primary.main' }}>
+                              {user.full_name_ar?.charAt(0) || user.first_name?.charAt(0) || user.email.charAt(0).toUpperCase()}
+                            </Avatar>
+                            <Box>
+                              <Typography variant="subtitle2">
+                                {user.full_name_ar || `${user.first_name} ${user.last_name}`.trim() || user.email}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {user.email}
+                              </Typography>
+                            </Box>
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+
+                {selectedUserForScoped && (
+                  <Box sx={{ mt: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
+                    <ScopedRoleAssignmentEnhanced
+                      userId={selectedUserForScoped}
+                      userName={users.find(u => u.id === selectedUserForScoped)?.full_name_ar ||
+                        `${users.find(u => u.id === selectedUserForScoped)?.first_name} ${users.find(u => u.id === selectedUserForScoped)?.last_name}`.trim()}
+                      userEmail={users.find(u => u.id === selectedUserForScoped)?.email}
+                    />
+                  </Box>
+                )}
+              </Box>
+            )}
+
+            {/* Organization Roles Tab */}
+            {scopedRolesTab === 'org-roles' && (
+              <Box>
+                <Typography variant="h6" mb={2}>إدارة أدوار المنظمة</Typography>
+                <Grid container spacing={2} mb={3}>
+                  {organizations.map((org) => (
+                    <Grid item xs={12} md={6} lg={4} key={org.id}>
+                      <Card
+                        sx={{
+                          cursor: 'pointer',
+                          border: selectedOrgForScoped === org.id ? 2 : 1,
+                          borderColor: selectedOrgForScoped === org.id ? 'primary.main' : 'divider',
+                          '&:hover': { boxShadow: 2 }
+                        }}
+                        onClick={() => setSelectedOrgForScoped(org.id)}
+                      >
+                        <CardContent>
+                          <Stack direction="row" alignItems="center" spacing={1}>
+                            <BusinessIcon sx={{ fontSize: 32, color: 'primary.main' }} />
+                            <Typography variant="subtitle2">{org.name}</Typography>
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+
+                {selectedOrgForScoped && (
+                  <Box sx={{ mt: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
+                    <OrgRoleAssignmentEnhanced
+                      orgId={selectedOrgForScoped}
+                      orgName={organizations.find(o => o.id === selectedOrgForScoped)?.name}
+                    />
+                  </Box>
+                )}
+              </Box>
+            )}
+
+            {/* Project Roles Tab */}
+            {scopedRolesTab === 'project-roles' && (
+              <Box>
+                <Typography variant="h6" mb={2}>إدارة أدوار المشروع</Typography>
+                <Grid container spacing={2} mb={3}>
+                  {projects.map((proj) => (
+                    <Grid item xs={12} md={6} lg={4} key={proj.id}>
+                      <Card
+                        sx={{
+                          cursor: 'pointer',
+                          border: selectedProjectForScoped === proj.id ? 2 : 1,
+                          borderColor: selectedProjectForScoped === proj.id ? 'primary.main' : 'divider',
+                          '&:hover': { boxShadow: 2 }
+                        }}
+                        onClick={() => setSelectedProjectForScoped(proj.id)}
+                      >
+                        <CardContent>
+                          <Stack direction="row" alignItems="center" spacing={1}>
+                            <WorkIcon sx={{ fontSize: 32, color: 'secondary.main' }} />
+                            <Box>
+                              <Typography variant="subtitle2">{proj.name}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {organizations.find(o => o.id === proj.org_id)?.name}
+                              </Typography>
+                            </Box>
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+
+                {selectedProjectForScoped && (
+                  <Box sx={{ mt: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
+                    <ProjectRoleAssignmentEnhanced
+                      projectId={selectedProjectForScoped}
+                      projectName={projects.find(p => p.id === selectedProjectForScoped)?.name}
+                      orgId={projects.find(p => p.id === selectedProjectForScoped)?.org_id}
+                    />
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Paper>
+        )}
       </Box>
 
       {/* Context Menu */}
@@ -1166,109 +1402,154 @@ export default function EnterpriseUserManagement() {
           </Stack>
         </DialogTitle>
 
-        <DialogContent>
-          <Stack spacing={3} sx={{ mt: 2 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="البريد الإلكتروني"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  disabled={Boolean(selectedUser)}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel>الدور</InputLabel>
-                  <Select
-                    value={formData.role_id || ''}
-                    label="الدور"
-                    onChange={(e) => setFormData({ ...formData, role_id: e.target.value as number })}
-                  >
-                    <MenuItem value="">بلا دور</MenuItem>
-                    {roles.map(role => (
-                      <MenuItem key={role.id} value={role.id}>
-                        {role.name_ar}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="الاسم الأول"
-                  value={formData.first_name}
-                  onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="الاسم الأخير"
-                  value={formData.last_name}
-                  onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="الاسم الكامل بالعربية"
-                  value={formData.full_name_ar}
-                  onChange={(e) => setFormData({ ...formData, full_name_ar: e.target.value })}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="رقم الهاتف"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="القسم"
-                  value={formData.department}
-                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="المسمى الوظيفي"
-                  value={formData.job_title}
-                  onChange={(e) => setFormData({ ...formData, job_title: e.target.value })}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={formData.is_active}
-                      onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+        <DialogContent sx={{ p: 0 }}>
+          <Tabs
+            value={dialogTab}
+            onChange={(_, val) => setDialogTab(val)}
+            variant="fullWidth"
+            sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'background.default' }}
+          >
+            <Tab label="البيانات الأساسية" />
+            <Tab
+              label="الأدوار المحدودة (Scope)"
+              disabled={!selectedUser} // Disable for new users until saved
+            />
+          </Tabs>
+
+          {/* Tab 0: Basic Info */}
+          {dialogTab === 0 && (
+            <Box sx={{ p: 3 }}>
+              <Stack spacing={3}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="البريد الإلكتروني"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      disabled={Boolean(selectedUser)}
                     />
-                  }
-                  label="حساب نشط"
-                />
-              </Grid>
-            </Grid>
-          </Stack>
+                  </Grid>
+                  {/* Password Field - Only for new users */}
+                  {!selectedUser && (
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        fullWidth
+                        label="كلمة المرور"
+                        type="password"
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        helperText="اتركه فارغاً لاستخدام كلمة المرور المؤقتة (TempPass123)"
+                      />
+                    </Grid>
+                  )}
+                  <Grid item xs={12} md={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>الدور (النظام)</InputLabel>
+                      <Select
+                        value={formData.role_id || ''}
+                        label="الدور (النظام)"
+                        onChange={(e) => setFormData({ ...formData, role_id: e.target.value as number })}
+                      >
+                        <MenuItem value="">بلا دور</MenuItem>
+                        {roles.map(role => (
+                          <MenuItem key={role.id} value={role.id}>
+                            {role.name_ar}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="الاسم الأول"
+                      value={formData.first_name}
+                      onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="الاسم الأخير"
+                      value={formData.last_name}
+                      onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="الاسم الكامل بالعربية"
+                      value={formData.full_name_ar}
+                      onChange={(e) => setFormData({ ...formData, full_name_ar: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="رقم الهاتف"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="القسم"
+                      value={formData.department}
+                      onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="المسمى الوظيفي"
+                      value={formData.job_title}
+                      onChange={(e) => setFormData({ ...formData, job_title: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={formData.is_active}
+                          onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                        />
+                      }
+                      label="حساب نشط"
+                    />
+                  </Grid>
+                </Grid>
+              </Stack>
+            </Box>
+          )}
+
+          {/* Tab 1: Scoped Roles */}
+          {dialogTab === 1 && selectedUser && (
+            <Box sx={{ p: 0, height: '500px', overflow: 'auto' }}>
+              <ScopedRoleAssignmentEnhanced
+                variant="embedded"
+                userId={selectedUser.id}
+                userName={selectedUser.full_name_ar || selectedUser.first_name + ' ' + selectedUser.last_name}
+                userEmail={selectedUser.email}
+              />
+            </Box>
+          )}
         </DialogContent>
 
-        <DialogActions>
+        <DialogActions sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
           <Button onClick={() => setEditDialogOpen(false)} disabled={saving}>
             إلغاء
           </Button>
-          <Button
-            onClick={handleSaveUser}
-            variant="contained"
-            disabled={saving || !formData.email}
-          >
-            {saving ? 'جاري الحفظ...' : 'حفظ'}
-          </Button>
+          {dialogTab === 0 && (
+            <Button
+              onClick={handleSaveUser}
+              variant="contained"
+              disabled={saving || !formData.email}
+            >
+              {saving ? 'جاري الحفظ...' : (selectedUser ? 'حفظ التغييرات' : 'إنشاء ومتابعة لتحديد الأدوار')}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 

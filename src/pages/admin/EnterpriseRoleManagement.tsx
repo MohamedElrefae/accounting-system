@@ -71,6 +71,7 @@ import CheckIcon from '@mui/icons-material/CheckCircle';
 import MoreIcon from '@mui/icons-material/MoreVert';
 import PermissionIcon from '@mui/icons-material/Assignment';
 import { supabase } from '../../utils/supabase';
+import { permissionAuditService } from '../../services/permissionAuditService';
 import EnhancedQuickPermissionAssignment from '../../components/EnhancedQuickPermissionAssignment';
 
 interface Role {
@@ -312,6 +313,42 @@ export default function EnterpriseRoleManagement() {
       setSaving(true);
 
       if (selectedRole) {
+        // Log role update
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          const { data: userOrgs } = await supabase
+            .from('org_memberships')
+            .select('org_id')
+            .eq('user_id', user?.id)
+            .limit(1)
+            .single();
+
+          if (userOrgs?.org_id) {
+            await permissionAuditService.logPermissionChange(
+              userOrgs.org_id,
+              'MODIFY',
+              'role',
+              String(selectedRole.id),
+              { 
+                name: selectedRole.name, 
+                name_ar: selectedRole.name_ar,
+                description: selectedRole.description,
+                description_ar: selectedRole.description_ar
+              },
+              { 
+                name: formData.name, 
+                name_ar: formData.name_ar,
+                description: formData.description,
+                description_ar: formData.description_ar
+              },
+              `Updated role ${selectedRole.name_ar} (${selectedRole.id})`
+            );
+          }
+        } catch (auditError) {
+          console.warn('⚠️ Failed to log role update:', auditError);
+          // Don't fail the main operation if audit logging fails
+        }
+
         const { error: updateError } = await supabase
           .from('roles')
           .update({
@@ -336,6 +373,38 @@ export default function EnterpriseRoleManagement() {
           .single();
 
         if (createError) throw createError;
+
+        // Log role creation
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          const { data: userOrgs } = await supabase
+            .from('org_memberships')
+            .select('org_id')
+            .eq('user_id', user?.id)
+            .limit(1)
+            .single();
+
+          if (userOrgs?.org_id && newRole) {
+            await permissionAuditService.logPermissionChange(
+              userOrgs.org_id,
+              'CREATE',
+              'role',
+              String((newRole as Role).id),
+              null,
+              { 
+                name: (newRole as Role).name, 
+                name_ar: (newRole as Role).name_ar,
+                description: (newRole as Role).description,
+                description_ar: (newRole as Role).description_ar
+              },
+              `Created new role ${(newRole as Role).name_ar}`
+            );
+          }
+        } catch (auditError) {
+          console.warn('⚠️ Failed to log role creation:', auditError);
+          // Don't fail the main operation if audit logging fails
+        }
+
         setSelectedRole(newRole as Role);
         alert('تم إنشاء الدور. يمكنك الآن تعيين الصلاحيات.');
         setActiveTab(1);
@@ -365,6 +434,14 @@ export default function EnterpriseRoleManagement() {
       console.log(`🔄 Saving ${formData.permissions.length} permissions for role ${selectedRole.id}...`);
       console.log('📋 Permissions to save:', formData.permissions);
 
+      // Get current permissions before saving (for audit trail)
+      const { data: currentPermsData } = await supabase
+        .from('role_permissions')
+        .select('permissions(name)')
+        .eq('role_id', selectedRole.id);
+      
+      const currentPermissions = currentPermsData?.map((rp: any) => rp.permissions?.name).filter(Boolean) || [];
+
       const { data, error } = await supabase.rpc('save_role_permissions', {
         p_role_id: selectedRole.id,
         p_permission_names: formData.permissions
@@ -373,6 +450,32 @@ export default function EnterpriseRoleManagement() {
       if (error) throw error;
 
       console.log('✅ RPC Response:', data);
+
+      // Log the permission change to audit trail
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: userOrgs } = await supabase
+          .from('org_memberships')
+          .select('org_id')
+          .eq('user_id', user?.id)
+          .limit(1)
+          .single();
+
+        if (userOrgs?.org_id) {
+          await permissionAuditService.logPermissionChange(
+            userOrgs.org_id,
+            'MODIFY',
+            'role_permissions',
+            String(selectedRole.id),
+            { role_id: selectedRole.id, permissions: currentPermissions },
+            { role_id: selectedRole.id, permissions: formData.permissions },
+            `Modified permissions for role ${selectedRole.name_ar} (${selectedRole.id})`
+          );
+        }
+      } catch (auditError) {
+        console.warn('⚠️ Failed to log permission change:', auditError);
+        // Don't fail the main operation if audit logging fails
+      }
 
       // Verify the save by checking database
       const { data: verifyData, error: verifyError } = await supabase
@@ -402,11 +505,50 @@ export default function EnterpriseRoleManagement() {
     if (!confirm(`هل أنت متأكد من حذف الدور "${role?.name_ar}"؟`)) return;
 
     try {
+      // Get role permissions before deletion (for audit trail)
+      const { data: rolePermsData } = await supabase
+        .from('role_permissions')
+        .select('permissions(name)')
+        .eq('role_id', roleId);
+      
+      const rolePermissions = rolePermsData?.map((rp: any) => rp.permissions?.name).filter(Boolean) || [];
+
       await supabase.from('user_roles').delete().eq('role_id', roleId);
       await supabase.from('role_permissions').delete().eq('role_id', roleId);
       const { error } = await supabase.from('roles').delete().eq('id', roleId);
       
       if (error) throw error;
+
+      // Log the role deletion to audit trail
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: userOrgs } = await supabase
+          .from('org_memberships')
+          .select('org_id')
+          .eq('user_id', user?.id)
+          .limit(1)
+          .single();
+
+        if (userOrgs?.org_id && role) {
+          await permissionAuditService.logPermissionChange(
+            userOrgs.org_id,
+            'DELETE',
+            'role',
+            String(roleId),
+            { 
+              role_id: roleId, 
+              name: role.name, 
+              name_ar: role.name_ar,
+              permissions: rolePermissions 
+            },
+            null,
+            `Deleted role ${role.name_ar} (${roleId})`
+          );
+        }
+      } catch (auditError) {
+        console.warn('⚠️ Failed to log role deletion:', auditError);
+        // Don't fail the main operation if audit logging fails
+      }
       
       await loadRoles();
       alert('تم حذف الدور بنجاح');

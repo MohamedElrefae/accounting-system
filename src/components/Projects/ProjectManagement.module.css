@@ -617,3 +617,119 @@
 [data-theme='dark'] .card:hover {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
+
+/* Tab Navigation */
+.tabsContainer {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  background: var(--surface);
+  padding: 0 2rem;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--muted_text);
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.tab:hover {
+  color: var(--text);
+  background: var(--hover-bg);
+}
+
+.tabActive {
+  color: var(--success);
+  border-bottom-color: var(--success);
+}
+
+.tabActive:hover {
+  background: transparent;
+}
+
+/* Members Tab Container */
+.membersTabContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  height: 100%;
+}
+
+.membersTabHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  background: var(--surface);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.membersTabHeader h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--heading);
+}
+
+.backButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--field_bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.backButton:hover {
+  background: var(--hover-bg);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+/* Responsive tabs */
+@media (max-width: 768px) {
+  .tabsContainer {
+    padding: 0 1rem;
+    overflow-x: auto;
+  }
+  
+  .tab {
+    padding: 0.875rem 1rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+  
+  .membersTabHeader {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+  
+  .membersTabHeader h2 {
+    font-size: 1rem;
+  }
+  
+  .backButton {
+    width: 100%;
+    justify-content: center;
+  }
+}
+

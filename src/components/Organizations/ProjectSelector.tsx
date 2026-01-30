@@ -67,22 +67,54 @@ export default function ProjectSelector({ orgId, value, onChange, label = 'Proje
     onChange?.(id);
   }, [persist, onChange, scope]);
 
+  const hasProjects = projects.length > 0;
+  const noProjectsMessage = effectiveOrg && !hasProjects 
+    ? 'لا توجد مشاريع مخصصة لك في هذه المؤسسة' 
+    : undefined;
+
   return (
     <TextField
       select
       fullWidth
       size={size}
       label={label}
-      value={projectId}
+      value={hasProjects ? projectId : ''}
       onChange={(e) => handleChange(e.target.value)}
-      sx={sx}
-      disabled={!effectiveOrg}
-      helperText={!effectiveOrg ? 'Select organization first' : undefined}
+      sx={{
+        ...sx,
+        '& .MuiSelect-select': {
+          color: !hasProjects ? '#d32f2f' : undefined,
+        }
+      }}
+      disabled={!effectiveOrg || !hasProjects}
+      helperText={!effectiveOrg ? 'اختر مؤسسة أولاً' : noProjectsMessage}
+      error={!!noProjectsMessage}
+      SelectProps={{
+        displayEmpty: true,
+        renderValue: (selected) => {
+          if (!hasProjects) {
+            return 'لا توجد مشاريع متاحة';
+          }
+          if (!selected) {
+            return allowAll ? 'الكل' : 'اختر مشروع';
+          }
+          const project = projects.find(p => p.id === selected);
+          return project ? `${project.code} - ${project.name}` : '';
+        }
+      }}
     >
-      {allowAll && <MenuItem value="">All</MenuItem>}
-      {projects.map(p => (
-        <MenuItem key={p.id} value={p.id}>{p.code} - {p.name}</MenuItem>
-      ))}
+      {!hasProjects ? (
+        <MenuItem disabled value="">
+          لا توجد مشاريع متاحة
+        </MenuItem>
+      ) : (
+        <>
+          {allowAll && <MenuItem value="">الكل</MenuItem>}
+          {projects.map(p => (
+            <MenuItem key={p.id} value={p.id}>{p.code} - {p.name}</MenuItem>
+          ))}
+        </>
+      )}
     </TextField>
   );
 }

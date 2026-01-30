@@ -33,6 +33,7 @@ const baseNavigation: NavigationItem[] = [
     titleEn: "Main Data", 
     titleAr: "البيانات الأساسية",
     icon: "database",
+    // NO requiredPermission - auto-shows if any child visible
     children: [
       {
         id: "accounts-tree",
@@ -40,7 +41,8 @@ const baseNavigation: NavigationItem[] = [
         titleEn: "Tree of Accounts",
         titleAr: "شجرة الحسابات", 
         icon: "tree-structure",
-        path: "/main-data/accounts-tree"
+        path: "/main-data/accounts-tree",
+        requiredPermission: "accounts.view"
       },
       {
         id: "organizations",
@@ -48,7 +50,8 @@ const baseNavigation: NavigationItem[] = [
         titleEn: "Organizations",
         titleAr: "إدارة المؤسسات",
         icon: "building",
-        path: "/main-data/organizations"
+        path: "/main-data/organizations",
+        requiredPermission: "organizations.view"
       },
       {
         id: "projects",
@@ -56,7 +59,8 @@ const baseNavigation: NavigationItem[] = [
         titleEn: "Projects",
         titleAr: "إدارة المشاريع",
         icon: "folder",
-        path: "/main-data/projects"
+        path: "/main-data/projects",
+        requiredPermission: "projects.view"
       },
       {
         id: "transaction-classification",
@@ -64,7 +68,8 @@ const baseNavigation: NavigationItem[] = [
         titleEn: "Transaction Classification",
         titleAr: "تصنيفات المعاملات",
         icon: "tag",
-        path: "/main-data/transaction-classification"
+        path: "/main-data/transaction-classification",
+        requiredPermission: "classification.view"
       },
       {
         id: "sub-tree",
@@ -81,7 +86,8 @@ const baseNavigation: NavigationItem[] = [
         titleEn: "Work Items",
         titleAr: "عناصر الأعمال",
         icon: "tree-structure",
-        path: "/main-data/work-items"
+        path: "/main-data/work-items",
+        requiredPermission: "work_items.view"
       },
       // Temporarily hidden: Document Categories (not ready for use)
       // {
@@ -107,7 +113,8 @@ const baseNavigation: NavigationItem[] = [
         titleEn: "Analysis Work Items",
         titleAr: "بنود الاعمال التحليلية",
         icon: "tree-structure",
-        path: "/main-data/analysis-work-items"
+        path: "/main-data/analysis-work-items",
+        requiredPermission: "analysis.view"
       },
       {
         id: "cost-centers",
@@ -115,7 +122,8 @@ const baseNavigation: NavigationItem[] = [
         titleEn: "Cost Centers",
         titleAr: "مراكز التكلفة",
         icon: "target",
-        path: "/main-data/cost-centers"
+        path: "/main-data/cost-centers",
+        requiredPermission: "cost_centers.view"
       },
       {
         id: "transaction-line-items",
@@ -151,7 +159,7 @@ const baseNavigation: NavigationItem[] = [
         titleAr: "معاملاتي",
         icon: "user-check",
         path: "/transactions/my",
-        requiredPermission: "transactions.read.own"
+        requiredPermission: "transactions.view.own"
       },
       {
         id: "my-transactions-enriched",
@@ -160,7 +168,7 @@ const baseNavigation: NavigationItem[] = [
         titleAr: "معاملاتي (محسّن)",
         icon: "user-check",
         path: "/transactions/my-enriched",
-        requiredPermission: "transactions.read.own"
+        requiredPermission: "transactions.view.own"
       },
       {
         id: "my-lines-enriched",
@@ -169,7 +177,7 @@ const baseNavigation: NavigationItem[] = [
         titleAr: "سطور معاملاتي",
         icon: "file-text",
         path: "/transactions/my-lines",
-        requiredPermission: "transactions.read.own"
+        requiredPermission: "transactions.view.own"
       },
       {
         id: "all-transactions-enriched",
@@ -178,7 +186,7 @@ const baseNavigation: NavigationItem[] = [
         titleAr: "جميع المعاملات (محسّن)",
         icon: "list",
         path: "/transactions/all-enriched",
-        requiredPermission: "transactions.read.all"
+        requiredPermission: "transactions.view.all"
       },
       {
         id: "all-lines-enriched",
@@ -187,7 +195,7 @@ const baseNavigation: NavigationItem[] = [
         titleAr: "جميع سطور المعاملات",
         icon: "file-text",
         path: "/transactions/all-lines",
-        requiredPermission: "transactions.read.all"
+        requiredPermission: "transactions.view.all"
       },
       {
         id: "pending-transactions",
@@ -205,7 +213,7 @@ const baseNavigation: NavigationItem[] = [
         titleAr: "جميع المعاملات", 
         icon: "list",
         path: "/transactions/all",
-        requiredPermission: "transactions.read.all"
+        requiredPermission: "transactions.view.all"
       },
 // GL2 menu items removed in unified model
       {
@@ -225,6 +233,7 @@ const baseNavigation: NavigationItem[] = [
     titleEn: "Approvals",
     titleAr: "الموافقات",
     icon: "Assignment",
+    // NO requiredPermission - auto-shows if any child visible
     children: [
       {
         id: "approvals-documents",
@@ -232,7 +241,8 @@ const baseNavigation: NavigationItem[] = [
         titleEn: "Document Approvals",
         titleAr: "موافقات المستندات",
         icon: "Assignment",
-        path: "/approvals/documents"
+        path: "/approvals/documents",
+        requiredPermission: "approvals.review"
       },
       {
         id: "approvals-inbox",
@@ -241,7 +251,7 @@ const baseNavigation: NavigationItem[] = [
         titleAr: "صندوق الموافقات",
         icon: "Assignment",
         path: "/approvals/inbox",
-        requiredPermission: "transactions.review"
+        requiredPermission: "approvals.review"
       },
       {
         id: "approvals-workflows",
@@ -250,7 +260,7 @@ const baseNavigation: NavigationItem[] = [
         titleAr: "مسارات الموافقات",
         icon: "Assignment",
         path: "/approvals/workflows",
-        requiredPermission: "transactions.manage"
+        requiredPermission: "approvals.manage"
       },
       {
         id: "approvals-test",
@@ -259,7 +269,7 @@ const baseNavigation: NavigationItem[] = [
         titleAr: "اختبار المسارات",
         icon: "Assignment",
         path: "/approvals/test",
-        requiredPermission: "transactions.manage"
+        requiredPermission: "approvals.manage"
       }
     ]
   },
@@ -269,6 +279,7 @@ const baseNavigation: NavigationItem[] = [
     titleEn: "Fiscal Management",
     titleAr: "الإدارة المالية",
     icon: "AccountBalance",
+    // NO requiredPermission - auto-shows if any child visible
     children: [
       {
         id: "fiscal-dashboard",
@@ -302,6 +313,8 @@ const baseNavigation: NavigationItem[] = [
     titleEn: "Financial Reports",
     titleAr: "التقارير المالية",
     icon: "chart-line",
+    requiredPermission: "reports.view",
+    // NO requiredPermission - auto-shows if any child visible
     children: [
       {
         id: "trial-balance",
@@ -441,7 +454,8 @@ const baseNavigation: NavigationItem[] = [
         titleEn: "Organization Management",
         titleAr: "إدارة المؤسسة",
         icon: "settings",
-        path: "/settings/organization-management"
+        path: "/settings/organization-management",
+        requiredPermission: "settings.manage"
       },
       {
         id: "account-prefix-mapping",
@@ -449,7 +463,8 @@ const baseNavigation: NavigationItem[] = [
         titleEn: "Account Prefix Mapping",
         titleAr: "تصنيف رموز الحسابات",
         icon: "settings",
-        path: "/settings/account-prefix-mapping"
+        path: "/settings/account-prefix-mapping",
+        requiredPermission: "settings.manage"
       },
       {
         id: "font-preferences",
@@ -457,7 +472,8 @@ const baseNavigation: NavigationItem[] = [
         titleEn: "Font & Formatting",
         titleAr: "إعدادات الخطوط والتنسيق",
         icon: "type",
-        path: "/settings/font-preferences"
+        path: "/settings/font-preferences",
+        requiredPermission: "settings.preferences"
       },
       {
         id: "export-database",
@@ -478,6 +494,15 @@ const baseNavigation: NavigationItem[] = [
         requiredPermission: "settings.audit"
       },
       {
+        id: "audit-management",
+        label: "Audit Management (New)",
+        titleEn: "Audit Management",
+        titleAr: "إدارة التدقيق",
+        icon: "Security",
+        path: "/admin/audit",
+        requiredPermission: "settings.audit"
+      },
+      {
         id: "diagnostics",
         label: "Diagnostics",
         titleEn: "Diagnostics",
@@ -492,7 +517,8 @@ const baseNavigation: NavigationItem[] = [
         titleEn: "Company/Organization Settings",
         titleAr: "إعدادات المؤسسة",
         icon: "settings",
-        path: "/settings/organization-management"
+        path: "/settings/organization-management",
+        requiredPermission: "settings.manage"
       }
     ]
   }
@@ -505,6 +531,7 @@ const inventorySection: NavigationItem | null = FEATURE_INVENTORY ? {
   titleEn: 'Inventory',
   titleAr: 'إدارة المخزون',
   icon: 'inventory',
+  requiredPermission: 'inventory.view',
   children: [
     {
       id: 'inventory-dashboard',

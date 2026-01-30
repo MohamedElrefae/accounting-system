@@ -38,7 +38,7 @@ interface AncestorItem {
 function mapAccountTypeToDbEnum(frontendType: string): string {
   const mapping: { [key: string]: string } = {
     'assets': 'asset',
-    'liabilities': 'liability', 
+    'liabilities': 'liability',
     'equity': 'equity',
     'revenue': 'revenue',
     'expenses': 'expense'
@@ -76,7 +76,7 @@ const AccountsTreePage: React.FC = () => {
   // Selected account state for action buttons
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [configModalOpen, setConfigModalOpen] = useState(false);
-  
+
   // Configuration options state
   const [configOptions, setConfigOptions] = useState<{
     autoExpandRoots: boolean;
@@ -158,12 +158,12 @@ const AccountsTreePage: React.FC = () => {
   useEffect(() => {
     try {
       localStorage.setItem('accountsTreeConfig', JSON.stringify(configOptions));
-    } catch {}
+    } catch { }
   }, [configOptions]);
 
   // Persist remember preference
   useEffect(() => {
-    try { localStorage.setItem('accountsTreePanelRemember', rememberPanel ? 'true' : 'false'); } catch {}
+    try { localStorage.setItem('accountsTreePanelRemember', rememberPanel ? 'true' : 'false'); } catch { }
   }, [rememberPanel]);
 
   // Persist panel state (per-mode) when open and remember is on
@@ -177,7 +177,7 @@ const AccountsTreePage: React.FC = () => {
       isDocked: panelDocked,
       dockPosition: panelDockPos,
     };
-    try { localStorage.setItem(key, JSON.stringify(state)); } catch {}
+    try { localStorage.setItem(key, JSON.stringify(state)); } catch { }
   }, [dialogOpen, rememberPanel, dialogMode, panelPosition, panelSize, panelMax, panelDocked, panelDockPos]);
 
   // Restore panel state when dialog opens (per-mode)
@@ -193,7 +193,7 @@ const AccountsTreePage: React.FC = () => {
       if (typeof st?.isMaximized === 'boolean') setPanelMax(st.isMaximized);
       if (typeof st?.isDocked === 'boolean') setPanelDocked(st.isDocked);
       if (st?.dockPosition) setPanelDockPos(st.dockPosition);
-    } catch {}
+    } catch { }
   }, [dialogOpen, dialogMode]);
 
   // Keyboard shortcuts: Esc to close, Ctrl/Cmd+Enter to save when dialog open
@@ -213,27 +213,30 @@ const AccountsTreePage: React.FC = () => {
   }, [dialogOpen]);
 
   const hasPermission = useHasPermission();
-  const hasAccountsUpdate = hasPermission('accounts.update');
+  const hasAccountsManage = hasPermission('accounts.manage');
+  // hasAccountsManage is redundant if we assume 'manage' implies 'update' for the form config logic
+  // Update: use 'accounts.manage' for form config as well
+
 
   const unifiedConfig = useMemo(() => {
     const existing = (dialogMode === 'edit' && draft?.id)
       ? {
-          id: draft.id as string,
-          code: String(draft.code || ''),
-          name_ar: String(draft.name_ar || draft.name || ''),
-          name_en: draft.name || '',
-          level: Number(draft.level || 1),
-          category: String(draft.account_type || ''),
-          statement_type: '',
-          parent_id: (draft.parent_id as string) || null,
-          is_active: (draft.status || 'active') === 'active',
-          allow_transactions: (typeof (draft as AccountItem & { allow_transactions?: boolean }).allow_transactions === 'boolean')
-            ? (draft as AccountItem & { allow_transactions?: boolean }).allow_transactions
-            : (((draft.level as number) || 1) >= 3),
-        }
+        id: draft.id as string,
+        code: String(draft.code || ''),
+        name_ar: String(draft.name_ar || draft.name || ''),
+        name_en: draft.name || '',
+        level: Number(draft.level || 1),
+        category: String(draft.account_type || ''),
+        statement_type: '',
+        parent_id: (draft.parent_id as string) || null,
+        is_active: (draft.status || 'active') === 'active',
+        allow_transactions: (typeof (draft as AccountItem & { allow_transactions?: boolean }).allow_transactions === 'boolean')
+          ? (draft as AccountItem & { allow_transactions?: boolean }).allow_transactions
+          : (((draft.level as number) || 1) >= 3),
+      }
       : undefined;
-    return createAccountFormConfig(dialogMode === 'edit', parentAccountsLite, existing as (import('../../components/Accounts/AccountFormConfig').AccountLite | null | undefined), true, !!hasAccountsUpdate);
-  }, [dialogMode, draft, parentAccountsLite, hasAccountsUpdate]);
+    return createAccountFormConfig(dialogMode === 'edit', parentAccountsLite, existing as (import('../../components/Accounts/AccountFormConfig').AccountLite | null | undefined), true, !!hasAccountsManage);
+  }, [dialogMode, draft, parentAccountsLite, hasAccountsManage]);
 
   const { showToast } = useToast();
 
@@ -264,7 +267,7 @@ const AccountsTreePage: React.FC = () => {
           }
         }
       }
-    } catch {}
+    } catch { }
 
     _setDeleteFlags(prev => ({ ...prev, ...updates }));
     // Also merge onto accounts so UI logic sees them immediately
@@ -346,9 +349,9 @@ const AccountsTreePage: React.FC = () => {
       setAccounts(rows);
       setExpanded(new Set());
       // Hydrate delete flags for visible roots
-      fetchCanDeleteFlags(rows.map(r => r.id)).catch(() => {});
+      fetchCanDeleteFlags(rows.map(r => r.id)).catch(() => { });
       // Hydrate rollups for visible roots
-      fetchAccountRollups(rows.map(r => r.id)).catch(() => {});
+      fetchAccountRollups(rows.map(r => r.id)).catch(() => { });
     }
     setLoading(false);
   }, [fetchAccountRollups, fetchCanDeleteFlags, orgId, selectedProject]);
@@ -365,7 +368,7 @@ const AccountsTreePage: React.FC = () => {
     if (error) return [] as AccountItem[];
     const mapped = (data || []).map(mapRow);
     // fetch rollups for these children
-    fetchAccountRollups(mapped.map(r => r.id)).catch(() => {});
+    fetchAccountRollups(mapped.map(r => r.id)).catch(() => { });
     return mapped;
   }, [fetchAccountRollups, orgId, selectedProject]);
 
@@ -419,9 +422,9 @@ const AccountsTreePage: React.FC = () => {
     setAccounts(combined);
 
     // Hydrate delete flags for the combined visible list
-    fetchCanDeleteFlags(combined.map(c => c.id)).catch(() => {});
+    fetchCanDeleteFlags(combined.map(c => c.id)).catch(() => { });
     // Hydrate rollups for combined list
-    fetchAccountRollups(combined.map(c => c.id)).catch(() => {});
+    fetchAccountRollups(combined.map(c => c.id)).catch(() => { });
 
     // Expand all ancestor paths of matches
     const toExpand = new Set<string>();
@@ -439,9 +442,9 @@ const AccountsTreePage: React.FC = () => {
     // When org or project changes or search cleared, reload roots
     if (!orgId) return;
     if (!searchTerm) {
-      loadRoots().catch(() => {});
+      loadRoots().catch(() => { });
     } else {
-      performSearch().catch(() => {});
+      performSearch().catch(() => { });
     }
   }, [orgId, selectedProject, balanceMode, searchTerm, loadRoots, performSearch]);
 
@@ -479,7 +482,7 @@ const AccountsTreePage: React.FC = () => {
       return merged;
     });
     // Hydrate delete flags for loaded children
-    fetchCanDeleteFlags(children.map(c => c.id)).catch(() => {});
+    fetchCanDeleteFlags(children.map(c => c.id)).catch(() => { });
     newSet.add(node.id);
     setExpanded(newSet);
   }
@@ -616,8 +619,8 @@ const AccountsTreePage: React.FC = () => {
       // Provide more helpful messages for common scenarios
       const friendly =
         msg?.toLowerCase().includes('children') ? 'لا يمكن حذف الحساب لوجود حسابات فرعية.' :
-        (msg?.toLowerCase().includes('foreign key') || msg?.toLowerCase().includes('related') || msg?.toLowerCase().includes('referenced')) ? 'لا يمكن حذف الحساب لوجود حركات أو بيانات مرتبطة.' :
-        '';
+          (msg?.toLowerCase().includes('foreign key') || msg?.toLowerCase().includes('related') || msg?.toLowerCase().includes('referenced')) ? 'لا يمكن حذف الحساب لوجود حركات أو بيانات مرتبطة.' :
+            '';
       showToast(`فشل حذف الحساب${friendly ? `: ${friendly}` : (msg ? `: ${msg}` : '')}`, { severity: 'error' });
     }
   };
@@ -688,44 +691,50 @@ const AccountsTreePage: React.FC = () => {
           <h1 className="page-title">شجرة الحسابات</h1>
         </div>
         <div className="page-actions">
-          {/* Config Button */}
-          <button 
-            className="ultimate-btn ultimate-btn-primary" 
-            title="إعدادات العرض" 
-            onClick={() => setConfigModalOpen(true)}
-          >
-            <div className="btn-content"><span className="btn-text">⚙️ إعدادات</span></div>
-          </button>
-          
-          {/* Main Action Buttons */}
-          <button 
-            className="ultimate-btn ultimate-btn-add" 
-            title="إضافة حساب جديد" 
-            onClick={handleTopLevelAdd}
-            data-tour="accounts-tree-add-top"
-          >
-            <div className="btn-content"><span className="btn-text">إضافة حساب جديد</span></div>
-          </button>
-          
-          <button 
-            className="ultimate-btn ultimate-btn-edit" 
-            title="تعديل الحساب المحدد" 
-            onClick={handleEditSelected}
-            disabled={!selectedAccountId}
-            data-tour="accounts-tree-edit-selected"
-          >
-            <div className="btn-content"><span className="btn-text">تعديل الحساب المحدد</span></div>
-          </button>
-          
-          <button 
-            className="ultimate-btn ultimate-btn-delete" 
-            title="حذف الحساب المحدد" 
-            onClick={handleDeleteSelected}
-            disabled={!selectedAccountId}
-          >
-            <div className="btn-content"><span className="btn-text">حذف الحساب المحدد</span></div>
-          </button>
-          
+          {/* Config Button - Requires Manage Permission */}
+          {hasAccountsManage && (
+            <button
+              className="ultimate-btn ultimate-btn-primary"
+              title="إعدادات العرض"
+              onClick={() => setConfigModalOpen(true)}
+            >
+              <div className="btn-content"><span className="btn-text">⚙️ إعدادات</span></div>
+            </button>
+          )}
+
+          {/* Main Action Buttons - Require Manage Permission */}
+          {hasAccountsManage && (
+            <>
+              <button
+                className="ultimate-btn ultimate-btn-add"
+                title="إضافة حساب جديد"
+                onClick={handleTopLevelAdd}
+                data-tour="accounts-tree-add-top"
+              >
+                <div className="btn-content"><span className="btn-text">إضافة حساب جديد</span></div>
+              </button>
+
+              <button
+                className="ultimate-btn ultimate-btn-edit"
+                title="تعديل الحساب المحدد"
+                onClick={handleEditSelected}
+                disabled={!selectedAccountId}
+                data-tour="accounts-tree-edit-selected"
+              >
+                <div className="btn-content"><span className="btn-text">تعديل الحساب المحدد</span></div>
+              </button>
+
+              <button
+                className="ultimate-btn ultimate-btn-delete"
+                title="حذف الحساب المحدد"
+                onClick={handleDeleteSelected}
+                disabled={!selectedAccountId}
+              >
+                <div className="btn-content"><span className="btn-text">حذف الحساب المحدد</span></div>
+              </button>
+            </>
+          )}
+
           <ExportButtons
             data={exportData}
             config={{ title: 'تقرير الحسابات', orientation: 'landscape', useArabicNumerals: true, rtlLayout: true }}
@@ -733,9 +742,9 @@ const AccountsTreePage: React.FC = () => {
             layout="horizontal"
           />
           {/* Debug button - remove after testing */}
-          <button 
-            className="ultimate-btn ultimate-btn-edit" 
-            title="Debug Rollups" 
+          <button
+            className="ultimate-btn ultimate-btn-edit"
+            title="Debug Rollups"
             onClick={async () => {
               if (!orgId) {
                 showToast('يرجى اختيار منظمة أولاً', { severity: 'warning' });
@@ -747,17 +756,17 @@ const AccountsTreePage: React.FC = () => {
                   const debugInfo = await debugAccountRollups(orgId);
                   console.log('🔍 Basic Debug Results:', debugInfo);
                 }
-                
+
                 // Test view directly with visible accounts
                 const visibleAccountIds = accounts.slice(0, 5).map(a => a.id);
                 if (import.meta.env.DEV) console.log('\n--- Testing View Directly ---');
                 const viewResults = await testViewDirectly(orgId, visibleAccountIds);
-                
+
                 // Manual calculation for comparison
                 if (visibleAccountIds.length > 0) {
                   if (import.meta.env.DEV) console.log('\n--- Manual Calculation ---');
                   const manualResults = await manualRollupsCalculation(orgId, visibleAccountIds);
-                  
+
                   // Compare results
                   if (viewResults && manualResults) {
                     if (import.meta.env.DEV) {
@@ -773,7 +782,7 @@ const AccountsTreePage: React.FC = () => {
                     }
                   }
                 }
-                
+
                 // Also test RPC modes if available
                 try {
                   if (import.meta.env.DEV) console.log('\n--- RPC Mode Testing ---');
@@ -781,7 +790,7 @@ const AccountsTreePage: React.FC = () => {
                 } catch {
                   console.log('⚠️ RPC test skipped (function may not exist yet)');
                 }
-                
+
                 console.log('=== ENHANCED ROLLUPS DEBUG END ===');
                 showToast(`Enhanced debug complete. Found ${debugInfo.accountsWithTransactions} accounts with transactions. Check console for detailed analysis.`, { severity: 'info' });
               } catch (err) {
@@ -799,7 +808,7 @@ const AccountsTreePage: React.FC = () => {
       {breadcrumbs.length > 0 && (
         <div style={{ padding: '0 1.5rem' }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-{breadcrumbs.map((b, i) => (
+            {breadcrumbs.map((b, i) => (
               <span key={b.id} style={{ background: 'var(--chip-bg)', padding: '4px 8px', borderRadius: 8 }}>
                 {b.code} - {b.name_ar || b.name}
                 {i < breadcrumbs.length - 1 ? ' / ' : ''}
@@ -852,10 +861,10 @@ const AccountsTreePage: React.FC = () => {
               name_ar: n.name_ar || n.name,
               is_active: n.status === 'active',
             }))}
-            onEdit={(node) => handleEdit(node as AccountItem)}
-            onAdd={(parent) => handleAdd(parent as AccountItem)}
-            onToggleStatus={(node) => handleToggleStatus(node as AccountItem)}
-            onDelete={(node) => handleDelete(node as AccountItem)}
+            onEdit={hasAccountsManage ? (node) => handleEdit(node as AccountItem) : undefined}
+            onAdd={hasAccountsManage ? (parent) => handleAdd(parent as AccountItem) : undefined}
+            onToggleStatus={hasAccountsManage ? (node) => handleToggleStatus(node as AccountItem) : undefined}
+            onDelete={hasAccountsManage ? (node) => handleDelete(node as AccountItem) : undefined}
             onSelect={(node) => handleSelectAccount(node as AccountItem)}
             onToggleExpand={async (node) => { toggleNode(node as AccountItem); }}
             canHaveChildren={(node) => {
@@ -906,10 +915,10 @@ const AccountsTreePage: React.FC = () => {
                   <th>الكود</th>
                   <th>اسم الحساب</th>
                   <th>نوع الحساب</th>
-                          <th>المستوى</th>
-                          <th style={{width: '120px'}}>به معاملات</th>
-                          <th style={{width: '150px'}}>الصافي</th>
-                          <th>الإجراءات</th>
+                  <th>المستوى</th>
+                  <th style={{ width: '120px' }}>به معاملات</th>
+                  <th style={{ width: '150px' }}>الصافي</th>
+                  <th>الإجراءات</th>
                 </tr>
               </thead>
               <tbody>
@@ -926,38 +935,42 @@ const AccountsTreePage: React.FC = () => {
                       <td className="table-center"><CurrencyFormatter amount={rollups[item.id]?.net_amount ?? 0} /></td>
                       <td>
                         <div className="tree-node-actions">
-                          <button className="ultimate-btn ultimate-btn-edit" title="تعديل" onClick={() => handleEdit(item)}> 
-                            <div className="btn-content"><span className="btn-text">تعديل</span></div>
-                          </button>
-                          {canAddSub && (
-                            <button className="ultimate-btn ultimate-btn-add" title="إضافة فرعي" onClick={() => handleAdd(item)}>
-                              <div className="btn-content"><span className="btn-text">إضافة فرعي</span></div>
-                            </button>
-                          )}
-                          <button className={`ultimate-btn ${isActive ? 'ultimate-btn-disable' : 'ultimate-btn-enable'}`} title={isActive ? 'تعطيل' : 'تفعيل'} onClick={() => handleToggleStatus(item)}>
-                            <div className="btn-content"><span className="btn-text">{isActive ? 'تعطيل' : 'تفعيل'}</span></div>
-                          </button>
-                          {(() => {
-                            const extendedItem = item as AccountItem & { has_transactions?: boolean; is_standard?: boolean };
-                            const disabled = !!(item.has_children || item.has_active_children || extendedItem?.has_transactions || extendedItem?.is_standard);
-                            const reason = item.has_children || item.has_active_children
-                              ? 'لا يمكن حذف حساب له فروع'
-                              : extendedItem?.is_standard
-                                ? 'حساب قياسي (افتراضي) لا يمكن حذفه'
-                                : extendedItem?.has_transactions
-                                  ? 'لا يمكن حذف حساب لديه حركات'
-                                  : 'حذف';
-                            return (
-                              <button
-                                className="ultimate-btn ultimate-btn-delete"
-                                title={reason}
-                                disabled={disabled}
-                                onClick={() => !disabled && handleDelete(item)}
-                              >
-                                <div className="btn-content"><span className="btn-text">حذف</span></div>
+                          {hasAccountsManage && (
+                            <>
+                              <button className="ultimate-btn ultimate-btn-edit" title="تعديل" onClick={() => handleEdit(item)}>
+                                <div className="btn-content"><span className="btn-text">تعديل</span></div>
                               </button>
-                            );
-                          })()}
+                              {canAddSub && (
+                                <button className="ultimate-btn ultimate-btn-add" title="إضافة فرعي" onClick={() => handleAdd(item)}>
+                                  <div className="btn-content"><span className="btn-text">إضافة فرعي</span></div>
+                                </button>
+                              )}
+                              <button className={`ultimate-btn ${isActive ? 'ultimate-btn-disable' : 'ultimate-btn-enable'}`} title={isActive ? 'تعطيل' : 'تفعيل'} onClick={() => handleToggleStatus(item)}>
+                                <div className="btn-content"><span className="btn-text">{isActive ? 'تعطيل' : 'تفعيل'}</span></div>
+                              </button>
+                              {(() => {
+                                const extendedItem = item as AccountItem & { has_transactions?: boolean; is_standard?: boolean };
+                                const disabled = !!(item.has_children || item.has_active_children || extendedItem?.has_transactions || extendedItem?.is_standard);
+                                const reason = item.has_children || item.has_active_children
+                                  ? 'لا يمكن حذف حساب له فروع'
+                                  : extendedItem?.is_standard
+                                    ? 'حساب قياسي (افتراضي) لا يمكن حذفه'
+                                    : extendedItem?.has_transactions
+                                      ? 'لا يمكن حذف حساب لديه حركات'
+                                      : 'حذف';
+                                return (
+                                  <button
+                                    className="ultimate-btn ultimate-btn-delete"
+                                    title={reason}
+                                    disabled={disabled}
+                                    onClick={() => !disabled && handleDelete(item)}
+                                  >
+                                    <div className="btn-content"><span className="btn-text">حذف</span></div>
+                                  </button>
+                                );
+                              })()}
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1021,213 +1034,213 @@ const AccountsTreePage: React.FC = () => {
               ref={formRef}
               config={unifiedConfig}
               initialData={formInitialData}
-            isLoading={saving}
-            onSubmit={async (form) => {
-              setSaving(true);
-              try {
-                if (dialogMode === 'edit' && draft.id) {
-                  // Map frontend enum values to database enum types
-                  const accountType = mapAccountTypeToDbEnum(String((form as any).category || ''));
-                  const status = mapStatusToDbEnum(!!(form as any).is_active);
-                  
-                  // Prepare account update data
-                  
-                  const { data, error } = await supabase.rpc('account_update', {
-                    p_org_id: orgId,
-                    p_id: draft.id,
-                    p_code: form.code,
-                    p_name: form.name_ar || form.name_en || 'Unnamed Account', // Ensure name is never empty
-                    p_name_ar: form.name_ar || form.name_en || 'Unnamed Account', // Ensure name_ar is never empty
-                    p_account_type: accountType,
-                    p_level: parseInt(String(form.level)) || 1,
-                    p_status: status,
-                  });
-                  
-                  if (error) {
-                    throw error;
-                  }
-                  
-                  if (!data) {
-                    throw new Error('No data returned from update function');
-                  }
-                  
-                  const updated = data as any;
-                  
-                  // Immediately enforce user's allow_transactions choice with a direct update
-                  try {
-                    const { error: allowErr } = await supabase
-                      .from('accounts')
-                      .update({ allow_transactions: !!form.allow_transactions })
-                      .eq('id', draft.id)
-                      .eq('org_id', orgId);
-                    if (allowErr) console.warn('allow_transactions update warning:', allowErr);
-                  } catch {}
-                  
-                  // Update core fields in local state - FIXED: Use form data as primary source
-                  setAccounts(prev => prev.map(a => (a.id === draft.id ? {
-                    ...a,
-                    // Use form data (user's current input) as primary source
-                    code: form.code,
-                    name: form.name_en || form.name_ar,
-                    name_ar: form.name_ar || form.name_en,
-                    level: parseInt(String(form.level)) || 1,
-                    status: form.is_active ? 'active' : 'inactive',
-                    account_type: accountType,
-                    // Only use server response for fields that should come from server
-                    parent_id: updated.parent_id || a.parent_id,
-                    org_id: updated.org_id || a.org_id,
-                    is_postable: updated.is_postable !== undefined ? updated.is_postable : a.is_postable,
-                    created_at: updated.created_at || a.created_at,
-                    updated_at: updated.updated_at || new Date().toISOString(),
-                  } : a)));
+              isLoading={saving}
+              onSubmit={async (form) => {
+                setSaving(true);
+                try {
+                  if (dialogMode === 'edit' && draft.id) {
+                    // Map frontend enum values to database enum types
+                    const accountType = mapAccountTypeToDbEnum(String((form as any).category || ''));
+                    const status = mapStatusToDbEnum(!!(form as any).is_active);
 
-                  // ADDITIONAL FIX: Clear form after successful save to prevent data reversion
-                  setDialogMode('view');
-                  setDraft(null);
+                    // Prepare account update data
 
-                  // Handle is_standard update separately (if permission and value changed)
-                  if (hasAccountsUpdate && (form.is_standard ?? false) !== ((draft as any).is_standard ?? false)) {
-                    const { error: stdErr } = await supabase
-                      .from('accounts')
-                      .update({ is_standard: !!form.is_standard })
-                      .eq('id', draft.id)
-                      .eq('org_id', orgId);
-                    if (stdErr) throw stdErr;
-                    setAccounts(prev => prev.map(a => a.id === draft.id ? { ...(a as any), is_standard: !!form.is_standard } : a));
-                  }
-                  
-                  showToast('تم تحديث الحساب بنجاح', { severity: 'success' });
-                } else {
-                  // Map frontend enum values to database enum types
-                  const accountType = mapAccountTypeToDbEnum(String((form as any).category || ''));
-                  const status = mapStatusToDbEnum(!!(form as any).is_active);
-                  
-                  const { data, error } = await supabase.rpc('account_insert_child', {
-                    p_org_id: orgId,
-                    p_parent_id: form.parent_id || null,
-                    p_code: form.code,
-                    p_name: form.name_en || form.name_ar,
-                    p_name_ar: form.name_ar,
-                    p_account_type: accountType,
-                    p_level: parseInt(String(form.level)) || 1,
-                    p_status: status,
-                  });
-                  if (error) throw error;
-                  const inserted = data as any;
-                  if (inserted) {
-                    // Enforce allow_transactions per user choice after insert
+                    const { data, error } = await supabase.rpc('account_update', {
+                      p_org_id: orgId,
+                      p_id: draft.id,
+                      p_code: form.code,
+                      p_name: form.name_ar || form.name_en || 'Unnamed Account', // Ensure name is never empty
+                      p_name_ar: form.name_ar || form.name_en || 'Unnamed Account', // Ensure name_ar is never empty
+                      p_account_type: accountType,
+                      p_level: parseInt(String(form.level)) || 1,
+                      p_status: status,
+                    });
+
+                    if (error) {
+                      throw error;
+                    }
+
+                    if (!data) {
+                      throw new Error('No data returned from update function');
+                    }
+
+                    const updated = data as any;
+
+                    // Immediately enforce user's allow_transactions choice with a direct update
                     try {
                       const { error: allowErr } = await supabase
                         .from('accounts')
                         .update({ allow_transactions: !!form.allow_transactions })
-                        .eq('id', inserted.id)
+                        .eq('id', draft.id)
                         .eq('org_id', orgId);
-                      if (allowErr) console.warn('allow_transactions update warning (insert):', allowErr);
-                    } catch {}
-                    setAccounts(prev => [...prev, inserted]);
-                    // If creator has permission and requested standard, set it now
-                    if (hasAccountsUpdate && (form.is_standard ?? false)) {
+                      if (allowErr) console.warn('allow_transactions update warning:', allowErr);
+                    } catch { }
+
+                    // Update core fields in local state - FIXED: Use form data as primary source
+                    setAccounts(prev => prev.map(a => (a.id === draft.id ? {
+                      ...a,
+                      // Use form data (user's current input) as primary source
+                      code: form.code,
+                      name: form.name_en || form.name_ar,
+                      name_ar: form.name_ar || form.name_en,
+                      level: parseInt(String(form.level)) || 1,
+                      status: form.is_active ? 'active' : 'inactive',
+                      account_type: accountType,
+                      // Only use server response for fields that should come from server
+                      parent_id: updated.parent_id || a.parent_id,
+                      org_id: updated.org_id || a.org_id,
+                      is_postable: updated.is_postable !== undefined ? updated.is_postable : a.is_postable,
+                      created_at: updated.created_at || a.created_at,
+                      updated_at: updated.updated_at || new Date().toISOString(),
+                    } : a)));
+
+                    // ADDITIONAL FIX: Clear form after successful save to prevent data reversion
+                    setDialogMode('view');
+                    setDraft(null);
+
+                    // Handle is_standard update separately (if permission and value changed)
+                    if (hasAccountsManage && (form.is_standard ?? false) !== ((draft as any).is_standard ?? false)) {
                       const { error: stdErr } = await supabase
                         .from('accounts')
-                        .update({ is_standard: true })
-                        .eq('id', inserted.id)
+                        .update({ is_standard: !!form.is_standard })
+                        .eq('id', draft.id)
                         .eq('org_id', orgId);
-                      if (!stdErr) {
-                        setAccounts(prev => prev.map(a => a.id === inserted.id ? { ...(a as any), is_standard: true } : a));
+                      if (stdErr) throw stdErr;
+                      setAccounts(prev => prev.map(a => a.id === draft.id ? { ...(a as any), is_standard: !!form.is_standard } : a));
+                    }
+
+                    showToast('تم تحديث الحساب بنجاح', { severity: 'success' });
+                  } else {
+                    // Map frontend enum values to database enum types
+                    const accountType = mapAccountTypeToDbEnum(String((form as any).category || ''));
+                    const status = mapStatusToDbEnum(!!(form as any).is_active);
+
+                    const { data, error } = await supabase.rpc('account_insert_child', {
+                      p_org_id: orgId,
+                      p_parent_id: form.parent_id || null,
+                      p_code: form.code,
+                      p_name: form.name_en || form.name_ar,
+                      p_name_ar: form.name_ar,
+                      p_account_type: accountType,
+                      p_level: parseInt(String(form.level)) || 1,
+                      p_status: status,
+                    });
+                    if (error) throw error;
+                    const inserted = data as any;
+                    if (inserted) {
+                      // Enforce allow_transactions per user choice after insert
+                      try {
+                        const { error: allowErr } = await supabase
+                          .from('accounts')
+                          .update({ allow_transactions: !!form.allow_transactions })
+                          .eq('id', inserted.id)
+                          .eq('org_id', orgId);
+                        if (allowErr) console.warn('allow_transactions update warning (insert):', allowErr);
+                      } catch { }
+                      setAccounts(prev => [...prev, inserted]);
+                      // If creator has permission and requested standard, set it now
+                      if (hasAccountsManage && (form.is_standard ?? false)) {
+                        const { error: stdErr } = await supabase
+                          .from('accounts')
+                          .update({ is_standard: true })
+                          .eq('id', inserted.id)
+                          .eq('org_id', orgId);
+                        if (!stdErr) {
+                          setAccounts(prev => prev.map(a => a.id === inserted.id ? { ...(a as any), is_standard: true } : a));
+                        }
                       }
                     }
+                    showToast('تم إضافة الحساب', { severity: 'success' });
                   }
-                  showToast('تم إضافة الحساب', { severity: 'success' });
+                  setDialogOpen(false);
+                } catch (e: any) {
+                  const msg = e?.message || e?.error_description || e?.hint || e?.details || '';
+                  const errCode = e?.code || e?.error?.code;
+                  const isDuplicateCode = (errCode === '23505') || (typeof msg === 'string' && msg.includes('accounts_code_unique_per_org'));
+
+                  console.error('save failed', e, msg);
+
+                  if (isDuplicateCode) {
+                    showToast('فشل حفظ التغييرات: هذا الكود مستخدم بالفعل داخل نفس المؤسسة. الرجاء اختيار كود مختلف.', { severity: 'error' });
+                    return;
+                  }
+
+                  showToast(`فشل حفظ التغييرات${msg ? `: ${msg}` : ''}`, { severity: 'error' });
+                  return;
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              onCancel={() => {
+                const dirty = formRef.current?.hasUnsavedChanges?.();
+                if (dirty) {
+                  const ok = window.confirm('لديك تغييرات غير محفوظة. هل تريد إلغاء دون حفظ؟');
+                  if (!ok) return;
                 }
                 setDialogOpen(false);
-              } catch (e: any) {
-                const msg = e?.message || e?.error_description || e?.hint || e?.details || '';
-                const errCode = e?.code || e?.error?.code;
-                const isDuplicateCode = (errCode === '23505') || (typeof msg === 'string' && msg.includes('accounts_code_unique_per_org'));
-
-                console.error('save failed', e, msg);
-
-                if (isDuplicateCode) {
-                  showToast('فشل حفظ التغييرات: هذا الكود مستخدم بالفعل داخل نفس المؤسسة. الرجاء اختيار كود مختلف.', { severity: 'error' });
-                  return;
-                }
-
-                showToast(`فشل حفظ التغييرات${msg ? `: ${msg}` : ''}`, { severity: 'error' });
-                return;
-              } finally {
-                setSaving(false);
-              }
-            }}
-            onCancel={() => {
-              const dirty = formRef.current?.hasUnsavedChanges?.();
-              if (dirty) {
-                const ok = window.confirm('لديك تغييرات غير محفوظة. هل تريد إلغاء دون حفظ؟');
-                if (!ok) return;
-              }
-              setDialogOpen(false);
-            }}
-            showAutoFillNotification
-          />
+              }}
+              showAutoFillNotification
+            />
           </div>
         </DraggableResizablePanel>
       )}
-      
+
       {/* Configuration Modal */}
       {configModalOpen && (
         <div className="config-modal-backdrop" onClick={() => setConfigModalOpen(false)}>
           <div className="config-modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="config-modal-header">
               <h3>إعدادات عرض شجرة الحسابات</h3>
-              <button 
-                className="config-modal-close" 
+              <button
+                className="config-modal-close"
                 onClick={() => setConfigModalOpen(false)}
                 title="إغلاق"
               >
                 ×
               </button>
             </div>
-            
+
             <div className="config-modal-body">
               <div className="config-section">
                 <h4>إعدادات العرض</h4>
-                
+
                 <div className="config-field">
                   <label className="config-label">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       checked={configOptions.autoExpandRoots}
                       onChange={(e) => setConfigOptions(prev => ({ ...prev, autoExpandRoots: e.target.checked }))}
                     />
                     توسيع الحسابات الرئيسية تلقائياً
                   </label>
                 </div>
-                
+
                 <div className="config-field">
                   <label className="config-label">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       checked={configOptions.showInactiveAccounts}
                       onChange={(e) => setConfigOptions(prev => ({ ...prev, showInactiveAccounts: e.target.checked }))}
                     />
                     إظهار الحسابات المعطلة
                   </label>
                 </div>
-                
+
                 <div className="config-field">
                   <label className="config-label">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       checked={configOptions.showTransactionCounts}
                       onChange={(e) => setConfigOptions(prev => ({ ...prev, showTransactionCounts: e.target.checked }))}
                     />
                     إظهار عدد العمليات المالية
                   </label>
                 </div>
-                
+
                 <div className="config-field">
                   <label className="config-label-block">
                     وضع العرض الافتراضي:
-                    <select 
+                    <select
                       value={configOptions.defaultViewMode}
                       onChange={(e) => setConfigOptions(prev => ({ ...prev, defaultViewMode: e.target.value as 'tree' | 'table' }))}
                       className="config-select"
@@ -1237,11 +1250,11 @@ const AccountsTreePage: React.FC = () => {
                     </select>
                   </label>
                 </div>
-                
+
                 <div className="config-field">
                   <label className="config-label-block">
                     الترتيب الافتراضي:
-                    <select 
+                    <select
                       value={configOptions.sortPref}
                       onChange={(e) => setConfigOptions(prev => ({ ...prev, sortPref: e.target.value as 'code' | 'name' | 'level' }))}
                       className="config-select"
@@ -1253,14 +1266,14 @@ const AccountsTreePage: React.FC = () => {
                   </label>
                 </div>
               </div>
-              
+
               <div className="config-section">
                 <h4>إعدادات التصدير</h4>
-                
+
                 <div className="config-field">
                   <label className="config-label-block">
                     تنسيق التصدير الافتراضي:
-                    <select 
+                    <select
                       value={configOptions.exportFormat}
                       onChange={(e) => setConfigOptions(prev => ({ ...prev, exportFormat: e.target.value as 'excel' | 'pdf' | 'csv' }))}
                       className="config-select"
@@ -1273,16 +1286,16 @@ const AccountsTreePage: React.FC = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="config-modal-footer">
-              <button 
+              <button
                 className="ultimate-btn ultimate-btn-add"
                 onClick={() => setConfigModalOpen(false)}
               >
                 <div className="btn-content"><span className="btn-text">حفظ الإعدادات</span></div>
               </button>
-              
-              <button 
+
+              <button
                 className="ultimate-btn ultimate-btn-warning"
                 onClick={() => {
                   setConfigOptions({
@@ -1297,8 +1310,8 @@ const AccountsTreePage: React.FC = () => {
               >
                 <div className="btn-content"><span className="btn-text">إعادة تعيين</span></div>
               </button>
-              
-              <button 
+
+              <button
                 className="ultimate-btn ultimate-btn-delete"
                 onClick={() => setConfigModalOpen(false)}
               >

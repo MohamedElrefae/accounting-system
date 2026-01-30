@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Card,
@@ -37,6 +37,7 @@ import {
 } from '@mui/icons-material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { supabase } from '../utils/supabase';
+import { permissionAuditService } from '../services/permissionAuditService';
 
 interface Role {
   id: number;
@@ -212,6 +213,17 @@ export default function EnhancedQuickPermissionAssignment({
         total_permissions: 0
       };
 
+      // Get current user and org for audit logging
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: userOrgs } = await supabase
+        .from('org_memberships')
+        .select('org_id')
+        .eq('user_id', user?.id)
+        .limit(1)
+        .single();
+
+      const orgId = userOrgs?.org_id;
+
       // Assign permissions to each selected role
       for (const roleId of selectedRoleIds) {
         console.log(`🔄 Assigning ${selectedPermissionNames.length} permissions to role ${roleId}...`);
@@ -229,6 +241,24 @@ export default function EnhancedQuickPermissionAssignment({
           console.log(`✅ RPC Response for role ${roleId}:`, data);
           overallResult.permissions_assigned = (overallResult.permissions_assigned || 0) + (data?.permissions_assigned || 0);
           overallResult.total_permissions = (overallResult.total_permissions || 0) + (data?.total_permissions || 0);
+
+          // Log the permission assignment to audit trail
+          if (orgId) {
+            try {
+              await permissionAuditService.logPermissionChange(
+                orgId,
+                'ASSIGN',
+                'role_permissions',
+                String(roleId),
+                null,
+                { role_id: roleId, permissions: selectedPermissionNames },
+                `Assigned ${selectedPermissionNames.length} permissions to role ${roleId}`
+              );
+            } catch (auditError) {
+              console.warn('⚠️ Failed to log permission assignment:', auditError);
+              // Don't fail the main operation if audit logging fails
+            }
+          }
         }
       }
 
@@ -297,11 +327,41 @@ export default function EnhancedQuickPermissionAssignment({
 
     try {
       setAssigning(true);
+
+      // Get current user and org for audit logging
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: userOrgs } = await supabase
+        .from('org_memberships')
+        .select('org_id')
+        .eq('user_id', user?.id)
+        .limit(1)
+        .single();
+
+      const orgId = userOrgs?.org_id;
+
       const { data, error } = await supabase.rpc('emergency_assign_all_permissions_to_role', {
         role_name: 'admin'
       });
 
       if (error) throw error;
+
+      // Log the emergency permission assignment to audit trail
+      if (orgId) {
+        try {
+          await permissionAuditService.logPermissionChange(
+            orgId,
+            'ASSIGN',
+            'role_permissions',
+            'admin',
+            null,
+            { role_name: 'admin', all_permissions: true },
+            'EMERGENCY: Assigned all permissions to admin role'
+          );
+        } catch (auditError) {
+          console.warn('⚠️ Failed to log emergency permission assignment:', auditError);
+          // Don't fail the main operation if audit logging fails
+        }
+      }
 
       const result: AssignmentResult = {
         success: true,

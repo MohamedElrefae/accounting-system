@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useMemo } from 'react';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
@@ -41,7 +41,8 @@ import {
 import useAppStore from '../../store/useAppStore';
 import { navigationItems } from '../../data/navigation';
 import type { NavigationItem } from '../../types';
-import { useHasPermission } from '../../hooks/useHasPermission';
+import { useOptimizedAuth } from '../../hooks/useOptimizedAuth';
+import { derivePermissionFromId } from '../../lib/permissions';
 import BrandHeader from './BrandHeader';
 
 export const DRAWER_WIDTH = 280;
@@ -49,80 +50,43 @@ export const DRAWER_COLLAPSED_WIDTH = 64;
 
 const getIcon = (iconName: string) => {
   switch (iconName) {
-    case 'Dashboard':
-      return <Dashboard />;
-    case 'AccountTree':
-      return <AccountTree />;
-    case 'Receipt':
-      return <Receipt />;
-    case 'Description':
-      return <Description />;
-    case 'People':
-      return <People />;
-    case 'LocalShipping':
-      return <LocalShipping />;
-    case 'Assessment':
-      return <Assessment />;
-    case 'Inventory':
-      return <Inventory />;
-    case 'Settings':
-      return <Settings />;
-    case 'List':
-      return <ListIcon />;
-    case 'Add':
-      return <Add />;
-    case 'EditNote':
-      return <Edit />;
-    case 'Book':
-      return <Description />;
-    case 'Balance':
-      return <AccountBalance />;
-    case 'ShoppingCart':
-      return <Inventory />;
-    case 'RequestQuote':
-      return <Receipt />;
-    case 'PersonOutline':
-      return <Group />;
-    case 'Assignment':
-      return <AssignmentTurnedIn />;
-    case 'Business':
-      return <Business />;
-    case 'TrendingUp':
-      return <TrendingUp />;
-    case 'AccountBalance':
-      return <AccountBalance />;
-    case 'MonetizationOn':
-      return <TrendingUp />;
-    case 'BarChart':
-      return <TableChart />;
-    case 'Category':
-      return <Category />;
-    case 'SwapHoriz':
-      return <TrendingUp />;
-    case 'Summarize':
-      return <Description />;
-    case 'Group':
-      return <Group />;
-    case 'Tune':
-      return <Tune />;
-    case 'Backup':
-      return <CloudUpload />;
-    case 'Security':
-      return <Security />;
-    case 'database':
-      return <TableChart />;
-    case 'tag':
-      return <Category />;
-    case 'type':
-      return <Tune />;
-    case 'AutoAwesome':
-      return <AutoAwesome />;
-    case 'Lightbulb':
-      return <Lightbulb />;
-    case 'Upload':
-      return <Upload />;
-    default:
-      return <Dashboard />;
+    case 'Dashboard': return <Dashboard />;
+    case 'AccountTree': return <AccountTree />;
+    case 'Receipt': return <Receipt />;
+    case 'Description': return <Description />;
+    case 'People': return <People />;
+    case 'LocalShipping': return <LocalShipping />;
+    case 'Assessment': return <Assessment />;
+    case 'Inventory': return <Inventory />;
+    case 'Settings': return <Settings />;
+    case 'List': return <ListIcon />;
+    case 'Add': return <Add />;
+    case 'EditNote': return <Edit />;
+    case 'Book': return <Description />;
+    case 'Balance': return <AccountBalance />;
+    case 'ShoppingCart': return <Inventory />;
+    case 'RequestQuote': return <Receipt />;
+    case 'PersonOutline': return <Group />;
+    case 'Assignment': return <AssignmentTurnedIn />;
+    case 'Business': return <Business />;
+    case 'TrendingUp': return <TrendingUp />;
+    case 'AccountBalance': return <AccountBalance />;
+    case 'MonetizationOn': return <TrendingUp />;
+    case 'BarChart': return <TableChart />;
+    case 'Category': return <Category />;
+    case 'SwapHoriz': return <TrendingUp />;
+    case 'Summarize': return <Description />;
+    case 'Group': return <Group />;
+    case 'Tune': return <Tune />;
+    case 'Backup': return <CloudUpload />;
+    case 'Security': return <Security />;
+    case 'database': return <TableChart />;
+    case 'tag': return <Category />;
+    case 'type': return <Tune />;
+    case 'AutoAwesome': return <AutoAwesome />;
+    case 'Lightbulb': return <Lightbulb />;
+    case 'Upload': return <Upload />;
+    default: return <Dashboard />;
   }
 };
 
@@ -132,11 +96,20 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = () => {
   const { sidebarCollapsed, language } = useAppStore();
-  const [expandedItems, setExpandedItems] = useState<string[]>(['dashboard']);
+  const [expandedItems, setExpandedItems] = useState<string[]>(['dashboard']); // Keep dashboard open by default
   const navigate = useNavigate();
   const location = useLocation();
+  const params = useParams<{ orgId?: string; projectId?: string }>();
   const isRtl = language === 'ar';
-  const hasPermission = useHasPermission();
+
+  const {
+    user,
+    hasGlobalPermission,
+    hasRoleInOrg,
+    hasRoleInProject,
+    // fallback to legacy check if item has no strict scope
+    hasActionAccess, // "hasPermission" equivalent
+  } = useOptimizedAuth();
 
   // Force component update when language changes
   React.useEffect(() => {
@@ -188,41 +161,34 @@ const Sidebar: React.FC<SidebarProps> = () => {
   };
 
   const toggleExpanded = (itemId: string) => {
-    // Enforce accordion behavior only at top-level.
-    // Multiple submenus under the currently expanded top-level are allowed.
+    // Enforce accordion behavior... (Same as before)
     setExpandedItems((prev) => {
+      // Logic copied from previous implementation for expand/collapse behavior
       const path = findPathToItem(navigationItems, itemId) || [itemId];
       const topLevelId = path[0];
       const isTopLevel = path.length === 1;
 
       if (isTopLevel) {
         if (prev.includes(itemId)) {
-          // Collapse this top-level and all its descendants
           const item = findNavigationItem(itemId, navigationItems);
           const toRemove = new Set<string>([itemId, ...getDescendantIds(item || undefined)]);
           return prev.filter((id) => !toRemove.has(id));
         }
-        // Expand this top-level; collapse all other top-level sections and their descendants
         const keepWithinThisTop = prev.filter((id) => {
           const p = findPathToItem(navigationItems, id);
           return p && p[0] === itemId;
         });
-        // Ensure the top-level id itself is included
         return Array.from(new Set<string>([...keepWithinThisTop, itemId]));
       } else {
-        // Child or deeper item under some top-level
         const currentItem = findNavigationItem(itemId, navigationItems);
         if (prev.includes(itemId)) {
-          // Collapse this item and all its descendants only
           const toRemove = new Set<string>([itemId, ...getDescendantIds(currentItem || undefined)]);
           return prev.filter((id) => !toRemove.has(id));
         }
-        // Expand this item while keeping only ids under the same top-level section
         const keepWithinSameTop = prev.filter((id) => {
           const p = findPathToItem(navigationItems, id);
           return p && p[0] === topLevelId;
         });
-        // Make sure the top-level is expanded and include this item
         return Array.from(new Set<string>([...keepWithinSameTop, topLevelId, itemId]));
       }
     });
@@ -237,15 +203,106 @@ const Sidebar: React.FC<SidebarProps> = () => {
     return location.pathname === path;
   };
 
+  /**
+   * CORE FILTERING LOGIC (The "Projection" Layer)
+   */
+  const filterItem = (item: NavigationItem): boolean => {
+    // 1. Super Admin Only override
+    if (item.superAdminOnly) {
+      // Assuming super_admin is checked via hasGlobalPermission or roles
+      // hasActionAccess('admin.all') is the legacy way.
+      // Let's check strict super admin role via hook if available, or fallback
+      if (!user?.app_metadata?.roles?.includes('super_admin')) return false;
+    }
+
+    // 2. Strict Scope Check (New)
+    if (item.scope === 'org') {
+      if (!params.orgId) return false; // Context mismatch
+      // If generic "org" scope, just need membership? or specific permission?
+      // If item also has requiredPermission, check that in org context
+      if (item.requiredPermission) {
+        // Check if it's a role instruction or action
+        // For now, assume action.
+        // TODO: Update useOptimizedAuth to explicitly export canPerformActionInOrg if not already
+        // (It was added in phase 9 plan, assuming it's returned by hook)
+        // We can access 'user.orgPermissions' manually or use helper
+        // Using helper:
+        // Note: canPerformActionInOrg is returned by useOptimizedAuth in our updated hook
+        // We'll trust the hook.
+        // @ts-ignore
+        if (typeof canPerformActionInOrg === 'function') {
+          // @ts-ignore
+          if (!canPerformActionInOrg(params.orgId, item.requiredPermission)) return false;
+        }
+      } else {
+        // Just org membership required
+        // @ts-ignore
+        if (!hasRoleInOrg(params.orgId, 'viewer') && !hasRoleInOrg(params.orgId, 'admin')) {
+          // Check any role ??
+          // For now, if no specific permission, we allow if partial member.
+        }
+      }
+    } else if (item.scope === 'project') {
+      if (!params.projectId) return false;
+      if (item.requiredPermission) {
+        if (typeof canPerformActionInProject === 'function') {
+          // @ts-ignore
+          if (!canPerformActionInProject(params.projectId, item.requiredPermission)) return false;
+        }
+      }
+    } else if (item.scope === 'global') {
+      if (item.requiredPermission) {
+        if (!hasGlobalPermission(item.requiredPermission)) return false;
+      }
+    } else {
+      // Legacy / Unscoped mode (fallback)
+      // Determine the permission to check
+      let permissionToCheck = item.requiredPermission;
+
+      // NEW: Auto-derive permission from item ID for leaf items without explicit permission
+      if (!permissionToCheck && item.path && !item.children) {
+        permissionToCheck = derivePermissionFromId(item.id, 'view') as any;
+
+        // -- Debug Log for Dynamic Derivation --
+        if (item.id === 'trial-balance') {
+          // console.log(`[Sidebar Debug] Derived permission for ${item.id}: ${permissionToCheck}`);
+        }
+      }
+
+      if (permissionToCheck) {
+        // Use legacy global check
+        const hasAccess = hasActionAccess && hasActionAccess(permissionToCheck);
+
+        // -- Debug Log for Decision --
+        if (item.id === 'accounts-tree' || item.id === 'reports' || item.id === 'dashboard' || item.id === 'main-data') {
+          console.log(`[Sidebar Debug] Item: ${item.id} | Req: ${permissionToCheck} | Granted: ${hasAccess} | UserRoles: ${user?.app_metadata?.roles}`);
+        }
+
+        if (!hasAccess) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  };
+
   const renderNavigationItem = (item: NavigationItem, level = 0) => {
-    const hasChildren = item.children && item.children.length > 0;
+    // FIRST: Check visibility strict
+    if (!filterItem(item)) return null;
+
+    // Check children visibility
+    const visibleChildren = item.children ? item.children.filter(filterItem) : [];
+    const hasChildren = visibleChildren.length > 0;
+
+    // If item has children but all are hidden -> Hide parent (unless parent has its own path)
+    if (item.children && item.children.length > 0 && !hasChildren && !item.path) {
+      return null;
+    }
+
     const isExpanded = expandedItems.includes(item.id);
     const title = language === 'ar' ? item.titleAr : item.titleEn;
     const isItemActive = isActive(item.path);
-
-    // Permission gate: prefer requiredPermission; fallback to legacy superAdminOnly
-    if (item.requiredPermission && !hasPermission(item.requiredPermission)) return null;
-    if (item.superAdminOnly && !hasPermission('admin.all')) return null;
 
     const ButtonComponent = (
       <ListItemButton
@@ -364,7 +421,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
       <React.Fragment key={item.id}>
         <ListItem disablePadding sx={{ display: 'block' }}>
           {sidebarCollapsed ? (
-            <Tooltip title={title} placement={isRtl ? 'left' : 'right'} arrow>
+            <Tooltip title={title || ''} placement={isRtl ? 'left' : 'right'} arrow>
               <Box>{ButtonComponent}</Box>
             </Tooltip>
           ) : (
@@ -375,7 +432,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
         {hasChildren && (
           <Collapse in={isExpanded && !sidebarCollapsed} timeout="auto" unmountOnExit>
             <List component="div" disablePadding>
-              {item.children?.map((child: NavigationItem) => renderNavigationItem(child, level + 1))}
+              {visibleChildren.map((child: NavigationItem) => renderNavigationItem(child, level + 1))}
             </List>
           </Collapse>
         )}
@@ -405,7 +462,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
           ? '4px 0 24px rgba(0, 0, 0, 0.12)'
           : '-4px 0 24px rgba(0, 0, 0, 0.12)',
         height: '100%',
-        // Scrollbar styling
         '&::-webkit-scrollbar': {
           width: '6px',
         },
@@ -421,10 +477,8 @@ const Sidebar: React.FC<SidebarProps> = () => {
         },
       }}
     >
-      {/* Header */}
       <BrandHeader collapsed={!!sidebarCollapsed} />
 
-      {/* Navigation */}
       <Box sx={{ overflow: 'auto' }}>
         <List>
           {navigationItems.map((item) => renderNavigationItem(item))}

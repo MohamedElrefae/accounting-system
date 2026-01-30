@@ -9,8 +9,7 @@ import html2canvas from 'html2canvas'
 import { getCompanyConfig } from '../../services/company-config'
 import { fetchTransactionsDateRange } from '../../services/reports/common'
 import { getBalanceSheet, type UnifiedFilters, type BalanceSheetRow as BSRow } from '../../services/reports/unified-financial-query'
-import { getActiveOrgId, getActiveProjectId } from '../../utils/org'
-import { fetchOrganizations, type LookupOption } from '../../services/lookups'
+import { useScope } from '../../contexts/ScopeContext'
 import Visibility from '@mui/icons-material/Visibility'
 import VisibilityOff from '@mui/icons-material/VisibilityOff'
 import Bolt from '@mui/icons-material/Bolt'
@@ -54,46 +53,38 @@ interface BSData {
 }
 
 export default function BalanceSheet() {
+  const { currentOrg, currentProject, availableProjects } = useScope()
   const [asOfDate, setAsOfDate] = useState<string>(todayISO())
   const [loading, setLoading] = useState<boolean>(false)
   const [data, setData] = useState<BSData | null>(null)
   const [error, setError] = useState<string>('')
   const [includeZeros, setIncludeZeros] = useState<boolean>(false)
   const [uiLang, setUiLang] = useState<'ar' | 'en'>('ar')
-  const [projects, setProjects] = useState<{ id: string; code: string; name: string }[]>([])
-  const [projectId, setProjectId] = useState<string>(() => { try { return getActiveProjectId() || '' } catch { return '' } })
   const [companyName, setCompanyName] = useState<string>('')
-  const [orgId, setOrgId] = useState<string>('')
-  const [_orgOptions, _setOrgOptions] = useState<LookupOption[]>([])
   const [detailedView, setDetailedView] = useState<boolean>(true)
   const [postedOnly, setPostedOnly] = useState<boolean>(false)
   // Numbers-only setting (hide currency symbol)
   const [numbersOnly, setNumbersOnly] = useState<boolean>(true)
   // Collapsible groups state - same as P&L
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
-  
+
   useEffect(() => {
     try {
       const v = localStorage.getItem('bs_numbersOnly')
       if (v !== null) setNumbersOnly(v === 'true')
-    } catch {}
+    } catch { }
   }, [])
-  
-  useEffect(() => {
-    try { localStorage.setItem('bs_numbersOnly', String(numbersOnly)) } catch {}
-  }, [numbersOnly])
 
   useEffect(() => {
-    const useGlobal = (()=>{ try { return localStorage.getItem('bs:useGlobalProject') === '1' } catch { return true } })()
-    if (useGlobal) { try { setProjectId(getActiveProjectId() || '') } catch {} }
-  }, [orgId])
+    try { localStorage.setItem('bs_numbersOnly', String(numbersOnly)) } catch { }
+  }, [numbersOnly])
 
   // Group rows by account type for better presentation
   const grouped = useMemo((): GroupedBSData[] => {
     if (!data) return []
-    
+
     const groups: GroupedBSData[] = []
-    
+
     const titles = {
       assets: { ar: 'الأصول', en: 'Assets' },
       liabilities: { ar: 'الالتزامات', en: 'Liabilities' },
@@ -146,48 +137,35 @@ export default function BalanceSheet() {
   }, [data, includeZeros])
 
   useEffect(() => {
-    // Auto-load once
-    loadProjects().then(() => load())
+    // Auto-load when org changes or initially
+    loadCompanyConfig()
+    if (currentOrg) {
+      load()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [currentOrg, currentProject, asOfDate, postedOnly])
 
   // Auto-set date range from first to last transaction for current project
   useEffect(() => {
     (async () => {
       try {
         const r = await fetchTransactionsDateRange({
-          orgId: null,
-          projectId: projectId || null,
+          orgId: currentOrg?.id || null,
+          projectId: currentProject?.id || null,
           postedOnly: postedOnly,
         })
         if (r) {
           if (r.max_date) setAsOfDate(r.max_date)
         }
-      } catch {}
+      } catch { }
     })()
-  }, [projectId, postedOnly])
+  }, [currentOrg?.id, currentProject?.id, postedOnly])
 
-  async function loadProjects() {
-    const { data: projectData } = await supabase.from('projects').select('id, code, name').eq('status', 'active').order('code')
-    setProjects(projectData || [])
-    
-    // Load organizations and set default
-    try { 
-      const orgs = await fetchOrganizations(); 
-      _setOrgOptions(orgs || [])
-      // Set default org from localStorage or first available
-      const storedOrgId = getActiveOrgId()
-      if (storedOrgId) {
-        setOrgId(storedOrgId)
-      } else if (orgs && orgs.length > 0) {
-        setOrgId(orgs[0].id)
-      }
-    } catch {}
-    
-    try { 
+  async function loadCompanyConfig() {
+    try {
       const cfg = await getCompanyConfig()
       setCompanyName(cfg.company_name || '')
-    } catch {}
+    } catch { }
   }
 
   async function load() {
@@ -198,18 +176,18 @@ export default function BalanceSheet() {
       const filters: UnifiedFilters = {
         dateFrom: null, // Balance Sheet is as-of date
         dateTo: asOfDate,
-        orgId: orgId || null,
-        projectId: projectId || null,
+        orgId: currentOrg?.id || null,
+        projectId: currentProject?.id || null,
         postedOnly
       }
 
       const result = await getBalanceSheet(filters)
-      
+
       // Transform the service result into the expected data structure
       const assets = result.rows.filter(r => r.account_type === 'assets')
       const liabilities = result.rows.filter(r => r.account_type === 'liabilities')
       const equity = result.rows.filter(r => r.account_type === 'equity')
-      
+
       const transformedData: BSData = {
         assets,
         liabilities,
@@ -221,7 +199,7 @@ export default function BalanceSheet() {
         net_worth: result.summary.net_worth,
         balance_check: result.summary.balance_check
       }
-      
+
       setData(transformedData)
     } catch (e: any) {
       setError(e?.message || 'حدث خطأ أثناء تحميل الميزانية العمومية')
@@ -242,7 +220,7 @@ export default function BalanceSheet() {
 
     // Build export data with sections
     const exportRows: any[] = []
-    
+
     // Assets section
     const assetsGroup = grouped.find(g => g.key === 'assets')
     if (assetsGroup) {
@@ -292,7 +270,7 @@ export default function BalanceSheet() {
         prependRows: [
           [uiLang === 'ar' ? 'الشركة' : 'Company', companyName || (uiLang === 'ar' ? 'غير محدد' : 'N/A')],
           [uiLang === 'ar' ? 'كما في تاريخ' : 'As of', asOfDate],
-          [uiLang === 'ar' ? 'المشروع' : 'Project', projectId ? (projects.find(p => p.id === projectId)?.code + ' — ' + (projects.find(p => p.id === projectId)?.name || '')) : (uiLang === 'ar' ? 'الكل' : 'All')],
+          [uiLang === 'ar' ? 'المشروع' : 'Project', currentProject ? (currentProject.code + ' — ' + (currentProject.name || '')) : (uiLang === 'ar' ? 'الكل' : 'All')],
           [''],
           [uiLang === 'ar' ? 'ملخص المؤشرات المالية:' : 'Financial Summary:'],
           [uiLang === 'ar' ? 'إجمالي الأصول' : 'Total Assets', formatArabicCurrency(data.total_assets, numbersOnly ? 'none' : 'EGP')],
@@ -302,12 +280,12 @@ export default function BalanceSheet() {
         ]
       }
     }
-    
-    const opts = { 
-      title: uiLang === 'ar' ? 'الميزانية العمومية' : 'Balance Sheet', 
-      rtlLayout: uiLang === 'ar' 
+
+    const opts = {
+      title: uiLang === 'ar' ? 'الميزانية العمومية' : 'Balance Sheet',
+      rtlLayout: uiLang === 'ar'
     }
-    
+
     if (kind === 'excel') return exportToExcel(exportData as any, opts as any)
     return exportToCSV(exportData as any, opts as any)
   }
@@ -334,8 +312,8 @@ export default function BalanceSheet() {
             el.style.fontSize = '14px'
             el.style.lineHeight = '1.5'
             el.style.color = '#000000'
-            ;(el.style as any).WebkitFontSmoothing = 'antialiased'
-            ;(el.style as any).MozOsxFontSmoothing = 'grayscale'
+              ; (el.style as any).WebkitFontSmoothing = 'antialiased'
+              ; (el.style as any).MozOsxFontSmoothing = 'grayscale'
             // Show the statement header for PDF capture
             const header = el.querySelector('[class*="reportHeader"]') as HTMLElement
             if (header) {
@@ -383,8 +361,8 @@ export default function BalanceSheet() {
 
     // Prepare report data
     const currentDate = new Date().toLocaleDateString('ar-EG')
-    const projectName = projectId ? projects.find(p => p.id === projectId)?.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
-    
+    const projectName = currentProject ? currentProject.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
+
     // Build professional commercial report HTML
     const reportHTML = `
       <!DOCTYPE html>
@@ -660,10 +638,10 @@ export default function BalanceSheet() {
         </body>
       </html>
     `
-    
+
     printWindow.document.write(reportHTML)
     printWindow.document.close()
-    
+
     // Wait for content to load, then print
     setTimeout(() => {
       printWindow.focus()
@@ -671,13 +649,13 @@ export default function BalanceSheet() {
       printWindow.close()
     }, 500)
   }
-  
+
   // Generate print content with proper commercial formatting
   function generatePrintContent(): string {
     if (!data) return ''
-    
+
     let html = ''
-    
+
     // Assets Section
     const assetsGroup = grouped.find(g => g.key === 'assets')
     if (assetsGroup) {
@@ -698,7 +676,7 @@ export default function BalanceSheet() {
         </div>
       `
     }
-    
+
     // Liabilities Section
     const liabilitiesGroup = grouped.find(g => g.key === 'liabilities')
     if (liabilitiesGroup) {
@@ -719,7 +697,7 @@ export default function BalanceSheet() {
         </div>
       `
     }
-    
+
     // Equity Section
     const equityGroup = grouped.find(g => g.key === 'equity')
     if (equityGroup) {
@@ -740,7 +718,7 @@ export default function BalanceSheet() {
         </div>
       `
     }
-    
+
     // Summary Section
     const balanceStatus = Math.abs(data.balance_check) < 0.01 ? 'balanced' : 'unbalanced'
     html += `
@@ -762,7 +740,7 @@ export default function BalanceSheet() {
         </div>
       </div>
     `
-    
+
     // Financial Ratios Section
     html += `
       <div class="ratios-section">
@@ -785,7 +763,7 @@ export default function BalanceSheet() {
         </div>
       </div>
     `
-    
+
     return html
   }
 
@@ -827,9 +805,9 @@ export default function BalanceSheet() {
   // Balance status
   const balanceStatus = useMemo(() => {
     if (!data) return null
-    
+
     const isBalanced = Math.abs(data.balance_check) < 0.01
-    
+
     return {
       status: isBalanced ? 'balanced' : 'unbalanced',
       textAr: isBalanced ? 'متوازنة ✓' : `غير متوازنة: فرق ${formatArabicCurrency(Math.abs(data.balance_check), numbersOnly ? 'none' : 'EGP')}`,
@@ -843,10 +821,10 @@ export default function BalanceSheet() {
       <div className={`${styles.professionalFilterBar} ${styles.noPrint}`}>
         {/* Left Section: Date Filters */}
         <div className={styles.filterSection}>
-          <select 
-            className={styles.filterSelect} 
-            value={projectId} 
-            onChange={e => setProjectId(e.target.value)} 
+          <select
+            className={styles.filterSelect}
+            value={projectId}
+            onChange={e => setProjectId(e.target.value)}
             aria-label={uiLang === 'ar' ? 'المشروع' : 'Project'}
             title={uiLang === 'ar' ? 'اختر مشروع للتصفية' : 'Select project to filter'}
           >
@@ -855,12 +833,12 @@ export default function BalanceSheet() {
               <option key={p.id} value={p.id}>{p.code} — {p.name}</option>
             ))}
           </select>
-          <input 
-            className={styles.filterInput} 
-            type="date" 
-            value={asOfDate} 
-            onChange={e => setAsOfDate(e.target.value)} 
-            aria-label={uiLang === 'ar' ? 'كما في تاريخ' : 'As of'} 
+          <input
+            className={styles.filterInput}
+            type="date"
+            value={asOfDate}
+            onChange={e => setAsOfDate(e.target.value)}
+            aria-label={uiLang === 'ar' ? 'كما في تاريخ' : 'As of'}
             title={uiLang === 'ar' ? 'تاريخ الميزانية' : 'Balance sheet date'}
           />
         </div>
@@ -871,10 +849,10 @@ export default function BalanceSheet() {
             <button type="button" className={`${styles.languageOption} ${uiLang === 'ar' ? styles.active : ''}`} onClick={() => setUiLang('ar')}>ع</button>
             <button type="button" className={`${styles.languageOption} ${uiLang === 'en' ? styles.active : ''}`} onClick={() => setUiLang('en')}>En</button>
           </div>
-          
+
           <div className={styles.groupControls}>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className={styles.groupControlButton}
               onClick={expandAllGroups}
               disabled={loading || grouped.length === 0}
@@ -883,8 +861,8 @@ export default function BalanceSheet() {
             >
               <UnfoldMore fontSize="small" />
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className={styles.groupControlButton}
               onClick={collapseAllGroups}
               disabled={loading || grouped.length === 0}
@@ -983,22 +961,22 @@ export default function BalanceSheet() {
           >
             🗂️ {uiLang === 'ar' ? 'عرض الكل' : 'Show All'}
           </button>
-          
+
           <div className={styles.exportGroup}>
-            <button 
-              type="button" 
-              className={styles.exportButton} 
-              onClick={() => doExport('excel')} 
+            <button
+              type="button"
+              className={styles.exportButton}
+              onClick={() => doExport('excel')}
               disabled={loading || grouped.length === 0}
               title={uiLang === 'ar' ? 'تصدير إلى Excel' : 'Export to Excel'}
               aria-label={uiLang === 'ar' ? 'تصدير الميزانية إلى Excel' : 'Export balance sheet to Excel'}
             >
               <IosShare fontSize="small" /> Excel
             </button>
-            <button 
-              type="button" 
-              className={styles.exportButton} 
-              onClick={() => doExport('csv')} 
+            <button
+              type="button"
+              className={styles.exportButton}
+              onClick={() => doExport('csv')}
               disabled={loading || grouped.length === 0}
               title={uiLang === 'ar' ? 'تصدير إلى CSV' : 'Export to CSV'}
               aria-label={uiLang === 'ar' ? 'تصدير الميزانية إلى CSV' : 'Export balance sheet to CSV'}
@@ -1006,20 +984,20 @@ export default function BalanceSheet() {
               <TableView fontSize="small" /> CSV
             </button>
           </div>
-          <button 
-            type="button" 
-            className={`${styles.actionButton} ${styles.secondary}`} 
-            onClick={printReport} 
+          <button
+            type="button"
+            className={`${styles.actionButton} ${styles.secondary}`}
+            onClick={printReport}
             disabled={loading || grouped.length === 0}
             title={uiLang === 'ar' ? 'طباعة التقرير' : 'Print the report'}
             aria-label={uiLang === 'ar' ? 'طباعة الميزانية العمومية' : 'Print balance sheet report'}
           >
             <Print fontSize="small" /> {uiLang === 'ar' ? 'طباعة' : 'Print'}
           </button>
-          <button 
-            type="button" 
-            className={`${styles.actionButton} ${styles.primary}`} 
-            onClick={load} 
+          <button
+            type="button"
+            className={`${styles.actionButton} ${styles.primary}`}
+            onClick={load}
             disabled={loading}
             title={uiLang === 'ar' ? 'تحديث البيانات' : 'Refresh the data'}
             aria-label={uiLang === 'ar' ? 'تحديث بيانات الميزانية العمومية' : 'Refresh balance sheet data'}
@@ -1042,9 +1020,9 @@ export default function BalanceSheet() {
             {uiLang === 'ar' ? 'تصدير PDF' : 'Export PDF'}
           </button>
         </div>
-        
+
         <div id="financial-report-content" className="financial-report-content">
-          <div className={styles.reportHeader} style={{display: 'none'}}>
+          <div className={styles.reportHeader} style={{ display: 'none' }}>
             <h2>{companyName || (uiLang === 'ar' ? 'الشركة' : 'Company')}</h2>
             <div className={styles.statementTitle}>{uiLang === 'ar' ? 'الميزانية العمومية' : 'Balance Sheet'}</div>
             <div className={styles.statementMeta}>
@@ -1084,15 +1062,15 @@ export default function BalanceSheet() {
                           onClick={() => toggleGroupCollapse(group.key)}
                           aria-expanded={!isCollapsed}
                           aria-controls={`group-content-${group.key}`}
-                          title={isCollapsed 
+                          title={isCollapsed
                             ? (uiLang === 'ar' ? `توسيع ${uiLang === 'ar' ? group.titleAr : group.titleEn}` : `Expand ${group.titleEn}`)
                             : (uiLang === 'ar' ? `طي ${uiLang === 'ar' ? group.titleAr : group.titleEn}` : `Collapse ${group.titleEn}`)
                           }
                         >
                           {isCollapsed ? <ExpandMore fontSize="small" /> : <ExpandLess fontSize="small" />}
                         </button>
-                        <h3 
-                          className="group-title clickable" 
+                        <h3
+                          className="group-title clickable"
                           onClick={() => toggleGroupCollapse(group.key)}
                           onKeyDown={(e) => handleGroupKeyDown(e, group.key)}
                           tabIndex={0}

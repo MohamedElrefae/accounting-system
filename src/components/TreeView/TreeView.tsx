@@ -46,11 +46,11 @@ interface TreeViewProps<T extends TreeNode = TreeNode> {
   extraColumns?: ExtraColumn[];
 }
 
-const TreeView = <T extends TreeNode = TreeNode>({ 
-  data, 
-  onEdit, 
-  onAdd, 
-  onToggleStatus, 
+const TreeView = <T extends TreeNode = TreeNode>({
+  data,
+  onEdit,
+  onAdd,
+  onToggleStatus,
   onDelete,
   onSelect,
   onToggleExpand,
@@ -62,7 +62,7 @@ const TreeView = <T extends TreeNode = TreeNode>({
   extraColumns = []
 }: TreeViewProps<T>) => {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
-  const [buttonStates, setButtonStates] = useState<{[key: string]: ButtonState}>({});
+  const [buttonStates, setButtonStates] = useState<{ [key: string]: ButtonState }>({});
 
   const toggleNode = useCallback((nodeId: string) => {
     setExpandedNodes(prev => {
@@ -133,10 +133,10 @@ const TreeView = <T extends TreeNode = TreeNode>({
 
     return (
       <div key={node.id} className="tree-node-wrapper">
-        <div 
+        <div
           className={`tree-node ${!node.is_active ? 'inactive' : ''}`}
         >
-          <div 
+          <div
             className={`tree-node-expander ${isExpanded ? 'expanded' : ''} ${!mayHaveChildren ? 'no-children' : ''}`}
             onClick={async () => {
               if (!mayHaveChildren) return;
@@ -149,15 +149,15 @@ const TreeView = <T extends TreeNode = TreeNode>({
           >
             {mayHaveChildren && <ChevronRight className="expander-icon" size={16} />}
           </div>
-          
+
           <div className={`tree-node-status ${node.is_active ? 'active' : 'inactive'}`} />
-          
+
           <div className="tree-node-spacer"></div>
-          
+
           <div className={`tree-node-code contrast-code-${document.documentElement.getAttribute('data-theme') || 'light'}`}>
             {node.code}
           </div>
-          
+
           <div className="tree-node-name" onClick={() => onSelect && onSelect(node)} style={{ cursor: onSelect ? 'pointer' : 'default' }}>
             {node.name_ar || node.name}
             {!node.is_active && <span className={`status-inactive-text ${ui.inactiveText}`}>(معطل)</span>}
@@ -167,11 +167,11 @@ const TreeView = <T extends TreeNode = TreeNode>({
               </span>
             )}
           </div>
-          
+
           <div className="tree-node-type">
             {node.account_type || '—'}
           </div>
-          
+
           <div className="tree-node-level">
             <span className={`level-badge ${ui.badgeLevel}`}>{node.level}</span>
           </div>
@@ -182,63 +182,57 @@ const TreeView = <T extends TreeNode = TreeNode>({
               {col.render(node)}
             </div>
           ))}
-          
+
           <div className="tree-node-actions">
             {/* Edit Button */}
-            <button
-              onClick={() => handleButtonWithStates(
-                `edit-${node.id}`,
-                async () => onEdit && onEdit(node)
-              )}
-              className={`ultimate-btn ultimate-btn-edit ${
-                getButtonState(`edit-${node.id}`).loading ? 'loading' : ''
-              } ${
-                getButtonState(`edit-${node.id}`).success ? 'success' : ''
-              } ${
-                getButtonState(`edit-${node.id}`).error ? 'error' : ''
-              }`}
-              disabled={getButtonState(`edit-${node.id}`).loading}
-              title="تعديل"
-            >
-              <div className="btn-content">
-                <div className={`btn-icon ${
-                  getButtonState(`edit-${node.id}`).loading ? 'spinning' : ''
-                }`}>
-                  {getButtonState(`edit-${node.id}`).loading ? (
-                    <Loader2 size={14} />
-                  ) : getButtonState(`edit-${node.id}`).success ? (
-                    <CheckCircle size={14} />
-                  ) : getButtonState(`edit-${node.id}`).error ? (
-                    <AlertCircle size={14} />
-                  ) : (
-                    <Edit2 size={14} />
-                  )}
+            {onEdit && (
+              <button
+                onClick={() => handleButtonWithStates(
+                  `edit-${node.id}`,
+                  async () => onEdit && onEdit(node)
+                )}
+                className={`ultimate-btn ultimate-btn-edit ${getButtonState(`edit-${node.id}`).loading ? 'loading' : ''
+                  } ${getButtonState(`edit-${node.id}`).success ? 'success' : ''
+                  } ${getButtonState(`edit-${node.id}`).error ? 'error' : ''
+                  }`}
+                disabled={getButtonState(`edit-${node.id}`).loading}
+                title="تعديل"
+              >
+                <div className="btn-content">
+                  <div className={`btn-icon ${getButtonState(`edit-${node.id}`).loading ? 'spinning' : ''
+                    }`}>
+                    {getButtonState(`edit-${node.id}`).loading ? (
+                      <Loader2 size={14} />
+                    ) : getButtonState(`edit-${node.id}`).success ? (
+                      <CheckCircle size={14} />
+                    ) : getButtonState(`edit-${node.id}`).error ? (
+                      <AlertCircle size={14} />
+                    ) : (
+                      <Edit2 size={14} />
+                    )}
+                  </div>
+                  <span className="btn-text">تعديل</span>
                 </div>
-                <span className="btn-text">تعديل</span>
-              </div>
-            </button>
+              </button>
+            )}
 
             {/* Add Sub-Account Button */}
-            {canAddSubAccount && (
+            {canAddSubAccount && onAdd && (
               <button
                 onClick={() => handleButtonWithStates(
                   `add-${node.id}`,
                   async () => onAdd && onAdd(node)
                 )}
-                className={`ultimate-btn ultimate-btn-add ${
-                  getButtonState(`add-${node.id}`).loading ? 'loading' : ''
-                } ${
-                  getButtonState(`add-${node.id}`).success ? 'success' : ''
-                } ${
-                  getButtonState(`add-${node.id}`).error ? 'error' : ''
-                }`}
+                className={`ultimate-btn ultimate-btn-add ${getButtonState(`add-${node.id}`).loading ? 'loading' : ''
+                  } ${getButtonState(`add-${node.id}`).success ? 'success' : ''
+                  } ${getButtonState(`add-${node.id}`).error ? 'error' : ''
+                  }`}
                 disabled={getButtonState(`add-${node.id}`).loading}
                 title="إضافة فرعي"
               >
                 <div className="btn-content">
-                  <div className={`btn-icon ${
-                    getButtonState(`add-${node.id}`).loading ? 'spinning' : ''
-                  }`}>
+                  <div className={`btn-icon ${getButtonState(`add-${node.id}`).loading ? 'spinning' : ''
+                    }`}>
                     {getButtonState(`add-${node.id}`).loading ? (
                       <Loader2 size={14} />
                     ) : getButtonState(`add-${node.id}`).success ? (
@@ -255,88 +249,84 @@ const TreeView = <T extends TreeNode = TreeNode>({
             )}
 
             {/* Toggle Status Button */}
-            <button
-              onClick={() => handleButtonWithStates(
-                `toggle-${node.id}`,
-                async () => onToggleStatus && onToggleStatus(node)
-              )}
-              className={`ultimate-btn ${node.is_active ? 'ultimate-btn-disable' : 'ultimate-btn-enable'} ${
-                getButtonState(`toggle-${node.id}`).loading ? 'loading' : ''
-              } ${
-                getButtonState(`toggle-${node.id}`).success ? 'success' : ''
-              } ${
-                getButtonState(`toggle-${node.id}`).error ? 'error' : ''
-              }`}
-              disabled={getButtonState(`toggle-${node.id}`).loading}
-              title={node.is_active ? 'تعطيل' : 'تفعيل'}
-            >
-              <div className="btn-content">
-                <div className={`btn-icon ${
-                  getButtonState(`toggle-${node.id}`).loading ? 'spinning' : ''
-                }`}>
-                  {getButtonState(`toggle-${node.id}`).loading ? (
-                    <Loader2 size={14} />
-                  ) : getButtonState(`toggle-${node.id}`).success ? (
-                    <CheckCircle size={14} />
-                  ) : getButtonState(`toggle-${node.id}`).error ? (
-                    <AlertCircle size={14} />
-                  ) : node.is_active ? (
-                    <Pause size={14} />
-                  ) : (
-                    <Play size={14} />
-                  )}
+            {onToggleStatus && (
+              <button
+                onClick={() => handleButtonWithStates(
+                  `toggle-${node.id}`,
+                  async () => onToggleStatus && onToggleStatus(node)
+                )}
+                className={`ultimate-btn ${node.is_active ? 'ultimate-btn-disable' : 'ultimate-btn-enable'} ${getButtonState(`toggle-${node.id}`).loading ? 'loading' : ''
+                  } ${getButtonState(`toggle-${node.id}`).success ? 'success' : ''
+                  } ${getButtonState(`toggle-${node.id}`).error ? 'error' : ''
+                  }`}
+                disabled={getButtonState(`toggle-${node.id}`).loading}
+                title={node.is_active ? 'تعطيل' : 'تفعيل'}
+              >
+                <div className="btn-content">
+                  <div className={`btn-icon ${getButtonState(`toggle-${node.id}`).loading ? 'spinning' : ''
+                    }`}>
+                    {getButtonState(`toggle-${node.id}`).loading ? (
+                      <Loader2 size={14} />
+                    ) : getButtonState(`toggle-${node.id}`).success ? (
+                      <CheckCircle size={14} />
+                    ) : getButtonState(`toggle-${node.id}`).error ? (
+                      <AlertCircle size={14} />
+                    ) : node.is_active ? (
+                      <Pause size={14} />
+                    ) : (
+                      <Play size={14} />
+                    )}
+                  </div>
+                  <span className="btn-text">{node.is_active ? 'تعطيل' : 'تفعيل'}</span>
                 </div>
-                <span className="btn-text">{node.is_active ? 'تعطيل' : 'تفعيل'}</span>
-              </div>
-            </button>
+              </button>
+            )}
 
             {/* Delete Button */}
-            <button
-              onClick={() => handleButtonWithStates(
-                `delete-${node.id}`,
-                async () => {
-                  if (window.confirm(`هل أنت متأكد من حذف "${node.name_ar}"؟`)) {
-                    onDelete?.(node);
+            {onDelete && (
+              <button
+                onClick={() => handleButtonWithStates(
+                  `delete-${node.id}`,
+                  async () => {
+                    if (window.confirm(`هل أنت متأكد من حذف "${node.name_ar}"؟`)) {
+                      onDelete?.(node);
+                    }
                   }
+                )}
+                className={`ultimate-btn ultimate-btn-delete ${getButtonState(`delete-${node.id}`).loading ? 'loading' : ''
+                  } ${getButtonState(`delete-${node.id}`).success ? 'success' : ''
+                  } ${getButtonState(`delete-${node.id}`).error ? 'error' : ''
+                  }`}
+                disabled={
+                  getButtonState(`delete-${node.id}`).loading ||
+                  (typeof isDeleteDisabled === 'function' ? isDeleteDisabled(node) : hasLoadedChildren)
                 }
-              )}
-              className={`ultimate-btn ultimate-btn-delete ${
-                getButtonState(`delete-${node.id}`).loading ? 'loading' : ''
-              } ${
-                getButtonState(`delete-${node.id}`).success ? 'success' : ''
-              } ${
-                getButtonState(`delete-${node.id}`).error ? 'error' : ''
-              }`}
-              disabled={
-                getButtonState(`delete-${node.id}`).loading ||
-                (typeof isDeleteDisabled === 'function' ? isDeleteDisabled(node) : hasLoadedChildren)
-              }
-              title={
-                typeof getDeleteDisabledReason === 'function'
-                  ? getDeleteDisabledReason(node) || 'حذف'
-                  : (hasLoadedChildren ? 'لا يمكن حذف حساب له فروع' : 'حذف')
-              }
-            >
-              <div className="btn-content">
-                <div className={`btn-icon ${
-                  getButtonState(`delete-${node.id}`).loading ? 'spinning' : ''
-                }`}>
-                  {getButtonState(`delete-${node.id}`).loading ? (
-                    <Loader2 size={14} />
-                  ) : getButtonState(`delete-${node.id}`).success ? (
-                    <CheckCircle size={14} />
-                  ) : getButtonState(`delete-${node.id}`).error ? (
-                    <AlertCircle size={14} />
-                  ) : (
-                    <Trash2 size={14} />
-                  )}
+                title={
+                  typeof getDeleteDisabledReason === 'function'
+                    ? getDeleteDisabledReason(node) || 'حذف'
+                    : (hasLoadedChildren ? 'لا يمكن حذف حساب له فروع' : 'حذف')
+                }
+              >
+                <div className="btn-content">
+                  <div className={`btn-icon ${getButtonState(`delete-${node.id}`).loading ? 'spinning' : ''
+                    }`}>
+                    {getButtonState(`delete-${node.id}`).loading ? (
+                      <Loader2 size={14} />
+                    ) : getButtonState(`delete-${node.id}`).success ? (
+                      <CheckCircle size={14} />
+                    ) : getButtonState(`delete-${node.id}`).error ? (
+                      <AlertCircle size={14} />
+                    ) : (
+                      <Trash2 size={14} />
+                    )}
+                  </div>
+                  <span className="btn-text">حذف</span>
                 </div>
-                <span className="btn-text">حذف</span>
-              </div>
-            </button>
+              </button>
+            )}
           </div>
         </div>
-        
+
         {isExpanded && hasLoadedChildren && (
           <div className="tree-node-children">
             {(node.children || []).map(child => renderTreeNode(child as any as T, depth + 1))}

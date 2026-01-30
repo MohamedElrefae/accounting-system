@@ -25,6 +25,7 @@ const OrgMembersManagement: React.FC = () => {
   const [userQuery, setUserQuery] = useState('');
   const [userOptions, setUserOptions] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [canAccessAllProjects, setCanAccessAllProjects] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const loadOrganizations = useCallback(async () => {
@@ -67,6 +68,7 @@ const OrgMembersManagement: React.FC = () => {
   const handleOpenAdd = async () => {
     setUserQuery('');
     setSelectedUserId('');
+    setCanAccessAllProjects(true);
     setAddDialogOpen(true);
     await fetchUserOptions('');
   };
@@ -85,7 +87,7 @@ const OrgMembersManagement: React.FC = () => {
     if (!selectedOrgId || !selectedUserId) return;
     setSaving(true);
     try {
-      await addOrgMember(selectedOrgId, selectedUserId);
+      await addOrgMember(selectedOrgId, selectedUserId, canAccessAllProjects);
       setAddDialogOpen(false);
       await loadMembers(selectedOrgId);
       showToast('تم إضافة العضو بنجاح', { severity: 'success' });
@@ -179,6 +181,7 @@ const OrgMembersManagement: React.FC = () => {
                     <th>المستخدم</th>
                     <th>البريد</th>
                     <th>القسم</th>
+                    <th>الوصول للمشاريع</th>
                     <th>الإجراءات</th>
                   </tr>
                 </thead>
@@ -196,6 +199,11 @@ const OrgMembersManagement: React.FC = () => {
                       </td>
                       <td className={styles.muted}>{m.user.email}</td>
                       <td className={styles.muted}>{m.user.department || '—'}</td>
+                      <td>
+                        <span className={m.can_access_all_projects ? styles.accessBadgeAll : styles.accessBadgeSpecific}>
+                          {m.can_access_all_projects ? 'جميع المشاريع' : 'مشاريع محددة'}
+                        </span>
+                      </td>
                       <td>
                         <button className={`${styles.actionButton} ${styles.deleteButton}`} onClick={() => handleRemove(m.user_id)}>
                           <Trash2 size={16} />
@@ -242,6 +250,23 @@ const OrgMembersManagement: React.FC = () => {
                       <option key={u.id} value={u.id}>{u.email}</option>
                     ))}
                   </select>
+                </div>
+                
+                <div className={styles.formField}>
+                  <label className={styles.checkboxLabel}>
+                    <input 
+                      type="checkbox" 
+                      checked={canAccessAllProjects}
+                      onChange={(e) => setCanAccessAllProjects(e.target.checked)}
+                      className={styles.checkbox}
+                    />
+                    <span>السماح بالوصول لجميع مشاريع المؤسسة</span>
+                  </label>
+                  <p className={styles.helpText}>
+                    {canAccessAllProjects 
+                      ? 'سيتمكن المستخدم من الوصول لجميع المشاريع في هذه المؤسسة تلقائياً'
+                      : 'سيحتاج المستخدم إلى إضافته لكل مشروع على حدة'}
+                  </p>
                 </div>
               </div>
             </div>

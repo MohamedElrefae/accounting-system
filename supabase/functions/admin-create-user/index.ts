@@ -85,12 +85,15 @@ serve(async (req) => {
       created_at: new Date().toISOString(),
     };
 
-    const { error: profErr } = await supabaseAdmin.from("user_profiles").insert(profileRow);
+    const { error: profErr } = await supabaseAdmin.from("user_profiles").upsert(
+      profileRow,
+      { onConflict: 'id' }
+    );
     if (profErr) {
       // Attempt cleanup: delete auth user if profile insert fails
       await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {});
       return new Response(
-        JSON.stringify({ error: `Failed to insert profile: ${profErr.message}` }),
+        JSON.stringify({ error: `Failed to upsert profile: ${profErr.message}` }),
         { status: 400, headers: { "content-type": "application/json", ...corsHeaders } }
       );
     }

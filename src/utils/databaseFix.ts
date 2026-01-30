@@ -12,125 +12,71 @@ import { getRolesFromAuthMetadata } from './authFallback';
 export const fetchUserRolesSafely = async (userId: string, user?: any): Promise<RoleSlug[]> => {
   // If no userId provided, return empty array
   if (!userId) {
+    console.warn('⚠️ fetchUserRolesSafely: Called with empty userId');
     return [];
   }
 
+  console.log(`🔍 fetchUserRolesSafely: Starting (User: ${userId})`);
+
   try {
-    // Fetch user roles with proper join to roles table
-    const { data: userRolesData, error: userRolesError } = await supabase
+    // STRATEGY 1: Simple two-step fetch (Most robust)
+    // First, just get the role IDs. Less likely to hit RLS join issues.
+    const { data: roleIds, error: roleIdsError } = await supabase
       .from('user_roles')
-      .select(`
-        role_id,
-        roles!inner (
-          id,
-          name,
-          name_ar
-        )
-      `)
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .limit(5); // Reduced limit
+      .select('role_id')
+      .eq('user_id', userId); 
+      // Removed .eq('is_active', true) for maximum reachability in debug mode
 
-    if (userRolesError) {
-      console.warn('Failed to fetch user roles with join, trying fallback:', userRolesError);
-      
-      // Fallback: fetch role IDs and then role names separately
-      const { data: roleIds, error: roleIdsError } = await supabase
-        .from('user_roles')
-        .select('role_id')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .limit(10);
-
-      if (roleIdsError || !roleIds || roleIds.length === 0) {
-        console.warn('No roles found in database, using auth metadata fallback');
-        if (user) {
-          return getRolesFromAuthMetadata(user);
-        }
-        return ['viewer'];
-      }
-
-      // Fetch role names separately
-      const roleIdsList = roleIds.map(r => r.role_id).filter(Boolean);
-      if (roleIdsList.length === 0) {
-        return ['viewer'];
-      }
-
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('roles')
-        .select('id, name, name_ar')
-        .in('id', roleIdsList);
-
-      if (rolesError || !rolesData) {
-        console.warn('Failed to fetch role names, using default');
-        return ['viewer'];
-      }
-
-      // Map role names to RoleSlug format
-      return rolesData
-        .map(role => {
-          const roleName = String(role.name || '').toLowerCase().replace(/\s+/g, '_');
-          // Map common role names to our RoleSlug types
-          const roleMapping: { [key: string]: RoleSlug } = {
-            'super_admin': 'super_admin',
-            'admin': 'admin',
-            'manager': 'manager',
-            'team_leader': 'team_leader',
-            'hr': 'hr',
-            'accountant': 'accountant',
-            'auditor': 'auditor',
-            'viewer': 'viewer',
-            'user': 'viewer'
-          };
-          return roleMapping[roleName] || 'viewer';
-        })
-        .filter(Boolean);
+    if (roleIdsError) {
+      console.error('❌ fetchUserRolesSafely: Failed to fetch role_ids', roleIdsError);
+      return []; // Safe fail: No access
     }
 
-    if (!userRolesData || userRolesData.length === 0) {
-      console.warn('No roles found for user, using auth metadata fallback');
-      if (user) {
-        return getRolesFromAuthMetadata(user);
-      }
-      return ['viewer'];
+    if (!roleIds || roleIds.length === 0) {
+      console.warn('ℹ️ fetchUserRolesSafely: No role_ids found in user_roles table for:', userId);
+      return []; // Valid: User has no roles
     }
 
-    // Extract role names from joined data
-    const roles = userRolesData
-      .map(userRole => {
-        const role = (userRole as any).roles;
-        if (!role) return null;
-        
-        const roleName = String(role.name || '').toLowerCase().replace(/\s+/g, '_');
-        
-        // Map database role names to our RoleSlug types
-        const roleMapping: { [key: string]: RoleSlug } = {
-          'super_admin': 'super_admin',
-          'super admin': 'super_admin',
-          'admin': 'admin',
-          'administrator': 'admin',
-          'manager': 'manager',
-          'team_leader': 'team_leader',
-          'hr': 'hr',
-          'accountant': 'accountant',
-          'auditor': 'auditor',
-          'viewer': 'viewer',
-          'user': 'viewer',
-          'employee': 'viewer'
-        };
-        
-        return roleMapping[roleName] || 'viewer';
+    console.log('✅ fetchUserRolesSafely: Found role_ids:', roleIds);
+
+    const roleIdsList = roleIds.map(r => r.role_id).filter(Boolean);
+
+    // Second, fetch names for these IDs
+    const { data: rolesData, error: rolesError } = await supabase
+      .from('roles')
+      .select('name')
+      .in('id', roleIdsList);
+
+    if (rolesError) {
+      console.error('❌ fetchUserRolesSafely: Failed to fetch role names', rolesError);
+      return [];
+    }
+
+    console.log('✅ fetchUserRolesSafely: Raw Roles Data:', rolesData);
+
+    // Map to RoleSlug
+    const mappedRoles = (rolesData || [])
+      .map(r => {
+        const name = r.name?.toLowerCase().replace(/\s+/g, '_');
+        // Sanitization and mapping
+        if (name === 'super_admin') return 'super_admin';
+        if (name === 'accountant') return 'accountant';
+        if (name === 'admin') return 'admin';
+        if (name === 'manager') return 'manager';
+        if (name === 'auditor') return 'auditor';
+        if (name === 'viewer') return 'viewer';
+        if (name === 'hr') return 'hr';
+        if (name === 'team_leader') return 'team_leader';
+        return null; 
       })
       .filter(Boolean) as RoleSlug[];
 
-    return roles.length > 0 ? roles : ['viewer'];
+    console.log('✅ fetchUserRolesSafely: FINAL Resolved Roles:', mappedRoles);
+    return mappedRoles;
 
   } catch (error) {
-    console.warn('Failed to fetch user roles, using fallback:', error);
-    if (user) {
-      return getRolesFromAuthMetadata(user);
-    }
-    return ['viewer'];
+    console.error('🔥 fetchUserRolesSafely: Critical Exception', error);
+    return []; // Safe fail
   }
 };
 

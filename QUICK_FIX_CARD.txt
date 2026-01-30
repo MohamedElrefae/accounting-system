@@ -1,0 +1,50 @@
+================================================================================
+                    INFINITE RLS RECURSION - QUICK FIX
+================================================================================
+
+PROBLEM:
+  App cannot load - Error: "infinite recursion detected in policy for relation system_roles"
+  
+CAUSE:
+  system_roles RLS policy checks system_roles table (checks itself = infinite loop)
+
+SOLUTION:
+  Deploy migration: supabase/migrations/20260127_fix_infinite_recursion_rls.sql
+
+TIME TO FIX:
+  5 minutes to deploy + 2 minutes to verify
+
+STEPS:
+  1. Go to Supabase SQL Editor
+  2. Copy & paste migration SQL
+  3. Click "Run"
+  4. Test: SELECT * FROM organizations LIMIT 1;
+  5. Hard refresh app: Ctrl+Shift+R
+  6. Verify TopBar loads
+
+VERIFICATION:
+  ✓ Organizations load
+  ✓ Projects load
+  ✓ TopBar works
+  ✓ No 500 errors
+  ✓ Org/Project selectors work
+
+FILES:
+  - supabase/migrations/20260127_fix_infinite_recursion_rls.sql (MAIN FIX)
+  - INFINITE_RECURSION_RLS_FIX.md (DETAILED GUIDE)
+  - EMERGENCY_ACTION_REQUIRED.md (QUICK STEPS)
+  - RLS_INFINITE_RECURSION_DIAGNOSIS.md (TECHNICAL DETAILS)
+
+RISK LEVEL: LOW
+  - Only simplifies RLS policies
+  - Uses trusted SECURITY DEFINER functions
+  - No data changes
+  - No security weakening
+
+ROLLBACK: Easy
+  - Revert migration in Supabase
+  - Redeploy
+
+STATUS: ✅ READY TO DEPLOY
+
+================================================================================

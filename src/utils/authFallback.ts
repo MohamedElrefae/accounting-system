@@ -9,7 +9,7 @@ import type { RoleSlug } from '../lib/permissions';
  */
 export const getRolesFromAuthMetadata = (user: any): RoleSlug[] => {
   try {
-    if (!user) return ['viewer'];
+    if (!user) return [];
 
     // Check user metadata for roles
     const metadata = user.user_metadata || {};
@@ -37,7 +37,7 @@ export const getRolesFromAuthMetadata = (user: any): RoleSlug[] => {
 
     // Check if user is admin based on email domain or specific emails
     const email = user.email || '';
-    const adminEmails = ['admin@company.com', 'melre@company.com']; // Add your admin emails
+    const adminEmails: string[] = []; // Removed hardcoded emails for testing
     const adminDomains = ['admin.company.com']; // Add admin domains
 
     if (adminEmails.includes(email.toLowerCase())) {
@@ -51,10 +51,10 @@ export const getRolesFromAuthMetadata = (user: any): RoleSlug[] => {
     }
 
     // Default role
-    return ['viewer'];
+    return [];
   } catch (error) {
     console.warn('Error getting roles from auth metadata:', error);
-    return ['viewer'];
+    return [];
   }
 };
 

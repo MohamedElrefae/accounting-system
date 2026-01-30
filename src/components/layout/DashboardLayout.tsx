@@ -7,29 +7,35 @@ import TopBar from './TopBar';
 import SidebarPortal from "./SidebarPortal";
 import useAppStore from '../../store/useAppStore';
 import { DRAWER_WIDTH, DRAWER_COLLAPSED_WIDTH } from './Sidebar';
-import { useSmartRoutePreloading } from '../../routes/RouteGroups';
 import { usePresenceHeartbeat } from '../../hooks/usePresenceHeartbeat';
 import DataLoadingErrorBoundary from '../Common/DataLoadingErrorBoundary';
 
-const DashboardLayout: React.FC = () => {
+interface DashboardLayoutProps {
+  children?: React.ReactNode;
+}
+
+const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const { sidebarCollapsed, toggleSidebar, language } = useAppStore();
   const isRtl = language === 'ar';
   const location = useLocation();
-  const { recordNavigation, preloadBasedOnPatterns, enabled } = useSmartRoutePreloading();
+  // Smart route preloading logic removed or needs update if RouteGroups deleted
+  // const { recordNavigation, preloadBasedOnPatterns, enabled } = useSmartRoutePreloading();
 
   usePresenceHeartbeat();
-  
+
   // Simple direction update - no remounting needed
   React.useEffect(() => {
     document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
     document.documentElement.lang = language;
   }, [language, isRtl]);
 
-  React.useEffect(() => {
-    if (!enabled) return;
-    recordNavigation(location.pathname);
-    preloadBasedOnPatterns();
-  }, [enabled, location.pathname, preloadBasedOnPatterns, recordNavigation]);
+  /*
+    React.useEffect(() => {
+      if (!enabled) return;
+      recordNavigation(location.pathname);
+      preloadBasedOnPatterns();
+    }, [enabled, location.pathname, preloadBasedOnPatterns, recordNavigation]);
+  */
 
   const handleMenuClick = () => {
     toggleSidebar?.();
@@ -37,12 +43,12 @@ const DashboardLayout: React.FC = () => {
 
   // Render the sidebar out-of-flow via a portal so it can freely sit on the left/right
   return (
-    <Box 
+    <Box
       sx={{
-        display: 'flex', 
+        display: 'flex',
         flexDirection: 'column',
-        width: '100vw', 
-        height: '100vh', 
+        width: '100vw',
+        height: '100vh',
         overflow: 'hidden',
       }}
     >
@@ -52,8 +58,8 @@ const DashboardLayout: React.FC = () => {
       <SidebarPortal />
 
       {/* Main content container. Add inline padding so content doesn't go under fixed sidebar */}
-      <Box 
-        sx={{ 
+      <Box
+        sx={{
           display: 'flex',
           flexDirection: 'row',
           flex: 1,
@@ -77,13 +83,13 @@ const DashboardLayout: React.FC = () => {
           <Toolbar />
           <Box
             key={location.pathname}
-            sx={{ 
-            flex: 1,
-            p: 3,
-            overflow: 'auto',
-          }}>
+            sx={{
+              flex: 1,
+              p: 3,
+              overflow: 'auto',
+            }}>
             <DataLoadingErrorBoundary>
-              <Outlet />
+              {children || <Outlet />}
             </DataLoadingErrorBoundary>
           </Box>
         </Box>

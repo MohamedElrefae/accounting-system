@@ -15,12 +15,12 @@ import SecurityIcon from '@mui/icons-material/Security';
 import AdminIcon from '@mui/icons-material/AdminPanelSettings';
 import KeyIcon from '@mui/icons-material/Key';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
-
 // Import enterprise components
 import EnterpriseUserManagement from './EnterpriseUserManagement';
 import EnterpriseRoleManagement from './EnterpriseRoleManagement';
 import EnterprisePermissionsManagement from './EnterprisePermissionsManagement';
 import { AccessRequestManagement } from '../../components/admin/AccessRequestManagement';
+import { useAuth } from '../../hooks/useAuth';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -41,9 +41,9 @@ function CustomTabPanel(props: TabPanelProps) {
       {...other}
     >
       {value === index && (
-        <Box sx={{ 
-          flexGrow: 1, 
-          display: 'flex', 
+        <Box sx={{
+          flexGrow: 1,
+          display: 'flex',
           flexDirection: 'column',
           p: 3,
           overflow: 'hidden'
@@ -65,6 +65,7 @@ function a11yProps(index: number) {
 export default function UserManagementSystem() {
   const [value, setValue] = useState(0);
   const theme = useTheme();
+  const { user } = useAuth();
 
   const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
@@ -125,12 +126,12 @@ export default function UserManagementSystem() {
           >
             <SecurityIcon sx={{ fontSize: 40, color: 'primary.contrastText' }} />
           </Box>
-          
+
           <Stack spacing={1} sx={{ textAlign: { xs: 'center', md: 'left' }, flexGrow: 1 }}>
-            <Typography 
-              variant="h3" 
-              component="h1" 
-              sx={{ 
+            <Typography
+              variant="h3"
+              component="h1"
+              sx={{
                 fontWeight: 800,
                 background: `linear-gradient(45deg, ${theme.palette.primary.main} 30%, ${theme.palette.secondary.main} 90%)`,
                 WebkitBackgroundClip: 'text',
@@ -140,8 +141,8 @@ export default function UserManagementSystem() {
             >
               إدارة المستخدمين والصلاحيات
             </Typography>
-            <Typography 
-              variant="h6" 
+            <Typography
+              variant="h6"
               color="text.secondary"
               sx={{ fontWeight: 400 }}
             >
@@ -184,9 +185,9 @@ export default function UserManagementSystem() {
       </Paper>
 
       {/* Main Content */}
-      <Paper 
+      <Paper
         elevation={1}
-        sx={{ 
+        sx={{
           flexGrow: 1,
           display: 'flex',
           flexDirection: 'column',
@@ -197,9 +198,9 @@ export default function UserManagementSystem() {
         }}
       >
         {/* Enhanced Tabs */}
-        <Box sx={{ 
+        <Box sx={{
           flexShrink: 0,
-          borderBottom: 1, 
+          borderBottom: 1,
           borderColor: 'divider',
           background: alpha(theme.palette.background.paper, 0.95),
           backdropFilter: 'blur(10px)'
@@ -248,17 +249,17 @@ export default function UserManagementSystem() {
                     sx={{
                       p: 1,
                       borderRadius: '12px',
-                      backgroundColor: value === index 
-                        ? alpha(tab.color, 0.12) 
+                      backgroundColor: value === index
+                        ? alpha(tab.color, 0.12)
                         : alpha(theme.palette.action.hover, 0.04),
                       transition: 'all 0.2s ease'
                     }}
                   >
-                    {React.cloneElement(tab.icon, { 
-                      sx: { 
-                        fontSize: 24, 
+                    {React.cloneElement(tab.icon, {
+                      sx: {
+                        fontSize: 24,
                         color: value === index ? tab.color : 'text.secondary'
-                      } 
+                      }
                     })}
                   </Box>
                 }
@@ -267,9 +268,9 @@ export default function UserManagementSystem() {
                     <Typography variant="body1" sx={{ fontWeight: 'inherit' }}>
                       {tab.label}
                     </Typography>
-                    <Typography 
-                      variant="caption" 
-                      sx={{ 
+                    <Typography
+                      variant="caption"
+                      sx={{
                         color: 'text.secondary',
                         opacity: value === index ? 1 : 0.7,
                         fontSize: '0.75rem'
@@ -286,9 +287,9 @@ export default function UserManagementSystem() {
         </Box>
 
         {/* Tab Content */}
-        <Box sx={{ 
-          flexGrow: 1, 
-          display: 'flex', 
+        <Box sx={{
+          flexGrow: 1,
+          display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden'
         }}>
