@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import useAppStore from '../../store/useAppStore'
 import styles from './GeneralLedger.module.css'
+import { formatArabicCurrency } from '../../utils/ArabicTextEngine'
 import { fetchGeneralLedgerReport, type GLFilters, type GLRow } from '../../services/reports/general-ledger'
 import ExportButtons from '../../components/Common/ExportButtons'
 import PresetBar from '../../components/Common/PresetBar'
 import { fetchGLAccountSummary, type GLAccountSummaryRow } from '../../services/reports/gl-account-summary'
-import { fetchAccountsMinimal, type LookupOption } from '../../services/lookups'
+import { fetchAccountsMinimal, fetchOrganizations, fetchProjects, type LookupOption } from '../../services/lookups'
 import { getCostCentersForSelector } from '../../services/cost-centers'
 import type { UniversalTableData } from '../../utils/UniversalExportManager'
 import { exportToExcel, exportToCSV } from '../../utils/UniversalExportManager'
@@ -52,12 +54,11 @@ const useDebounced = (value: string, delay: number) => {
   return debouncedValue
 }
 
-import { useTranslation } from 'react-i18next'
+
 
 const GeneralLedger: React.FC = () => {
   const { currentOrg, currentProject } = useScope()
-  const { i18n } = useTranslation()
-  const uiLang = i18n.language
+  const { language: uiLang } = useAppStore()
 
   // Filters
   const [filters, setFilters] = useState<GLFilters>({
@@ -246,7 +247,7 @@ const GeneralLedger: React.FC = () => {
     //     }
     //   } catch { /* noop */ }
     // })()
-  }, [orgId, projectId, filters.postedOnly])
+  }, [currentOrg?.id, currentProject?.id, filters.postedOnly])
 
   // Presets and columns
   const reportKey = 'general-ledger'
@@ -352,8 +353,8 @@ const GeneralLedger: React.FC = () => {
           return chips.length ? `${base} — ${chips.join(' — ')}` : base
         })(),
         orientation: 'landscape' as const,
-        useArabicNumerals: true,
-        rtlLayout: true,
+        useArabicNumerals: uiLang === 'ar',
+        rtlLayout: uiLang === 'ar',
       }
 
       if (view === 'overview') {
@@ -600,11 +601,8 @@ const GeneralLedger: React.FC = () => {
   // Helper function for formatting currency in print context
   const formatPrintCurrency = (amount: number, currency?: string) => {
     if (amount === 0) return '—'
-    const formatted = Math.abs(amount).toLocaleString('ar-EG', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })
-    return currency === 'none' ? formatted : `${formatted} ج.م`
+    const formatted = formatArabicCurrency(amount, 'none', { useArabicNumerals: uiLang === 'ar' })
+    return currency === 'none' ? formatted : (uiLang === 'ar' ? `${formatted} ج.م` : `EGP ${formatted}`)
   }
 
   // Professional commercial print function for General Ledger
@@ -1203,7 +1201,6 @@ const GeneralLedger: React.FC = () => {
       const qAnalysisItemId = qp.get('analysisWorkItemId') || '';
 
       if (qAccountId) setAccountId(qAccountId);
-      if (qAccountId) setAccountId(qAccountId);
       // Org and Project are now handled globally
 
       if (qCostCenterId) setCostCenterId(qCostCenterId);
@@ -1250,7 +1247,7 @@ const GeneralLedger: React.FC = () => {
 
       // Load expenses categories for the first available org
       if (orgs.length > 0) {
-        const firstOrgId = orgId || orgs[0].id
+        const firstOrgId = currentOrg?.id || orgs[0].id
         try {
           console.log('💰 Loading expenses categories for org:', firstOrgId)
           const { data: expensesData } = await supabase
@@ -1988,8 +1985,7 @@ const GeneralLedger: React.FC = () => {
 
                 const f = ((p as { filters?: GLPresetFilters }).filters) ?? {}
                 setAccountId(f.accountId || '')
-                setOrgId(f.orgId || '')
-                setProjectId(f.projectId || '')
+                // Removed undefined setOrgId and setProjectId
                 setCostCenterId(f.costCenterId || '')
                 setAnalysisWorkItemId(f.analysisWorkItemId || '')
                 setFilters(prev => ({
@@ -2020,8 +2016,8 @@ const GeneralLedger: React.FC = () => {
                   dateTo: filters.dateTo,
                   includeOpening: filters.includeOpening,
                   postedOnly: filters.postedOnly,
-                  orgId,
-                  projectId,
+                  orgId: currentOrg?.id || null,
+                  projectId: currentProject?.id || null,
                   costCenterId,
                   accountId,
                   analysisWorkItemId,
@@ -2326,8 +2322,7 @@ const GeneralLedger: React.FC = () => {
 
             // Reset basic filters
             setAccountId('');
-            setOrgId('');
-            setProjectId('');
+            // Removed undefined setOrgId and setProjectId
             setCostCenterId('');
             setClassificationId(''); // Reset classification filter
             setExpensesCategoryId(''); // Reset expenses category filter
@@ -2375,8 +2370,7 @@ const GeneralLedger: React.FC = () => {
 
             // Reset basic filters
             setAccountId('');
-            setOrgId('');
-            setProjectId('');
+            // Removed undefined setOrgId and setProjectId
             setClassificationId('');
 
             // Keep "has balance" view

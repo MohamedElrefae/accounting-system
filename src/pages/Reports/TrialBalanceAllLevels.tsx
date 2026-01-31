@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import styles from './TrialBalanceAllLevels.module.css'
 import './StandardFinancialStatements.css'
 import { supabase } from '../../utils/supabase'
@@ -7,9 +7,9 @@ import { type ExplorerMode } from '../../components/Reports/AccountColumns'
 import { exportToExcel, exportToCSV } from '../../utils/UniversalExportManager'
 import type { UniversalTableData, UniversalTableColumn } from '../../utils/UniversalExportManager'
 import { getCompanyConfig } from '../../services/company-config'
-import { fetchProjects, fetchOrganizations, type LookupOption } from '../../services/lookups'
-import { getActiveProjectId } from '../../utils/org'
 import { fetchGLSummary, type UnifiedFilters } from '../../services/reports/unified-financial-query'
+import { useScope } from '../../contexts/ScopeContext'
+import useAppStore from '../../store/useAppStore'
 
 /**
  * Trial Balance All Levels Report
@@ -44,20 +44,20 @@ function startOfYearISO() {
 }
 
 export default function TrialBalanceAllLevels() {
+  const { currentOrg, currentProject } = useScope()
+  const lang = useAppStore((s: any) => s.language)
+  const isAr = lang === 'ar'
+
   // Filters
   const [mode, setMode] = useState<ExplorerMode>('range') // range => show period columns, asof => opening/closing toggle
   const [dateFrom, setDateFrom] = useState<string>(startOfYearISO())
   const [dateTo, setDateTo] = useState<string>(todayISO())
   const [postedOnly, setPostedOnly] = useState<boolean>(false)
-  const [projectId, setProjectId] = useState<string>(() => { try { return getActiveProjectId() || '' } catch { return '' } })
-  const [projectOptions, setProjectOptions] = useState<LookupOption[]>([])
-  const [orgOptions, setOrgOptions] = useState<LookupOption[]>([])
-  const [orgId, setOrgId] = useState<string>('')
 
   // Toggles
   const [numbersOnly, setNumbersOnly] = useState<boolean>(true) // export numbers only
   const [includeZeros, setIncludeZeros] = useState<boolean>(false)
-  const [uiLang, setUiLang] = useState<'ar' | 'en'>('ar')
+  const uiLang = isAr ? 'ar' : 'en'
 
   // Data
   type TBAmounts = { opening_debit: number; opening_credit: number; period_debits: number; period_credits: number; closing_debit: number; closing_credit: number }
@@ -82,35 +82,12 @@ export default function TrialBalanceAllLevels() {
   }
   // GLSummaryRow type is now imported from unified-financial-query
 
-  const orgIdRef = useRef<string | null>(null)
-
-  useEffect(() => {
-    const useGlobal = (()=>{ try { return localStorage.getItem('tb:useGlobalProject') === '1' } catch { return true } })()
-    if (useGlobal) { try { setProjectId(getActiveProjectId() || '') } catch {} }
-  }, [orgId])
-
-  // Persist numbersOnly like other pages
-  useEffect(() => { try { const v = localStorage.getItem('tb_all_numbersOnly'); if (v !== null) setNumbersOnly(v === 'true') } catch { /* noop */ } }, [])
-  useEffect(() => { try { localStorage.setItem('tb_all_numbersOnly', String(numbersOnly)) } catch { /* noop */ } }, [numbersOnly])
-
-  // Load company and projects
+  // Load company
   useEffect(() => {
     (async () => {
       try { const cfg = await getCompanyConfig(); setCompanyName(cfg?.company_name || '') } catch { /* noop */ }
-      try { const orgs = await fetchOrganizations(); setOrgOptions(orgs || []); } catch { /* noop */ }
-      try { const projs = await fetchProjects(); setProjectOptions(projs || []) } catch { /* noop */ }
-      // Default org selection: prefer stored, else first
-      try {
-        const { getActiveOrgId } = await import('../../utils/org');
-        const stored = getActiveOrgId?.();
-        if (stored) setOrgId(stored);
-        else if (orgOptions.length > 0) setOrgId(orgOptions[0].id);
-      } catch { /* noop */ }
     })()
   }, [])
-
-  // Keep ref in sync with state for RPC calls
-  useEffect(() => { orgIdRef.current = orgId || null }, [orgId])
 
   // Auto-set date range - removed account explorer dependency
 
@@ -123,7 +100,7 @@ export default function TrialBalanceAllLevels() {
         .from('accounts')
         .select('id, code, name, name_ar, level, parent_id, status, category, org_id')
         .order('code', { ascending: true })
-      if (orgIdRef.current) accQ = accQ.eq('org_id', orgIdRef.current)
+      if (currentOrg?.id) accQ = accQ.eq('org_id', currentOrg.id)
       const accRes = await accQ
       if (accRes.error) throw accRes.error
       const accounts = (accRes.data || []) as DBAccount[]
@@ -132,8 +109,8 @@ export default function TrialBalanceAllLevels() {
       const filters: UnifiedFilters = {
         dateFrom: mode === 'range' ? (dateFrom || null) : null,
         dateTo: dateTo || null,
-        orgId: orgIdRef.current || null,
-        projectId: projectId || null,
+        orgId: currentOrg?.id || null,
+        projectId: currentProject?.id || null,
         postedOnly,
       }
       const summaryRows = await fetchGLSummary(filters)
@@ -220,7 +197,7 @@ export default function TrialBalanceAllLevels() {
       }
     }, 250)
     return () => { canceled = true; clearTimeout(t) }
-  }, [mode, postedOnly, orgId, projectId, dateFrom, dateTo])
+  }, [mode, postedOnly, currentOrg?.id, currentProject?.id, dateFrom, dateTo])
 
   // Expand to target level 1..4
   async function expandToLevel(targetLevel: number) {
@@ -259,17 +236,17 @@ export default function TrialBalanceAllLevels() {
     const title = (uiLang === 'ar' ? 'ميزان المراجعة (شجري)' : 'Trial Balance (All Levels)') + ' — ' + modeTitle
     const cols: UniversalTableColumn[] = (mode === 'range'
       ? [
-          { key: 'code', header: uiLang === 'ar' ? 'الكود' : 'Code', type: 'text' },
-          { key: 'name', header: uiLang === 'ar' ? 'اسم الحساب' : 'Account', type: 'text' },
-          { key: 'period_debits', header: uiLang === 'ar' ? 'مدين الفترة' : 'Period Debits', type: 'currency', currency: numbersOnly ? 'none' : 'EGP' },
-          { key: 'period_credits', header: uiLang === 'ar' ? 'دائن الفترة' : 'Period Credits', type: 'currency', currency: numbersOnly ? 'none' : 'EGP' },
-        ]
+        { key: 'code', header: uiLang === 'ar' ? 'الكود' : 'Code', type: 'text' },
+        { key: 'name', header: uiLang === 'ar' ? 'اسم الحساب' : 'Account', type: 'text' },
+        { key: 'period_debits', header: uiLang === 'ar' ? 'مدين الفترة' : 'Period Debits', type: 'currency', currency: numbersOnly ? 'none' : 'EGP' },
+        { key: 'period_credits', header: uiLang === 'ar' ? 'دائن الفترة' : 'Period Credits', type: 'currency', currency: numbersOnly ? 'none' : 'EGP' },
+      ]
       : [
-          { key: 'code', header: uiLang === 'ar' ? 'الكود' : 'Code', type: 'text' },
-          { key: 'name', header: uiLang === 'ar' ? 'اسم الحساب' : 'Account', type: 'text' },
-          { key: 'closing_debit', header: uiLang === 'ar' ? 'ختامي مدين' : 'Closing Debit', type: 'currency', currency: numbersOnly ? 'none' : 'EGP' },
-          { key: 'closing_credit', header: uiLang === 'ar' ? 'ختامي دائن' : 'Closing Credit', type: 'currency', currency: numbersOnly ? 'none' : 'EGP' },
-        ]) as UniversalTableColumn[]
+        { key: 'code', header: uiLang === 'ar' ? 'الكود' : 'Code', type: 'text' },
+        { key: 'name', header: uiLang === 'ar' ? 'اسم الحساب' : 'Account', type: 'text' },
+        { key: 'closing_debit', header: uiLang === 'ar' ? 'ختامي مدين' : 'Closing Debit', type: 'currency', currency: numbersOnly ? 'none' : 'EGP' },
+        { key: 'closing_credit', header: uiLang === 'ar' ? 'ختامي دائن' : 'Closing Credit', type: 'currency', currency: numbersOnly ? 'none' : 'EGP' },
+      ]) as UniversalTableColumn[]
     const rows = visibleNodes
       .filter(n => includeZeros || !isZero(n))
       .map(n => ({
@@ -293,8 +270,7 @@ export default function TrialBalanceAllLevels() {
 
     // Prepare report data
     const currentDate = new Date().toLocaleDateString('ar-EG')
-    const projectName = projectId ? projectOptions.find(p => p.id === projectId)?.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
-    
+
     // Build professional commercial report HTML
     const reportHTML = `
       <!DOCTYPE html>
@@ -540,7 +516,7 @@ export default function TrialBalanceAllLevels() {
             <div class="report-title">${uiLang === 'ar' ? 'ميزان المراجعة (جميع المستويات)' : 'Trial Balance (All Levels)'}</div>
             <div class="report-period">${mode === 'range' ? `${uiLang === 'ar' ? 'من' : 'From'}: ${dateFrom} ${uiLang === 'ar' ? 'إلى' : 'To'}: ${dateTo}` : `${uiLang === 'ar' ? 'حتى تاريخ' : 'As of'}: ${dateTo}`}</div>
             <div class="report-filters">
-              <span class="filter-item">${uiLang === 'ar' ? 'المشروع' : 'Project'}: ${projectName}</span>
+              <span class="filter-item">${uiLang === 'ar' ? 'المشروع' : 'Project'}: ${currentProject?.name || (uiLang === 'ar' ? 'الكل' : 'All')}</span>
               <span class="filter-item">${uiLang === 'ar' ? 'تاريخ الطباعة' : 'Print Date'}: ${currentDate}</span>
               ${postedOnly ? `<span class="filter-item">${uiLang === 'ar' ? 'قيود معتمدة فقط' : 'Posted Only'}</span>` : ''}
               ${!includeZeros ? `<span class="filter-item">${uiLang === 'ar' ? 'إخفاء الأصفار' : 'Hide Zeros'}</span>` : ''}
@@ -554,10 +530,10 @@ export default function TrialBalanceAllLevels() {
         </body>
       </html>
     `
-    
+
     printWindow.document.write(reportHTML)
     printWindow.document.close()
-    
+
     // Wait for content to load, then print
     setTimeout(() => {
       printWindow.focus()
@@ -569,7 +545,7 @@ export default function TrialBalanceAllLevels() {
   // Generate print content with proper commercial formatting
   function generatePrintContent(): string {
     let html = ''
-    
+
     // Trial Balance Table
     html += `
       <table class="trial-balance-table">
@@ -588,20 +564,20 @@ export default function TrialBalanceAllLevels() {
         </thead>
         <tbody>
     `
-    
+
     // Generate hierarchical content
     const renderNodePrint = (node: TBNode, level: number): string => {
       if (!includeZeros && isZero(node)) return ''
-      
+
       // Use closing_debit/closing_credit consistently for balanced display
       const debit = node.rollup.closing_debit
       const credit = node.rollup.closing_credit
-      
-      const debitAmount = debit > 0 ? formatArabicCurrency(debit, numbersOnly ? 'none' : 'EGP') : ''
-      const creditAmount = credit > 0 ? formatArabicCurrency(credit, numbersOnly ? 'none' : 'EGP') : ''
-      
+
+      const debitAmount = debit > 0 ? formatArabicCurrency(debit, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr }) : ''
+      const creditAmount = credit > 0 ? formatArabicCurrency(credit, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr }) : ''
+
       const indent = '&nbsp;'.repeat(level * 4)
-      
+
       let result = `
         <tr class="account-row level-${level}">
           <td class="account-code">${node.code}</td>
@@ -610,64 +586,64 @@ export default function TrialBalanceAllLevels() {
           <td class="amount-credit">${creditAmount}</td>
         </tr>
       `
-      
+
       // Add children if expanded
       if (expanded.has(node.id) && node.children.length > 0) {
         for (const child of node.children) {
           result += renderNodePrint(child, level + 1)
         }
       }
-      
+
       return result
     }
-    
+
     // Render all root nodes
     for (const root of roots) {
       if (!includeZeros && isZero(root)) continue
       html += renderNodePrint(root, 0)
     }
-    
+
     html += `
         </tbody>
       </table>
     `
-    
+
     // Grand Total Section - use closing_debit/closing_credit for consistency
     const totalDebits = roots.reduce((s, r) => s + r.rollup.closing_debit, 0)
     const totalCredits = roots.reduce((s, r) => s + r.rollup.closing_credit, 0)
     const difference = Math.abs(totalDebits - totalCredits)
     const isBalanced = difference < 0.01
-    
+
     html += `
       <div class="grand-total">
         <div class="grand-total-header">${uiLang === 'ar' ? 'المجاميع العامة' : 'Grand Totals'}</div>
         <div class="total-row">
           <div class="total-label">${uiLang === 'ar' ? 'إجمالي المدين الختامي' : 'Total Closing Debits'}</div>
-          <div class="total-debit">${formatArabicCurrency(totalDebits, numbersOnly ? 'none' : 'EGP')}</div>
+          <div class="total-debit">${formatArabicCurrency(totalDebits, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</div>
           <div class="total-credit"></div>
         </div>
         <div class="total-row">
           <div class="total-label">${uiLang === 'ar' ? 'إجمالي الدائن الختامي' : 'Total Closing Credits'}</div>
           <div class="total-debit"></div>
-          <div class="total-credit">${formatArabicCurrency(totalCredits, numbersOnly ? 'none' : 'EGP')}</div>
+          <div class="total-credit">${formatArabicCurrency(totalCredits, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</div>
         </div>
         <div class="total-row">
           <div class="total-label">${uiLang === 'ar' ? 'الفرق' : 'Difference'}</div>
           <div class="total-debit"></div>
-          <div class="total-credit">${isBalanced ? (uiLang === 'ar' ? 'متوازن ✓' : 'Balanced ✓') : formatArabicCurrency(difference, numbersOnly ? 'none' : 'EGP')}</div>
+          <div class="total-credit">${isBalanced ? (uiLang === 'ar' ? 'متوازن ✓' : 'Balanced ✓') : formatArabicCurrency(difference, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</div>
         </div>
       </div>
     `
-    
+
     // Balance Status
     html += `
       <div class="balance-status ${isBalanced ? 'balanced' : 'unbalanced'}">
-        ${isBalanced 
-          ? (uiLang === 'ar' ? 'ميزان المراجعة متوازن ✓' : 'Trial Balance is Balanced ✓') 
-          : (uiLang === 'ar' ? `ميزان المراجعة غير متوازن: فرق ${formatArabicCurrency(difference, numbersOnly ? 'none' : 'EGP')}` : `Trial Balance is Unbalanced: Difference ${formatArabicCurrency(difference, numbersOnly ? 'none' : 'EGP')}`)}
+        ${isBalanced
+        ? (uiLang === 'ar' ? 'ميزان المراجعة متوازن ✓' : 'Trial Balance is Balanced ✓')
+        : (uiLang === 'ar' ? `ميزان المراجعة غير متوازن: فرق ${formatArabicCurrency(difference, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}` : `Trial Balance is Unbalanced: Difference ${formatArabicCurrency(difference, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}`)}
       </div>
     `
-    
+
     return html
   }
 
@@ -678,7 +654,7 @@ export default function TrialBalanceAllLevels() {
 
   // Collapse/expand state for groups
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
-  
+
   const toggleGroupCollapse = (groupKey: string) => {
     setCollapsedGroups(prev => {
       const newCollapsed = new Set(prev)
@@ -717,8 +693,8 @@ export default function TrialBalanceAllLevels() {
             <span className={styles.accountName}>{node.name_ar || node.name}</span>
           </div>
           <div className={styles.accountAmounts}>
-            <span className={styles.debitAmount}>{debit > 0 ? formatArabicCurrency(debit, numbersOnly ? 'none' : 'EGP') : '—'}</span>
-            <span className={styles.creditAmount}>{credit > 0 ? formatArabicCurrency(credit, numbersOnly ? 'none' : 'EGP') : '—'}</span>
+            <span className={styles.debitAmount}>{debit > 0 ? formatArabicCurrency(debit, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr }) : '—'}</span>
+            <span className={styles.creditAmount}>{credit > 0 ? formatArabicCurrency(credit, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr }) : '—'}</span>
           </div>
         </div>
         {/* Children rows (expanded vertically below parent) */}
@@ -734,28 +710,18 @@ export default function TrialBalanceAllLevels() {
   return (
     <div className={styles.container} dir={uiLang === 'ar' ? 'rtl' : 'ltr'}>
       <div className={`${styles.professionalFilterBar} ${styles.noPrint}`}>
-        {/* Left: org + project + dates */}
+        {/* Left: scope status + dates */}
         <div className={styles.filterSection}>
-          <select className={styles.filterSelect} value={orgId} onChange={e => {
-            setOrgId(e.target.value)
-            ;(async () => {
-              try {
-                const { setActiveOrgId } = await import('../../utils/org');
-                setActiveOrgId?.(e.target.value)
-              } catch {}
-            })()
-          }} aria-label={uiLang === 'ar' ? 'المؤسسة' : 'Organization'}>
-            <option value="">{uiLang === 'ar' ? 'اختر المؤسسة' : 'Select organization'}</option>
-            {orgOptions.map(o => (
-              <option key={o.id} value={o.id}>{o.code ? `${o.code} — ` : ''}{o.name_ar || o.name}</option>
-            ))}
-          </select>
-          <select className={styles.filterSelect} value={projectId} onChange={e => setProjectId(e.target.value)} aria-label={uiLang === 'ar' ? 'المشروع' : 'Project'}>
-            <option value="">{uiLang === 'ar' ? 'كل المشاريع' : 'All Projects'}</option>
-            {projectOptions.map(p => (
-              <option key={p.id} value={p.id}>{p.code} — {p.name_ar || p.name}</option>
-            ))}
-          </select>
+          <div className={styles.filterGroup}>
+            <label className={styles.filterLabel}>{uiLang === 'ar' ? 'المؤسسة' : 'Organization'}</label>
+            <div className={styles.filterValueText}>{currentOrg?.name || '—'}</div>
+          </div>
+
+          <div className={styles.filterGroup}>
+            <label className={styles.filterLabel}>{uiLang === 'ar' ? 'المشروع' : 'Project'}</label>
+            <div className={styles.filterValueText}>{currentProject?.name || (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')}</div>
+          </div>
+
           {mode === 'range' && (
             <>
               <input className={styles.filterInput} type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} aria-label={uiLang === 'ar' ? 'من' : 'From'} />
@@ -769,9 +735,8 @@ export default function TrialBalanceAllLevels() {
 
         {/* Center: language + group controls + toggles */}
         <div className={styles.centerSection}>
-          <div className={styles.languageToggle} role="group" aria-label={uiLang === 'ar' ? 'اللغة' : 'Language'}>
-            <button type="button" className={`${styles.languageOption} ${uiLang === 'ar' ? 'active' : ''}`} onClick={() => setUiLang('ar')}>ع</button>
-            <button type="button" className={`${styles.languageOption} ${uiLang === 'en' ? 'active' : ''}`} onClick={() => setUiLang('en')}>En</button>
+          <div className={styles.languageDisplay}>
+            {uiLang === 'ar' ? 'العربية' : 'English'}
           </div>
 
           <div className={styles.groupControls}>
@@ -810,8 +775,6 @@ export default function TrialBalanceAllLevels() {
               setDateFrom(startOfYearISO())
               setDateTo(todayISO())
               setMode('range') // Show period activity
-              setProjectId('')
-              setOrgId('')
               setIncludeZeros(false) // Hide zero balances for business view
               setPostedOnly(false)
               expandToLevel(2) // Show meaningful detail
@@ -846,13 +809,13 @@ export default function TrialBalanceAllLevels() {
           >
             🗂️ {uiLang === 'ar' ? 'عرض الكل' : 'Show All'}
           </button>
-          
+
           <div className={styles.exportGroup}>
             <button type="button" className={styles.exportButton} onClick={() => exportVisible('excel')} title={uiLang === 'ar' ? 'تصدير Excel' : 'Export Excel'}><IosShare fontSize="small" /> Excel</button>
             <button type="button" className={styles.exportButton} onClick={() => exportVisible('csv')} title={uiLang === 'ar' ? 'تصدير CSV' : 'Export CSV'}><TableView fontSize="small" /> CSV</button>
           </div>
           <button type="button" className={`${styles.actionButton} ${styles.secondary}`} onClick={printReport} title={uiLang === 'ar' ? 'طباعة' : 'Print'}><Print fontSize="small" /> {uiLang === 'ar' ? 'طباعة' : 'Print'}</button>
-<button type="button" className={`${styles.actionButton} ${styles.primary}`} onClick={loadData} disabled={loading} title={uiLang === 'ar' ? 'تحديث' : 'Refresh'}>
+          <button type="button" className={`${styles.actionButton} ${styles.primary}`} onClick={loadData} disabled={loading} title={uiLang === 'ar' ? 'تحديث' : 'Refresh'}>
             <Refresh fontSize="small" /> {loading ? (uiLang === 'ar' ? 'جاري التحميل...' : 'Loading...') : (uiLang === 'ar' ? 'تحديث' : 'Refresh')}
           </button>
         </div>
@@ -886,9 +849,9 @@ export default function TrialBalanceAllLevels() {
               // Use closing_debit/closing_credit consistently for all display modes
               const debit = root.rollup.closing_debit
               const credit = root.rollup.closing_credit
-              
+
               if (!includeZeros && isZero(root)) return null
-              
+
               return (
                 <div key={root.id} className={styles.financialGroup}>
                   {/* Group Header */}
@@ -910,7 +873,7 @@ export default function TrialBalanceAllLevels() {
                       <span className={styles.creditAmount}>{credit > 0 ? formatArabicCurrency(credit, numbersOnly ? 'none' : 'EGP') : '—'}</span>
                     </div>
                   </div>
-                  
+
                   {/* Group Content */}
                   {!isCollapsed && (
                     <div className={styles.groupContent}>

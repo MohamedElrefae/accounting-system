@@ -1,7 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
 import { fetchAnalysisItemUsage, type AnalysisUsageRow, fetchTopAnalysisItems, type TopAnalysisMetric } from '../../services/reports/analysis-item-usage'
-import { getOrganizations, type Organization } from '../../services/organization'
-import { getActiveProjects, type Project } from '../../services/projects'
 import ExportButtons from '../../components/Common/ExportButtons'
 import PresetBar from '../../components/Common/PresetBar'
 import { useReportPresets } from '../../hooks/useReportPresets'
@@ -10,39 +7,27 @@ import { Button, Card, CardContent, FormControl, InputLabel, MenuItem, Select, T
 import '../../components/Common/UltimateButtons.css'
 
 const AnalysisItemUsagePage: React.FC = () => {
-  const [orgs, setOrgs] = useState<Organization[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
-  const [orgId, setOrgId] = useState<string>('')
-  const [projectId, setProjectId] = useState<string>('')
-  const [dateFrom, setDateFrom] = useState<string>('')
-  const [dateTo, setDateTo] = useState<string>('')
-  const [search, setSearch] = useState<string>('')
-  const [onlyWithTx, setOnlyWithTx] = useState<boolean>(false)
+  const { currentOrg, currentProject, availableOrgs, availableProjects } = useScope()
+  const { language: uiLang } = useAppStore()
+  const isAr = uiLang === 'ar'
+
   const [rows, setRows] = useState<AnalysisUsageRow[]>([])
-  const [loading, setLoading] = useState<boolean>(false)
+  const [loading, setLoading] = useState(false)
+  const [dateFrom, setDateFrom] = useState<string | null>(null)
+  const [dateTo, setDateTo] = useState<string | null>(null)
+  const [onlyWithTx, setOnlyWithTx] = useState(false)
+  const [search, setSearch] = useState('')
   const [topMetric, setTopMetric] = useState<'net' | 'debit' | 'credit' | 'count'>('net')
   const [topLimit, setTopLimit] = useState<number>(10)
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [o, p] = await Promise.all([
-          getOrganizations().catch(() => []),
-          getActiveProjects().catch(() => []),
-        ])
-        setOrgs(o)
-        setProjects(p)
-        if (!orgId && o.length) setOrgId(o[0].id)
-      } catch {}
-    })()
-  }, [])
+  // No local orgs/projects needed, using useScope()
 
   const load = async () => {
     setLoading(true)
     try {
       const data = await fetchAnalysisItemUsage({
-        orgId: orgId || null,
-        projectId: projectId || null,
+        orgId: currentOrg?.id || null,
+        projectId: currentProject?.id || null,
         search: (search || '').trim() || null,
         onlyWithTx,
         dateFrom: dateFrom || null,
@@ -54,7 +39,9 @@ const AnalysisItemUsagePage: React.FC = () => {
     }
   }
 
-  useEffect(() => { load() }, [orgId, projectId, onlyWithTx, dateFrom, dateTo])
+  useEffect(() => {
+    if (currentOrg?.id) load()
+  }, [currentOrg?.id, currentProject?.id, onlyWithTx, dateFrom, dateTo])
 
   // Presets
   const reportKey = 'analysis-item-usage'
@@ -63,8 +50,6 @@ const AnalysisItemUsagePage: React.FC = () => {
   useEffect(() => {
     loadPresetsAndApplyLast((p) => {
       type UsagePresetFilters = {
-        orgId?: string
-        projectId?: string
         dateFrom?: string
         dateTo?: string
         onlyWithTx?: boolean
@@ -73,8 +58,6 @@ const AnalysisItemUsagePage: React.FC = () => {
         topLimit?: number
       }
       const f = (p as { filters?: UsagePresetFilters }).filters || {}
-      if (f.orgId != null) setOrgId(f.orgId)
-      if (f.projectId != null) setProjectId(f.projectId)
       if (f.dateFrom != null) setDateFrom(f.dateFrom)
       if (f.dateTo != null) setDateTo(f.dateTo)
       if (typeof f.onlyWithTx === 'boolean') setOnlyWithTx(f.onlyWithTx)
@@ -92,13 +75,13 @@ const AnalysisItemUsagePage: React.FC = () => {
 
   const exportData = useMemo(() => {
     const columns = createStandardColumns([
-      { key: 'code', header: 'Code / الكود', type: 'text' },
-      { key: 'name', header: 'Name / الاسم', type: 'text' },
-      { key: 'name_ar', header: 'Arabic Name / الاسم العربي', type: 'text' },
-      { key: 'tx_count', header: 'Tx Count', type: 'number' },
-      { key: 'total_debit_amount', header: 'Total Debit', type: 'currency' },
-      { key: 'total_credit_amount', header: 'Total Credit', type: 'currency' },
-      { key: 'net_amount', header: 'Net', type: 'currency' },
+      { key: 'code', header: isAr ? 'الكود' : 'Code', type: 'text' },
+      { key: 'name', header: isAr ? 'الاسم' : 'Name', type: 'text' },
+      { key: 'name_ar', header: isAr ? 'الاسم العربي' : 'Arabic Name', type: 'text' },
+      { key: 'tx_count', header: isAr ? 'عدد المعاملات' : 'Tx Count', type: 'number' },
+      { key: 'total_debit_amount', header: isAr ? 'إجمالي المدين' : 'Total Debit', type: 'currency' },
+      { key: 'total_credit_amount', header: isAr ? 'إجمالي الدائن' : 'Total Credit', type: 'currency' },
+      { key: 'net_amount', header: isAr ? 'الرصيد' : 'Net', type: 'currency' },
     ])
     const dataRows = filtered.map(r => ({
       code: r.code,
@@ -116,8 +99,8 @@ const AnalysisItemUsagePage: React.FC = () => {
   // Server-side Top-N export helper
   const handleServerTopExport = async (format: 'excel' | 'csv') => {
     const items = await fetchTopAnalysisItems({
-      orgId: orgId || null,
-      projectId: projectId || null,
+      orgId: currentOrg?.id || null,
+      projectId: currentProject?.id || null,
       dateFrom: dateFrom || null,
       dateTo: dateTo || null,
       orderBy: topMetric as TopAnalysisMetric,
@@ -125,36 +108,46 @@ const AnalysisItemUsagePage: React.FC = () => {
       limit: topLimit,
     })
     const cols = createStandardColumns([
-      { key: 'code', header: 'Code / الكود', type: 'text' },
-      { key: 'name', header: 'Name / الاسم', type: 'text' },
-      { key: 'name_ar', header: 'Arabic Name / الاسم العربي', type: 'text' },
-      { key: 'metric', header: 'Metric', type: 'text' },
-      { key: 'value', header: 'Value', type: 'number' },
+      { key: 'code', header: isAr ? 'الكود' : 'Code', type: 'text' },
+      { key: 'name', header: isAr ? 'الاسم' : 'Name', type: 'text' },
+      { key: 'name_ar', header: isAr ? 'الاسم العربي' : 'Arabic Name', type: 'text' },
+      { key: 'metric', header: isAr ? 'المقياس' : 'Metric', type: 'text' },
+      { key: 'value', header: isAr ? 'القيمة' : 'Value', type: 'number' },
     ])
     const rows = items.map(r => ({
       code: r.code,
       name: r.name,
       name_ar: r.name_ar || '',
       metric: topMetric,
-      value: topMetric === 'net' ? Number(r.net_amount||0) : topMetric === 'debit' ? Number(r.total_debit_amount||0) : topMetric === 'credit' ? Number(r.total_credit_amount||0) : Number(r.tx_count||0),
+      value: topMetric === 'net' ? Number(r.net_amount || 0) : topMetric === 'debit' ? Number(r.total_debit_amount || 0) : topMetric === 'credit' ? Number(r.total_credit_amount || 0) : Number(r.tx_count || 0),
     }))
     const data = prepareTableData(cols, rows)
     const title = (() => {
-      const metricLabels: Record<string,string> = { net: 'Top by Net', debit: 'Top by Total Debit', credit: 'Top by Total Credit', count: 'Top by Tx Count' }
-      const orgLabel = orgId ? (() => {
-        const o = orgs.find(x => x.id === orgId)
-        return o ? `${o.code ? o.code + ' - ' : ''}${o.name}` : 'Org: Selected'
-      })() : 'Org: All'
-      const projLabel = projectId ? (() => {
-        const p = projects.find(x => x.id === projectId)
-        return p ? `${p.code ? p.code + ' - ' : ''}${p.name}` : 'Project: Selected'
-      })() : 'Project: All'
-      const rangeLabel = (dateFrom || dateTo) ? `Range: ${dateFrom || '—'} → ${dateTo || '—'}` : 'Range: All'
-      return `Analysis Item Usage — Top ${topLimit} — ${metricLabels[topMetric]} — ${orgLabel} — ${projLabel} — ${rangeLabel}`
+      const metricLabels: Record<string, string> = isAr ? {
+        net: 'الأعلى بالرصيد',
+        debit: 'الأعلى بالمدين',
+        credit: 'الأعلى بالدائن',
+        count: 'الأعلى بعدد المعاملات'
+      } : {
+        net: 'Top by Net',
+        debit: 'Top by Total Debit',
+        credit: 'Top by Total Credit',
+        count: 'Top by Tx Count'
+      }
+      const orgLabel = currentOrg?.id ? (() => {
+        const o = availableOrgs.find(x => x.id === currentOrg?.id)
+        return o ? `${o.code ? o.code + ' - ' : ''}${o.name}` : (isAr ? 'المؤسسة: المختارة' : 'Org: Selected')
+      })() : (isAr ? 'المؤسسة: الكل' : 'Org: All')
+      const projLabel = currentProject?.id ? (() => {
+        const p = availableProjects.find(x => x.id === currentProject?.id)
+        return p ? `${p.code ? p.code + ' - ' : ''}${p.name}` : (isAr ? 'المشروع: المختار' : 'Project: Selected')
+      })() : (isAr ? 'المشروع: الكل' : 'Project: All')
+      const rangeLabel = (dateFrom || dateTo) ? (isAr ? `الفترة: ${dateFrom || '—'} ← ${dateTo || '—'}` : `Range: ${dateFrom || '—'} ← ${dateTo || '—'}`) : (isAr ? 'الفترة: الكل' : 'Range: All')
+      return isAr ? `استخدام بنود التحليل — أعلى ${topLimit} — ${metricLabels[topMetric]} — ${orgLabel} — ${projLabel} — ${rangeLabel}` : `Analysis Item Usage — Top ${topLimit} — ${metricLabels[topMetric]} — ${orgLabel} — ${projLabel} — ${rangeLabel}`
     })()
     const { exportToExcel, exportToCSV } = await import('../../utils/UniversalExportManager')
-    if (format === 'excel') await exportToExcel(data, { title, rtlLayout: true, useArabicNumerals: true })
-    else await exportToCSV(data, { title, rtlLayout: true, useArabicNumerals: true })
+    if (format === 'excel') await exportToExcel(data, { title, rtlLayout: isAr, useArabicNumerals: isAr })
+    else await exportToCSV(data, { title, rtlLayout: isAr, useArabicNumerals: isAr })
   }
 
   return (
@@ -169,8 +162,6 @@ const AnalysisItemUsagePage: React.FC = () => {
           onChangePreset={async (id) => {
             await selectPresetAndApply(String(id), (p) => {
               const f = (p as { filters?: any }).filters || {}
-              if (f.orgId != null) setOrgId(f.orgId)
-              if (f.projectId != null) setProjectId(f.projectId)
               if (f.dateFrom != null) setDateFrom(f.dateFrom)
               if (f.dateTo != null) setDateTo(f.dateTo)
               if (typeof f.onlyWithTx === 'boolean') setOnlyWithTx(f.onlyWithTx)
@@ -185,8 +176,6 @@ const AnalysisItemUsagePage: React.FC = () => {
             await saveCurrentPreset({
               name: newPresetName.trim(),
               filters: {
-                orgId,
-                projectId,
                 dateFrom,
                 dateTo,
                 onlyWithTx,
@@ -214,7 +203,7 @@ const AnalysisItemUsagePage: React.FC = () => {
             <MenuItem value="credit">Top by Total Credit</MenuItem>
             <MenuItem value="count">Top by Tx Count</MenuItem>
           </Select>
-          <TextField size="small" type="number" value={topLimit} onChange={e => setTopLimit(Math.max(1, parseInt(e.target.value||'10', 10) || 10))} label="N" inputProps={{ min: 1, style: { width: 70 } }} />
+          <TextField size="small" type="number" value={topLimit} onChange={e => setTopLimit(Math.max(1, parseInt(e.target.value || '10', 10) || 10))} label="N" inputProps={{ min: 1, style: { width: 70 } }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <button className="ultimate-btn ultimate-btn-edit" onClick={() => handleServerTopExport('excel')} title="Export Top-N (Server) Excel">
               <div className="btn-content"><span className="btn-text">Top-N (Server) Excel</span></div>
@@ -228,41 +217,38 @@ const AnalysisItemUsagePage: React.FC = () => {
           data={exportData}
           config={{
             title: (() => {
-              const orgLabel = orgId ? (() => {
-                const o = orgs.find(x => x.id === orgId)
-                return o ? `${o.code ? o.code + ' - ' : ''}${o.name}` : 'Org: Selected'
-              })() : 'Org: All'
-              const projLabel = projectId ? (() => {
-                const p = projects.find(x => x.id === projectId)
-                return p ? `${p.code ? p.code + ' - ' : ''}${p.name}` : 'Project: Selected'
-              })() : 'Project: All'
-              const rangeLabel = (dateFrom || dateTo) ? `Range: ${dateFrom || '—'} → ${dateTo || '—'}` : 'Range: All'
-              return `Analysis Item Usage — ${orgLabel} — ${projLabel} — ${rangeLabel}`
+              const orgLabel = currentOrg?.id ? (() => {
+                const o = availableOrgs.find(x => x.id === currentOrg.id)
+                return o ? `${o.code ? o.code + ' - ' : ''}${o.name}` : (isAr ? 'المؤسسة: المختارة' : 'Org: Selected')
+              })() : (isAr ? 'المؤسسة: الكل' : 'Org: All')
+              const projLabel = currentProject?.id ? (() => {
+                const p = availableProjects.find(x => x.id === currentProject.id)
+                return p ? `${p.code ? p.code + ' - ' : ''}${p.name}` : (isAr ? 'المشروع: المختار' : 'Project: Selected')
+              })() : (isAr ? 'المشروع: الكل' : 'Project: All')
+              const rangeLabel = (dateFrom || dateTo) ? (isAr ? `الفترة: ${dateFrom || '—'} ← ${dateTo || '—'}` : `Range: ${dateFrom || '—'} ← ${dateTo || '—'}`) : (isAr ? 'الفترة: الكل' : 'Range: All')
+              return isAr ? `استخدام بنود التحليل — ${orgLabel} — ${projLabel} — ${rangeLabel}` : `Analysis Item Usage — ${orgLabel} — ${projLabel} — ${rangeLabel}`
             })(),
-            rtlLayout: true,
-            useArabicNumerals: true,
+            rtlLayout: isAr,
+            useArabicNumerals: isAr,
           }}
           size="small"
         />
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
-        <FormControl size="small">
-          <InputLabel>Organization</InputLabel>
-          <Select label="Organization" value={orgId} onChange={(e) => setOrgId(String(e.target.value))}>
-            {orgs.map(o => (<MenuItem key={o.id} value={o.id}>{o.code} - {o.name}</MenuItem>))}
-          </Select>
-        </FormControl>
-        <FormControl size="small">
-          <InputLabel>Project</InputLabel>
-          <Select label="Project" value={projectId} onChange={(e) => setProjectId(String(e.target.value))}>
-            <MenuItem value="">All</MenuItem>
-            {projects.map(p => (<MenuItem key={p.id} value={p.id}>{p.code} - {p.name}</MenuItem>))}
-          </Select>
-        </FormControl>
-        <TextField size="small" type="date" label="From" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-        <TextField size="small" type="date" label="To" value={dateTo} onChange={e => setDateTo(e.target.value)} />
-        <TextField size="small" label="Search / بحث" value={search} onChange={e => setSearch(e.target.value)} />
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <Typography variant="caption" color="textSecondary">Organization / المؤسسة</Typography>
+          <Typography variant="body2">{currentOrg?.name || '—'}</Typography>
+        </div>
+        {currentProject?.id && (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <Typography variant="caption" color="textSecondary">Project / المشروع</Typography>
+            <Typography variant="body2">{currentProject.name}</Typography>
+          </div>
+        )}
+        <TextField size="small" type="date" label="From" value={dateFrom || ''} onChange={e => setDateFrom(e.target.value)} />
+        <TextField size="small" type="date" label="To" value={dateTo || ''} onChange={e => setDateTo(e.target.value)} />
+        <TextField size="small" label="Search / بحث" value={search || ''} onChange={e => setSearch(e.target.value)} />
         <FormControl size="small" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
           <Checkbox checked={onlyWithTx} onChange={e => setOnlyWithTx(e.target.checked)} /> Only with Tx
         </FormControl>
@@ -278,21 +264,21 @@ const AnalysisItemUsagePage: React.FC = () => {
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Code</TableCell>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Arabic Name</TableCell>
-                    <TableCell align="right">Tx Count</TableCell>
-                    <TableCell align="right">Total Debit</TableCell>
-                    <TableCell align="right">Total Credit</TableCell>
-                    <TableCell align="right">Net</TableCell>
+                    <TableCell>{isAr ? 'الكود' : 'Code'}</TableCell>
+                    <TableCell>{isAr ? 'الاسم' : 'Name'}</TableCell>
+                    <TableCell>{isAr ? 'الاسم العربي' : 'Arabic Name'}</TableCell>
+                    <TableCell align="right">{isAr ? 'عدد المعاملات' : 'Tx Count'}</TableCell>
+                    <TableCell align="right">{isAr ? 'إجمالي المدين' : 'Total Debit'}</TableCell>
+                    <TableCell align="right">{isAr ? 'إجمالي الدائن' : 'Total Credit'}</TableCell>
+                    <TableCell align="right">{isAr ? 'الرصيد' : 'Net'}</TableCell>
                     <TableCell align="center">GL</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {filtered.map(r => {
                     const params = new URLSearchParams()
-                    if (orgId) params.set('orgId', orgId)
-                    if (projectId) params.set('projectId', projectId)
+                    if (currentOrg?.id) params.set('orgId', currentOrg.id)
+                    if (currentProject?.id) params.set('projectId', currentProject.id)
                     if (dateFrom) params.set('dateFrom', dateFrom)
                     if (dateTo) params.set('dateTo', dateTo)
                     // Let GL include opening and postedOnly defaults; user can change there
@@ -307,10 +293,10 @@ const AnalysisItemUsagePage: React.FC = () => {
                         </TableCell>
                         <TableCell>{r.name}</TableCell>
                         <TableCell>{r.name_ar || ''}</TableCell>
-                        <TableCell align="right">{Number(r.tx_count || 0).toLocaleString()}</TableCell>
-                        <TableCell align="right">{Number(r.total_debit_amount || 0).toLocaleString()}</TableCell>
-                        <TableCell align="right">{Number(r.total_credit_amount || 0).toLocaleString()}</TableCell>
-                        <TableCell align="right">{Number(r.net_amount || 0).toLocaleString()}</TableCell>
+                        <TableCell align="right">{formatArabicCurrency(Number(r.tx_count || 0), 'none', { useArabicNumerals: isAr })}</TableCell>
+                        <TableCell align="right">{formatArabicCurrency(Number(r.total_debit_amount || 0), 'none', { useArabicNumerals: isAr })}</TableCell>
+                        <TableCell align="right">{formatArabicCurrency(Number(r.total_credit_amount || 0), 'none', { useArabicNumerals: isAr })}</TableCell>
+                        <TableCell align="right">{formatArabicCurrency(Number(r.net_amount || 0), 'none', { useArabicNumerals: isAr })}</TableCell>
                         <TableCell align="center">
                           <a href={glUrl} target="_blank" rel="noopener" title="Open in General Ledger" style={{ textDecoration: 'none' }}>
                             🔎 GL

@@ -1,56 +1,36 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import styles from './WorkItemUsage.module.css'
-import { getOrganizations, type Organization } from '../../services/organization'
-import { getActiveProjects, type Project } from '../../services/projects'
 import { getWorkItemUsage, type WorkItemUsageRow } from '../../services/reports/work-item-usage'
 import ResizableTable from '../../components/Common/ResizableTable'
 import ExportButtons from '../../components/Common/ExportButtons'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
 import { useToast } from '../../contexts/ToastContext'
+import { useScope } from '../../contexts/ScopeContext'
+import useAppStore from '../../store/useAppStore'
 
 const WorkItemUsagePage: React.FC = () => {
+  const { currentOrg, currentProject, availableProjects } = useScope()
+  const { language: uiLang } = useAppStore()
+  const isAr = uiLang === 'ar'
   const { showToast } = useToast()
-  const [orgs, setOrgs] = useState<Organization[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
-  const [orgId, setOrgId] = useState<string>('')
-  const [projectId, setProjectId] = useState<string>('')
   const [search, setSearch] = useState('')
   const [onlyWithTx, setOnlyWithTx] = useState(false)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [status, setStatus] = useState<'all' | 'posted' | 'unposted'>('all')
   const [rows, setRows] = useState<WorkItemUsageRow[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    (async () => {
-      setLoading(true)
-      try {
-        const [o, p] = await Promise.all([
-          getOrganizations().catch(() => []),
-          getActiveProjects().catch(() => [])
-        ])
-        setOrgs(o)
-        setProjects(p)
-        // Default org
-        const defOrg = o[0]?.id || ''
-        setOrgId(defOrg)
-        const data = await getWorkItemUsage({ orgId: defOrg, search, onlyWithTx, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, status })
-        setRows(data)
-      } catch (e: any) {
-        showToast(e.message || 'Failed to load Work Item Usage', { severity: 'error' })
-      } finally {
-        setLoading(false)
-      }
-    })()
-  }, [])
+    if (currentOrg?.id) reload()
+  }, [currentOrg?.id, currentProject?.id])
 
-  const reload = async (org: string, proj?: string) => {
+  const reload = async () => {
     setLoading(true)
     try {
       const data = await getWorkItemUsage({
-        orgId: org || undefined,
-        projectId: proj || undefined,
+        orgId: currentOrg?.id || undefined,
+        projectId: currentProject?.id || undefined,
         search,
         onlyWithTx,
         dateFrom: dateFrom || undefined,
@@ -66,7 +46,7 @@ const WorkItemUsagePage: React.FC = () => {
   }
 
   const tableData = useMemo(() => {
-    const projMap = new Map(projects.map(p => [p.id, p]))
+    const projMap = new Map((availableProjects || []).map(p => [p.id, p]))
     return rows.map(r => ({
       code: r.code,
       name: r.name || r.name_ar || '',
@@ -75,7 +55,7 @@ const WorkItemUsagePage: React.FC = () => {
       total_amount: r.total_amount,
       original: r,
     }))
-  }, [rows, projects])
+  }, [rows, availableProjects])
 
   const exportData = useMemo(() => {
     const columns = createStandardColumns([
@@ -101,35 +81,35 @@ const WorkItemUsagePage: React.FC = () => {
       <div className={styles.header}>
         <div className={styles.title}>Work Item Usage / استخدام عناصر الأعمال</div>
         <div className={styles.toolbar}>
-          <select className={styles.select} value={orgId} onChange={async (e) => { const v = String(e.target.value); setOrgId(v); await reload(v, projectId || undefined) }}>
-            <option value="">جميع المؤسسات</option>
-            {orgs.map(o => (<option key={o.id} value={o.id}>{o.code} - {o.name}</option>))}
-          </select>
-          <select className={styles.select} value={projectId} onChange={async (e) => { const v = String(e.target.value); setProjectId(v); await reload(orgId, v || undefined) }}>
-            <option value="">كتالوج المؤسسة + جميع المشاريع</option>
-            {projects.map(p => (<option key={p.id} value={p.id}>{p.code} - {p.name}</option>))}
-          </select>
-          <input className={styles.input} placeholder="بحث الكود/الاسم" value={search} onChange={async (e) => { const v = e.target.value; setSearch(v); await reload(orgId, projectId || undefined) }} />
-          <input className={styles.input} type="date" value={dateFrom} onChange={async (e) => { setDateFrom(e.target.value); await reload(orgId, projectId || undefined) }} />
-          <input className={styles.input} type="date" value={dateTo} onChange={async (e) => { setDateTo(e.target.value); await reload(orgId, projectId || undefined) }} />
+          <div className={styles.scopeInfo}>
+            <span className={styles.scopeLabel}>{isAr ? 'المؤسسة' : 'Org'}:</span>
+            <span className={styles.scopeValue}>{currentOrg?.name || '—'}</span>
+          </div>
+          {currentProject?.id && (
+            <div className={styles.scopeInfo}>
+              <span className={styles.scopeLabel}>{isAr ? 'المشروع' : 'Proj'}:</span>
+              <span className={styles.scopeValue}>{currentProject.name}</span>
+            </div>
+          )}
+          <input className={styles.input} placeholder="بحث الكود/الاسم" value={search} onChange={(e) => setSearch(e.target.value)} onBlur={() => reload()} />
+          <input className={styles.input} type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} onBlur={() => reload()} />
+          <input className={styles.input} type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} onBlur={() => reload()} />
           <button
             className={`${styles.button} ${styles.resetBtn}`}
             title="مسح جميع الفلاتر"
-            onClick={async () => {
+            onClick={() => {
               setSearch('')
               setDateFrom('')
               setDateTo('')
               setOnlyWithTx(false)
               setStatus('all')
-              setOrgId('')
-              setProjectId('')
-              await reload('', undefined)
+              reload()
             }}
           >🔄</button>
           <label>
-            <input type="checkbox" checked={onlyWithTx} onChange={async (e) => { setOnlyWithTx(e.target.checked); await reload(orgId, projectId || undefined) }} /> عناصر بها معاملات فقط
+            <input type="checkbox" checked={onlyWithTx} onChange={(e) => { setOnlyWithTx(e.target.checked); reload(); }} /> عناصر بها معاملات فقط
           </label>
-          <select className={styles.select} value={status} onChange={async (e) => { const v = e.target.value as 'all'|'posted'|'unposted'; setStatus(v); await reload(orgId, projectId || undefined) }}>
+          <select className={styles.select} value={status} onChange={(e) => { const v = e.target.value as 'all' | 'posted' | 'unposted'; setStatus(v); reload(); }}>
             <option value="all">جميع الحالات</option>
             <option value="posted">مرحلة فقط</option>
             <option value="unposted">غير مرحلة فقط</option>
@@ -145,7 +125,7 @@ const WorkItemUsagePage: React.FC = () => {
             data={tableData as any}
             isLoading={loading}
             emptyMessage="لا توجد بيانات"
-            onColumnResize={() => {}}
+            onColumnResize={() => { }}
             renderCell={(_value: any, column: any, row: any) => {
               if (column.key === 'code') {
                 return (

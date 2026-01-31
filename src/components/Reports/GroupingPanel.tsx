@@ -7,6 +7,7 @@ interface ReportControlsProps {
     onSortOrderChange: (order: 'asc' | 'desc') => void
     isSummaryMode?: boolean
     onSummaryModeChange?: (mode: boolean) => void
+    isAr?: boolean
 }
 
 const groupingOptions = [
@@ -43,31 +44,32 @@ export function ReportControls({
     onSortOrderChange,
     isSummaryMode = false,
     onSummaryModeChange,
+    isAr = false
 }: ReportControlsProps) {
     return (
         <div className="report-grouping-panel" style={{ flexWrap: 'wrap', gap: '24px' }}>
             {/* View Mode Toggle */}
-            <div className="grouping-label-container" style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: '24px' }}>
-                <span className="grouping-label">نمط العرض:</span>
+            <div className="grouping-label-container" style={{ borderLeft: isAr ? '1px solid #e2e8f0' : 'none', borderRight: !isAr ? '1px solid #e2e8f0' : 'none', paddingLeft: isAr ? '24px' : '0', paddingRight: !isAr ? '24px' : '0' }}>
+                <span className="grouping-label">{isAr ? 'نمط العرض:' : 'View Mode:'}</span>
                 <div style={{ display: 'flex', gap: '8px' }}>
                     <button
                         className={`ultimate-btn ${!isSummaryMode ? 'ultimate-btn-success' : 'ultimate-btn-neutral'}`}
                         onClick={() => onSummaryModeChange?.(false)}
                         style={{ padding: '4px 12px', height: '32px', minHeight: 'unset', fontSize: '12px' }}
                     >
-                        تفصيلي
+                        {isAr ? 'تفصيلي' : 'Detailed'}
                     </button>
                     <button
                         className={`ultimate-btn ${isSummaryMode ? 'ultimate-btn-success' : 'ultimate-btn-neutral'}`}
                         onClick={() => onSummaryModeChange?.(true)}
                         style={{ padding: '4px 12px', height: '32px', minHeight: 'unset', fontSize: '12px' }}
                     >
-                        ملخص
+                        {isAr ? 'ملخص' : 'Summary'}
                     </button>
                 </div>
             </div>
             <div className="grouping-label-container">
-                <span className="grouping-label">تجميع حسب:</span>
+                <span className="grouping-label">{isAr ? 'تجميع حسب:' : 'Group By:'}</span>
                 <select
                     className="grouping-select"
                     value={selectedGrouping}
@@ -75,7 +77,7 @@ export function ReportControls({
                 >
                     {groupingOptions.map(option => (
                         <option key={option.value} value={option.value}>
-                            {option.label}
+                            {isAr ? option.label : option.labelEn}
                         </option>
                     ))}
                 </select>
@@ -91,7 +93,7 @@ export function ReportControls({
             </div>
 
             <div className="grouping-label-container">
-                <span className="grouping-label">ترتيب حسب:</span>
+                <span className="grouping-label">{isAr ? 'ترتيب حسب:' : 'Sort By:'}</span>
                 <select
                     className="grouping-select"
                     value={selectedSortField}
@@ -100,7 +102,7 @@ export function ReportControls({
                 >
                     {sortOptions.map(option => (
                         <option key={option.value} value={option.value}>
-                            {option.label}
+                            {isAr ? option.label : option.labelEn}
                         </option>
                     ))}
                 </select>
@@ -110,13 +112,13 @@ export function ReportControls({
                     onChange={(e) => onSortOrderChange(e.target.value as 'asc' | 'desc')}
                     style={{ minWidth: '100px' }}
                 >
-                    <option value="desc">تنازلي ↓</option>
-                    <option value="asc">تصاعدي ↑</option>
+                    <option value="desc">{isAr ? 'تنازلي ↓' : 'Descending ↓'}</option>
+                    <option value="asc">{isAr ? 'تصاعدي ↑' : 'Ascending ↑'}</option>
                 </select>
             </div>
 
             <span className="grouping-help">
-                تحكم في طريقة عرض وترتيب سطور المعاملات
+                {isAr ? 'تحكم في طريقة عرض وترتيب سطور المعاملات' : 'Control how transaction lines are displayed and sorted'}
             </span>
         </div>
     )

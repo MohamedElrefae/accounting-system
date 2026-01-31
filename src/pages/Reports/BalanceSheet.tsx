@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { supabase } from '../../utils/supabase'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import useAppStore from '../../store/useAppStore'
 import { formatArabicCurrency } from '../../utils/ArabicTextEngine'
 import { exportToExcel, exportToCSV } from '../../utils/UniversalExportManager'
 import styles from './BalanceSheet.module.css'
@@ -54,12 +54,15 @@ interface BSData {
 
 export default function BalanceSheet() {
   const { currentOrg, currentProject, availableProjects } = useScope()
+  const lang = useAppStore((s: { language: string }) => s.language)
+  const isAr = lang === 'ar'
+
   const [asOfDate, setAsOfDate] = useState<string>(todayISO())
   const [loading, setLoading] = useState<boolean>(false)
   const [data, setData] = useState<BSData | null>(null)
   const [error, setError] = useState<string>('')
   const [includeZeros, setIncludeZeros] = useState<boolean>(false)
-  const [uiLang, setUiLang] = useState<'ar' | 'en'>('ar')
+  const uiLang = isAr ? 'ar' : 'en'
   const [companyName, setCompanyName] = useState<string>('')
   const [detailedView, setDetailedView] = useState<boolean>(true)
   const [postedOnly, setPostedOnly] = useState<boolean>(false)
@@ -273,10 +276,10 @@ export default function BalanceSheet() {
           [uiLang === 'ar' ? 'المشروع' : 'Project', currentProject ? (currentProject.code + ' — ' + (currentProject.name || '')) : (uiLang === 'ar' ? 'الكل' : 'All')],
           [''],
           [uiLang === 'ar' ? 'ملخص المؤشرات المالية:' : 'Financial Summary:'],
-          [uiLang === 'ar' ? 'إجمالي الأصول' : 'Total Assets', formatArabicCurrency(data.total_assets, numbersOnly ? 'none' : 'EGP')],
-          [uiLang === 'ar' ? 'إجمالي الالتزامات' : 'Total Liabilities', formatArabicCurrency(data.total_liabilities, numbersOnly ? 'none' : 'EGP')],
-          [uiLang === 'ar' ? 'إجمالي حقوق الملكية' : 'Total Equity', formatArabicCurrency(data.total_equity, numbersOnly ? 'none' : 'EGP')],
-          [uiLang === 'ar' ? 'صافي القيمة' : 'Net Worth', formatArabicCurrency(data.net_worth, numbersOnly ? 'none' : 'EGP')],
+          [uiLang === 'ar' ? 'إجمالي الأصول' : 'Total Assets', formatArabicCurrency(data.total_assets, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })],
+          [uiLang === 'ar' ? 'إجمالي الالتزامات' : 'Total Liabilities', formatArabicCurrency(data.total_liabilities, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })],
+          [uiLang === 'ar' ? 'إجمالي حقوق الملكية' : 'Total Equity', formatArabicCurrency(data.total_equity, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })],
+          [uiLang === 'ar' ? 'صافي القيمة' : 'Net Worth', formatArabicCurrency(data.net_worth, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })],
         ]
       }
     }
@@ -361,7 +364,6 @@ export default function BalanceSheet() {
 
     // Prepare report data
     const currentDate = new Date().toLocaleDateString('ar-EG')
-    const projectName = currentProject ? currentProject.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
 
     // Build professional commercial report HTML
     const reportHTML = `
@@ -624,7 +626,7 @@ export default function BalanceSheet() {
             <div class="report-title">${uiLang === 'ar' ? 'الميزانية العمومية' : 'Balance Sheet'}</div>
             <div class="report-date">${uiLang === 'ar' ? 'كما في تاريخ' : 'As of'}: ${asOfDate}</div>
             <div class="report-filters">
-              <span class="filter-item">${uiLang === 'ar' ? 'المشروع' : 'Project'}: ${projectName}</span>
+              <span class="filter-item">${uiLang === 'ar' ? 'المشروع' : 'Project'}: ${currentProject?.name || (uiLang === 'ar' ? 'الكل' : 'All')}</span>
               <span class="filter-item">${uiLang === 'ar' ? 'تاريخ الطباعة' : 'Print Date'}: ${currentDate}</span>
               ${postedOnly ? `<span class="filter-item">${uiLang === 'ar' ? 'قيود معتمدة فقط' : 'Posted Only'}</span>` : ''}
               <span class="filter-item">${uiLang === 'ar' ? 'العرض' : 'View'}: ${detailedView ? (uiLang === 'ar' ? 'تفصيلي' : 'Detailed') : (uiLang === 'ar' ? 'ملخص' : 'Summary')}</span>
@@ -800,7 +802,7 @@ export default function BalanceSheet() {
     // Auto reload when inputs change
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [asOfDate, projectId, includeZeros, postedOnly])
+  }, [asOfDate, currentProject?.id, currentOrg?.id, includeZeros, postedOnly])
 
   // Balance status
   const balanceStatus = useMemo(() => {
@@ -820,19 +822,18 @@ export default function BalanceSheet() {
       {/* Unified one-row filter bar using advanced implementation - EXACT copy from P&L */}
       <div className={`${styles.professionalFilterBar} ${styles.noPrint}`}>
         {/* Left Section: Date Filters */}
+        {/* Left Section: Scope status + Date Filters */}
         <div className={styles.filterSection}>
-          <select
-            className={styles.filterSelect}
-            value={projectId}
-            onChange={e => setProjectId(e.target.value)}
-            aria-label={uiLang === 'ar' ? 'المشروع' : 'Project'}
-            title={uiLang === 'ar' ? 'اختر مشروع للتصفية' : 'Select project to filter'}
-          >
-            <option value="">{uiLang === 'ar' ? 'كل المشاريع' : 'All Projects'}</option>
-            {projects.map(p => (
-              <option key={p.id} value={p.id}>{p.code} — {p.name}</option>
-            ))}
-          </select>
+          <div className={styles.filterGroup}>
+            <label className={styles.filterLabel}>{uiLang === 'ar' ? 'المؤسسة' : 'Organization'}</label>
+            <div className={styles.filterValueText}>{currentOrg?.name || '—'}</div>
+          </div>
+
+          <div className={styles.filterGroup}>
+            <label className={styles.filterLabel}>{uiLang === 'ar' ? 'المشروع' : 'Project'}</label>
+            <div className={styles.filterValueText}>{currentProject?.name || (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')}</div>
+          </div>
+
           <input
             className={styles.filterInput}
             type="date"
@@ -845,9 +846,8 @@ export default function BalanceSheet() {
 
         {/* Center Section: Language + Group Controls + Feature Toggles */}
         <div className={styles.centerSection}>
-          <div className={styles.languageToggle} role="group" aria-label={uiLang === 'ar' ? 'اللغة' : 'Language'}>
-            <button type="button" className={`${styles.languageOption} ${uiLang === 'ar' ? styles.active : ''}`} onClick={() => setUiLang('ar')}>ع</button>
-            <button type="button" className={`${styles.languageOption} ${uiLang === 'en' ? styles.active : ''}`} onClick={() => setUiLang('en')}>En</button>
+          <div className={styles.languageDisplay}>
+            {uiLang === 'ar' ? 'العربية' : 'English'}
           </div>
 
           <div className={styles.groupControls}>
@@ -926,7 +926,6 @@ export default function BalanceSheet() {
             onClick={() => {
               // Reset to show all data with meaningful filters
               setAsOfDate(todayISO())
-              setProjectId('')
               setIncludeZeros(false) // Hide zero balances for business view
               setPostedOnly(false)
               setDetailedView(true)
@@ -1027,8 +1026,8 @@ export default function BalanceSheet() {
             <div className={styles.statementTitle}>{uiLang === 'ar' ? 'الميزانية العمومية' : 'Balance Sheet'}</div>
             <div className={styles.statementMeta}>
               <span>{uiLang === 'ar' ? 'كما في تاريخ' : 'As of'}: {asOfDate}</span>
-              {projectId && (
-                <span>{uiLang === 'ar' ? 'المشروع' : 'Project'}: {projects.find(p => p.id === projectId)?.name || projectId}</span>
+              {currentProject?.id && (
+                <span>{uiLang === 'ar' ? 'المشروع' : 'Project'}: {(availableProjects || []).find(p => p.id === currentProject.id)?.name || currentProject.id}</span>
               )}
               {postedOnly && (
                 <span>{uiLang === 'ar' ? 'قيود معتمدة فقط' : 'Posted only'}</span>
@@ -1080,7 +1079,7 @@ export default function BalanceSheet() {
                           <span className="account-count">({group.rows.length})</span>
                         </h3>
                         <div className="group-totals-preview">
-                          <span className="preview-amount">{formatArabicCurrency(Math.abs(group.total), numbersOnly ? 'none' : 'EGP')}</span>
+                          <span className="preview-amount">{formatArabicCurrency(Math.abs(group.total), numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</span>
                         </div>
                       </div>
                       {!isCollapsed && (
@@ -1096,7 +1095,7 @@ export default function BalanceSheet() {
                                     </span>
                                   </div>
                                   <div className="account-amounts">
-                                    <span className="amount">{formatArabicCurrency(Math.abs(row.amount), numbersOnly ? 'none' : 'EGP')}</span>
+                                    <span className="amount">{formatArabicCurrency(Math.abs(row.amount), numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</span>
                                   </div>
                                 </div>
                               ))}
@@ -1107,7 +1106,7 @@ export default function BalanceSheet() {
                               {uiLang === 'ar' ? `إجمالي ${group.titleAr}` : `Total ${group.titleEn}`}
                             </span>
                             <div className="subtotal-amounts">
-                              <span className="subtotal-amount">{formatArabicCurrency(Math.abs(group.total), numbersOnly ? 'none' : 'EGP')}</span>
+                              <span className="subtotal-amount">{formatArabicCurrency(Math.abs(group.total), numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</span>
                             </div>
                           </div>
                         </>
@@ -1121,14 +1120,14 @@ export default function BalanceSheet() {
                   <div className="calculation-line total-assets">
                     <span className="calc-label">{uiLang === 'ar' ? 'إجمالي الأصول' : 'Total Assets'}</span>
                     <div className="calc-amounts">
-                      <span className="calc-amount">{formatArabicCurrency(data.total_assets, numbersOnly ? 'none' : 'EGP')}</span>
+                      <span className="calc-amount">{formatArabicCurrency(data.total_assets, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</span>
                     </div>
                   </div>
 
                   <div className="calculation-line total-liabilities-equity">
                     <span className="calc-label">{uiLang === 'ar' ? 'إجمالي الالتزامات وحقوق الملكية' : 'Total Liabilities & Equity'}</span>
                     <div className="calc-amounts">
-                      <span className="calc-amount">{formatArabicCurrency(data.total_liabilities_and_equity, numbersOnly ? 'none' : 'EGP')}</span>
+                      <span className="calc-amount">{formatArabicCurrency(data.total_liabilities_and_equity, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</span>
                     </div>
                   </div>
 
@@ -1136,7 +1135,7 @@ export default function BalanceSheet() {
                     <span className="calc-label">{uiLang === 'ar' ? 'التوازن المحاسبي' : 'Balance Check'}</span>
                     <div className="calc-amounts">
                       <span className={`calc-amount ${Math.abs(data.balance_check) < 0.01 ? 'balanced' : 'unbalanced'}`}>
-                        {Math.abs(data.balance_check) < 0.01 ? (uiLang === 'ar' ? 'متوازنة ✓' : 'Balanced ✓') : formatArabicCurrency(data.balance_check, numbersOnly ? 'none' : 'EGP')}
+                        {Math.abs(data.balance_check) < 0.01 ? (uiLang === 'ar' ? 'متوازنة ✓' : 'Balanced ✓') : formatArabicCurrency(data.balance_check, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}
                       </span>
                     </div>
                   </div>
@@ -1146,19 +1145,19 @@ export default function BalanceSheet() {
                 <div className="balance-sheet-ratios">
                   <div className="ratio-line">
                     <span className="ratio-label">{uiLang === 'ar' ? 'نسبة المديونية' : 'Debt Ratio'}</span>
-                    <span className="ratio-value">{data.total_assets !== 0 ? formatArabicCurrency(parseFloat(((data.total_liabilities / data.total_assets) * 100).toFixed(2)), 'none') : '0'}%</span>
+                    <span className="ratio-value">{data.total_assets !== 0 ? formatArabicCurrency(parseFloat(((data.total_liabilities / data.total_assets) * 100).toFixed(2)), 'none', { useArabicNumerals: isAr }) : '0'}%</span>
                   </div>
                   <div className="ratio-line">
                     <span className="ratio-label">{uiLang === 'ar' ? 'نسبة حقوق الملكية' : 'Equity Ratio'}</span>
-                    <span className="ratio-value">{data.total_assets !== 0 ? formatArabicCurrency(parseFloat(((data.total_equity / data.total_assets) * 100).toFixed(2)), 'none') : '0'}%</span>
+                    <span className="ratio-value">{data.total_assets !== 0 ? formatArabicCurrency(parseFloat(((data.total_equity / data.total_assets) * 100).toFixed(2)), 'none', { useArabicNumerals: isAr }) : '0'}%</span>
                   </div>
                   <div className="ratio-line">
                     <span className="ratio-label">{uiLang === 'ar' ? 'معدل العائد على الأصول' : 'Return on Assets'}</span>
-                    <span className="ratio-value">{data.total_assets !== 0 ? formatArabicCurrency(parseFloat(((data.net_worth / data.total_assets) * 100).toFixed(2)), 'none') : '0'}%</span>
+                    <span className="ratio-value">{data.total_assets !== 0 ? formatArabicCurrency(parseFloat(((data.net_worth / data.total_assets) * 100).toFixed(2)), 'none', { useArabicNumerals: isAr }) : '0'}%</span>
                   </div>
                   <div className="ratio-line">
                     <span className="ratio-label">{uiLang === 'ar' ? 'معدل العائد على حقوق الملكية' : 'Return on Equity'}</span>
-                    <span className="ratio-value">{data.total_equity !== 0 ? formatArabicCurrency(parseFloat(((data.net_worth / data.total_equity) * 100).toFixed(2)), 'none') : '0'}%</span>
+                    <span className="ratio-value">{data.total_equity !== 0 ? formatArabicCurrency(parseFloat(((data.net_worth / data.total_equity) * 100).toFixed(2)), 'none', { useArabicNumerals: isAr }) : '0'}%</span>
                   </div>
                 </div>
               </div>

@@ -12,6 +12,10 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import '../Transactions/Transactions.css'
+import { formatArabicCurrency } from '../../utils/ArabicTextEngine'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import useAppStore from '../../store/useAppStore'
+import { useScope } from '../../contexts/ScopeContext'
 import { useTransactionsData } from '../../contexts/TransactionsDataContext'
 import ExportButtons from '../../components/Common/ExportButtons'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
@@ -21,7 +25,6 @@ import type { ColumnConfig } from '../../components/Common/ColumnConfiguration'
 import useColumnPreferences from '../../hooks/useColumnPreferences'
 import UnifiedFilterBar from '../../components/Common/UnifiedFilterBar'
 import { useRunningBalanceFilters } from '../../hooks/useRunningBalanceFilters'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useUnifiedSync } from '../../hooks/useUnifiedSync'
 import { fetchRunningBalance, type RunningBalanceSummary } from '../../services/reports/runningBalanceService'
 import {
@@ -60,6 +63,10 @@ const RunningBalanceEnrichedPage = () => {
   const [pageSize, setPageSize] = useState(50)
   const [columnsConfigOpen, setColumnsConfigOpen] = useState(false)
   const [enhancedExportOpen, setEnhancedExportOpen] = useState(false)
+
+  const { currentOrg, currentProject } = useScope()
+  const { language: uiLang } = useAppStore()
+  const isAr = uiLang === 'ar'
 
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -103,8 +110,8 @@ const RunningBalanceEnrichedPage = () => {
         subTreeId: appliedFilters.expensesCategoryId || null,
         dateFrom: appliedFilters.dateFrom || null,
         dateTo: appliedFilters.dateTo || null,
-        orgId: appliedFilters.orgId || null,
-        projectId: appliedFilters.projectId || null,
+        orgId: appliedFilters.orgId || currentOrg?.id || null,
+        projectId: appliedFilters.projectId || currentProject?.id || null,
         classificationId: appliedFilters.classificationId || null,
         costCenterId: appliedFilters.costCenterId || null,
         workItemId: appliedFilters.workItemId || null,
@@ -171,15 +178,15 @@ const RunningBalanceEnrichedPage = () => {
   // Get label for the primary dimension
   const primaryDimensionLabel = useMemo(() => {
     const dimensionLabels: Record<PrimaryDimension, string> = {
-      account: 'الحساب',
-      sub_tree: 'اسم الحساب',
-      project: 'المشروع',
-      classification: 'التصنيف',
-      cost_center: 'مركز التكلفة',
-      work_item: 'عنصر العمل',
-      analysis_item: 'بند التحليل',
-      date_range: 'جميع الحسابات',
-      none: 'الحساب',
+      account: isAr ? 'الحساب' : 'Account',
+      sub_tree: isAr ? 'اسم الحساب' : 'Account Name',
+      project: isAr ? 'المشروع' : 'Project',
+      classification: isAr ? 'التصنيف' : 'Classification',
+      cost_center: isAr ? 'مركز التكلفة' : 'Cost Center',
+      work_item: isAr ? 'عنصر العمل' : 'Work Item',
+      analysis_item: isAr ? 'بند التحليل' : 'Analysis Item',
+      date_range: isAr ? 'جميع الحسابات' : 'All Accounts',
+      none: isAr ? 'الحساب' : 'Account',
     };
     return dimensionLabels[primaryDimension];
   }, [primaryDimension])
@@ -241,7 +248,7 @@ const RunningBalanceEnrichedPage = () => {
     // Hidden dimension columns (can be enabled via column config)
     // We filter out the one that is already shown as "dimensionColumn" (primaryDimensionKey)
     // AND we filter out 'account_label' if we just added it manually above
-    const hiddenDimensionColumns: ColumnConfig[] = [
+    const hiddenColumnsRaw: ColumnConfig[] = [
       { key: 'account_label', label: 'الحساب', visible: false, width: 220, minWidth: 160, maxWidth: 320, type: 'text', resizable: true },
       { key: 'project_label', label: 'المشروع', visible: false, width: 180, minWidth: 140, maxWidth: 260, type: 'text', resizable: true },
       { key: 'cost_center_label', label: 'مركز التكلفة', visible: false, width: 180, minWidth: 140, maxWidth: 260, type: 'text', resizable: true },
@@ -249,7 +256,8 @@ const RunningBalanceEnrichedPage = () => {
       { key: 'work_item_label', label: 'عنصر العمل', visible: false, width: 180, minWidth: 140, maxWidth: 260, type: 'text', resizable: true },
       { key: 'analysis_label', label: 'بند التحليل', visible: false, width: 180, minWidth: 140, maxWidth: 260, type: 'text', resizable: true },
       { key: 'sub_tree_label', label: 'اسم الحساب', visible: false, width: 180, minWidth: 140, maxWidth: 260, type: 'text', resizable: true },
-    ].filter(col => col.key !== primaryDimensionKey && !(primaryDimension !== 'account' && primaryDimension !== 'date_range' && primaryDimension !== 'none' && col.key === 'account_label'));
+    ];
+    const hiddenDimensionColumns = (hiddenColumnsRaw as any[]).filter(col => col.key !== primaryDimensionKey && !(primaryDimension !== 'account' && primaryDimension !== 'date_range' && primaryDimension !== 'none' && col.key === 'account_label')) as ColumnConfig[];
 
     return [...baseColumns, dimensionColumn, ...extraAccountColumn, ...coreColumns, ...hiddenDimensionColumns];
   }, [primaryDimensionKey, primaryDimensionLabel, primaryDimension])
@@ -345,8 +353,8 @@ const RunningBalanceEnrichedPage = () => {
 
   // Format currency for display
   const formatCurrency = useCallback((value: number) => {
-    return value.toLocaleString('ar-SA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }, [])
+    return formatArabicCurrency(value, 'none', { useArabicNumerals: isAr })
+  }, [isAr])
 
   // Export data with summary information
   const exportData = useMemo(() => {

@@ -118,6 +118,8 @@ export interface ProfitLossSummary {
   gross_profit: number
   total_operating_expenses: number
   operating_income: number
+  total_other_income: number
+  total_other_expenses: number
   net_income: number
   // Margin percentages
   gross_margin_percent: number
@@ -484,6 +486,8 @@ export async function getProfitLoss(filters: UnifiedFilters = {}): Promise<{
     gross_profit: 0,
     total_operating_expenses: 0,
     operating_income: 0,
+    total_other_income: 0,
+    total_other_expenses: 0,
     net_income: 0,
     gross_margin_percent: 0,
     operating_margin_percent: 0,
@@ -493,7 +497,7 @@ export async function getProfitLoss(filters: UnifiedFilters = {}): Promise<{
   for (const row of glRows) {
     const category = classifyAccountByCode(row.account_code)
     
-    // Only include P&L accounts
+    // Only include P&L accounts (4, 5)
     if (category !== 'revenue' && category !== 'expenses') continue
 
     const closingDebit = row.closing_debit || 0
@@ -504,17 +508,26 @@ export async function getProfitLoss(filters: UnifiedFilters = {}): Promise<{
 
     const displayAmount = closingDebit + closingCredit
 
-    // Classify expense sub-types
+    // Classify account types more granularly based on first two digits
     let accountType: ProfitLossRow['account_type']
+    const firstTwo = row.account_code.substring(0, 2)
+
     if (category === 'revenue') {
-      accountType = 'revenue'
-      summary.total_revenue += displayAmount
+      if (firstTwo === '48' || firstTwo === '49') {
+        accountType = 'other_income'
+        summary.total_other_income += displayAmount
+      } else {
+        accountType = 'revenue'
+        summary.total_revenue += displayAmount
+      }
     } else {
-      // Sub-categorize expenses based on account code
-      const firstTwo = row.account_code.substring(0, 2)
+      // Expenses
       if (firstTwo === '50' || firstTwo === '51' || firstTwo === '52') {
         accountType = 'cost_of_sales'
         summary.total_cost_of_sales += displayAmount
+      } else if (firstTwo === '58' || firstTwo === '59') {
+        accountType = 'other_expenses'
+        summary.total_other_expenses += displayAmount
       } else {
         accountType = 'expenses'
         summary.total_operating_expenses += displayAmount
@@ -528,13 +541,16 @@ export async function getProfitLoss(filters: UnifiedFilters = {}): Promise<{
       account_name_en: row.account_name_en,
       account_type: accountType,
       amount: displayAmount,
-      sort_order: accountType === 'revenue' ? 1 : accountType === 'cost_of_sales' ? 2 : 3
+      sort_order: accountType === 'revenue' ? 1 : 
+                  accountType === 'cost_of_sales' ? 2 : 
+                  accountType === 'expenses' ? 3 : 
+                  accountType === 'other_income' ? 4 : 5
     })
   }
 
   summary.gross_profit = summary.total_revenue - summary.total_cost_of_sales
   summary.operating_income = summary.gross_profit - summary.total_operating_expenses
-  summary.net_income = summary.operating_income
+  summary.net_income = summary.operating_income + summary.total_other_income - summary.total_other_expenses
   
   // Calculate margin percentages (avoid division by zero)
   if (summary.total_revenue !== 0) {

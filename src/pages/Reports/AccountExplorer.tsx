@@ -5,15 +5,21 @@ import { supabase } from '../../utils/supabase'
 import { formatArabicCurrency } from '../../utils/ArabicTextEngine'
 import { tableColWidths, type ExplorerMode } from '../../components/Reports/AccountColumns'
 import ReportTreeView from '../../components/TreeView/ReportTreeView'
-import { fetchProjects, fetchOrganizations, type LookupOption, fetchAccountsMinimal } from '../../services/lookups'
-import { getCompanyConfig } from '../../services/company-config'
-import { getActiveProjectId } from '../../utils/org'
-import SearchableSelect, { type SearchableSelectOption } from '../../components/Common/SearchableSelect'
+import {
+  fetchProjects,
+  fetchOrganizations,
+  type LookupOption,
+  fetchAccountsMinimal
+} from '../../services/lookups'
 import { getAllTransactionClassifications, type TransactionClassification } from '../../services/transaction-classification'
 import { getExpensesCategoriesList } from '../../services/sub-tree'
-import { listWorkItemsAll } from '../../services/work-items'
 import { getCostCentersForSelector } from '../../services/cost-centers'
+import { listWorkItemsAll } from '../../services/work-items'
+import { getCompanyConfig } from '../../services/company-config'
 import { fetchGLSummary, type UnifiedFilters } from '../../services/reports/unified-financial-query'
+import SearchableSelect, { type SearchableSelectOption } from '../../components/Common/SearchableSelect'
+import { useScope } from '../../contexts/ScopeContext'
+import useAppStore from '../../store/useAppStore'
 import TableView from '@mui/icons-material/TableView'
 import Print from '@mui/icons-material/Print'
 import PictureAsPdf from '@mui/icons-material/PictureAsPdf'
@@ -82,6 +88,10 @@ const sumAmounts = (a: Amounts, b: Amounts): Amounts => ({
 })
 
 const AccountExplorerReport: React.FC = () => {
+  const { currentOrg, currentProject } = useScope()
+  const lang = useAppStore((s: any) => s.language)
+  const isAr = lang === 'ar'
+
   // View toggles
   const [viewMode, setViewMode] = useState<'tree' | 'table'>('tree')
   const [mode, setMode] = useState<ExplorerMode>('asof')
@@ -91,17 +101,10 @@ const AccountExplorerReport: React.FC = () => {
   const [dateTo, setDateTo] = useState<string>(todayISO())
   const [postedOnly, setPostedOnly] = useState<boolean>(false)
   const [includeZeros, setIncludeZeros] = useState<boolean>(false)
-  const [uiLang, setUiLang] = useState<'ar' | 'en'>('ar')
+  const uiLang = isAr ? 'ar' : 'en'
   const [showOpeningInRange, setShowOpeningInRange] = useState<boolean>(true)
   const [numbersOnly, setNumbersOnly] = useState<boolean>(true)
   const [currencySymbol, setCurrencySymbol] = useState<string>('none')
-
-  // Orgs and projects
-  const [orgOptions, setOrgOptions] = useState<LookupOption[]>([])
-  const [projectOptions, setProjectOptions] = useState<LookupOption[]>([])
-  const [orgId, setOrgId] = useState<string>('')
-  const [projectId, setProjectId] = useState<string>(() => { try { return getActiveProjectId() || '' } catch { return '' } })
-  const orgIdRef = useRef<string | null>(null)
 
   // Data
   const [nodes, setNodes] = useState<Node[]>([])
@@ -125,7 +128,7 @@ const AccountExplorerReport: React.FC = () => {
       } else {
         await document.exitFullscreen()
       }
-    } catch {}
+    } catch { }
   }
 
   // Advanced filters
@@ -145,36 +148,23 @@ const AccountExplorerReport: React.FC = () => {
   const [amountMax, setAmountMax] = useState<string>('')
   const [searchTerm, setSearchTerm] = useState<string>('')
 
-  useEffect(() => {
-    const useGlobal = (()=>{ try { return localStorage.getItem('ae:useGlobalProject') === '1' } catch { return true } })()
-    if (useGlobal) { try { setProjectId(getActiveProjectId() || '') } catch {} }
-  }, [orgId])
-
-  // Load orgs, projects, default org, company currency
+  // Load company currency
   useEffect(() => {
     (async () => {
-      try { const orgs = await fetchOrganizations(); setOrgOptions(orgs || []) } catch {}
-      try { const projs = await fetchProjects(); setProjectOptions(projs || []) } catch {}
-      try {
-        const { getActiveOrgId } = await import('../../utils/org')
-        const stored = getActiveOrgId?.()
-        if (stored) setOrgId(stored)
-      } catch {}
-      try { const cfg = await getCompanyConfig(); setCurrencySymbol(cfg.currency_symbol || cfg.currency_code || 'EGP'); setCompanyName(cfg?.company_name || '') } catch {}
+      try { const cfg = await getCompanyConfig(); setCurrencySymbol(cfg.currency_symbol || cfg.currency_code || 'EGP'); setCompanyName(cfg?.company_name || '') } catch { }
     })()
   }, [])
-  useEffect(() => { orgIdRef.current = orgId || null }, [orgId])
 
   // Load lookups on org change
   useEffect(() => {
     (async () => {
       try {
-        if (orgId) {
+        if (currentOrg?.id) {
           const [classes, cats, wItems, ccs, accs] = await Promise.all([
             getAllTransactionClassifications().catch(() => []),
-            getExpensesCategoriesList(orgId).catch(() => []),
-            listWorkItemsAll(orgId).catch(() => []),
-            getCostCentersForSelector(orgId).catch(() => []),
+            getExpensesCategoriesList(currentOrg.id).catch(() => []),
+            listWorkItemsAll(currentOrg.id).catch(() => []),
+            getCostCentersForSelector(currentOrg.id).catch(() => []),
             fetchAccountsMinimal().catch(() => []),
           ])
           setClassifications(classes || [])
@@ -186,7 +176,7 @@ const AccountExplorerReport: React.FC = () => {
         }
       } catch { /* noop */ }
     })()
-  }, [orgId, uiLang])
+  }, [currentOrg?.id, uiLang])
 
   // Load data
   async function loadData() {
@@ -198,7 +188,7 @@ const AccountExplorerReport: React.FC = () => {
         .from('accounts')
         .select('id, code, name, name_ar, level, parent_id, status, category, org_id')
         .order('code', { ascending: true })
-      if (orgIdRef.current) accQ = accQ.eq('org_id', orgIdRef.current)
+      if (currentOrg?.id) accQ = accQ.eq('org_id', currentOrg.id)
       const accRes = await accQ
       if (accRes.error) throw accRes.error
       const accounts = (accRes.data || []) as Array<{
@@ -217,8 +207,8 @@ const AccountExplorerReport: React.FC = () => {
       const filters: UnifiedFilters = {
         dateFrom: mode === 'range' ? (dateFrom || null) : null,
         dateTo: dateTo || null,
-        orgId: orgIdRef.current || null,
-        projectId: projectId || null,
+        orgId: currentOrg?.id || null,
+        projectId: currentProject?.id || null,
         postedOnly,
         classificationId: classificationId || null,
         analysisWorkItemId: workItemId || null,
@@ -293,8 +283,8 @@ const AccountExplorerReport: React.FC = () => {
       }
     }, 250)
     return () => { canceled = true; clearTimeout(t) }
-  }, [orgId, projectId, postedOnly, mode, dateFrom, dateTo, classificationId, expensesCategoryId, workItemId, costCenterId, debitAccountId, creditAccountId, amountMin, amountMax])
-  
+  }, [currentOrg?.id, currentProject?.id, postedOnly, mode, dateFrom, dateTo, classificationId, expensesCategoryId, workItemId, costCenterId, debitAccountId, creditAccountId, amountMin, amountMax])
+
   // Initial data load once on mount (in case orgId is not set yet)
   useEffect(() => {
     let canceled = false
@@ -316,8 +306,8 @@ const AccountExplorerReport: React.FC = () => {
   const openGL = (accountId: string) => {
     const params = new URLSearchParams()
     params.set('accountId', accountId)
-    if (orgId) params.set('orgId', orgId)
-    if (projectId) params.set('projectId', projectId)
+    if (currentOrg?.id) params.set('orgId', currentOrg.id)
+    if (currentProject?.id) params.set('projectId', currentProject.id)
     params.set('postedOnly', String(!!postedOnly))
     params.set('includeOpening', mode === 'range' ? String(true) : String(false))
     if (mode === 'range') {
@@ -336,7 +326,7 @@ const AccountExplorerReport: React.FC = () => {
     if (amountMin) params.set('amountMin', amountMin)
     if (amountMax) params.set('amountMax', amountMax)
     const url = `/reports/general-ledger?${params.toString()}`
-    try { window.open(url, '_blank', 'noopener') } catch {}
+    try { window.open(url, '_blank', 'noopener') } catch { }
   }
 
   const flattenNodes = (roots: Node[]): Node[] => {
@@ -387,7 +377,7 @@ const AccountExplorerReport: React.FC = () => {
     }
 
     const rows = visibleFlat.map(n => {
-          const row: (string|number)[] = [String(n.code), String(n.name_ar || n.name), String(n.category || ''), String(n.level)]
+      const row: (string | number)[] = [String(n.code), String(n.name_ar || n.name), String(n.category || ''), String(n.level)]
       const openingDebit = Number(n.rollup.opening_debit || 0)
       const openingCredit = Number(n.rollup.opening_credit || 0)
       const periodDebits = Number(n.rollup.period_debits || 0)
@@ -418,15 +408,15 @@ const AccountExplorerReport: React.FC = () => {
       // const _projectName = projectId ? projectOptions.find(p => p.id === projectId)?.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
       const reportTitle = uiLang === 'ar' ? 'مستكشف الحسابات - التقرير المالي' : 'Account Explorer - Financial Report'
       const periodText = mode === 'range' ? `${uiLang === 'ar' ? 'من' : 'From'} ${dateFrom} ${uiLang === 'ar' ? 'إلى' : 'To'} ${dateTo}` : `${uiLang === 'ar' ? 'حتى تاريخ' : 'As of'} ${dateTo}`
-      
+
       // Build PDF table structure
-          const pdfColumns: import('../../services/pdf-generator').PDFTableColumn[] = [
+      const pdfColumns: import('../../services/pdf-generator').PDFTableColumn[] = [
         { key: 'code', header: uiLang === 'ar' ? 'رمز الحساب' : 'Account Code', width: '100px', align: 'center', type: 'text' },
         { key: 'name', header: uiLang === 'ar' ? 'اسم الحساب' : 'Account Name', width: '300px', align: 'right', type: 'text' },
         { key: 'type', header: uiLang === 'ar' ? 'نوع الحساب' : 'Account Type', width: '120px', align: 'center', type: 'text' },
         { key: 'level', header: uiLang === 'ar' ? 'المستوى' : 'Level', width: '80px', align: 'center', type: 'number' }
       ]
-      
+
       // Add dynamic columns based on mode
       if (mode === 'range') {
         if (showOpeningInRange) {
@@ -450,12 +440,12 @@ const AccountExplorerReport: React.FC = () => {
           { key: 'final_net', header: uiLang === 'ar' ? 'الصافي الختامي' : 'Final Net', width: '120px', align: 'right', type: 'currency' }
         )
       }
-      
+
       // Build PDF rows
       const pdfRows = visibleFlat.map(n => {
         const periodNet = Number(n.rollup.period_debits || 0) - Number(n.rollup.period_credits || 0)
         const finalNet = Number(n.rollup.closing_debit || 0) - Number(n.rollup.closing_credit || 0)
-        
+
         const row: Record<string, any> = {
           code: n.code,
           name: n.name_ar || n.name,
@@ -465,7 +455,7 @@ const AccountExplorerReport: React.FC = () => {
           closing_credit: Number(n.rollup.closing_credit || 0),
           final_net: finalNet
         }
-        
+
         if (mode === 'range') {
           row.opening_debit = Number(n.rollup.opening_debit || 0)
           row.opening_credit = Number(n.rollup.opening_credit || 0)
@@ -473,10 +463,10 @@ const AccountExplorerReport: React.FC = () => {
           row.period_credits = Number(n.rollup.period_credits || 0)
           row.period_net = periodNet
         }
-        
+
         return row
       })
-      
+
       // Calculate totals from root accounts (same as UI)
       const rootAccounts = nodes.filter(n => !n.parent_id)
       const totalClosingDebits = rootAccounts.reduce((sum, acc) => sum + Number(acc.rollup.closing_debit || 0), 0)
@@ -484,25 +474,25 @@ const AccountExplorerReport: React.FC = () => {
       const totalPeriodDebits = rootAccounts.reduce((sum, acc) => sum + Number(acc.rollup.period_debits || 0), 0)
       const totalPeriodCredits = rootAccounts.reduce((sum, acc) => sum + Number(acc.rollup.period_credits || 0), 0)
       const totalNet = totalClosingDebits - totalClosingCredits
-      
+
       // Build totals object
       const totals: Record<string, number> = {
         totalClosingDebits,
         totalClosingCredits,
         netTotal: totalNet
       }
-      
+
       if (mode === 'range') {
         totals.totalPeriodDebits = totalPeriodDebits
         totals.totalPeriodCredits = totalPeriodCredits
       }
-      
+
       const tableData: PDFTableData = {
         columns: pdfColumns,
         rows: pdfRows,
         totals
       }
-      
+
       const pdfOptions: PDFOptions = {
         title: reportTitle,
         subtitle: periodText,
@@ -515,9 +505,9 @@ const AccountExplorerReport: React.FC = () => {
         showHeader: true,
         showFooter: true
       }
-      
+
       await generateFinancialPDF(tableData, pdfOptions)
-      
+
     } catch (error) {
       console.error('PDF generation failed:', error)
       alert(uiLang === 'ar' ? 'فشل في إنشاء ملف PDF' : 'Failed to generate PDF')
@@ -531,9 +521,8 @@ const AccountExplorerReport: React.FC = () => {
 
     // Prepare report data
     const currentDate = new Date().toLocaleDateString('ar-EG')
-    const projectName = projectId ? projectOptions.find(p => p.id === projectId)?.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
     const reportTitle = uiLang === 'ar' ? 'مستكشف الحسابات - التقرير المالي' : 'Account Explorer - Financial Report'
-    
+
     // Build professional commercial report HTML
     const reportHTML = `
       <!DOCTYPE html>
@@ -756,7 +745,7 @@ const AccountExplorerReport: React.FC = () => {
             <div class="report-title">${reportTitle}</div>
             <div class="report-period">${mode === 'range' ? `${uiLang === 'ar' ? 'من' : 'From'}: ${dateFrom} ${uiLang === 'ar' ? 'إلى' : 'To'}: ${dateTo}` : `${uiLang === 'ar' ? 'حتى تاريخ' : 'As of'}: ${dateTo}`}</div>
             <div class="report-filters">
-              <span class="filter-item">${uiLang === 'ar' ? 'المشروع' : 'Project'}: ${projectName}</span>
+              <span class="filter-item">${uiLang === 'ar' ? 'المشروع' : 'Project'}: ${currentProject?.name || (uiLang === 'ar' ? 'الكل' : 'All')}</span>
               <span class="filter-item">${uiLang === 'ar' ? 'تاريخ الطباعة' : 'Print Date'}: ${currentDate}</span>
               <span class="filter-item">${uiLang === 'ar' ? 'وضع العرض' : 'View Mode'}: ${viewMode === 'table' ? (uiLang === 'ar' ? 'جدول' : 'Table') : (uiLang === 'ar' ? 'شجرة' : 'Tree')}</span>
               ${postedOnly ? `<span class="filter-item">${uiLang === 'ar' ? 'قيود معتمدة فقط' : 'Posted Only'}</span>` : ''}
@@ -772,10 +761,10 @@ const AccountExplorerReport: React.FC = () => {
         </body>
       </html>
     `
-    
+
     printWindow.document.write(reportHTML)
     printWindow.document.close()
-    
+
     // Wait for content to load, then print
     setTimeout(() => {
       printWindow.focus()
@@ -787,7 +776,7 @@ const AccountExplorerReport: React.FC = () => {
   // Generate accounts print content with proper commercial formatting
   function generateAccountsPrintContent(): string {
     let html = ''
-    
+
     // Main accounts table
     html += `
       <table class="accounts-table">
@@ -797,7 +786,7 @@ const AccountExplorerReport: React.FC = () => {
             <th class="account-name">${uiLang === 'ar' ? 'اسم الحساب' : 'Account Name'}</th>
             <th class="account-type">${uiLang === 'ar' ? 'نوع الحساب' : 'Account Type'}</th>
             <th class="account-level">${uiLang === 'ar' ? 'المستوى' : 'Level'}</th>`
-    
+
     // Dynamic columns based on mode
     if (mode === 'range') {
       if (showOpeningInRange) {
@@ -818,65 +807,65 @@ const AccountExplorerReport: React.FC = () => {
             <th class="amount-cell">${uiLang === 'ar' ? 'دائن ختامي' : 'Closing Credit'}</th>
             <th class="amount-cell">${uiLang === 'ar' ? 'الصافي الختامي' : 'Final Net'}</th>`
     }
-    
+
     html += `
           </tr>
         </thead>
         <tbody>`
-    
+
     // Generate account rows
     for (const account of visibleFlat) {
       if (!includeZeros && isZero(account)) continue
-      
+
       const periodNet = Number(account.rollup.period_debits || 0) - Number(account.rollup.period_credits || 0)
       const finalNet = Number(account.rollup.closing_debit || 0) - Number(account.rollup.closing_credit || 0)
       const hasChildren = (account.children && account.children.length > 0)
-      
+
       let rowClass = ''
       if (hasChildren) {
         if (account.level === 1) rowClass = 'parent-row level-1'
         else if (account.level === 2) rowClass = 'parent-row level-2'
         else rowClass = 'parent-row'
       }
-      
+
       const indentStyle = `padding-right: ${(account.level - 1) * 20}px;`
-      
+
       html += `
         <tr class="${rowClass}">
           <td class="account-code">${account.code}</td>
           <td class="account-name" style="${indentStyle}">${account.name_ar || account.name}</td>
           <td class="account-type">${account.category || '—'}</td>
           <td class="account-level">${account.level}</td>`
-      
+
       // Dynamic amount columns
       if (mode === 'range') {
         if (showOpeningInRange) {
           html += `
-          <td class="amount-cell">${formatArabicCurrency(account.rollup.opening_debit, numbersOnly ? 'none' : currencySymbol)}</td>
-          <td class="amount-cell">${formatArabicCurrency(account.rollup.opening_credit, numbersOnly ? 'none' : currencySymbol)}</td>`
+          <td class="amount-cell">${formatArabicCurrency(account.rollup.opening_debit, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
+          <td class="amount-cell">${formatArabicCurrency(account.rollup.opening_credit, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>`
         }
         html += `
-          <td class="amount-cell">${formatArabicCurrency(account.rollup.period_debits, numbersOnly ? 'none' : currencySymbol)}</td>
-          <td class="amount-cell">${formatArabicCurrency(account.rollup.period_credits, numbersOnly ? 'none' : currencySymbol)}</td>
-          <td class="amount-cell">${formatArabicCurrency(account.rollup.closing_debit, numbersOnly ? 'none' : currencySymbol)}</td>
-          <td class="amount-cell">${formatArabicCurrency(account.rollup.closing_credit, numbersOnly ? 'none' : currencySymbol)}</td>
-          <td class="amount-cell">${formatArabicCurrency(periodNet, numbersOnly ? 'none' : currencySymbol)}</td>
-          <td class="amount-cell">${formatArabicCurrency(finalNet, numbersOnly ? 'none' : currencySymbol)}</td>`
+          <td class="amount-cell">${formatArabicCurrency(account.rollup.period_debits, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
+          <td class="amount-cell">${formatArabicCurrency(account.rollup.period_credits, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
+          <td class="amount-cell">${formatArabicCurrency(account.rollup.closing_debit, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
+          <td class="amount-cell">${formatArabicCurrency(account.rollup.closing_credit, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
+          <td class="amount-cell">${formatArabicCurrency(periodNet, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
+          <td class="amount-cell">${formatArabicCurrency(finalNet, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>`
       } else {
         html += `
-          <td class="amount-cell">${formatArabicCurrency(account.rollup.closing_debit, numbersOnly ? 'none' : currencySymbol)}</td>
-          <td class="amount-cell">${formatArabicCurrency(account.rollup.closing_credit, numbersOnly ? 'none' : currencySymbol)}</td>
-          <td class="amount-cell">${formatArabicCurrency(finalNet, numbersOnly ? 'none' : currencySymbol)}</td>`
+          <td class="amount-cell">${formatArabicCurrency(account.rollup.closing_debit, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
+          <td class="amount-cell">${formatArabicCurrency(account.rollup.closing_credit, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
+          <td class="amount-cell">${formatArabicCurrency(finalNet, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>`
       }
-      
+
       html += `
         </tr>`
     }
-    
+
     html += `
         </tbody>
       </table>`
-    
+
     // Grand Total Section - Calculate from root accounts only (same as UI)
     // Get root accounts (nodes without parent_id)
     const rootAccounts = nodes.filter(n => !n.parent_id)
@@ -887,70 +876,60 @@ const AccountExplorerReport: React.FC = () => {
     const totalNet = totalClosingDebits - totalClosingCredits
     const difference = Math.abs(totalClosingDebits - totalClosingCredits)
     const isBalanced = difference < 0.01
-    
+
     html += `
       <div class="grand-total">
         <div class="grand-total-header">${uiLang === 'ar' ? 'المجاميع العامة' : 'Grand Totals'}</div>`
-    
+
     if (mode === 'range') {
       html += `
         <div class="total-row">
           <div class="total-label">${uiLang === 'ar' ? 'إجمالي مدين الفترة' : 'Total Period Debits'}</div>
-          <div class="total-amount">${formatArabicCurrency(totalPeriodDebits, numbersOnly ? 'none' : currencySymbol)}</div>
+          <div class="total-amount">${formatArabicCurrency(totalPeriodDebits, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</div>
         </div>
         <div class="total-row">
           <div class="total-label">${uiLang === 'ar' ? 'إجمالي دائن الفترة' : 'Total Period Credits'}</div>
-          <div class="total-amount">${formatArabicCurrency(totalPeriodCredits, numbersOnly ? 'none' : currencySymbol)}</div>
+          <div class="total-amount">${formatArabicCurrency(totalPeriodCredits, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</div>
         </div>`
     }
-    
+
     html += `
         <div class="total-row">
           <div class="total-label">${uiLang === 'ar' ? 'إجمالي المدين الختامي' : 'Total Closing Debits'}</div>
-          <div class="total-amount">${formatArabicCurrency(totalClosingDebits, numbersOnly ? 'none' : currencySymbol)}</div>
+          <div class="total-amount">${formatArabicCurrency(totalClosingDebits, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</div>
         </div>
         <div class="total-row">
           <div class="total-label">${uiLang === 'ar' ? 'إجمالي الدائن الختامي' : 'Total Closing Credits'}</div>
-          <div class="total-amount">${formatArabicCurrency(totalClosingCredits, numbersOnly ? 'none' : currencySymbol)}</div>
+          <div class="total-amount">${formatArabicCurrency(totalClosingCredits, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</div>
         </div>
         <div class="total-row">
           <div class="total-label">${uiLang === 'ar' ? 'الصافي الإجمالي' : 'Total Net'}</div>
-          <div class="total-amount">${formatArabicCurrency(totalNet, numbersOnly ? 'none' : currencySymbol)}</div>
+          <div class="total-amount">${formatArabicCurrency(totalNet, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</div>
         </div>
         <div class="total-row">
           <div class="total-label">${uiLang === 'ar' ? 'حالة التوازن' : 'Balance Status'}</div>
           <div class="total-amount">${isBalanced ? (uiLang === 'ar' ? 'متوازن ✓' : 'Balanced ✓') : (uiLang === 'ar' ? 'غير متوازن' : 'Unbalanced')}</div>
         </div>
       </div>`
-    
+
     return html
   }
 
   return (
     <div ref={rootRef} className={styles.container} dir={uiLang === 'ar' ? 'rtl' : 'ltr'}>
       <div className={`${styles.professionalFilterBar} ${styles.noPrint}`}>
-        {/* Left: org + project + dates */}
+        {/* Left: scope status + dates */}
         <div className={styles.filterSection}>
-          <select className={styles.filterSelect} value={orgId} onChange={e => {
-            setOrgId(e.target.value)
-            ;(async () => {
-              try {
-                const { setActiveOrgId } = await import('../../utils/org')
-                setActiveOrgId?.(e.target.value)
-              } catch {}
-            })()
-          }} aria-label={uiLang === 'ar' ? 'المؤسسة' : 'Organization'}>
-            <option value="">{uiLang === 'ar' ? 'اختر المؤسسة' : 'Select organization'}</option>
-            {orgOptions.map(o => (
-              <option key={o.id} value={o.id}>{o.code ? `${o.code} — ` : ''}{o.name_ar || o.name}</option>
-            ))}
-          </select>
-          <select className={styles.filterSelect} value={projectId} onChange={e => setProjectId(e.target.value)} aria-label={uiLang === 'ar' ? 'المشروع' : 'Project'}>
-            <option value="">{uiLang === 'ar' ? 'كل المشاريع' : 'All Projects'}</option>
-            {projectOptions.map(p => (
-              <option key={p.id} value={p.id}>{p.code} — {p.name_ar || p.name}</option>
-            ))}
-          </select>
+          <div className={styles.filterGroup}>
+            <label className={styles.filterLabel}>{uiLang === 'ar' ? 'المؤسسة' : 'Organization'}</label>
+            <div className={styles.filterValueText}>{currentOrg?.name || '—'}</div>
+          </div>
+
+          <div className={styles.filterGroup}>
+            <label className={styles.filterLabel}>{uiLang === 'ar' ? 'المشروع' : 'Project'}</label>
+            <div className={styles.filterValueText}>{currentProject?.name || (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')}</div>
+          </div>
+
           {mode === 'range' && (
             <>
               <input className={styles.filterInput} type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} aria-label={uiLang === 'ar' ? 'من' : 'From'} />
@@ -964,9 +943,8 @@ const AccountExplorerReport: React.FC = () => {
 
         {/* Center: language + view toggles + expand/collapse */}
         <div className={styles.centerSection}>
-          <div className={styles.languageToggle} role="group" aria-label={uiLang === 'ar' ? 'اللغة' : 'Language'}>
-            <button type="button" className={`${styles.languageOption} ${uiLang === 'ar' ? 'active' : ''}`} onClick={() => setUiLang('ar')}>ع</button>
-            <button type="button" className={`${styles.languageOption} ${uiLang === 'en' ? 'active' : ''}`} onClick={() => setUiLang('en')}>En</button>
+          <div className={styles.languageDisplay}>
+            {uiLang === 'ar' ? 'العربية' : 'English'}
           </div>
 
           <div className={styles.groupControls}>
@@ -1007,10 +985,10 @@ const AccountExplorerReport: React.FC = () => {
         <div className={styles.actionSection}>
           <div className={styles.exportGroup}>
             <button type="button" className={styles.exportButton} onClick={exportCSV} title={uiLang === 'ar' ? 'تصدير CSV' : 'Export CSV'}><TableView fontSize="small" /> CSV</button>
-            <button 
-              type="button" 
-              className={`${styles.exportButton} ${styles.pdfButton}`} 
-              onClick={generatePDF} 
+            <button
+              type="button"
+              className={`${styles.exportButton} ${styles.pdfButton}`}
+              onClick={generatePDF}
               title={uiLang === 'ar' ? 'تصدير PDF رسمي' : 'Export Official PDF'}
               style={{
                 backgroundColor: '#dc2626',
@@ -1122,7 +1100,7 @@ const AccountExplorerReport: React.FC = () => {
             }))}
             selectedId={undefined}
             onSelect={undefined}
-            onToggleExpand={async () => {}}
+            onToggleExpand={async () => { }}
             canHaveChildren={(node) => nodes.some(n => n.parent_id === (node as any).id)}
             getChildrenCount={(node) => nodes.filter(n => n.parent_id === (node as any).id).length}
             mode={mode}
@@ -1199,27 +1177,27 @@ const AccountExplorerReport: React.FC = () => {
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openGL(n.id) } }}
                     >
                       <td className={`${styles.tableCodeCell} contrast-table-code-${document.documentElement.getAttribute('data-theme') || 'light'}`}>{n.code}</td>
-                      <td style={{ paddingInlineStart: `${(n.level - 1) * 16}px` }}>{n.name_ar || n.name}</td>
+                      <td style={{ paddingInlineStart: `${(n.level - 1) * 16}px` }}>{isAr ? (n.name_ar || n.name) : (n.name || n.name_ar)}</td>
                       <td className={styles.tableCenter}>{n.category || '—'}</td>
                       <td className={styles.tableCenter}>{n.level}</td>
                       {mode === 'range' ? (
                         <>
                           {showOpeningInRange && (<>
-                            <td className={styles.tableRight}>{formatArabicCurrency(n.rollup.opening_debit, numbersOnly ? 'none' : currencySymbol)}</td>
-                            <td className={styles.tableRight}>{formatArabicCurrency(n.rollup.opening_credit, numbersOnly ? 'none' : currencySymbol)}</td>
+                            <td className={styles.tableRight}>{formatArabicCurrency(n.rollup.opening_debit, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
+                            <td className={styles.tableRight}>{formatArabicCurrency(n.rollup.opening_credit, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
                           </>)}
-                          <td className={styles.tableRight}>{formatArabicCurrency(n.rollup.period_debits, numbersOnly ? 'none' : currencySymbol)}</td>
-                          <td className={styles.tableRight}>{formatArabicCurrency(n.rollup.period_credits, numbersOnly ? 'none' : currencySymbol)}</td>
-                          <td className={styles.tableRight}>{formatArabicCurrency(n.rollup.closing_debit, numbersOnly ? 'none' : currencySymbol)}</td>
-                          <td className={styles.tableRight}>{formatArabicCurrency(n.rollup.closing_credit, numbersOnly ? 'none' : currencySymbol)}</td>
-                          <td className={styles.tableRight}>{formatArabicCurrency(periodNet, numbersOnly ? 'none' : currencySymbol)}</td>
-                          <td className={styles.tableRight}>{formatArabicCurrency(finalNet, numbersOnly ? 'none' : currencySymbol)}</td>
+                          <td className={styles.tableRight}>{formatArabicCurrency(n.rollup.period_debits, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
+                          <td className={styles.tableRight}>{formatArabicCurrency(n.rollup.period_credits, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
+                          <td className={styles.tableRight}>{formatArabicCurrency(n.rollup.closing_debit, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
+                          <td className={styles.tableRight}>{formatArabicCurrency(n.rollup.closing_credit, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
+                          <td className={styles.tableRight}>{formatArabicCurrency(periodNet, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
+                          <td className={styles.tableRight}>{formatArabicCurrency(finalNet, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
                         </>
                       ) : (
                         <>
-                          <td className={styles.tableRight}>{formatArabicCurrency(n.rollup.closing_debit, numbersOnly ? 'none' : currencySymbol)}</td>
-                          <td className={styles.tableRight}>{formatArabicCurrency(n.rollup.closing_credit, numbersOnly ? 'none' : currencySymbol)}</td>
-                          <td className={styles.tableRight}>{formatArabicCurrency(finalNet, numbersOnly ? 'none' : currencySymbol)}</td>
+                          <td className={styles.tableRight}>{formatArabicCurrency(n.rollup.closing_debit, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
+                          <td className={styles.tableRight}>{formatArabicCurrency(n.rollup.closing_credit, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
+                          <td className={styles.tableRight}>{formatArabicCurrency(finalNet, numbersOnly ? 'none' : currencySymbol, { useArabicNumerals: isAr })}</td>
                         </>
                       )}
                     </tr>

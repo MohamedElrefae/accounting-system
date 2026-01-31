@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { supabase } from '../../utils/supabase'
 import { formatArabicCurrency } from '../../utils/ArabicTextEngine'
 import { exportToExcel, exportToCSV } from '../../utils/UniversalExportManager'
 import styles from './ProfitLoss.module.css'
@@ -9,8 +8,6 @@ import html2canvas from 'html2canvas'
 import { getCompanyConfig } from '../../services/company-config'
 import { fetchTransactionsDateRange } from '../../services/reports/common';
 import { getProfitLoss, type UnifiedFilters, type ProfitLossRow as PLRow, type ProfitLossSummary as PLSummary } from '../../services/reports/unified-financial-query'
-// import { getActiveOrgId, getActiveProjectId } from '../../utils/org' // Deprecated
-// import { fetchOrganizations, type LookupOption } from '../../services/lookups' // Deprecated
 import { useScope } from '../../contexts/ScopeContext'
 import Visibility from '@mui/icons-material/Visibility'
 import VisibilityOff from '@mui/icons-material/VisibilityOff'
@@ -24,6 +21,7 @@ import ExpandMore from '@mui/icons-material/ExpandMore'
 import ExpandLess from '@mui/icons-material/ExpandLess'
 import UnfoldMore from '@mui/icons-material/UnfoldMore'
 import UnfoldLess from '@mui/icons-material/UnfoldLess'
+import useAppStore from '../../store/useAppStore'
 
 function todayISO() {
   const d = new Date()
@@ -48,6 +46,9 @@ interface GroupedPLData {
 
 export default function ProfitLoss() {
   const { currentOrg, currentProject } = useScope()
+  const lang = useAppStore((s: { language: string }) => s.language)
+  const isAr = lang === 'ar'
+
   const [dateFrom, setDateFrom] = useState<string>(startOfYearISO())
   const [dateTo, setDateTo] = useState<string>(todayISO())
   const [loading, setLoading] = useState<boolean>(false)
@@ -55,12 +56,8 @@ export default function ProfitLoss() {
   const [summary, setSummary] = useState<PLSummary | null>(null)
   const [error, setError] = useState<string>('')
   const [includeZeros, setIncludeZeros] = useState<boolean>(false)
-  const [uiLang, setUiLang] = useState<'ar' | 'en'>('ar')
-  // const [projects, setProjects] = useState<{ id: string; code: string; name: string }[]>([]) // Removed
-  // const [projectId, setProjectId] = useState<string>(() => { try { return getActiveProjectId() || '' } catch { return '' } }) // Removed
+  const uiLang = isAr ? 'ar' : 'en'
   const [companyName, setCompanyName] = useState<string>('')
-  // const [orgId, setOrgId] = useState<string>('') // Removed
-  // const [_orgOptions, _setOrgOptions] = useState<LookupOption[]>([]) // Removed
   const [detailedView, setDetailedView] = useState<boolean>(true)
   const [postedOnly, setPostedOnly] = useState<boolean>(false)
   // Numbers-only setting (hide currency symbol)
@@ -137,7 +134,6 @@ export default function ProfitLoss() {
   }, [currentProject?.id, postedOnly])
 
   async function loadInitialData() {
-    // Only load company config now, no projects list needed
     try {
       const cfg = await getCompanyConfig()
       setCompanyName(cfg.company_name || '')
@@ -152,8 +148,8 @@ export default function ProfitLoss() {
       const filters: UnifiedFilters = {
         dateFrom,
         dateTo,
-        orgId: orgId || null,
-        projectId: projectId || null,
+        orgId: currentOrg?.id || null,
+        projectId: currentProject?.id || null,
         postedOnly
       }
 
@@ -180,7 +176,7 @@ export default function ProfitLoss() {
     let canceled = false
     const t = setTimeout(() => { if (!canceled && !document.hidden) load() }, 250)
     return () => { canceled = true; clearTimeout(t) }
-  }, [dateFrom, dateTo, orgId, projectId, postedOnly, includeZeros])
+  }, [dateFrom, dateTo, currentOrg?.id, currentProject?.id, postedOnly, includeZeros])
 
   function doExport(kind: 'excel' | 'csv') {
     if (!summary) return
@@ -276,7 +272,7 @@ export default function ProfitLoss() {
         prependRows: [
           [uiLang === 'ar' ? 'الشركة' : 'Company', companyName || (uiLang === 'ar' ? 'غير محدد' : 'N/A')],
           [uiLang === 'ar' ? 'الفترة' : 'Period', `${dateFrom} → ${dateTo}`],
-          [uiLang === 'ar' ? 'المشروع' : 'Project', projectId ? (projects.find(p => p.id === projectId)?.code + ' — ' + (projects.find(p => p.id === projectId)?.name || '')) : (uiLang === 'ar' ? 'الكل' : 'All')],
+          [uiLang === 'ar' ? 'المشروع' : 'Project', currentProject ? (currentProject.code + ' — ' + (currentProject.name || '')) : (uiLang === 'ar' ? 'الكل' : 'All')],
           [''],
           [uiLang === 'ar' ? 'ملخص المؤشرات المالية:' : 'Financial Metrics Summary:'],
           [uiLang === 'ar' ? 'هامش الربح الإجمالي' : 'Gross Margin', `${summary.gross_margin_percent.toFixed(2)}%`],
@@ -366,7 +362,6 @@ export default function ProfitLoss() {
 
     // Prepare report data
     const currentDate = new Date().toLocaleDateString('ar-EG')
-    const projectName = projectId ? projects.find(p => p.id === projectId)?.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
 
     // Build professional commercial report HTML
     const reportHTML = `
@@ -697,7 +692,7 @@ export default function ProfitLoss() {
             <div class="report-title">${uiLang === 'ar' ? 'قائمة الدخل (الأرباح والخسائر)' : 'Profit & Loss Statement'}</div>
             <div class="report-period">${uiLang === 'ar' ? 'من' : 'From'}: ${dateFrom} ${uiLang === 'ar' ? 'إلى' : 'To'}: ${dateTo}</div>
             <div class="report-filters">
-              <span class="filter-item">${uiLang === 'ar' ? 'المشروع' : 'Project'}: ${projectName}</span>
+              <span class="filter-item">${uiLang === 'ar' ? 'المشروع' : 'Project'}: ${currentProject?.name || (uiLang === 'ar' ? 'الكل' : 'All')}</span>
               <span class="filter-item">${uiLang === 'ar' ? 'تاريخ الطباعة' : 'Print Date'}: ${currentDate}</span>
               ${postedOnly ? `<span class="filter-item">${uiLang === 'ar' ? 'قيود معتمدة فقط' : 'Posted Only'}</span>` : ''}
               ${detailedView ? `<span class="filter-item">${uiLang === 'ar' ? 'عرض تفصيلي' : 'Detailed View'}</span>` : ''}
@@ -868,7 +863,7 @@ export default function ProfitLoss() {
     // Auto reload when inputs change
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFrom, dateTo, projectId, includeZeros, postedOnly])
+  }, [dateFrom, dateTo, currentProject?.id, currentOrg?.id, includeZeros, postedOnly])
 
   // Performance status
   const performanceStatus = useMemo(() => {
@@ -877,14 +872,14 @@ export default function ProfitLoss() {
     if (summary.net_income > 0) {
       return {
         status: 'profit',
-        textAr: `✓ ربح صافي: ${formatArabicCurrency(summary.net_income, numbersOnly ? 'none' : 'EGP')}`,
-        textEn: `✓ Net Profit: ${formatArabicCurrency(summary.net_income, numbersOnly ? 'none' : 'EGP')}`
+        textAr: `✓ ربح صافي: ${formatArabicCurrency(summary.net_income, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: true })}`,
+        textEn: `✓ Net Profit: ${formatArabicCurrency(summary.net_income, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: false })}`
       }
     } else if (summary.net_income < 0) {
       return {
         status: 'loss',
-        textAr: `⚠ خسارة صافية: ${formatArabicCurrency(Math.abs(summary.net_income), numbersOnly ? 'none' : 'EGP')}`,
-        textEn: `⚠ Net Loss: ${formatArabicCurrency(Math.abs(summary.net_income), numbersOnly ? 'none' : 'EGP')}`
+        textAr: `⚠ خسارة صافية: ${formatArabicCurrency(Math.abs(summary.net_income), numbersOnly ? 'none' : 'EGP', { useArabicNumerals: true })}`,
+        textEn: `⚠ Net Loss: ${formatArabicCurrency(Math.abs(summary.net_income), numbersOnly ? 'none' : 'EGP', { useArabicNumerals: false })}`
       }
     } else {
       return {
@@ -900,19 +895,18 @@ export default function ProfitLoss() {
       {/* Unified one-row filter bar using advanced implementation */}
       <div className={`${styles.professionalFilterBar} ${styles.noPrint}`}>
         {/* Left Section: Date Filters */}
+        {/* Left Section: Scope status + Date Filters */}
         <div className={styles.filterSection}>
-          <select
-            className={styles.filterSelect}
-            value={projectId}
-            onChange={e => setProjectId(e.target.value)}
-            aria-label={uiLang === 'ar' ? 'المشروع' : 'Project'}
-            title={uiLang === 'ar' ? 'اختر مشروع للتصفية' : 'Select project to filter'}
-          >
-            <option value="">{uiLang === 'ar' ? 'كل المشاريع' : 'All Projects'}</option>
-            {projects.map(p => (
-              <option key={p.id} value={p.id}>{p.code} — {p.name}</option>
-            ))}
-          </select>
+          <div className={styles.filterGroup}>
+            <label className={styles.filterLabel}>{uiLang === 'ar' ? 'المؤسسة' : 'Organization'}</label>
+            <div className={styles.filterValueText}>{currentOrg?.name || '—'}</div>
+          </div>
+
+          <div className={styles.filterGroup}>
+            <label className={styles.filterLabel}>{uiLang === 'ar' ? 'المشروع' : 'Project'}</label>
+            <div className={styles.filterValueText}>{currentProject?.name || (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')}</div>
+          </div>
+
           <input
             className={styles.filterInput}
             type="date"
@@ -933,9 +927,8 @@ export default function ProfitLoss() {
 
         {/* Center Section: Language + Group Controls + Feature Toggles */}
         <div className={styles.centerSection}>
-          <div className={styles.languageToggle} role="group" aria-label={uiLang === 'ar' ? 'اللغة' : 'Language'}>
-            <button type="button" className={`${styles.languageOption} ${uiLang === 'ar' ? styles.active : ''}`} onClick={() => setUiLang('ar')}>ع</button>
-            <button type="button" className={`${styles.languageOption} ${uiLang === 'en' ? styles.active : ''}`} onClick={() => setUiLang('en')}>En</button>
+          <div className={styles.languageDisplay}>
+            {uiLang === 'ar' ? 'العربية' : 'English'}
           </div>
 
           <div className={styles.groupControls}>
@@ -1015,7 +1008,6 @@ export default function ProfitLoss() {
               // Reset to show all data with meaningful filters
               setDateFrom(startOfYearISO())
               setDateTo(todayISO())
-              setProjectId('')
               setIncludeZeros(false) // Hide zero balances for business view
               setPostedOnly(false)
               setDetailedView(true)
@@ -1116,8 +1108,8 @@ export default function ProfitLoss() {
             <div className={styles.statementTitle}>{uiLang === 'ar' ? 'قائمة الدخل' : 'Profit & Loss Statement'}</div>
             <div className={styles.statementMeta}>
               <span>{uiLang === 'ar' ? 'الفترة' : 'Period'}: {dateFrom} ← {dateTo}</span>
-              {projectId && (
-                <span>{uiLang === 'ar' ? 'المشروع' : 'Project'}: {projects.find(p => p.id === projectId)?.name || projectId}</span>
+              {currentProject?.id && (
+                <span>{uiLang === 'ar' ? 'المشروع' : 'Project'}: {currentProject.name}</span>
               )}
               {postedOnly && (
                 <span>{uiLang === 'ar' ? 'قيود معتمدة فقط' : 'Posted only'}</span>
@@ -1169,7 +1161,7 @@ export default function ProfitLoss() {
                           <span className="account-count">({group.rows.length})</span>
                         </h3>
                         <div className="group-totals-preview">
-                          <span className="preview-amount">{formatArabicCurrency(Math.abs(group.total), numbersOnly ? 'none' : 'EGP')}</span>
+                          <span className="preview-amount">{formatArabicCurrency(Math.abs(group.total), numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</span>
                         </div>
                       </div>
                       {!isCollapsed && (
@@ -1185,7 +1177,7 @@ export default function ProfitLoss() {
                                     </span>
                                   </div>
                                   <div className="account-amounts">
-                                    <span className="amount">{formatArabicCurrency(Math.abs(row.amount), numbersOnly ? 'none' : 'EGP')}</span>
+                                    <span className="amount">{formatArabicCurrency(Math.abs(row.amount), numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</span>
                                   </div>
                                 </div>
                               ))}
@@ -1196,7 +1188,7 @@ export default function ProfitLoss() {
                               {uiLang === 'ar' ? `إجمالي ${group.titleAr}` : `Total ${group.titleEn}`}
                             </span>
                             <div className="subtotal-amounts">
-                              <span className="subtotal-amount">{formatArabicCurrency(Math.abs(group.total), numbersOnly ? 'none' : 'EGP')}</span>
+                              <span className="subtotal-amount">{formatArabicCurrency(Math.abs(group.total), numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</span>
                             </div>
                           </div>
                         </>
@@ -1210,14 +1202,14 @@ export default function ProfitLoss() {
                   <div className="calculation-line gross-profit">
                     <span className="calc-label">{uiLang === 'ar' ? 'إجمالي الربح' : 'Gross Profit'}</span>
                     <div className="calc-amounts">
-                      <span className="calc-amount">{formatArabicCurrency(summary.gross_profit, numbersOnly ? 'none' : 'EGP')}</span>
+                      <span className="calc-amount">{formatArabicCurrency(summary.gross_profit, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</span>
                     </div>
                   </div>
 
                   <div className="calculation-line operating-income">
                     <span className="calc-label">{uiLang === 'ar' ? 'الدخل التشغيلي' : 'Operating Income'}</span>
                     <div className="calc-amounts">
-                      <span className="calc-amount">{formatArabicCurrency(summary.operating_income, numbersOnly ? 'none' : 'EGP')}</span>
+                      <span className="calc-amount">{formatArabicCurrency(summary.operating_income, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</span>
                     </div>
                   </div>
 
@@ -1225,7 +1217,7 @@ export default function ProfitLoss() {
                     <span className="calc-label">{uiLang === 'ar' ? 'صافي الدخل' : 'Net Income'}</span>
                     <div className="calc-amounts">
                       <span className={`calc-amount ${summary.net_income >= 0 ? 'profit' : 'loss'}`}>
-                        {formatArabicCurrency(summary.net_income, numbersOnly ? 'none' : 'EGP')}
+                        {formatArabicCurrency(summary.net_income, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}
                       </span>
                     </div>
                   </div>
@@ -1235,15 +1227,15 @@ export default function ProfitLoss() {
                 <div className="profit-loss-ratios">
                   <div className="ratio-line">
                     <span className="ratio-label">{uiLang === 'ar' ? 'هامش الربح الإجمالي' : 'Gross Margin'}</span>
-                    <span className="ratio-value">{formatArabicCurrency(parseFloat(summary.gross_margin_percent.toFixed(2)), 'none')}%</span>
+                    <span className="ratio-value">{formatArabicCurrency(parseFloat(summary.gross_margin_percent.toFixed(2)), 'none', { useArabicNumerals: isAr })}%</span>
                   </div>
                   <div className="ratio-line">
                     <span className="ratio-label">{uiLang === 'ar' ? 'هامش الربح التشغيلي' : 'Operating Margin'}</span>
-                    <span className="ratio-value">{formatArabicCurrency(parseFloat(summary.operating_margin_percent.toFixed(2)), 'none')}%</span>
+                    <span className="ratio-value">{formatArabicCurrency(parseFloat(summary.operating_margin_percent.toFixed(2)), 'none', { useArabicNumerals: isAr })}%</span>
                   </div>
                   <div className="ratio-line">
                     <span className="ratio-label">{uiLang === 'ar' ? 'هامش الربح الصافي' : 'Net Margin'}</span>
-                    <span className="ratio-value">{formatArabicCurrency(parseFloat(summary.net_margin_percent.toFixed(2)), 'none')}%</span>
+                    <span className="ratio-value">{formatArabicCurrency(parseFloat(summary.net_margin_percent.toFixed(2)), 'none', { useArabicNumerals: isAr })}%</span>
                   </div>
                 </div>
               </div>

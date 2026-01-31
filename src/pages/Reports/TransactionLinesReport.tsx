@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { formatArabicCurrency } from '../../utils/ArabicTextEngine'
+import useAppStore from '../../store/useAppStore'
 import { useHasPermission } from '../../hooks/useHasPermission'
 import '../Transactions/Transactions.css'
 import './TransactionLinesReport.css'
@@ -21,6 +23,9 @@ import { useReportGrouping } from '../../hooks/useReportGrouping'
 import SummaryBar from '../../components/Reports/SummaryBar'
 
 const TransactionLinesReportPage = () => {
+    const lang = useAppStore((s: { language: string }) => s.language)
+    const isAr = lang === 'ar'
+
     const {
         organizations,
         projects,
@@ -284,25 +289,25 @@ const TransactionLinesReportPage = () => {
 
     // Column configuration
     const defaultColumns: ColumnConfig[] = useMemo(() => [
-        { key: 'entry_number', label: 'رقم القيد', visible: true, width: 120, minWidth: 100, maxWidth: 200, type: 'text', resizable: true },
-        { key: 'entry_date', label: 'التاريخ', visible: true, width: 130, minWidth: 120, maxWidth: 180, type: 'date', resizable: true },
-        { key: 'line_no', label: 'رقم السطر', visible: true, width: 90, minWidth: 70, maxWidth: 120, type: 'number', resizable: true },
-        { key: 'header_description', label: 'بيان القيد', visible: true, width: 200, minWidth: 150, maxWidth: 350, type: 'text', resizable: true },
-        { key: 'description', label: 'بيان السطر', visible: true, width: 200, minWidth: 150, maxWidth: 350, type: 'text', resizable: true },
-        { key: 'account_label', label: 'الحساب', visible: true, width: 220, minWidth: 160, maxWidth: 320, type: 'text', resizable: true },
-        { key: 'debit_amount', label: 'مدين', visible: true, width: 130, minWidth: 100, maxWidth: 180, type: 'currency', resizable: true },
-        { key: 'credit_amount', label: 'دائن', visible: true, width: 130, minWidth: 100, maxWidth: 180, type: 'currency', resizable: true },
-        { key: 'project_label', label: 'المشروع', visible: true, width: 200, minWidth: 160, maxWidth: 300, type: 'text', resizable: true },
-        { key: 'cost_center_label', label: 'مركز التكلفة', visible: true, width: 200, minWidth: 160, maxWidth: 300, type: 'text', resizable: true },
-        { key: 'work_item_label', label: 'عنصر العمل', visible: true, width: 200, minWidth: 160, maxWidth: 300, type: 'text', resizable: true },
-        { key: 'analysis_work_item_label', label: 'بند التحليل', visible: true, width: 200, minWidth: 160, maxWidth: 300, type: 'text', resizable: true },
-        { key: 'sub_tree_label', label: 'الشجرة الفرعية', visible: true, width: 200, minWidth: 160, maxWidth: 300, type: 'text', resizable: true },
-        { key: 'classification_label', label: 'التصنيف', visible: false, width: 180, minWidth: 140, maxWidth: 260, type: 'text', resizable: true },
-        { key: 'organization_label', label: 'المؤسسة', visible: true, width: 180, minWidth: 140, maxWidth: 260, type: 'text', resizable: true },
-        { key: 'line_items_count', label: 'عدد البنود', visible: false, width: 100, minWidth: 80, maxWidth: 140, type: 'number', resizable: true },
-        { key: 'line_items_total', label: 'إجمالي البنود', visible: false, width: 130, minWidth: 100, maxWidth: 180, type: 'currency', resizable: true },
-        { key: 'approval_status', label: 'حالة الاعتماد', visible: true, width: 140, minWidth: 120, maxWidth: 200, type: 'badge', resizable: false },
-    ], [])
+        { key: 'entry_number', label: isAr ? 'رقم القيد' : 'Entry #', visible: true, width: 120, minWidth: 100, maxWidth: 200, type: 'text', resizable: true },
+        { key: 'entry_date', label: isAr ? 'التاريخ' : 'Date', visible: true, width: 130, minWidth: 120, maxWidth: 180, type: 'date', resizable: true },
+        { key: 'line_no', label: isAr ? 'رقم السطر' : 'Line #', visible: true, width: 90, minWidth: 70, maxWidth: 120, type: 'number', resizable: true },
+        { key: 'header_description', label: isAr ? 'بيان القيد' : 'Header Desc', visible: true, width: 200, minWidth: 150, maxWidth: 350, type: 'text', resizable: true },
+        { key: 'description', label: isAr ? 'بيان السطر' : 'Line Desc', visible: true, width: 200, minWidth: 150, maxWidth: 350, type: 'text', resizable: true },
+        { key: 'account_label', label: isAr ? 'الحساب' : 'Account', visible: true, width: 220, minWidth: 160, maxWidth: 320, type: 'text', resizable: true },
+        { key: 'debit_amount', label: isAr ? 'مدين' : 'Debit', visible: true, width: 130, minWidth: 100, maxWidth: 180, type: 'currency', resizable: true },
+        { key: 'credit_amount', label: isAr ? 'دائن' : 'Credit', visible: true, width: 130, minWidth: 100, maxWidth: 180, type: 'currency', resizable: true },
+        { key: 'project_label', label: isAr ? 'المشروع' : 'Project', visible: true, width: 200, minWidth: 160, maxWidth: 300, type: 'text', resizable: true },
+        { key: 'cost_center_label', label: isAr ? 'مركز التكلفة' : 'Cost Center', visible: true, width: 200, minWidth: 160, maxWidth: 300, type: 'text', resizable: true },
+        { key: 'work_item_label', label: isAr ? 'عنصر العمل' : 'Work Item', visible: true, width: 200, minWidth: 160, maxWidth: 300, type: 'text', resizable: true },
+        { key: 'analysis_work_item_label', label: isAr ? 'بند التحليل' : 'Analysis Item', visible: true, width: 200, minWidth: 160, maxWidth: 300, type: 'text', resizable: true },
+        { key: 'sub_tree_label', label: isAr ? 'الشجرة الفرعية' : 'Sub-Tree', visible: true, width: 200, minWidth: 160, maxWidth: 300, type: 'text', resizable: true },
+        { key: 'classification_label', label: isAr ? 'التصنيف' : 'Classification', visible: false, width: 180, minWidth: 140, maxWidth: 260, type: 'text', resizable: true },
+        { key: 'organization_label', label: isAr ? 'المؤسسة' : 'Organization', visible: true, width: 180, minWidth: 140, maxWidth: 260, type: 'text', resizable: true },
+        { key: 'line_items_count', label: isAr ? 'عدد البنود' : 'Items Count', visible: false, width: 100, minWidth: 80, maxWidth: 140, type: 'number', resizable: true },
+        { key: 'line_items_total', label: isAr ? 'إجمالي البنود' : 'Items Total', visible: false, width: 130, minWidth: 100, maxWidth: 180, type: 'currency', resizable: true },
+        { key: 'approval_status', label: isAr ? 'حالة الاعتماد' : 'Status', visible: true, width: 140, minWidth: 120, maxWidth: 200, type: 'badge', resizable: false },
+    ], [isAr])
 
     const { columns, handleColumnResize, handleColumnConfigChange, resetToDefaults } = useColumnPreferences({
         storageKey: 'transaction_lines_report_table',
@@ -314,50 +319,50 @@ const TransactionLinesReportPage = () => {
     const accountLabel = useCallback((id?: string | null) => {
         if (!id) return '—'
         const a = accounts.find(x => x.id === id)
-        return a ? `${a.code} - ${a.name_ar || a.name}` : id
-    }, [accounts])
+        return a ? `${a.code} - ${isAr ? (a.name_ar || a.name) : (a.name || a.name_ar)}` : id
+    }, [accounts, isAr])
 
     const projectLabel = useCallback((id?: string | null) => {
         if (!id) return '—'
         const p = projects.find(x => x.id === id)
-        return p ? `${p.code} - ${p.name}` : id
-    }, [projects])
+        return p ? `${p.code} - ${isAr ? (p.name || p.name_en || '') : (p.name_en || p.name || '')}` : id
+    }, [projects, isAr])
 
     const costCenterLabel = useCallback((id?: string | null) => {
         if (!id) return '—'
         const cc = costCenters.find(x => x.id === id)
-        return cc ? `${cc.code} - ${cc.name}` : id
-    }, [costCenters])
+        return cc ? `${cc.code} - ${isAr ? (cc.name || cc.name_en || '') : (cc.name_en || cc.name || '')}` : id
+    }, [costCenters, isAr])
 
     const workItemLabel = useCallback((id?: string | null) => {
         if (!id) return '—'
         const wi = workItems.find(x => x.id === id)
-        return wi ? `${wi.code} - ${wi.name}` : id
-    }, [workItems])
+        return wi ? `${wi.code} - ${isAr ? (wi.name || wi.name_en || '') : (wi.name_en || wi.name || '')}` : id
+    }, [workItems, isAr])
 
     const analysisLabel = useCallback((id?: string | null) => {
         if (!id) return '—'
         const a = analysisItemsMap[id]
-        return a ? `${a.code} - ${a.name}` : id
-    }, [analysisItemsMap])
+        return a ? `${a.code} - ${isAr ? (a.name || a.name_en || '') : (a.name_en || a.name || '')}` : id
+    }, [analysisItemsMap, isAr])
 
     const subTreeLabel = useCallback((id?: string | null) => {
         if (!id) return '—'
         const cat = categories.find(x => x.id === id)
-        return cat ? `${cat.code} - ${cat.description}` : id
-    }, [categories])
+        return cat ? `${cat.code} - ${isAr ? (cat.description || cat.description_en || '') : (cat.description_en || cat.description || '')}` : id
+    }, [categories, isAr])
 
     const classificationLabel = useCallback((id?: string | null) => {
         if (!id) return '—'
         const c = classifications.find(x => x.id === id)
-        return c ? `${c.code} - ${c.name}` : id
-    }, [classifications])
+        return c ? `${c.code} - ${isAr ? (c.name || c.name_en || '') : (c.name_en || c.name || '')}` : id
+    }, [classifications, isAr])
 
     const organizationLabel = useCallback((id?: string | null) => {
         if (!id) return '—'
         const o = organizations.find(x => x.id === id)
-        return o ? `${o.code} - ${o.name}` : id
-    }, [organizations])
+        return o ? `${o.code} - ${isAr ? (o.name || o.name_en || '') : (o.name_en || o.name || '')}` : id
+    }, [organizations, isAr])
 
 
     // Prepare table data with labels
@@ -534,26 +539,26 @@ const TransactionLinesReportPage = () => {
         return () => window.removeEventListener('transactions:refresh', handler)
     }, [refetch])
 
-    if (loading) return <div className="loading-container"><div className="loading-spinner" />جاري التحميل...</div>
-    if (queryError) return <div className="error-container">خطأ: {(queryError as any)?.message || 'فشل تحميل البيانات'}</div>
+    if (loading) return <div className="loading-container"><div className="loading-spinner" />{isAr ? 'جاري التحميل...' : 'Loading...'}</div>
+    if (queryError) return <div className="error-container">{isAr ? 'خطأ:' : 'Error:'} {(queryError as any)?.message || (isAr ? 'فشل تحميل البيانات' : 'Failed to load data')}</div>
 
     return (
-        <div className="transactions-container" dir="rtl">
+        <div className={`transactions-container ${isAr ? 'rtl' : 'ltr'}`} dir={isAr ? 'rtl' : 'ltr'}>
             <div className="transactions-header">
-                <h1 className="transactions-title">تقرير سطور المعاملات</h1>
+                <h1 className="transactions-title">{isAr ? 'تقرير سطور المعاملات' : 'Transaction Lines Report'}</h1>
                 <div className="transactions-actions">
                     <button className="ultimate-btn ultimate-btn-edit" onClick={() => setColumnsConfigOpen(true)}>
-                        <div className="btn-content"><span className="btn-text">⚙️ إعدادات الأعمدة</span></div>
+                        <div className="btn-content"><span className="btn-text">{isAr ? '⚙️ إعدادات الأعمدة' : '⚙️ Column Settings'}</span></div>
                     </button>
                     <ExportButtons
                         data={exportData}
                         config={{
-                            title: 'تقرير سطور المعاملات',
+                            title: isAr ? 'تقرير سطور المعاملات' : 'Transaction Lines Report',
                             subtitle: appliedFilters.dateFrom || appliedFilters.dateTo
-                                ? `الفترة من: ${appliedFilters.dateFrom || '—'} إلى: ${appliedFilters.dateTo || '—'}`
+                                ? (isAr ? `الفترة من: ${appliedFilters.dateFrom || '—'} إلى: ${appliedFilters.dateTo || '—'}` : `Period From: ${appliedFilters.dateFrom || '—'} To: ${appliedFilters.dateTo || '—'}`)
                                 : undefined,
-                            rtlLayout: true,
-                            useArabicNumerals: true
+                            rtlLayout: isAr,
+                            useArabicNumerals: isAr
                         }}
                         size="small"
                         layout="horizontal"
@@ -583,6 +588,7 @@ const TransactionLinesReportPage = () => {
                 onSortOrderChange={setSortOrder}
                 isSummaryMode={isSummaryMode}
                 onSummaryModeChange={setIsSummaryMode}
+                isAr={isAr}
             />
 
             <div className="transactions-content" style={{ display: 'flex', flexDirection: 'column', gap: '20px', overflow: 'auto', paddingBottom: '40px' }}>
@@ -620,10 +626,10 @@ const TransactionLinesReportPage = () => {
                                             </span>
                                         </div>
                                         <div style={{ display: 'flex', gap: '16px', fontSize: '14px', fontWeight: 500 }}>
-                                            <span style={{ color: '#374151' }}>مدين: {group.subtotal.debit.toLocaleString('ar-SA', { minimumFractionDigits: 2 })}</span>
-                                            <span style={{ color: '#374151' }}>دائن: {group.subtotal.credit.toLocaleString('ar-SA', { minimumFractionDigits: 2 })}</span>
+                                            <span style={{ color: '#374151' }}>{isAr ? 'مدين:' : 'Debit:'} {formatArabicCurrency(group.subtotal.debit, 'none', { useArabicNumerals: isAr })}</span>
+                                            <span style={{ color: '#374151' }}>{isAr ? 'دائن:' : 'Credit:'} {formatArabicCurrency(group.subtotal.credit, 'none', { useArabicNumerals: isAr })}</span>
                                             <span style={{ color: group.subtotal.balance >= 0 ? '#059669' : '#dc2626' }}>
-                                                الرصيد: {group.subtotal.balance.toLocaleString('ar-SA', { minimumFractionDigits: 2 })}
+                                                {isAr ? 'الرصيد:' : 'Balance:'} {formatArabicCurrency(group.subtotal.balance, 'none', { useArabicNumerals: isAr })}
                                             </span>
                                         </div>
                                     </div>
@@ -636,7 +642,7 @@ const TransactionLinesReportPage = () => {
                                                 onColumnResize={handleColumnResize as any}
                                                 className={`transactions-resizable-table ${wrapMode ? 'wrap' : 'nowrap'} grouped-table`}
                                                 isLoading={false}
-                                                emptyMessage="لا توجد سطور"
+                                                emptyMessage={isAr ? 'لا توجد سطور' : 'No lines found'}
                                                 getRowId={(row) => (row as any).id}
                                                 onRowClick={(row: any) => {
                                                     if (row.transaction_id) {
@@ -647,15 +653,15 @@ const TransactionLinesReportPage = () => {
                                                     if (column.key === 'approval_status') {
                                                         const st = row.original?.is_posted ? 'posted' : (row.approval_status || 'draft')
                                                         const map: Record<string, { label: string; cls: string; tip: string }> = {
-                                                            draft: { label: 'مسودة', cls: 'ultimate-btn-neutral', tip: 'لم يتم إرسالها للمراجعة بعد' },
-                                                            submitted: { label: 'مُرسلة', cls: 'ultimate-btn-edit', tip: 'بإنتظار المراجعة' },
-                                                            pending: { label: 'قيد المراجعة', cls: 'ultimate-btn-edit', tip: 'بإنتظار اعتماد السطور' },
-                                                            revision_requested: { label: 'طلب تعديل', cls: 'ultimate-btn-warning', tip: 'أُعيدت للتعديل' },
-                                                            requires_revision: { label: 'يحتاج تعديل', cls: 'ultimate-btn-warning', tip: 'تم رفض بعض السطور' },
-                                                            approved: { label: 'معتمدة', cls: 'ultimate-btn-success', tip: 'تم اعتماد جميع السطور' },
-                                                            rejected: { label: 'مرفوضة', cls: 'ultimate-btn-delete', tip: 'تم الرفض' },
-                                                            cancelled: { label: 'ملغاة', cls: 'ultimate-btn-neutral', tip: 'ألغى المُرسل الإرسال' },
-                                                            posted: { label: 'مرحلة', cls: 'ultimate-btn-posted', tip: 'تم الترحيل' },
+                                                            draft: { label: isAr ? 'مسودة' : 'Draft', cls: 'ultimate-btn-neutral', tip: isAr ? 'لم يتم إرسالها للمراجعة بعد' : 'Not submitted for review yet' },
+                                                            submitted: { label: isAr ? 'مُرسلة' : 'Submitted', cls: 'ultimate-btn-edit', tip: isAr ? 'بإنتظار المراجعة' : 'Awaiting review' },
+                                                            pending: { label: isAr ? 'قيد المراجعة' : 'Pending', cls: 'ultimate-btn-edit', tip: isAr ? 'بإنتظار اعتماد السطور' : 'Awaiting line approval' },
+                                                            revision_requested: { label: isAr ? 'طلب تعديل' : 'Revision Req', cls: 'ultimate-btn-warning', tip: isAr ? 'أُعيدت للتعديل' : 'Returned for revision' },
+                                                            requires_revision: { label: isAr ? 'يحتاج تعديل' : 'Needs Revision', cls: 'ultimate-btn-warning', tip: isAr ? 'تم رفض بعض السطور' : 'Some lines were rejected' },
+                                                            approved: { label: isAr ? 'معتمدة' : 'Approved', cls: 'ultimate-btn-success', tip: isAr ? 'تم اعتماد جميع السطور' : 'All lines approved' },
+                                                            rejected: { label: isAr ? 'مرفوضة' : 'Rejected', cls: 'ultimate-btn-delete', tip: isAr ? 'تم الرفض' : 'Rejected' },
+                                                            cancelled: { label: isAr ? 'ملغاة' : 'Cancelled', cls: 'ultimate-btn-neutral', tip: isAr ? 'ألغى المُرسل الإرسال' : 'Sender cancelled submission' },
+                                                            posted: { label: isAr ? 'مرحلة' : 'Posted', cls: 'ultimate-btn-posted', tip: isAr ? 'تم الترحيل' : 'Posted to GL' },
                                                         }
                                                         const conf = map[st] || map['draft']
                                                         return (
@@ -667,7 +673,7 @@ const TransactionLinesReportPage = () => {
                                                     if (column.key === 'debit_amount' || column.key === 'credit_amount' || column.key === 'line_items_total') {
                                                         const num = Number(value) || 0
                                                         if (num === 0) return <span style={{ color: '#9ca3af' }}>—</span>
-                                                        return <span style={{ fontWeight: 600 }}>{num.toLocaleString('ar-SA', { minimumFractionDigits: 2 })}</span>
+                                                        return <span style={{ fontWeight: 600 }}>{formatArabicCurrency(num, 'none', { useArabicNumerals: isAr })}</span>
                                                     }
                                                     return undefined
                                                 }}
@@ -682,11 +688,11 @@ const TransactionLinesReportPage = () => {
                                                 fontSize: '14px',
                                                 fontWeight: 600
                                             }}>
-                                                <span>إجمالي {group.groupName}:</span>
-                                                <span>مدين: {group.subtotal.debit.toLocaleString('ar-SA', { minimumFractionDigits: 2 })}</span>
-                                                <span>دائن: {group.subtotal.credit.toLocaleString('ar-SA', { minimumFractionDigits: 2 })}</span>
+                                                <span>{isAr ? 'إجمالي' : 'Total'} {group.groupName}:</span>
+                                                <span>{isAr ? 'مدين:' : 'Debit:'} {formatArabicCurrency(group.subtotal.debit, 'none', { useArabicNumerals: isAr })}</span>
+                                                <span>{isAr ? 'دائن:' : 'Credit:'} {formatArabicCurrency(group.subtotal.credit, 'none', { useArabicNumerals: isAr })}</span>
                                                 <span style={{ color: group.subtotal.balance >= 0 ? '#059669' : '#dc2626' }}>
-                                                    الرصيد: {group.subtotal.balance.toLocaleString('ar-SA', { minimumFractionDigits: 2 })}
+                                                    {isAr ? 'الرصيد:' : 'Balance:'} {formatArabicCurrency(group.subtotal.balance, 'none', { useArabicNumerals: isAr })}
                                                 </span>
                                             </div>
                                         </div>
@@ -699,25 +705,25 @@ const TransactionLinesReportPage = () => {
                     <>
                         <div className="transactions-tablebar">
                             <div className="transactions-toolbar">
-                                <span className="transactions-count">عدد السطور: {totalCount}</span>
+                                <span className="transactions-count">{isAr ? 'عدد السطور:' : 'Lines Count:'} {totalCount}</span>
                                 <label className="wrap-toggle">
                                     <input type="checkbox" checked={wrapMode} onChange={(e) => setWrapMode(e.target.checked)} />
-                                    <span>التفاف النص</span>
+                                    <span>{isAr ? 'التفاف النص' : 'Wrap Text'}</span>
                                 </label>
                                 <button className="ultimate-btn" onClick={() => refetch().catch(() => { })}>
-                                    <div className="btn-content"><span className="btn-text">تحديث 🔁</span></div>
+                                    <div className="btn-content"><span className="btn-text">{isAr ? 'تحديث 🔁' : 'Refresh 🔁'}</span></div>
                                 </button>
-                                <button className="ultimate-btn ultimate-btn-warning" onClick={() => { setWrapMode(false); resetToDefaults() }} title="استعادة الإعدادات الافتراضية">
-                                    <div className="btn-content"><span className="btn-text">استعادة الافتراضي</span></div>
+                                <button className="ultimate-btn ultimate-btn-warning" onClick={() => { setWrapMode(false); resetToDefaults() }} title={isAr ? 'استعادة الإعدادات الافتراضية' : 'Restore Default Settings'}>
+                                    <div className="btn-content"><span className="btn-text">{isAr ? 'استعادة الافتراضي' : 'Reset Defaults'}</span></div>
                                 </button>
                             </div>
                             <div className="transactions-pagination">
                                 <button className="ultimate-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
-                                    <div className="btn-content"><span className="btn-text">السابق</span></div>
+                                    <div className="btn-content"><span className="btn-text">{isAr ? 'السابق' : 'Prev'}</span></div>
                                 </button>
-                                <span>صفحة {page} من {Math.max(1, Math.ceil(totalCount / pageSize))}</span>
+                                <span>{isAr ? 'صفحة' : 'Page'} {page} {isAr ? 'من' : 'of'} {Math.max(1, Math.ceil(totalCount / pageSize))}</span>
                                 <button className="ultimate-btn" onClick={() => setPage(p => Math.min(Math.ceil(totalCount / pageSize) || 1, p + 1))} disabled={page >= Math.ceil(totalCount / pageSize)}>
-                                    <div className="btn-content"><span className="btn-text">التالي</span></div>
+                                    <div className="btn-content"><span className="btn-text">{isAr ? 'التالي' : 'Next'}</span></div>
                                 </button>
                                 <select className="filter-select" value={pageSize} onChange={e => { setPageSize(parseInt(e.target.value) || 20); setPage(1) }}>
                                     <option value={10}>10</option>
@@ -734,7 +740,7 @@ const TransactionLinesReportPage = () => {
                             onColumnResize={handleColumnResize as any}
                             className={`transactions-resizable-table ${wrapMode ? 'wrap' : 'nowrap'}`}
                             isLoading={loading}
-                            emptyMessage="لا توجد سطور"
+                            emptyMessage={isAr ? 'لا توجد سطور' : 'No lines found'}
                             getRowId={(row) => (row as any).id}
                             onRowClick={(row: any) => {
                                 if (row.transaction_id) {
@@ -745,15 +751,15 @@ const TransactionLinesReportPage = () => {
                                 if (column.key === 'approval_status') {
                                     const st = row.original?.is_posted ? 'posted' : (row.approval_status || 'draft')
                                     const map: Record<string, { label: string; cls: string; tip: string }> = {
-                                        draft: { label: 'مسودة', cls: 'ultimate-btn-neutral', tip: 'لم يتم إرسالها للمراجعة بعد' },
-                                        submitted: { label: 'مُرسلة', cls: 'ultimate-btn-edit', tip: 'بإنتظار المراجعة' },
-                                        pending: { label: 'قيد المراجعة', cls: 'ultimate-btn-edit', tip: 'بإنتظار اعتماد السطور' },
-                                        revision_requested: { label: 'طلب تعديل', cls: 'ultimate-btn-warning', tip: 'أُعيدت للتعديل' },
-                                        requires_revision: { label: 'يحتاج تعديل', cls: 'ultimate-btn-warning', tip: 'تم رفض بعض السطور' },
-                                        approved: { label: 'معتمدة', cls: 'ultimate-btn-success', tip: 'تم اعتماد جميع السطور' },
-                                        rejected: { label: 'مرفوضة', cls: 'ultimate-btn-delete', tip: 'تم الرفض' },
-                                        cancelled: { label: 'ملغاة', cls: 'ultimate-btn-neutral', tip: 'ألغى المُرسل الإرسال' },
-                                        posted: { label: 'مرحلة', cls: 'ultimate-btn-posted', tip: 'تم الترحيل' },
+                                        draft: { label: isAr ? 'مسودة' : 'Draft', cls: 'ultimate-btn-neutral', tip: isAr ? 'لم يتم إرسالها للمراجعة بعد' : 'Not submitted for review yet' },
+                                        submitted: { label: isAr ? 'مُرسلة' : 'Submitted', cls: 'ultimate-btn-edit', tip: isAr ? 'بإنتظار المراجعة' : 'Awaiting review' },
+                                        pending: { label: isAr ? 'قيد المراجعة' : 'Pending', cls: 'ultimate-btn-edit', tip: isAr ? 'بإنتظار اعتماد السطور' : 'Awaiting line approval' },
+                                        revision_requested: { label: isAr ? 'طلب تعديل' : 'Revision Req', cls: 'ultimate-btn-warning', tip: isAr ? 'أُعيدت للتعديل' : 'Returned for revision' },
+                                        requires_revision: { label: isAr ? 'يحتاج تعديل' : 'Needs Revision', cls: 'ultimate-btn-warning', tip: isAr ? 'تم رفض بعض السطور' : 'Some lines were rejected' },
+                                        approved: { label: isAr ? 'معتمدة' : 'Approved', cls: 'ultimate-btn-success', tip: isAr ? 'تم اعتماد جميع السطور' : 'All lines approved' },
+                                        rejected: { label: isAr ? 'مرفوضة' : 'Rejected', cls: 'ultimate-btn-delete', tip: isAr ? 'تم الرفض' : 'Rejected' },
+                                        cancelled: { label: isAr ? 'ملغاة' : 'Cancelled', cls: 'ultimate-btn-neutral', tip: isAr ? 'ألغى المُرسل الإرسال' : 'Sender cancelled submission' },
+                                        posted: { label: isAr ? 'مرحلة' : 'Posted', cls: 'ultimate-btn-posted', tip: isAr ? 'تم الترحيل' : 'Posted to GL' },
                                     }
                                     const conf = map[st] || map['draft']
                                     return (
@@ -765,7 +771,7 @@ const TransactionLinesReportPage = () => {
                                 if (column.key === 'debit_amount' || column.key === 'credit_amount' || column.key === 'line_items_total') {
                                     const num = Number(value) || 0
                                     if (num === 0) return <span style={{ color: '#9ca3af' }}>—</span>
-                                    return <span style={{ fontWeight: 600 }}>{num.toLocaleString('ar-SA', { minimumFractionDigits: 2 })}</span>
+                                    return <span style={{ fontWeight: 600 }}>{formatArabicCurrency(num, 'none', { useArabicNumerals: isAr })}</span>
                                 }
                                 return undefined
                             }}
@@ -778,6 +784,7 @@ const TransactionLinesReportPage = () => {
                     credit={grandTotal.credit}
                     balance={grandTotal.balance}
                     count={grandTotal.count}
+                    isAr={isAr}
                 />
             </div>
 
@@ -799,7 +806,7 @@ const TransactionLinesReportPage = () => {
                     ))}
                 </div>
             </div>
-        </div>
+        </div >
     )
 }
 

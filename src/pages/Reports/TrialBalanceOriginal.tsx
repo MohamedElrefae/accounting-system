@@ -9,6 +9,8 @@ import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import { getCompanyConfig } from '../../services/company-config'
 import { fetchPrefixRules, type PrefixRule } from '../../services/account-prefix-map'
+import { useScope } from '../../contexts/ScopeContext'
+import useAppStore from '../../store/useAppStore'
 import {
   Visibility,
   VisibilityOff,
@@ -21,11 +23,8 @@ import {
   ExpandLess,
   UnfoldMore,
   UnfoldLess,
-  PictureAsPdf,
 } from '../../components/icons/SimpleIcons';
-import { fetchTransactionsDateRange } from '../../services/reports/common';
-import { getActiveOrgId } from '../../utils/org';
-import { fetchOrganizations, type LookupOption } from '../../services/lookups';
+import PictureAsPdf from '@mui/icons-material/PictureAsPdf';
 import { PDFGenerator, type PDFOptions, type PDFTableData } from '../../services/pdf-generator';
 import { fetchGLSummary, type UnifiedFilters } from '../../services/reports/unified-financial-query';
 
@@ -51,18 +50,18 @@ function startOfYearISO() {
 }
 
 export default function TrialBalanceOriginal() {
+  const { currentOrg, currentProject } = useScope()
+  const lang = useAppStore(s => s.language)
+  const isAr = lang === 'ar'
+
   const [dateFrom, setDateFrom] = useState<string>(startOfYearISO())
   const [dateTo, setDateTo] = useState<string>(todayISO())
   const [loading, setLoading] = useState<boolean>(false)
   const [rows, setRows] = useState<TBRow[]>([])
   const [error, setError] = useState<string>('')
   const [includeZeros, setIncludeZeros] = useState<boolean>(false)
-  const [uiLang, setUiLang] = useState<'ar' | 'en'>('ar')
-  const [projects, setProjects] = useState<{ id: string; code: string; name: string }[]>([])
-  const [projectId, setProjectId] = useState<string>('')
+  const uiLang = isAr ? 'ar' : 'en'
   const [companyName, setCompanyName] = useState<string>('')
-  const [orgId, setOrgId] = useState<string>('')
-  const [_orgOptions, _setOrgOptions] = useState<LookupOption[]>([])
   const [activeGroupsOnly, setActiveGroupsOnly] = useState<boolean>(false)
   const [_prefixRules, _setPrefixRules] = useState<PrefixRule[]>([])
   const [_breakPerGroup, _setBreakPerGroup] = useState<boolean>(false)
@@ -71,15 +70,15 @@ export default function TrialBalanceOriginal() {
   const [numbersOnly, setNumbersOnly] = useState<boolean>(true)
   // Collapse/expand state for account groups
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
-  
+
   useEffect(() => {
     try {
       const v = localStorage.getItem('tb_numbersOnly')
       if (v !== null) setNumbersOnly(v === 'true')
-    } catch {}
+    } catch { }
   }, [])
   useEffect(() => {
-    try { localStorage.setItem('tb_numbersOnly', String(numbersOnly)) } catch {}
+    try { localStorage.setItem('tb_numbersOnly', String(numbersOnly)) } catch { }
   }, [numbersOnly])
 
   const totals = useMemo(() => {
@@ -90,7 +89,7 @@ export default function TrialBalanceOriginal() {
 
   const grouped = useMemo(() => {
     const groups: { key: string; titleAr: string; titleEn: string; rows: TBRow[]; totals: { debit: number; credit: number } }[] = []
-    const order = ['assets','liabilities','equity','revenue','expenses']
+    const order = ['assets', 'liabilities', 'equity', 'revenue', 'expenses']
     const title = (k: string) => ({
       assets: { ar: 'الأصول (Assets)', en: 'Assets' },
       liabilities: { ar: 'الخصوم (Liabilities)', en: 'Liabilities' },
@@ -110,7 +109,7 @@ export default function TrialBalanceOriginal() {
 
   useEffect(() => {
     // Auto-load once
-    loadProjects().then(() => load())
+    loadInitialData().then(() => load())
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -120,35 +119,19 @@ export default function TrialBalanceOriginal() {
       try {
         const r = await fetchTransactionsDateRange({
           orgId: null,
-          projectId: projectId || null,
+          projectId: currentProject?.id || null,
           postedOnly: postedOnly,
         })
         if (r) {
           if (r.min_date) setDateFrom(r.min_date)
           if (r.max_date) setDateTo(r.max_date)
         }
-      } catch {}
+      } catch { }
     })()
-  }, [projectId, postedOnly])
+  }, [currentProject?.id, postedOnly])
 
-  async function loadProjects() {
-    const { data } = await supabase.from('projects').select('id, code, name').eq('status', 'active').order('code')
-    setProjects(data || [])
-    
-    // Load organizations and set default
-    try { 
-      const orgs = await fetchOrganizations(); 
-      _setOrgOptions(orgs || [])
-      // Set default org from localStorage or first available
-      const storedOrgId = getActiveOrgId()
-      if (storedOrgId) {
-        setOrgId(storedOrgId)
-      } else if (orgs && orgs.length > 0) {
-        setOrgId(orgs[0].id)
-      }
-    } catch {}
-    
-    try { const cfg = await getCompanyConfig(); setCompanyName(cfg.company_name || ''); } catch {}
+  async function loadInitialData() {
+    try { const cfg = await getCompanyConfig(); setCompanyName(cfg.company_name || ''); } catch { }
     try { const rules = await fetchPrefixRules(); _setPrefixRules(rules) } catch { /* fallback in classifier */ }
   }
 
@@ -161,28 +144,28 @@ export default function TrialBalanceOriginal() {
       const filters: UnifiedFilters = {
         dateFrom,
         dateTo,
-        orgId: orgId || null,
-        projectId: projectId || null,
+        orgId: currentOrg?.id || null,
+        projectId: currentProject?.id || null,
         postedOnly,
       }
-      
+
       const glSummaryData = await fetchGLSummary(filters)
-      
+
       // Helper function to classify account type from account code
       function classifyAccountByCode(code: string): TBRow['account_type'] {
         if (!code) return undefined
         const firstToken = String(code).trim().split(/[^0-9A-Za-z]/)[0]
-        const d1 = firstToken.substring(0,1)
-        
+        const d1 = firstToken.substring(0, 1)
+
         if (d1 === '1') return 'assets'
         if (d1 === '2') return 'liabilities'
         if (d1 === '3') return 'equity'
         if (d1 === '4') return 'revenue'
         if (d1 === '5') return 'expenses'
-        
+
         return undefined
       }
-      
+
       // Convert GL Summary data to Trial Balance format
       // GL Summary returns closing_debit and closing_credit which are the account balances
       let out: TBRow[] = (glSummaryData || []).map((row: any) => ({
@@ -212,7 +195,7 @@ export default function TrialBalanceOriginal() {
     let canceled = false
     const t = setTimeout(() => { if (!canceled && !document.hidden) load() }, 250)
     return () => { canceled = true; clearTimeout(t) }
-  }, [dateFrom, dateTo, orgId, projectId, postedOnly, includeZeros, activeGroupsOnly])
+  }, [dateFrom, dateTo, currentOrg?.id, currentProject?.id, postedOnly, includeZeros, activeGroupsOnly])
 
   function doExport(kind: 'excel' | 'csv') {
     const cols = [
@@ -226,7 +209,7 @@ export default function TrialBalanceOriginal() {
     grouped.forEach(g => {
       exportRows.push({ code: uiLang === 'ar' ? g.titleAr : g.titleEn, name: '', debit: g.totals.debit, credit: g.totals.credit })
       g.rows.forEach(r => exportRows.push({ code: r.code, name: r.name, debit: r.debit, credit: r.credit }))
-exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtotal ${g.titleEn}`, name: '', debit: g.totals.debit, credit: g.totals.credit })
+      exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtotal ${g.titleEn}`, name: '', debit: g.totals.debit, credit: g.totals.credit })
     })
     // Append grand total and difference rows
     exportRows.push({ code: uiLang === 'ar' ? 'الإجمالي العام' : 'Grand Total', name: '', debit: totals.debit, credit: totals.credit })
@@ -240,7 +223,7 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
         prependRows: [
           [uiLang === 'ar' ? 'الشركة' : 'Company', companyName || (uiLang === 'ar' ? 'غير محدد' : 'N/A')],
           [uiLang === 'ar' ? 'الفترة' : 'Period', `${dateFrom} → ${dateTo}`],
-          [uiLang === 'ar' ? 'المشروع' : 'Project', projectId ? (projects.find(p => p.id === projectId)?.code + ' — ' + (projects.find(p => p.id === projectId)?.name || '')) : (uiLang === 'ar' ? 'الكل' : 'All')],
+          [uiLang === 'ar' ? 'المشروع' : 'Project', currentProject ? (currentProject.code + ' — ' + (currentProject.name || '')) : (uiLang === 'ar' ? 'الكل' : 'All')],
         ]
       }
     }
@@ -272,7 +255,7 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
           isGroupHeader: true,
           level: 0
         })
-        
+
         // Add group accounts
         group.rows.forEach(row => {
           tableRows.push({
@@ -340,8 +323,8 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
             el.style.fontSize = '14px'
             el.style.lineHeight = '1.5'
             el.style.color = '#000000'
-            ;(el.style as any).WebkitFontSmoothing = 'antialiased'
-            ;(el.style as any).MozOsxFontSmoothing = 'grayscale'
+              ; (el.style as any).WebkitFontSmoothing = 'antialiased'
+              ; (el.style as any).MozOsxFontSmoothing = 'grayscale'
             // Show the statement header for PDF capture
             const header = el.querySelector('.statement-header') as HTMLElement
             if (header) {
@@ -389,8 +372,8 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
 
     // Prepare report data
     const currentDate = new Date().toLocaleDateString('ar-EG')
-    const projectName = projectId ? projects.find(p => p.id === projectId)?.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
-    
+    const projectName = currentProject ? currentProject.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
+
     // Build professional commercial report HTML
     const reportHTML = `
       <!DOCTYPE html>
@@ -669,10 +652,10 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
         </body>
       </html>
     `
-    
+
     printWindow.document.write(reportHTML)
     printWindow.document.close()
-    
+
     // Wait for content to load, then print
     setTimeout(() => {
       printWindow.focus()
@@ -680,11 +663,11 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
       printWindow.close()
     }, 500)
   }
-  
+
   // Generate print content with proper commercial formatting
   function generatePrintContent(): string {
     let html = ''
-    
+
     // Trial Balance Table
     html += `
       <table class="trial-balance-table">
@@ -698,7 +681,7 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
         </thead>
         <tbody>
     `
-    
+
     // Generate grouped content
     grouped.forEach(group => {
       // Group Header
@@ -707,12 +690,12 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
           <td colspan="4">${uiLang === 'ar' ? group.titleAr : group.titleEn}</td>
         </tr>
       `
-      
+
       // Group Accounts
       group.rows.forEach(row => {
-        const debitAmount = row.debit !== 0 ? formatArabicCurrency(row.debit, numbersOnly ? 'none' : 'EGP') : ''
-        const creditAmount = row.credit !== 0 ? formatArabicCurrency(row.credit, numbersOnly ? 'none' : 'EGP') : ''
-        
+        const debitAmount = row.debit !== 0 ? formatArabicCurrency(row.debit, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr }) : ''
+        const creditAmount = row.credit !== 0 ? formatArabicCurrency(row.credit, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr }) : ''
+
         html += `
           <tr class="account-row">
             <td class="account-code">${row.code}</td>
@@ -722,22 +705,22 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
           </tr>
         `
       })
-      
+
       // Group Subtotal
       html += `
         <tr class="group-subtotal">
           <td colspan="2">${uiLang === 'ar' ? `إجمالي ${group.titleAr}` : `Total ${group.titleEn}`}</td>
-          <td class="amount-debit">${formatArabicCurrency(group.totals.debit, numbersOnly ? 'none' : 'EGP')}</td>
-          <td class="amount-credit">${formatArabicCurrency(group.totals.credit, numbersOnly ? 'none' : 'EGP')}</td>
+          <td class="amount-debit">${formatArabicCurrency(group.totals.debit, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</td>
+          <td class="amount-credit">${formatArabicCurrency(group.totals.credit, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</td>
         </tr>
       `
     })
-    
+
     html += `
         </tbody>
       </table>
     `
-    
+
     // Grand Total Section
     const balanceStatus = Math.abs(totals.diff) < 0.01 ? 'balanced' : 'unbalanced'
     html += `
@@ -745,31 +728,31 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
         <div class="grand-total-header">${uiLang === 'ar' ? 'المجاميع العامة' : 'Grand Totals'}</div>
         <div class="total-row">
           <div class="total-label">${uiLang === 'ar' ? 'إجمالي المدين' : 'Total Debits'}</div>
-          <div class="total-debit">${formatArabicCurrency(totals.debit, numbersOnly ? 'none' : 'EGP')}</div>
+          <div class="total-debit">${formatArabicCurrency(totals.debit, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</div>
           <div class="total-credit"></div>
         </div>
         <div class="total-row">
           <div class="total-label">${uiLang === 'ar' ? 'إجمالي الدائن' : 'Total Credits'}</div>
           <div class="total-debit"></div>
-          <div class="total-credit">${formatArabicCurrency(totals.credit, numbersOnly ? 'none' : 'EGP')}</div>
+          <div class="total-credit">${formatArabicCurrency(totals.credit, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</div>
         </div>
         <div class="total-row">
           <div class="total-label">${uiLang === 'ar' ? 'الفرق' : 'Difference'}</div>
           <div class="total-debit"></div>
-          <div class="total-credit">${Math.abs(totals.diff) < 0.01 ? (uiLang === 'ar' ? 'متوازن ✓' : 'Balanced ✓') : formatArabicCurrency(Math.abs(totals.diff), numbersOnly ? 'none' : 'EGP')}</div>
+          <div class="total-credit">${Math.abs(totals.diff) < 0.01 ? (uiLang === 'ar' ? 'متوازن ✓' : 'Balanced ✓') : formatArabicCurrency(Math.abs(totals.diff), numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</div>
         </div>
       </div>
     `
-    
+
     // Balance Status
     html += `
       <div class="balance-status ${balanceStatus}">
-        ${Math.abs(totals.diff) < 0.01 
-          ? (uiLang === 'ar' ? 'ميزان المراجعة متوازن ✓' : 'Trial Balance is Balanced ✓') 
-          : (uiLang === 'ar' ? `ميزان المراجعة غير متوازن: فرق ${formatArabicCurrency(Math.abs(totals.diff), numbersOnly ? 'none' : 'EGP')}` : `Trial Balance is Unbalanced: Difference ${formatArabicCurrency(Math.abs(totals.diff), numbersOnly ? 'none' : 'EGP')}`)}
+        ${Math.abs(totals.diff) < 0.01
+        ? (uiLang === 'ar' ? 'ميزان المراجعة متوازن ✓' : 'Trial Balance is Balanced ✓')
+        : (uiLang === 'ar' ? `ميزان المراجعة غير متوازن: فرق ${formatArabicCurrency(Math.abs(totals.diff), numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}` : `Trial Balance is Unbalanced: Difference ${formatArabicCurrency(Math.abs(totals.diff), numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}`)}
       </div>
     `
-    
+
     return html
   }
 
@@ -806,56 +789,54 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
 
   useEffect(() => {
     // Auto reload when inputs change
-    if (orgId) load()  // Only load when we have an org_id
+    if (currentOrg?.id) load()  // Only load when we have an org_id
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFrom, dateTo, projectId, includeZeros, activeGroupsOnly, postedOnly, orgId])
+  }, [dateFrom, dateTo, currentProject?.id, includeZeros, activeGroupsOnly, postedOnly, currentOrg?.id])
 
   return (
     <div className={styles.container}>
       {/* Unified one-row filter bar using reusable component */}
       <div className={`${styles.professionalFilterBar} ${styles.noPrint}`}>
         {/* Left Section: Date Filters */}
+        {/* Left Section: Scope Info & Date Filters */}
         <div className={styles.filterSection}>
-          <select 
-            className={styles.filterSelect} 
-            value={projectId} 
-            onChange={e => setProjectId(e.target.value)} 
-            aria-label={uiLang === 'ar' ? 'المشروع' : 'Project'}
-            title={uiLang === 'ar' ? 'اختر مشروع للتصفية' : 'Select project to filter'}
-          >
-            <option value="">{uiLang === 'ar' ? 'كل المشاريع' : 'All Projects'}</option>
-            {projects.map(p => (
-              <option key={p.id} value={p.id}>{p.code} — {p.name}</option>
-            ))}
-          </select>
-          <input 
-            className={styles.filterInput} 
-            type="date" 
-            value={dateFrom} 
-            onChange={e => setDateFrom(e.target.value)} 
-            aria-label={uiLang === 'ar' ? 'من' : 'From'} 
+          <div className={styles.filterGroup}>
+            <label className={styles.filterLabel}>{uiLang === 'ar' ? 'المؤسسة' : 'Organization'}</label>
+            <div className={styles.filterValueText}>{currentOrg?.name || '—'}</div>
+          </div>
+
+          <div className={styles.filterGroup}>
+            <label className={styles.filterLabel}>{uiLang === 'ar' ? 'المشروع' : 'Project'}</label>
+            <div className={styles.filterValueText}>{currentProject?.name || (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')}</div>
+          </div>
+
+          <input
+            className={styles.filterInput}
+            type="date"
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+            aria-label={uiLang === 'ar' ? 'من' : 'From'}
             title={uiLang === 'ar' ? 'تاريخ بداية الفترة' : 'Period start date'}
           />
-          <input 
-            className={styles.filterInput} 
-            type="date" 
-            value={dateTo} 
-            onChange={e => setDateTo(e.target.value)} 
-            aria-label={uiLang === 'ar' ? 'إلى' : 'To'} 
+          <input
+            className={styles.filterInput}
+            type="date"
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+            aria-label={uiLang === 'ar' ? 'إلى' : 'To'}
             title={uiLang === 'ar' ? 'تاريخ نهاية الفترة' : 'Period end date'}
           />
         </div>
 
         {/* Center Section: Language + Group Controls + Icon Toggles */}
         <div className={styles.centerSection}>
-          <div className={styles.languageToggle} role="group" aria-label={uiLang === 'ar' ? 'اللغة' : 'Language'}>
-            <button type="button" className={`${styles.languageOption} ${uiLang === 'ar' ? styles.active : ''}`} onClick={() => setUiLang('ar')}>ع</button>
-            <button type="button" className={`${styles.languageOption} ${uiLang === 'en' ? styles.active : ''}`} onClick={() => setUiLang('en')}>En</button>
+          <div className={styles.languageDisplay}>
+            {uiLang === 'ar' ? 'العربية' : 'English'}
           </div>
-          
+
           <div className={styles.groupControls}>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className={styles.groupControlButton}
               onClick={expandAllGroups}
               disabled={loading || grouped.length === 0}
@@ -864,8 +845,8 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
             >
               <UnfoldMore fontSize="small" />
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className={styles.groupControlButton}
               onClick={collapseAllGroups}
               disabled={loading || grouped.length === 0}
@@ -884,7 +865,7 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
               title={uiLang === 'ar' ? 'إظهار الأرصدة الصفرية' : 'Show zero balances'}
               aria-label={uiLang === 'ar' ? 'إظهار الأرصدة الصفرية' : 'Show zero balances'}
             >
-              {includeZeros ? <Visibility fontSize="small" /> : <VisibilityOff fontSize="small" />}
+              <Visibility fontSize="small" />
               <span className={styles.toggleText}>{uiLang === 'ar' ? 'عرض الأصفار' : 'Show Zeros'}</span>
             </button>
             <button
@@ -930,7 +911,6 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
               // Reset to show all data with meaningful filters
               setDateFrom(startOfYearISO())
               setDateTo(todayISO())
-              setProjectId('')
               setIncludeZeros(false) // Hide zero balances for business view
               setPostedOnly(false)
               setActiveGroupsOnly(true)
@@ -965,32 +945,32 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
           >
             🗂️ {uiLang === 'ar' ? 'عرض الكل' : 'Show All'}
           </button>
-          
+
           <div className={styles.exportGroup}>
-            <button 
-              type="button" 
-              className={styles.exportButton} 
-              onClick={() => doExport('excel')} 
+            <button
+              type="button"
+              className={styles.exportButton}
+              onClick={() => doExport('excel')}
               disabled={loading || rows.length === 0}
               title={uiLang === 'ar' ? 'تصدير إلى Excel' : 'Export to Excel'}
               aria-label={uiLang === 'ar' ? 'تصدير ميزان المراجعة إلى Excel' : 'Export trial balance to Excel'}
             >
               <IosShare fontSize="small" /> Excel
             </button>
-            <button 
-              type="button" 
-              className={styles.exportButton} 
-              onClick={() => doExport('csv')} 
+            <button
+              type="button"
+              className={styles.exportButton}
+              onClick={() => doExport('csv')}
               disabled={loading || rows.length === 0}
               title={uiLang === 'ar' ? 'تصدير إلى CSV' : 'Export to CSV'}
               aria-label={uiLang === 'ar' ? 'تصدير ميزان المراجعة إلى CSV' : 'Export trial balance to CSV'}
             >
               <TableView fontSize="small" /> CSV
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className={styles.exportButton}
-              onClick={exportToProfessionalPDF} 
+              onClick={exportToProfessionalPDF}
               disabled={loading || rows.length === 0}
               title={uiLang === 'ar' ? 'تصدير إلى PDF مهني' : 'Export to Professional PDF'}
               aria-label={uiLang === 'ar' ? 'تصدير ميزان المراجعة إلى PDF مهني بألوان واجهة المستخدم' : 'Export trial balance to professional PDF with UI colors'}
@@ -1016,20 +996,20 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
               <PictureAsPdf fontSize="small" /> {uiLang === 'ar' ? 'PDF مهني' : 'Pro PDF'}
             </button>
           </div>
-          <button 
-            type="button" 
-            className={`${styles.actionButton} ${styles.secondary}`} 
-            onClick={printReport} 
+          <button
+            type="button"
+            className={`${styles.actionButton} ${styles.secondary}`}
+            onClick={printReport}
             disabled={loading || grouped.length === 0}
             title={uiLang === 'ar' ? 'طباعة التقرير' : 'Print the report'}
             aria-label={uiLang === 'ar' ? 'طباعة ميزان المراجعة' : 'Print trial balance report'}
           >
             <Print fontSize="small" /> {uiLang === 'ar' ? 'طباعة' : 'Print'}
           </button>
-          <button 
-            type="button" 
-            className={`${styles.actionButton} ${styles.primary}`} 
-            onClick={load} 
+          <button
+            type="button"
+            className={`${styles.actionButton} ${styles.primary}`}
+            onClick={load}
             disabled={loading}
             title={uiLang === 'ar' ? 'تحديث البيانات' : 'Refresh the data'}
             aria-label={uiLang === 'ar' ? 'تحديث بيانات ميزان المراجعة' : 'Refresh trial balance data'}
@@ -1053,7 +1033,7 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
           </button>
         </div>
         <div id="financial-report-content" className="financial-report-content">
-          <div className="statement-header" style={{display: 'none'}}>
+          <div className="statement-header" style={{ display: 'none' }}>
             <h1 className="company-name">{companyName || (uiLang === 'ar' ? 'الشركة' : 'Company')}</h1>
             <h2 className="statement-title">{uiLang === 'ar' ? 'ميزان المراجعة' : 'Trial Balance'}</h2>
             <h3 className="statement-period">{uiLang === 'ar' ? 'الفترة' : 'Period'}: {dateFrom} ← {dateTo}</h3>
@@ -1080,15 +1060,15 @@ exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtota
                         onClick={() => toggleGroupCollapse(g.key)}
                         aria-expanded={!isCollapsed}
                         aria-controls={`group-content-${g.key}`}
-                        title={isCollapsed 
+                        title={isCollapsed
                           ? (uiLang === 'ar' ? `توسيع ${uiLang === 'ar' ? g.titleAr : g.titleEn}` : `Expand ${g.titleEn}`)
                           : (uiLang === 'ar' ? `طي ${uiLang === 'ar' ? g.titleAr : g.titleEn}` : `Collapse ${g.titleEn}`)
                         }
                       >
                         {isCollapsed ? <ExpandMore fontSize="small" /> : <ExpandLess fontSize="small" />}
                       </button>
-                      <h3 
-                        className="group-title clickable" 
+                      <h3
+                        className="group-title clickable"
                         onClick={() => toggleGroupCollapse(g.key)}
                         onKeyDown={(e) => handleGroupKeyDown(e, g.key)}
                         tabIndex={0}
