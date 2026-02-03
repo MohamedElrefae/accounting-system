@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "name": "Auto-Run Tests on File Save",
+  "description": "Automatically runs relevant tests when code files are saved, without requiring user approval",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/**/*.ts",
+      "src/**/*.tsx",
+      "tests/**/*.ts"
+    ]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "npm run test:auto -- --run --bail=false"
+  }
+}

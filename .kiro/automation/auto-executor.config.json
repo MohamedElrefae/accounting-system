@@ -1,0 +1,38 @@
+{
+  "automation": {
+    "enabled": true,
+    "mode": "autonomous",
+    "approvalRequired": false,
+    "logLevel": "info",
+    "maxRetries": 3,
+    "timeout": 300000
+  },
+  "execution": {
+    "tests": {
+      "autoRun": true,
+      "parallel": true,
+      "stopOnFailure": false,
+      "reportFormat": "json"
+    },
+    "commands": {
+      "autoExecute": true,
+      "captureOutput": true,
+      "logToFile": true
+    },
+    "deployments": {
+      "autoApprove": true,
+      "rollbackOnError": true,
+      "validateBefore": true
+    }
+  },
+  "notifications": {
+    "onSuccess": "silent",
+    "onFailure": "log",
+    "onCompletion": "summary"
+  },
+  "logging": {
+    "directory": ".kiro/logs",
+    "retention": 30,
+    "format": "json"
+  }
+}

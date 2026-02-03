@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "name": "Auto-Execute Remaining Tasks on Agent Stop",
+  "description": "Automatically executes all remaining incomplete tasks in the Enterprise Authentication Performance Optimization spec when the agent completes execution",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Execute the next incomplete task from the Enterprise Authentication Performance Optimization spec (.kiro/specs/enterprise-auth-performance-optimization/tasks.md). Start with task 9.5 and continue sequentially through all remaining tasks. For each task, read the requirements and design documents first, then implement the task completely before moving to the next one. Update task status as you progress."
+  },
+  "workspaceFolderName": "accounting-systemr5",
+  "shortName": "auto-execute-remaining-tasks"
+}

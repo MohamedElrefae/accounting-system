@@ -12,7 +12,7 @@ const LandingDecider: React.FC = () => {
   const { demoMode } = useAppStore()
   const scope = useScopeOptional()
   const orgId = scope?.currentOrg?.id
-  
+
   // Fetch server-backed landing preference (scoped by active org via service)
   const { data: pref, isLoading, error } = useQuery({
     queryKey: ['landingPreference', orgId ?? null],
@@ -25,16 +25,16 @@ const LandingDecider: React.FC = () => {
 
   // Prefetch the dashboard bundle and data on idle to keep the first transition fast
   React.useEffect(() => {
-    const prefetch = () => { 
+    const prefetch = () => {
       void import('./Dashboard')
-      import('../services/dashboard-queries').then(m => { void m.prefetchDashboardQueries(qc, {}) }).catch(() => {})
+      import('../services/dashboard-queries').then(m => { void m.prefetchDashboardQueries(qc, {}) }).catch(() => { })
       // Prefetch popular report bundles to speed first navigation
       void import('./Reports/TrialBalanceOriginal')
       void import('./Reports/GeneralLedger')
     }
     if (demoMode) return
     if ('requestIdleCallback' in window) {
-      ;(window as any).requestIdleCallback(prefetch, { timeout: 1500 })
+      ; (window as any).requestIdleCallback(prefetch, { timeout: 1500 })
     } else {
       const t = setTimeout(prefetch, 300)
       return () => clearTimeout(t)
@@ -44,11 +44,12 @@ const LandingDecider: React.FC = () => {
   // Show loading state briefly
   if (!demoMode && isLoading) return <div style={{ padding: '20px' }}>Loading...</div>
 
-  // If there's an error or no preference, default to dashboard
-  const effectivePref = demoMode ? 'dashboard' : (error ? 'dashboard' : (pref || 'dashboard'))
+  // If there's an error or no preference, default to welcome (not dashboard)
+  // Dashboard requires specific permissions, so welcome is safer default
+  const effectivePref = demoMode ? 'dashboard' : (error ? 'welcome' : (pref || 'welcome'))
 
   return (
-    <React.Suspense fallback={<div style={{ padding: '20px' }}>Loading dashboard...</div>}> 
+    <React.Suspense fallback={<div style={{ padding: '20px' }}>Loading dashboard...</div>}>
       {effectivePref === 'dashboard' ? <Dashboard /> : <Welcome />}
     </React.Suspense>
   )

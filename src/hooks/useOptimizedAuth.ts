@@ -418,7 +418,9 @@ const loadAuthData = async (userId: string) => {
 
   const startTime = performance.now();
   const defaultRoles: RoleSlug[] = ['viewer']; // FAIL SAFE: Default to Viewer
-  console.log('[Auth] loadAuthData start', { userId, defaultRoles }); 
+  if (import.meta.env.DEV) {
+    console.log('[Auth] loadAuthData start', { userId, defaultRoles });
+  } 
   const defaultPermissions = flattenPermissions(defaultRoles);
   
   // Check localStorage cache first for instant load

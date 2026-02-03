@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { OptimizedSuspense } from '../components/Common/PerformanceOptimizer';
 import OptimizedProtectedRoute from '../components/routing/OptimizedProtectedRoute';
 import { TransactionsDataProvider } from '../contexts/TransactionsDataContext';
@@ -16,6 +16,7 @@ import { useAuditContext } from '../hooks/useAuditContext';
 // Core & Dashboard
 const Dashboard = React.lazy(() => import('../pages/Dashboard'));
 const Welcome = React.lazy(() => import('../pages/Welcome'));
+const LandingDecider = React.lazy(() => import('../pages/LandingDecider'));
 const PerformanceDashboardPage = React.lazy(() => import('../pages/PerformanceDashboard'));
 
 // Main Data
@@ -92,8 +93,6 @@ const ProjectAttachmentsPage = React.lazy(() => import('../pages/Projects/Projec
  * Provides a single source of truth for all authenticated application routes.
  */
 const UnifiedRoutes: React.FC = () => {
-    const location = useLocation();
-
     // Hook for audit logging context (optional, but good practice)
     useAuditContext({ pageName: 'Application', moduleName: 'UnifiedRouter' });
 
@@ -104,7 +103,7 @@ const UnifiedRoutes: React.FC = () => {
             {/* ============================================================ */}
             <Route index element={
                 <OptimizedSuspense>
-                    <Dashboard />
+                    <LandingDecider />
                 </OptimizedSuspense>
             } />
             <Route path="dashboard" element={

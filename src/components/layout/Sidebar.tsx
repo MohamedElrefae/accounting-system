@@ -273,9 +273,8 @@ const Sidebar: React.FC<SidebarProps> = () => {
         // Use legacy global check
         const hasAccess = hasActionAccess && hasActionAccess(permissionToCheck);
 
-        // -- Debug Log for Decision --
-        if (item.id === 'accounts-tree' || item.id === 'reports' || item.id === 'dashboard' || item.id === 'main-data') {
-          console.log(`[Sidebar Debug] Item: ${item.id} | Req: ${permissionToCheck} | Granted: ${hasAccess} | UserRoles: ${user?.app_metadata?.roles}`);
+        if (import.meta.env.DEV) {
+          // console.log(`[Sidebar Debug] Item: ${item.id} | Req: ${permissionToCheck} | Granted: ${hasAccess} | UserRoles: ${user?.app_metadata?.roles}`);
         }
 
         if (!hasAccess) {

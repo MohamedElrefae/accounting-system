@@ -22,7 +22,6 @@ import {
   LogoutIcon,
   VisibilityIcon,
   VisibilityOffIcon,
-  LightbulbIcon,
   RefreshIcon,
   WifiOff,
   Wifi,
@@ -47,27 +46,27 @@ import { useScope } from '../../contexts/ScopeContext';
 const ConnectionStatusInline: React.FC = () => {
   const connectionHealth = useConnectionHealth();
   const { error: scopeError, isLoadingOrgs } = useScope();
-  
+
   const getStatusColor = () => {
     if (!connectionHealth.isOnline) return 'error';
     if (connectionHealth.latency && connectionHealth.latency > 2000) return 'warning';
     if (scopeError) return 'warning';
     return 'success';
   };
-  
+
   const getStatusText = () => {
     if (!connectionHealth.isOnline) return 'غير متصل';
     if (scopeError && scopeError.includes('Connection')) return 'مشاكل في الاتصال';
     if (isLoadingOrgs) return 'جاري التحميل...';
     return 'متصل';
   };
-  
+
   const getStatusIcon = () => {
     if (!connectionHealth.isOnline) return <WifiOff />;
     if (connectionHealth.latency && connectionHealth.latency > 2000) return <NoInternetIcon />;
     return <Wifi />;
   };
-  
+
   return (
     <Tooltip title={`الحالة: ${getStatusText()}`}>
       <Chip
@@ -188,11 +187,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
 
   // Helper function to get user role
   const getUserRole = () => {
-    console.log('[TopBar] Profile:', profile);
-    console.log('[TopBar] Roles:', profile?.roles);
-    console.log('[TopBar] isSuperAdmin:', isSuperAdmin());
-    console.log('[TopBar] hasRole(admin):', hasRole('admin'));
-    console.log('[TopBar] hasRole(manager):', hasRole('manager'));
+    // Debug logs removed for production cleanliness
 
     // Check for admin/manager roles first
     if (isSuperAdmin()) {
@@ -301,7 +296,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
               <ScopedOrgSelector
                 size="small"
-                sx={{ 
+                sx={{
                   minWidth: 200,
                   '& .MuiOutlinedInput-root': {
                     fontSize: '0.85rem',
@@ -315,7 +310,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
               <ScopedProjectSelector
                 size="small"
                 allowAll
-                sx={{ 
+                sx={{
                   minWidth: 200,
                   '& .MuiOutlinedInput-root': {
                     fontSize: '0.85rem',
@@ -354,16 +349,6 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
                 {language === 'ar' ? 'مزامنة' : 'Sync'}
               </StyledTopBarButton>
             </Tooltip>
-
-            {/* Help Button */}
-            <Box sx={{ display: { xs: 'none', lg: 'block' } }}>
-              <StyledTopBarButton
-                onClick={() => navigate('/getting-started')}
-                startIcon={<LightbulbIcon fontSize="small" />}
-              >
-                {language === 'ar' ? 'مساعدة' : 'Help'}
-              </StyledTopBarButton>
-            </Box>
 
             {/* Utility Icons Group */}
             <Box sx={{ display: 'flex', gap: 1, backgroundColor: (theme) => alpha(theme.palette.divider, 0.05), p: 0.5, borderRadius: '10px' }}>

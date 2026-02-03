@@ -14,9 +14,9 @@ import FolderPermissionsDialog from '../../../components/documents/FolderPermiss
 import DocumentPermissionsDialog from '../../../components/documents/DocumentPermissionsDialog';
 import { useScopeOptional } from '../../../contexts/ScopeContext';
 
-import DocumentManagementLayout, { 
-  type Document, 
-  type DocumentManagementLayoutProps 
+import DocumentManagementLayout, {
+  type Document,
+  type DocumentManagementLayoutProps
 } from '../components/DocumentManagementLayout';
 
 // Custom hook for debounced search
@@ -39,18 +39,18 @@ function useDebounced<T>(value: T, delay: number): T {
 const DocumentManagementPage: React.FC = () => {
   // Toast notifications
   const { showToast } = useToast();
-  
+
   // Permissions
   const hasPermission = useHasPermission();
 
   const scope = useScopeOptional();
   const orgId = scope?.currentOrg?.id || '';
   const projectId = scope?.currentProject?.id || '';
-  
+
   // Organization and Project state
   const [organizations, setOrganizations] = useState<Array<{ id: string; name: string; code: string }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; name: string; name_ar?: string }>>([]);
-  
+
   // Folders state
   const [folders, setFolders] = useState<DocumentFolder[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -62,11 +62,11 @@ const DocumentManagementPage: React.FC = () => {
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  
+
   // Search and Filter state
   const [searchText, setSearchText] = useState<string>('');
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
-  
+
   // UI state
   const [viewMode] = useState<'grid' | 'list'>('grid');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -82,14 +82,14 @@ const DocumentManagementPage: React.FC = () => {
   // Category selector for upload
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
-  
+
   // Debounce search input
   const debouncedSearchText = useDebounced(searchText, 400);
-  
+
   // Build query parameters for documents hook
   const documentsQuery = useMemo(() => {
     if (!orgId) return undefined;
-    
+
     return {
       orgId,
       search: debouncedSearchText,
@@ -102,24 +102,24 @@ const DocumentManagementPage: React.FC = () => {
       fts: debouncedSearchText.length > 2, // Use full-text search for longer queries
     };
   }, [orgId, debouncedSearchText, activeFilters, projectId, selectedFolderId]);
-  
+
   // Use existing documents hook
-  const { 
-    data: documentsData, 
+  const {
+    data: documentsData,
     isLoading: documentsLoading,
-    error: documentsError 
+    error: documentsError
   } = useDocuments(documentsQuery);
-  
+
   // Load initial data
   useEffect(() => {
     const initializeData = async () => {
       try {
         setIsInitializing(true);
-        
+
         // Load organizations
         const orgs = await getOrganizations();
         setOrganizations(orgs || []);
-        
+
         // Set default org if not already set
         if (!orgId && orgs && orgs.length > 0) {
           const defaultOrgId = orgs[0].id as string;
@@ -132,10 +132,10 @@ const DocumentManagementPage: React.FC = () => {
         setIsInitializing(false);
       }
     };
-    
+
     initializeData();
   }, [orgId, showToast, scope]);
-  
+
   // Load projects & folders when organization changes
   useEffect(() => {
     const loadProjects = async () => {
@@ -143,14 +143,14 @@ const DocumentManagementPage: React.FC = () => {
         setProjects([]);
         return;
       }
-      
+
       try {
         const { data } = await supabase
           .from('projects')
           .select('id,name,name_ar')
           .eq('org_id', orgId)
           .order('name');
-        
+
         setProjects(data || []);
       } catch (error) {
         console.error('Failed to load projects:', error);
@@ -171,7 +171,7 @@ const DocumentManagementPage: React.FC = () => {
             names.unshift(cur.name);
             cur = cur.parent_id ? byId.get(cur.parent_id) : undefined;
           }
-        return names.join('/');
+          return names.join('/');
         };
         const fp: Record<string, string> = {};
         fs.forEach(f => { fp[f.id] = buildPath(f.id); });
@@ -199,23 +199,23 @@ const DocumentManagementPage: React.FC = () => {
         setCategoryNames({});
       }
     };
-    
+
     loadProjects();
   }, [orgId, selectedFolderId]);
-  
+
   // Event handlers
   const handleOrgChange = useCallback((newOrgId: string) => {
     if (scope) { void scope.setOrganization(newOrgId) }
   }, [scope]);
-  
+
   const handleProjectChange = useCallback((newProjectId: string) => {
     if (scope) { void scope.setProject(newProjectId || null) }
   }, [scope]);
-  
+
   const handleSearchChange = useCallback((newSearchText: string) => {
     setSearchText(newSearchText);
   }, []);
-  
+
   const handleFilterToggle = useCallback((filter: string) => {
     setActiveFilters(prev => {
       if (prev.includes(filter)) {
@@ -225,16 +225,16 @@ const DocumentManagementPage: React.FC = () => {
       }
     });
   }, []);
-  
+
   const handleFilterClear = useCallback(() => {
     setActiveFilters([]);
   }, []);
-  
+
   const handleNewDocument = useCallback(() => {
     // TODO: Navigate to document creation page or open modal
     showToast('New document creation not yet implemented', { severity: 'info' });
   }, [showToast]);
-  
+
   const handleUploadDocument = useCallback(() => {
     if (!orgId) {
       showToast('Select an organization first', { severity: 'warning' });
@@ -244,12 +244,12 @@ const DocumentManagementPage: React.FC = () => {
     fileInputRef.current.value = '';
     fileInputRef.current.click();
   }, [showToast, orgId]);
-  
+
   const handleExportDocuments = useCallback(() => {
     // TODO: Export current filtered documents
     showToast('Document export not yet implemented', { severity: 'info' });
   }, [showToast]);
-  
+
   const handleDocumentClick = useCallback((doc: Document) => {
     try {
       const full = (documentsData?.data as any[])?.find?.((d: any) => d.id === doc.id) as SvcDocument | undefined;
@@ -263,11 +263,11 @@ const DocumentManagementPage: React.FC = () => {
       showToast('Unable to open document details', { severity: 'error' });
     }
   }, [documentsData?.data, showToast]);
-  
+
   // Transform documents data
   const documents = useMemo((): Document[] => {
     if (!documentsData?.data) return [];
-    
+
     return documentsData.data.map((doc: any) => ({
       id: doc.id,
       title: doc.title,
@@ -282,19 +282,19 @@ const DocumentManagementPage: React.FC = () => {
       mime_type: doc.mime_type,
     }));
   }, [documentsData?.data]);
-  
+
   const totalCount = documentsData?.total || 0;
-  
+
   // Determine if page is loading
   const isLoading = isInitializing || documentsLoading;
-  
+
   // Format error message
-  const errorMessage = documentsError 
-    ? typeof documentsError === 'string' 
-      ? documentsError 
+  const errorMessage = documentsError
+    ? typeof documentsError === 'string'
+      ? documentsError
       : documentsError.message || 'An error occurred while loading documents'
     : null;
-  
+
   // Build props for layout component
   const onFileSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -302,7 +302,7 @@ const DocumentManagementPage: React.FC = () => {
     setPendingFile(file);
     setCategoryDialogOpen(true);
   }, []);
-  
+
   const layoutProps: DocumentManagementLayoutProps = {
     // Organization and project data
     organizations,
@@ -311,7 +311,7 @@ const DocumentManagementPage: React.FC = () => {
     projectId,
     searchText,
     activeFilters,
-    
+
     // Event handlers
     onOrgChange: handleOrgChange,
     onProjectChange: handleProjectChange,
@@ -326,21 +326,21 @@ const DocumentManagementPage: React.FC = () => {
     selectedDocumentIds: selectedIds,
     categoryNames,
     folderPaths,
-    
+
     // Document data
     documents,
     totalCount,
     documentsLoading,
     viewMode,
     error: errorMessage,
-    
+
     // Loading and permissions
     isLoading,
     canCreate: hasPermission('documents.create'),
     canUpload: hasPermission('documents.create'), // Assuming upload requires create permission
     canExport: hasPermission('documents.read'), // Assuming export requires read permission
   };
-  
+
   const handleDebug = useCallback(async () => {
     try {
       const { data: sess } = await supabase.auth.getSession();
@@ -408,33 +408,37 @@ const DocumentManagementPage: React.FC = () => {
   return (
     <>
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-        <button type="button" onClick={handleDebug} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer' }}>
-          Debug Documents Auth
-        </button>
-        <button type="button" onClick={async () => {
-          try {
-            if (!orgId) { alert('Select an organization first'); return; }
-            const { data, error } = await supabase.rpc('edms_debug_identity', { p_org_id: orgId });
-            if (error) { console.error('[Run Debug RPC] error', error); alert('Debug RPC failed: ' + error.message); return; }
-            const row: any = Array.isArray(data) ? data[0] : data;
-            const text =
-              'edms_debug_identity\n\n' +
-              `uid: ${row?.uid}\n` +
-              `jwt_role: ${row?.jwt_role}\n` +
-              `db_user: ${row?.db_user}\n` +
-              `db_role: ${row?.db_role}\n` +
-              `is_member: ${row?.is_member}\n` +
-              `has_role_create: ${row?.has_role_create}`;
-            console.log('[Run Debug RPC]\n' + text);
-            try { await (navigator as any)?.clipboard?.writeText?.(text); alert('Debug RPC results copied to clipboard and printed in console.'); }
-            catch { alert(text); }
-          } catch (e: any) {
-            console.error('[Run Debug RPC] failed', e);
-            alert('Debug RPC failed: ' + (e?.message || e));
-          }
-        }} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer' }}>
-          Run Debug RPC
-        </button>
+        {import.meta.env.DEV && (
+          <>
+            <button type="button" onClick={handleDebug} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer' }}>
+              Debug Documents Auth
+            </button>
+            <button type="button" onClick={async () => {
+              try {
+                if (!orgId) { alert('Select an organization first'); return; }
+                const { data, error } = await supabase.rpc('edms_debug_identity', { p_org_id: orgId });
+                if (error) { console.error('[Run Debug RPC] error', error); alert('Debug RPC failed: ' + error.message); return; }
+                const row: any = Array.isArray(data) ? data[0] : data;
+                const text =
+                  'edms_debug_identity\n\n' +
+                  `uid: ${row?.uid}\n` +
+                  `jwt_role: ${row?.jwt_role}\n` +
+                  `db_user: ${row?.db_user}\n` +
+                  `db_role: ${row?.db_role}\n` +
+                  `is_member: ${row?.is_member}\n` +
+                  `has_role_create: ${row?.has_role_create}`;
+                console.log('[Run Debug RPC]\n' + text);
+                try { await (navigator as any)?.clipboard?.writeText?.(text); alert('Debug RPC results copied to clipboard and printed in console.'); }
+                catch { alert(text); }
+              } catch (e: any) {
+                console.error('[Run Debug RPC] failed', e);
+                alert('Debug RPC failed: ' + (e?.message || e));
+              }
+            }} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer' }}>
+              Run Debug RPC
+            </button>
+          </>
+        )}
         <button type="button" onClick={handleUploadDocument} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer' }}>
           Upload Document
         </button>
@@ -506,7 +510,7 @@ const DocumentManagementPage: React.FC = () => {
                     if (!ok) return;
                     await deleteFolder(selectedFolderId);
                     setFolders(prev => prev.filter(f => f.id !== selectedFolderId));
-                    setSelectedFolderId(await getUnfiledFolderId(orgId) );
+                    setSelectedFolderId(await getUnfiledFolderId(orgId));
                     showToast('Folder deleted', { severity: 'success' });
                   } catch (e: any) {
                     showToast(e?.message || 'Failed to delete folder (ensure it has no subfolders/documents)', { severity: 'error' });
@@ -536,8 +540,8 @@ const DocumentManagementPage: React.FC = () => {
                   roots.push(f);
                 }
               });
-              Object.values(children).forEach(arr => arr.sort((a,b) => (a.position - b.position) || a.name.localeCompare(b.name)));
-              roots.sort((a,b) => (a.position - b.position) || a.name.localeCompare(b.name));
+              Object.values(children).forEach(arr => arr.sort((a, b) => (a.position - b.position) || a.name.localeCompare(b.name)));
+              roots.sort((a, b) => (a.position - b.position) || a.name.localeCompare(b.name));
 
               // Expand/collapse state: expand roots and selected ancestry
               const isExpanded = (id: string) => expandedFolders.has(id);
@@ -579,7 +583,7 @@ const DocumentManagementPage: React.FC = () => {
                         (async () => {
                           try {
                             // Move under node as child with last position among its current children
-                            const kids = (children[node.id] || []).slice().sort((a,b) => a.position - b.position);
+                            const kids = (children[node.id] || []).slice().sort((a, b) => a.position - b.position);
                             const lastPos = kids.length ? kids[kids.length - 1].position : -1;
                             await supabase.from('document_folders').update({ parent_id: node.id, position: lastPos + 1 }).eq('id', source.id);
                             const fs = await listFolders(orgId);
@@ -819,14 +823,14 @@ const DocumentManagementPage: React.FC = () => {
         <CategorySelectDialog
           open={categoryDialogOpen}
           orgId={orgId}
-          onCancel={() => { setCategoryDialogOpen(false); setPendingFile(null); try { if (fileInputRef.current) (fileInputRef.current as any).value=''; } catch {} }}
+          onCancel={() => { setCategoryDialogOpen(false); setPendingFile(null); try { if (fileInputRef.current) (fileInputRef.current as any).value = ''; } catch { } }}
           onSelect={async (categoryId) => {
             try {
               if (!pendingFile) return;
               const file = pendingFile;
               const title = (file as any).name?.split('.')?.slice(0, -1).join('.') || 'Untitled document';
               const { version } = await uploadDocument({ orgId, title, file, folderId: selectedFolderId || undefined, categoryId: categoryId || undefined });
-              try { const url = await getSignedUrl(version.storage_path); console.debug('Signed URL generated', url); } catch {}
+              try { const url = await getSignedUrl(version.storage_path); console.debug('Signed URL generated', url); } catch { }
               showToast('Document uploaded successfully', { severity: 'success' });
             } catch (err: any) {
               console.error('Upload failed', err);
@@ -834,7 +838,7 @@ const DocumentManagementPage: React.FC = () => {
             } finally {
               setCategoryDialogOpen(false);
               setPendingFile(null);
-              try { if (fileInputRef.current) (fileInputRef.current as any).value=''; } catch {}
+              try { if (fileInputRef.current) (fileInputRef.current as any).value = ''; } catch { }
             }
           }}
         />

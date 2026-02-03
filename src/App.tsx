@@ -11,8 +11,7 @@ import DataLoadingErrorBoundary from './components/Common/DataLoadingErrorBounda
 import DataLoadingState from './components/Common/DataLoadingState';
 import { Box } from '@mui/material';
 import PerformanceOptimizer from './components/Common/PerformanceOptimizer';
-import RefreshMonitor from './components/Debug/RefreshMonitor';
-import { PermissionDebug } from './components/Debug/PermissionDebug'; // Added Debug Component
+// Debug components removed for production
 
 // Lazy load unified routes
 const UnifiedRoutes = React.lazy(() => import('./routes/UnifiedRoutes'));
@@ -50,8 +49,6 @@ const OptimizedApp: React.FC = () => {
       }}
     >
       <PerformanceOptimizer>
-        <PermissionDebug /> {/* Debugger injected here */}
-        <RefreshMonitor />
         <Routes>
           {/* Auth Routes */}
           <Route path="/login" element={<LoginForm />} />

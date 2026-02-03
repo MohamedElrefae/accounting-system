@@ -741,66 +741,68 @@ const AccountsTreePage: React.FC = () => {
             size="small"
             layout="horizontal"
           />
-          {/* Debug button - remove after testing */}
-          <button
-            className="ultimate-btn ultimate-btn-edit"
-            title="Debug Rollups"
-            onClick={async () => {
-              if (!orgId) {
-                showToast('يرجى اختيار منظمة أولاً', { severity: 'warning' });
-                return;
-              }
-              try {
-                if (import.meta.env.DEV) {
-                  console.log('=== ENHANCED ROLLUPS DEBUG START ===');
-                  const debugInfo = await debugAccountRollups(orgId);
-                  console.log('🔍 Basic Debug Results:', debugInfo);
+          {/* Debug button - only shown in development mode */}
+          {import.meta.env.DEV && (
+            <button
+              className="ultimate-btn ultimate-btn-edit"
+              title="Debug Rollups"
+              onClick={async () => {
+                if (!orgId) {
+                  showToast('يرجى اختيار منظمة أولاً', { severity: 'warning' });
+                  return;
                 }
+                try {
+                  if (import.meta.env.DEV) {
+                    console.log('=== ENHANCED ROLLUPS DEBUG START ===');
+                    const debugInfo = await debugAccountRollups(orgId);
+                    console.log('🔍 Basic Debug Results:', debugInfo);
+                  }
 
-                // Test view directly with visible accounts
-                const visibleAccountIds = accounts.slice(0, 5).map(a => a.id);
-                if (import.meta.env.DEV) console.log('\n--- Testing View Directly ---');
-                const viewResults = await testViewDirectly(orgId, visibleAccountIds);
+                  // Test view directly with visible accounts
+                  const visibleAccountIds = accounts.slice(0, 5).map(a => a.id);
+                  if (import.meta.env.DEV) console.log('\n--- Testing View Directly ---');
+                  const viewResults = await testViewDirectly(orgId, visibleAccountIds);
 
-                // Manual calculation for comparison
-                if (visibleAccountIds.length > 0) {
-                  if (import.meta.env.DEV) console.log('\n--- Manual Calculation ---');
-                  const manualResults = await manualRollupsCalculation(orgId, visibleAccountIds);
+                  // Manual calculation for comparison
+                  if (visibleAccountIds.length > 0) {
+                    if (import.meta.env.DEV) console.log('\n--- Manual Calculation ---');
+                    const manualResults = await manualRollupsCalculation(orgId, visibleAccountIds);
 
-                  // Compare results
-                  if (viewResults && manualResults) {
-                    if (import.meta.env.DEV) {
-                      console.log('\n--- Results Comparison ---');
-                      visibleAccountIds.forEach(id => {
-                        const viewData = viewResults.find(v => v.id === id);
-                        const manualData = manualResults[id];
-                        console.log(`Account ${id}:`);
-                        console.log('  View:', { has_transactions: viewData?.has_transactions, net_amount: viewData?.net_amount });
-                        console.log('  Manual:', { has_transactions: manualData?.has_transactions, net_amount: manualData?.net_amount });
-                        console.log('  Match:', viewData?.has_transactions === manualData?.has_transactions && Number(viewData?.net_amount || 0) === (manualData?.net_amount || 0));
-                      });
+                    // Compare results
+                    if (viewResults && manualResults) {
+                      if (import.meta.env.DEV) {
+                        console.log('\n--- Results Comparison ---');
+                        visibleAccountIds.forEach(id => {
+                          const viewData = viewResults.find(v => v.id === id);
+                          const manualData = manualResults[id];
+                          console.log(`Account ${id}:`);
+                          console.log('  View:', { has_transactions: viewData?.has_transactions, net_amount: viewData?.net_amount });
+                          console.log('  Manual:', { has_transactions: manualData?.has_transactions, net_amount: manualData?.net_amount });
+                          console.log('  Match:', viewData?.has_transactions === manualData?.has_transactions && Number(viewData?.net_amount || 0) === (manualData?.net_amount || 0));
+                        });
+                      }
                     }
                   }
-                }
 
-                // Also test RPC modes if available
-                try {
-                  if (import.meta.env.DEV) console.log('\n--- RPC Mode Testing ---');
-                  await testRollupModes(orgId);
-                } catch {
-                  console.log('⚠️ RPC test skipped (function may not exist yet)');
-                }
+                  // Also test RPC modes if available
+                  try {
+                    if (import.meta.env.DEV) console.log('\n--- RPC Mode Testing ---');
+                    await testRollupModes(orgId);
+                  } catch {
+                    console.log('⚠️ RPC test skipped (function may not exist yet)');
+                  }
 
-                console.log('=== ENHANCED ROLLUPS DEBUG END ===');
-                showToast(`Enhanced debug complete. Found ${debugInfo.accountsWithTransactions} accounts with transactions. Check console for detailed analysis.`, { severity: 'info' });
-              } catch (err) {
-                console.error('Debug failed:', err);
-                showToast('Debug failed - check console', { severity: 'error' });
-              }
-            }}
-          >
-            <div className="btn-content"><span className="btn-text">🔍 Debug</span></div>
-          </button>
+                  console.log('=== ENHANCED ROLLUPS DEBUG END ===');
+                  showToast(`Enhanced debug complete. Found ${debugInfo.accountsWithTransactions} accounts with transactions. Check console for detailed analysis.`, { severity: 'info' });
+                } catch (err) {
+                  console.error('Debug failed:', err);
+                  showToast('Debug failed - check console', { severity: 'error' });
+                }
+              }}
+            >
+              <div className="btn-content"><span className="btn-text">🔍 Debug</span></div>
+            </button>
+          )}
         </div>
       </div>
 

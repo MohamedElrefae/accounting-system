@@ -9,7 +9,7 @@ export async function getLandingPreference(orgId?: string): Promise<LandingPrefe
   try {
     const { data: auth } = await supabase.auth.getUser()
     const user = auth?.user
-    if (!user) return 'dashboard' // Default to dashboard for authenticated users
+    if (!user) return 'welcome' // Default to welcome for new users
 
     const effectiveOrgId = orgId ?? null
 
@@ -17,23 +17,22 @@ export async function getLandingPreference(orgId?: string): Promise<LandingPrefe
       .from('user_landing_preferences')
       .select('landing_preference')
       .eq('user_id', user.id)
-      .limit(1)
 
     q = effectiveOrgId ? q.eq('org_id', effectiveOrgId) : (q as any).is('org_id', null)
 
-    const { data, error } = await q.single()
+    const { data, error } = await q.maybeSingle()
     
-    // If table doesn't exist or query fails, default to dashboard
+    // If table doesn't exist or query fails, default to welcome
     if (error) {
-      console.log('Landing preference query failed, defaulting to dashboard:', error.message)
-      return 'dashboard'
+      console.log('Landing preference query failed, defaulting to welcome:', error.message)
+      return 'welcome'
     }
     
-    if (!data) return 'dashboard'
+    if (!data) return 'welcome'
     return (data as any).landing_preference as LandingPreference
   } catch (error) {
-    console.log('Error getting landing preference, defaulting to dashboard:', error)
-    return 'dashboard'
+    console.log('Error getting landing preference, defaulting to welcome:', error)
+    return 'welcome'
   }
 }
 

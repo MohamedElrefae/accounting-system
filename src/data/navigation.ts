@@ -12,22 +12,6 @@ const baseNavigation: NavigationItem[] = [
     path: "/"
   },
   {
-    id: "getting-started",
-    label: "Getting Started",
-    titleEn: "Getting Started",
-    titleAr: "ابدأ هنا",
-    icon: "AutoAwesome",
-    path: "/getting-started"
-  },
-  {
-    id: "help-center",
-    label: "Help",
-    titleEn: "Help Center",
-    titleAr: "مركز المساعدة",
-    icon: "Lightbulb",
-    path: "/help"
-  },
-  {
     id: "main-data",
     label: "Main Data",
     titleEn: "Main Data", 

@@ -59,13 +59,15 @@ const OptimizedProtectedRoute: React.FC<OptimizedProtectedRouteProps> = ({
     return <>{children}</>;
   }
 
-  // DEBUG: Trace Flicker
-  console.log('[RouteGuard] Render:', {
-    path: location.pathname,
-    loading,
-    user: !!user,
-    roles: (user as any)?.roles || []
-  });
+  // DEBUG: Trace Flicker (only in DEV mode)
+  if (import.meta.env.DEV) {
+    // console.log('[RouteGuard] Render:', {
+    //   path: location.pathname,
+    //   loading,
+    //   user: !!user,
+    //   roles: (user as any)?.roles || []
+    // });
+  }
 
   // 1. Loading State
   if (loading) {

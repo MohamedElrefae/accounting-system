@@ -1,0 +1,1240 @@
+
+> accounting-system@1.0.0 test:property
+> vitest run tests/property --config tests/property/test-config.ts
+
+
+[1m[46m RUN [49m[22m [36mv4.0.5 [39m[90mC:/5/accounting-systemr5[39m
+
+stderr | tests/property/memory-opt.test.ts
+Cleanup warning: TypeError: fetch failed
+
+[90mstdout[2m | tests/property/memory-opt.test.ts
+[22m[39mProperty-based testing environment initialized
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39m≡ا¤ Supabase URL: SET
+≡ا¤ Supabase Key: SET
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.755Z #_acquireLock begin [33m10000[39m
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.756Z #_acquireLock lock acquired for storage key sb-bgxknceshxxifwytalex-auth-token
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.756Z #_recoverAndRefresh() begin
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.782Z #onAuthStateChange() registered callback with id [32mSymbol(auth-callback)[39m
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39mGoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.782Z #_recoverAndRefresh() session from storage [1mnull[22m
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.782Z #_recoverAndRefresh() session is not valid
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.782Z #_recoverAndRefresh() end
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39mGoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.783Z #_handleVisibilityChange()
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.783Z #_removeVisibilityChangedCallback()
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.784Z #_stopAutoRefresh()
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39mGoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.784Z #_startAutoRefresh()
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.784Z #_initialize() end
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39mGoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.785Z #_acquireLock lock released for storage key sb-bgxknceshxxifwytalex-auth-token
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39mGoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.785Z #_acquireLock end
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39mGoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.785Z #_acquireLock begin [33m10000[39m
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.785Z #_acquireLock lock acquired for storage key sb-bgxknceshxxifwytalex-auth-token
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.786Z #_useSession begin
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.786Z #__loadSession() begin
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39mGoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.786Z #getSession() session from storage [1mnull[22m
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.786Z #__loadSession() end
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39mGoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.787Z INITIAL_SESSION callback id [32mSymbol(auth-callback)[39m session [1mnull[22m
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.788Z #_acquireLock lock released for storage key sb-bgxknceshxxifwytalex-auth-token
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.788Z #_useSession end
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39mGoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.788Z #_acquireLock end
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39mGoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.789Z #_autoRefreshTokenTick() begin
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.789Z #_acquireLock begin [33m0[39m
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.789Z #_acquireLock lock acquired for storage key sb-bgxknceshxxifwytalex-auth-token
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.789Z #_useSession begin
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.789Z #__loadSession() begin
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39mGoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.789Z #getSession() session from storage [1mnull[22m
+GoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.789Z #__loadSession() end
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39mGoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.790Z #_autoRefreshTokenTick() no session
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39mGoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.790Z #_useSession end
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39mGoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.790Z #_autoRefreshTokenTick() end
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39mGoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.790Z #_acquireLock lock released for storage key sb-bgxknceshxxifwytalex-auth-token
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39mGoTrueClient@sb-bgxknceshxxifwytalex-auth-token:0 (2.93.3) 2026-02-01T19:29:44.790Z #_acquireLock end
+
+[90mstdout[2m | tests/property/rpc-function-performance.test.ts
+[22m[39mProperty-based testing environment initialized
+
+stderr | tests/property/rpc-function-performance.test.ts
+Cleanup warning: TypeError: fetch failed
+
+[90mstdout[2m | tests/property/database-index-optimization.test.ts
+[22m[39mProperty-based testing environment initialized
+
+stderr | tests/property/database-index-optimization.test.ts
+Cleanup warning: TypeError: fetch failed
+
+[90mstdout[2m | tests/property/database-index-optimization.test.ts
+[22m[39mProperty-based testing cleanup completed
+
+ [31mظإ»[39m tests/property/database-index-optimization.test.ts [2m([22m[2m5 tests[22m[2m | [22m[33m5 skipped[39m[2m)[22m[32m 146[2mms[22m[39m
+       [2m[90mظô[39m[22m should execute authentication queries under 50ms with proper index usage
+       [2m[90mظô[39m[22m should reduce total query count from 8 to 4 per authentication request
+       [2m[90mظô[39m[22m should use proper database indexes for scoped roles queries
+       [2m[90mظô[39m[22m should maintain query result consistency between optimized and original queries
+       [2m[90mظô[39m[22m should demonstrate measurable performance improvement over baseline
+stderr | tests/property/batch-processing-efficiency.test.ts
+Cleanup warning: TypeError: fetch failed
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39mProperty-based testing environment initialized
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts[2m > [22m[2mProperty 4: Batch Processing Efficiency[2m > [22m[2mProperty 4.1: Batch processing should reduce database queries
+[22m[39mظ£à Permission service cleanup complete
+
+[90mstdout[2m | tests/property/cache-performance.test.ts
+[22m[39mProperty-based testing environment initialized
+
+stderr | tests/property/cache-performance.test.ts
+Cleanup warning: TypeError: fetch failed
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts[2m > [22m[2mProperty 4: Batch Processing Efficiency[2m > [22m[2mProperty 4.1: Batch processing should reduce database queries
+[22m[39mظ£à Permission service cleanup complete
+
+[90mstdout[2m | tests/property/memory-opt.test.ts
+[22m[39mProperty-based testing cleanup completed
+
+ [31mظإ»[39m tests/property/memory-opt.test.ts [2m([22m[2m5 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 581[2mms[22m[39m
+[31m     [31m├ù[31m should reduce memory footprint by at least 38% through compression[39m[32m 147[2mms[22m[39m
+     [32mظ£ô[39m should maintain memory efficiency across varying session sizes[32m 182[2mms[22m[39m
+     [32mظ£ô[39m should compress permission arrays to bitmaps with 60% reduction[32m 11[2mms[22m[39m
+     [32mظ£ô[39m should maintain permission bitmap accuracy across all permission sets[32m 14[2mms[22m[39m
+     [32mظ£ô[39m should handle edge cases: empty and single permission sets[32m 1[2mms[22m[39m
+[90mstdout[2m | tests/property/rpc-function-performance.test.ts
+[22m[39mProperty-based testing cleanup completed
+
+ [32mظ£ô[39m tests/property/rpc-function-performance.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 1075[2mms[22m[39m
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts[2m > [22m[2mProperty 4: Batch Processing Efficiency[2m > [22m[2mProperty 4.2: Batch processing should improve response time
+[22m[39mظ£à Permission service cleanup complete
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts[2m > [22m[2mProperty 4: Batch Processing Efficiency[2m > [22m[2mProperty 4.3: Batch processing should maintain accuracy
+[22m[39mظ£à Permission service cleanup complete
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts[2m > [22m[2mProperty 4: Batch Processing Efficiency[2m > [22m[2mProperty 4.4: Batch processing should benefit from caching
+[22m[39mظ£à Permission service cleanup complete
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts[2m > [22m[2mProperty 4: Batch Processing Efficiency[2m > [22m[2mProperty 4.5: Batch processing should scale linearly
+[22m[39mظ£à Permission service cleanup complete
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+stderr | tests/property/batch-processing-efficiency.test.ts > Property 4: Batch Processing Efficiency > Property 4.6: Batch processing should handle errors gracefully
+Error validating permissions batch: Error: RPC error
+    at PermissionService.mockRPC [as validatePermissionsViaRPC] (C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:368:19)
+    at PermissionService.validatePermissionsBatch (C:/5/accounting-systemr5/src/services/permission/PermissionService.ts:212:34)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:375:26
+    at AsyncProperty.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/AsyncProperty.generic.js:46:28)
+    at asyncRunIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:33:21)
+    at C:/5/accounting-systemr5/tests/property/batch-processing-efficiency.test.ts:348:5
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:20
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts[2m > [22m[2mProperty 4: Batch Processing Efficiency[2m > [22m[2mProperty 4.6: Batch processing should handle errors gracefully
+[22m[39mظ£à Permission service cleanup complete
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts[2m > [22m[2mProperty 4: Batch Processing Efficiency[2m > [22m[2mProperty 4.7: Batch processing should return consistent results
+[22m[39mظ£à Permission service cleanup complete
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts[2m > [22m[2mProperty 4: Batch Processing Efficiency[2m > [22m[2mProperty 4.8: Batch processing response time should be bounded
+[22m[39mظ£à Permission service cleanup complete
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts[2m > [22m[2mProperty 4: Batch Processing Efficiency[2m > [22m[2mProperty 4.9: Batch processing should achieve high cache hit rate
+[22m[39mظ£à Permission service cleanup complete
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts[2m > [22m[2mProperty 4: Batch Processing Efficiency[2m > [22m[2mProperty 4.10: Batch processing should handle concurrent requests
+[22m[39mظ£à Permission service cleanup complete
+
+[90mstdout[2m | tests/property/batch-processing-efficiency.test.ts
+[22m[39mProperty-based testing cleanup completed
+
+ [32mظ£ô[39m tests/property/batch-processing-efficiency.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 5864[2mms[22m[39m
+     [33m[2mظ£ô[22m[39m Property 4.2: Batch processing should improve response time [33m 1563[2mms[22m[39m
+     [33m[2mظ£ô[22m[39m Property 4.5: Batch processing should scale linearly [33m 2272[2mms[22m[39m
+     [33m[2mظ£ô[22m[39m Property 4.8: Batch processing response time should be bounded [33m 1557[2mms[22m[39m
+[90mstdout[2m | tests/property/cache-performance.test.ts
+[22m[39mProperty-based testing cleanup completed
+
+ [32mظ£ô[39m tests/property/cache-performance.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 15999[2mms[22m[39m
+     [33m[2mظ£ô[22m[39m Property 2.6: Concurrent cache access should maintain consistency [33m 389[2mms[22m[39m
+     [33m[2mظ£ô[22m[39m Property 2.7: Cache entries should expire after TTL [33m 15077[2mms[22m[39m
+
+ظ»ظ»ظ»ظ»ظ»ظ» Failed Suites 1 ظ»ظ»ظ»ظ»ظ»ظ»ظ»
+
+ FAIL  tests/property/database-index-optimization.test.ts [ tests/property/database-index-optimization.test.ts ]
+TypeError: Cannot read properties of null (reading 'id')
+ ظإ» tests/property/database-index-optimization.test.ts:44:25
+     42|     .single();
+     43|   
+     44|   testUserId = testUser.id;
+       |                         ^
+     45| });
+     46| 
+
+ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»[1/2]ظ»
+
+
+ظ»ظ»ظ»ظ»ظ»ظ»ظ» Failed Tests 1 ظ»ظ»ظ»ظ»ظ»ظ»ظ»
+
+ FAIL  tests/property/memory-opt.test.ts > Property 3.1: Memory footprint reduction (38% target) > should reduce memory footprint by at least 38% through compression
+Error: Property failed after 1 tests
+{ seed: 1695272081, path: "0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0", endOnFailure: true }
+Counterexample: [[{"userId":"00000000-0000-1000-8000-000000000000","orgId":"00000000-0000-1000-8000-000000000000","projectId":"00000000-0000-1000-8000-000000000000","roleId":"00000000-0000-1000-8000-000000000000","permissions":["     ","     ","     ","     ","     "]},{"userId":"00000000-0000-1000-8000-000000000000","orgId":"00000000-0000-1000-8000-000000000000","projectId":"00000000-0000-1000-8000-000000000000","roleId":"00000000-0000-1000-8000-000000000000","permissions":["     ","     ","     ","     ","     "]},{"userId":"00000000-0000-1000-8000-000000000000","orgId":"00000000-0000-1000-8000-000000000000","projectId":"00000000-0000-1000-8000-000000000000","roleId":"00000000-0000-1000-8000-000000000000","permissions":["     ","     ","     ","     ","     "]},{"userId":"00000000-0000-1000-8000-000000000000","orgId":"00000000-0000-1000-8000-000000000000","projectId":"00000000-0000-1000-8000-000000000000","roleId":"00000000-0000-1000-8000-000000000000","permissions":["     ","     ","     ","     ","     "]},{"userId":"00000000-0000-1000-8000-000000000000","orgId":"00000000-0000-1000-8000-000000000000","projectId":"00000000-0000-1000-8000-000000000000","roleId":"00000000-0000-1000-8000-000000000000","permissions":["     ","     ","     ","     ","     "]}]]
+Shrunk 232 time(s)
+Got AssertionError: expected 782 to be less than or equal to 781.82
+    at C:/5/accounting-systemr5/tests/property/memory-opt.test.ts:53:36
+    at Property.predicate (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/Property.js:14:54)
+    at Property.run (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/property/Property.generic.js:46:33)
+    at runIt (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:18:30)
+    at check (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:62:11)
+    at Module.assert (file:///C:/5/accounting-systemr5/node_modules/fast-check/lib/esm/check/runner/Runner.js:65:17)
+    at C:/5/accounting-systemr5/tests/property/memory-opt.test.ts:28:8
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:157:11
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:753:26
+    at file:///C:/5/accounting-systemr5/node_modules/@vitest/runner/dist/index.js:1636:20
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ظإ» tests/property/memory-opt.test.ts:53:36
+     51|           
+     52|           // Verify compression achieves target
+     53|           expect(compressedMemory).toBeLessThanOrEqual(originalMemory ظخ
+       |                                    ^
+     54|           expect(originalMemory - compressedMemory).toBeGreaterThanOrEظخ
+     55|             originalMemory * memoryReductionTarget * 0.85 // Allow 15%ظخ
+ ظإ» Property.predicate node_modules/fast-check/lib/esm/check/property/Property.js:14:54
+ ظإ» Property.run node_modules/fast-check/lib/esm/check/property/Property.generic.js:46:33
+ ظإ» runIt node_modules/fast-check/lib/esm/check/runner/Runner.js:18:30
+ ظإ» check node_modules/fast-check/lib/esm/check/runner/Runner.js:62:11
+ ظإ» Module.assert node_modules/fast-check/lib/esm/check/runner/Runner.js:65:17
+ ظإ» tests/property/memory-opt.test.ts:28:8
+ ظإ» buildError node_modules/fast-check/lib/esm/check/runner/utils/RunDetailsFormatter.js:126:15
+ ظإ» throwIfFailed node_modules/fast-check/lib/esm/check/runner/utils/RunDetailsFormatter.js:138:11
+ ظإ» reportRunDetails node_modules/fast-check/lib/esm/check/runner/utils/RunDetailsFormatter.js:151:16
+ ظإ» Module.assert node_modules/fast-check/lib/esm/check/runner/Runner.js:69:9
+ ظإ» tests/property/memory-opt.test.ts:28:8
+
+ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»ظ»[2/2]ظ»
+
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m3 passed[39m[22m[90m (5)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m32 passed[39m[22m[2m | [22m[33m5 skipped[39m[90m (38)[39m
+[2m   Start at [22m 21:29:43
+[2m   Duration [22m 16.98s[2m (transform 722ms, setup 323ms, collect 2.66s, tests 23.66s, environment 2ms, prepare 68ms)[22m
+
