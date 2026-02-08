@@ -6,6 +6,7 @@ import type { TransactionClassification } from '../../services/transaction-class
 import type { ExpensesCategoryRow } from '../../types/sub-tree'
 import type { WorkItemRow } from '../../types/work-items'
 // Data now comes from TransactionsDataContext via props - no independent fetching
+import { useScope } from '../../contexts/ScopeContext'
 import {
   Stepper,
   Step,
@@ -136,16 +137,19 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   const [draftLineIds, setDraftLineIds] = useState<Record<number, string>>({})
 
   // Header data (transactions table)
+  // Get scoped context for org/project synchronization
+  const { getOrgId, getProjectId } = useScope()
+
   const [headerData, setHeaderData] = useState<Record<string, any>>(() => {
     const today = new Date().toISOString().split('T')[0]
-    const defaultOrgId = localStorage.getItem('default_org_id') || (organizations[0]?.id || '')
-    const defaultProjectId = localStorage.getItem('default_project_id') || ''
+    const currentOrgId = getOrgId()
+    const currentProjectId = getProjectId()
     return {
       entry_date: today,
       description: '',
       description_ar: '',
-      org_id: defaultOrgId,
-      project_id: defaultProjectId,
+      org_id: currentOrgId || (organizations[0]?.id || ''),
+      project_id: currentProjectId || '',
       // Defaults to propagate to lines (match old wizard header fields)
       default_cost_center_id: '',
       default_work_item_id: '',
@@ -181,6 +185,23 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       })
     }
   }, [open, effectiveCategories.length, effectiveCostCenters.length, effectiveWorkItems.length, effectiveClassifications.length, effectiveAnalysisItems, accounts.length, organizations.length, projects.length])
+
+  // Sync with scope context changes
+  useEffect(() => {
+    if (open) {
+      const currentScopeOrgId = getOrgId()
+      const currentScopeProjectId = getProjectId()
+      
+      // Update header data if scope changes and wizard is on basic step
+      if (currentStep === 'basic') {
+        setHeaderData(prev => ({
+          ...prev,
+          org_id: currentScopeOrgId || prev.org_id,
+          project_id: currentScopeProjectId || prev.project_id
+        }))
+      }
+    }
+  }, [open, getOrgId, getProjectId, currentStep])
 
   // Lines data (transaction_lines table)
   const [lines, setLines] = useState<TxLine[]>([
@@ -747,8 +768,8 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
           entry_date: new Date().toISOString().split('T')[0],
           description: '',
           description_ar: '',
-          org_id: localStorage.getItem('default_org_id') || (organizations[0]?.id || ''),
-          project_id: localStorage.getItem('default_project_id') || '',
+          org_id: getOrgId() || (organizations[0]?.id || ''),
+          project_id: getProjectId() || '',
           default_cost_center_id: '',
           default_work_item_id: '',
           default_sub_tree_id: '',
@@ -839,9 +860,8 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
           entry_date: new Date().toISOString().split('T')[0],
           description: '',
           description_ar: '',
-          org_id: localStorage.getItem('default_org_id') || (organizations[0]?.id || ''),
-          project_id: localStorage.getItem('default_project_id') || '',
-          // reset defaults
+          org_id: getOrgId() || (organizations[0]?.id || ''),
+          project_id: getProjectId() || '',
           default_cost_center_id: '',
           default_work_item_id: '',
           default_sub_tree_id: '',

@@ -100,14 +100,14 @@ DROP POLICY IF EXISTS "tli_select" ON transaction_line_items;
 
 CREATE POLICY "users_see_org_transaction_line_items" ON transaction_line_items FOR SELECT
 USING (
-  transaction_id IN (
-    SELECT t.id
-    FROM transactions t
-    WHERE t.org_id IN (
-      SELECT org_id 
-      FROM org_memberships 
-      WHERE user_id = auth.uid()
-    )
+  org_id IN (
+    SELECT org_id 
+    FROM org_memberships 
+    WHERE user_id = auth.uid()
+  )
+);
+
+CREATE POLICY "super_a
   )
 );
 
