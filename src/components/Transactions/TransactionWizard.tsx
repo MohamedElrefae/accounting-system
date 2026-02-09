@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react'
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import DraggablePanelContainer from '../Common/DraggablePanelContainer'
 import type { Account, Project } from '../../services/transactions'
 import type { Organization } from '../../types'
@@ -7,6 +7,7 @@ import type { ExpensesCategoryRow } from '../../types/sub-tree'
 import type { WorkItemRow } from '../../types/work-items'
 // Data now comes from TransactionsDataContext via props - no independent fetching
 import { useScope } from '../../contexts/ScopeContext'
+import { getActiveProjectsByOrg } from '../../services/projects'
 import {
   Stepper,
   Step,
@@ -38,6 +39,7 @@ import './TransactionWizard.css'
 import AttachDocumentsPanel from '../documents/AttachDocumentsPanel'
 import SearchableSelect from '../Common/SearchableSelect'
 import TransactionApprovalStatus from '../Approvals/TransactionApprovalStatus'
+import LineProjectSelector from './LineProjectSelector'
 
 interface TransactionWizardProps {
   open: boolean
@@ -191,17 +193,37 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     if (open) {
       const currentScopeOrgId = getOrgId()
       const currentScopeProjectId = getProjectId()
-      
+
       // Update header data if scope changes and wizard is on basic step
       if (currentStep === 'basic') {
-        setHeaderData(prev => ({
-          ...prev,
-          org_id: currentScopeOrgId || prev.org_id,
-          project_id: currentScopeProjectId || prev.project_id
-        }))
+        setHeaderData(prev => {
+          // Update organization
+          const newOrgId = currentScopeOrgId || prev.org_id
+          const newProjectId = currentScopeProjectId || prev.project_id
+
+          return {
+            ...prev,
+            org_id: newOrgId,
+            project_id: newProjectId
+          }
+        })
       }
     }
   }, [open, getOrgId, getProjectId, currentStep])
+
+  // Separate effect for project validation when secureProjects is initialized
+  useEffect(() => {
+    // Only run validation when projects are properly initialized
+    // Use ref to prevent initialization errors and check if secureProjects has content
+    if (projectsReadyRef.current && open && currentStep === 'basic' && headerData.org_id && headerData.project_id && secureProjects.length > 0) {
+      // Check if current project is accessible in current org
+      const isProjectAccessible = secureProjects.some(p => p.id === headerData.project_id)
+      if (!isProjectAccessible) {
+        console.warn(`[TransactionWizard] Project ${headerData.project_id} is not accessible in org ${headerData.org_id}, clearing project selection`)
+        setHeaderData(prev => ({ ...prev, project_id: undefined }))
+      }
+    }
+  }, [open, currentStep, headerData.org_id, headerData.project_id]) // Remove secureProjects from deps
 
   // Lines data (transaction_lines table)
   const [lines, setLines] = useState<TxLine[]>([
@@ -340,12 +362,54 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     [accounts]
   )
 
-  // Filter projects by org
-  const filteredProjects = useMemo(() => {
-    if (!headerData.org_id) return projects
-    const scoped = projects.filter(p => p.org_id === headerData.org_id || !p.org_id)
-    return scoped.length > 0 ? scoped : projects
-  }, [projects, headerData.org_id])
+  // Filter projects by org AND user permissions (secure approach)
+  const [secureProjects, setSecureProjects] = useState<Project[]>([])
+  const [loadingProjects, setLoadingProjects] = useState(false)
+  const projectsReadyRef = useRef(false) // Use useRef to track initialization state
+
+  // Load user-accessible projects when org changes
+  const loadSecureProjects = useCallback(async () => {
+    if (!headerData.org_id) {
+      setSecureProjects([])
+      projectsReadyRef.current = false // Reset initialization flag
+      return
+    }
+
+    setLoadingProjects(true)
+    try {
+      const userProjects = await getActiveProjectsByOrg(headerData.org_id)
+      setSecureProjects(userProjects)
+      projectsReadyRef.current = true // Set flag when projects are loaded
+      if (import.meta.env.DEV) {
+        console.log(`[TransactionWizard] Loaded ${userProjects.length} user-accessible projects for org ${headerData.org_id}`)
+      }
+
+      // Validate existing lines - clear only truly inaccessible projects
+      // Allow different projects per line, just clear ones not accessible for current org
+      setLines(prev => prev.map(line => {
+        // Only validate lines that use the header org (or no org set, implying header org override)
+        // If line has a different explicit org_id, don't validate against header org projects
+        const needsValidation = !line.org_id || line.org_id === headerData.org_id
+
+        if (needsValidation && line.project_id && !userProjects.some(p => p.id === line.project_id)) {
+          console.warn(`[TransactionWizard] Clearing inaccessible project ${line.project_id} from line (not accessible in org ${headerData.org_id})`)
+          return { ...line, project_id: undefined }
+        }
+        return line
+      }))
+
+    } catch (error) {
+      console.error('[TransactionWizard] Failed to load user-accessible projects:', error)
+      setSecureProjects([]) // Secure fallback - no projects if permissions check fails
+      projectsReadyRef.current = false // Reset flag on error
+    } finally {
+      setLoadingProjects(false)
+    }
+  }, [headerData.org_id])
+
+  useEffect(() => {
+    loadSecureProjects()
+  }, [loadSecureProjects])
 
   // Prepare options for SearchableSelect
   const organizationOptions = useMemo(() =>
@@ -353,10 +417,12 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     [organizations]
   )
 
-  const projectOptions = useMemo(() =>
-    filteredProjects.map(proj => ({ value: proj.id, label: `${proj.code} - ${proj.name}` })),
-    [filteredProjects]
-  )
+  const projectOptions = useMemo(() => {
+    if (loadingProjects) {
+      return [{ value: '', label: 'Loading projects...' }]
+    }
+    return secureProjects.map(proj => ({ value: proj.id, label: `${proj.code} - ${proj.name}` }))
+  }, [secureProjects, loadingProjects])
 
   const costCenterOptions = useMemo(() =>
     effectiveCostCenters.map(cc => ({ value: cc.id, label: `${cc.code} - ${cc.name}` })),
@@ -890,7 +956,10 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   }
 
   const addLine = () => {
-    const newLineNo = lines.length + 1
+    const newLineNo = Math.max(...lines.map(l => l.line_no), 0) + 1
+
+    // Load Step 1 project as default, but allow user to change to any accessible project
+    // This follows same approach as top bar - show all accessible projects for the org
     setLines(prev => [...prev, {
       line_no: newLineNo,
       account_id: '',
@@ -898,7 +967,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       credit_amount: 0,
       description: '',
       org_id: headerData.org_id,
-      project_id: headerData.project_id,
+      project_id: headerData.project_id || undefined, // Default to Step 1 project
       cost_center_id: headerData.default_cost_center_id || undefined,
       work_item_id: headerData.default_work_item_id || undefined,
       sub_tree_id: headerData.default_sub_tree_id || undefined,
@@ -912,6 +981,17 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   }
 
   const updateLine = (idx: number, updates: Partial<TxLine>) => {
+    // Validate project selection against user permissions
+    // Allow different projects per line, but block truly inaccessible ones
+    // Validation moved to UI components (SearchableSelect / LineProjectSelector) to support multi-org scenarios
+    // if (updates.project_id && updates.project_id !== '') {
+    //   const isAccessible = secureProjects.some(p => p.id === updates.project_id)
+    //   if (!isAccessible) {
+    //     console.warn(`[TransactionWizard] Line ${idx}: Cannot select inaccessible project: ${updates.project_id}`)
+    //     return
+    //   }
+    // }
+
     setLines(prev => prev.map((line, i) => i === idx ? { ...line, ...updates } : line))
   }
 
@@ -922,18 +1002,19 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
           <SearchableSelect
             options={organizationOptions}
             value={line.org_id || headerData.org_id || ''}
-            onChange={(val) => updateLine(idx, { org_id: val })}
+            onChange={(val) => updateLine(idx, { org_id: val, project_id: undefined })}
             placeholder="اختر المؤسسة"
           />
         )
       case 'project_id':
+        const effectiveOrgId = line.org_id || headerData.org_id
         return (
-          <SearchableSelect
-            options={projectOptions}
+          <LineProjectSelector
+            orgId={effectiveOrgId}
             value={line.project_id || ''}
-            onChange={(val) => updateLine(idx, { project_id: val || undefined })}
-            placeholder="بدون مشروع"
-            disabled={!headerData.org_id}
+            onChange={(val) => updateLine(idx, { project_id: val })}
+            disabled={!effectiveOrgId}
+            placeholder={effectiveOrgId ? 'بدون مشروع' : 'اختر المؤسسة أولاً'}
           />
         )
       case 'cost_center_id':

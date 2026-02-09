@@ -12,7 +12,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query';
 import { ScopeContext, type ScopeContextValue } from './ScopeContext';
 import { getOrganizations, type Organization } from '../services/organization';
-import { getActiveProjectsByOrg, validateProjectAccess, type Project } from '../services/projects';
+import { getActiveProjectsByOrg, type Project } from '../services/projects';
 import { queryKeys } from '../lib/queryKeys';
 import { getConnectionMonitor, type ConnectionHealth } from '../utils/connectionMonitor';
 
@@ -87,23 +87,41 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
       // - org_memberships.can_access_all_projects = true → ALL projects
       // - org_memberships.can_access_all_projects = false → Only project_memberships
       const projects = await getActiveProjectsByOrg(orgId);
-      if (import.meta.env.DEV) console.log('[ScopeProvider] Loaded projects:', projects.length);
       
       if (!mountedRef.current) return projects;
       
       // Set available projects (no additional filtering needed - RPC already did it)
       setAvailableProjects(projects);
       
-      // Restore project from localStorage if still valid
-      const storedProjectId = getStoredProjectId();
-      const matchingProject = projects.find(p => p.id === storedProjectId);
-      
-      if (matchingProject) {
-        if (import.meta.env.DEV) console.log('[ScopeProvider] Restored project from storage:', matchingProject.code);
-        setCurrentProject(matchingProject);
-      } else {
+      // Provide user feedback about project access
+      if (projects.length === 0) {
+        console.warn('[ScopeProvider] ⚠️ No projects accessible for user in this organization');
+        console.warn('[ScopeProvider] This could mean:');
+        console.warn('[ScopeProvider]   1. User has no project memberships');
+        console.warn('[ScopeProvider]   2. User cannot access all projects in org');
+        console.warn('[ScopeProvider]   3. No active projects exist in this organization');
+        
+        // Clear any previously selected project since it's no longer accessible
         setCurrentProject(null);
         setStoredProjectId(null);
+      } else {
+        if (import.meta.env.DEV) console.log('[ScopeProvider] ✅ Loaded projects:', projects.length);
+        
+        // Restore project from localStorage if still valid and accessible
+        const storedProjectId = getStoredProjectId();
+        const matchingProject = projects.find(p => p.id === storedProjectId);
+        
+        if (matchingProject) {
+          if (import.meta.env.DEV) console.log('[ScopeProvider] Restored project from storage:', matchingProject.code);
+          setCurrentProject(matchingProject);
+        } else {
+          // Either no stored project or it's no longer accessible
+          if (storedProjectId) {
+            console.warn('[ScopeProvider] Previously selected project is no longer accessible, clearing selection');
+          }
+          setCurrentProject(null);
+          setStoredProjectId(null);
+        }
       }
       
       return projects;
@@ -120,6 +138,7 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
       if (mountedRef.current) {
         setAvailableProjects([]);
         setCurrentProject(null);
+        setError('Failed to load projects. Please check your permissions and try again.');
       }
       return [];
     } finally {

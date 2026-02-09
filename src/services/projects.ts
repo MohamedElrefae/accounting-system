@@ -133,53 +133,63 @@ const withRetry = async <T>(
 export async function getActiveProjectsByOrg(orgId: string): Promise<Project[]> {
   console.log(`[getActiveProjectsByOrg] Loading projects for org: ${orgId}`);
   
-  try {
-    // Try to use the new RPC that respects project_memberships
-    // Falls back to direct query if RPC doesn't exist
-    try {
-      const { data, error } = await withRetry(
-        () => supabase.rpc('get_user_accessible_projects', { p_org_id: orgId }),
-        2, // fewer retries for RPC
-        500
-      );
-      
-      if (!error && data) {
-        console.log(`[getActiveProjectsByOrg] RPC returned ${data.length} projects`);
-        return (data as Project[]) || [];
-      }
-    } catch (rpcError) {
-      console.warn('[getActiveProjectsByOrg] RPC failed, falling back to direct query:', rpcError);
-    }
-    
-    // Fallback: direct query (for backward compatibility)
-    console.log('[getActiveProjectsByOrg] Using direct query fallback');
-    const { data, error } = await withRetry(
-      () => supabase
-        .from('projects')
-        .select('*')
-        .eq('status', 'active')
-        .eq('org_id', orgId)
-        .order('code', { ascending: true }),
-      3,
-      1000
-    );
-    
-    if (error) {
-      console.error('[getActiveProjectsByOrg] Direct query failed:', error);
-      throw new Error(`Failed to load projects: ${error.message}`);
-    }
-    
-    const projects = (data as Project[]) || [];
-    console.log(`[getActiveProjectsByOrg] Direct query returned ${projects.length} projects`);
-    return projects;
-    
-  } catch (error: any) {
-    console.error('[getActiveProjectsByOrg] All attempts failed:', error);
-    
-    // Return empty array as fallback to prevent app from breaking
-    console.warn('[getActiveProjectsByOrg] Returning empty array as fallback');
+  if (!orgId) {
+    console.warn('[getActiveProjectsByOrg] No org ID provided, returning empty array');
     return [];
   }
+  
+  try {
+    // Try to use the RPC that respects project_memberships and org_memberships
+    // This is the PRIMARY method that enforces proper access control
+    console.log('[getActiveProjectsByOrg] Attempting RPC call for user-accessible projects');
+    const { data, error } = await withRetry(
+      () => supabase.rpc('get_user_accessible_projects', { p_org_id: orgId }),
+      2,
+      500
+    );
+    
+    if (!error && data) {
+      const projectCount = Array.isArray(data) ? data.length : 0;
+      console.log(`[getActiveProjectsByOrg] ✅ RPC returned ${projectCount} projects with proper access control`);
+      
+      // Log project details for debugging
+      if (projectCount > 0 && import.meta.env.DEV) {
+        console.log('[getActiveProjectsByOrg] Projects:', data.map((p: any) => `${p.code} - ${p.name}`));
+      }
+      
+      return (data as Project[]) || [];
+    } else if (error) {
+      console.error('[getActiveProjectsByOrg] ❌ RPC failed:', error);
+      
+      // Check if it's a function not found error
+      if (error.code === 'PGRST116' || error.message?.includes('function get_user_accessible_projects') || error.message?.includes('does not exist')) {
+        console.error('[getActiveProjectsByOrg] ❌ RPC function does not exist - migration may not be deployed');
+        console.log('[getActiveProjectsByOrg] 💡 Run migration: supabase/migrations/20260126_phase_2_get_user_accessible_projects_v2.sql');
+      } else {
+        console.error('[getActiveProjectsByOrg] ❌ RPC error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+      }
+    }
+  } catch (rpcError) {
+    console.error('[getActiveProjectsByOrg] ❌ RPC exception:', rpcError);
+  }
+  
+  // IMPORTANT: We should NOT fall back to direct query as it bypasses access control
+  // Instead, return empty array and log the issue clearly
+  console.error('[getActiveProjectsByOrg] ⚠️ RPC failed - NOT falling back to direct query for security reasons');
+  console.error('[getActiveProjectsByOrg] ⚠️ This could mean:');
+  console.error('[getActiveProjectsByOrg]   1. RPC migration not deployed');
+  console.error('[getActiveProjectsByOrg]   2. User not authenticated');
+  console.error('[getActiveProjectsByOrg]   3. User lacks organization membership');
+  console.error('[getActiveProjectsByOrg]   4. Database permissions issue');
+  
+  // Return empty array - this is secure and prevents unauthorized access
+  console.warn('[getActiveProjectsByOrg] 🔒 Returning empty array for security');
+  return [];
 }
 
 // Get user's project memberships
