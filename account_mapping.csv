@@ -1,0 +1,23 @@
+﻿old_code,old_name,new_code,new_name,notes
+31,التكاليف,5120,مواد مباشرة,Direct costs - map to direct materials
+41,ايرادات العمليات,4100,إيرادات عقود,Operations revenue - map to contract revenue
+56,ارباح وخسائر راسمالية,4200,إيرادات أخرى,Capital gains/losses - map to other income
+115,الحاسب الالى,1530,معدات مكتبية,Computer equipment - map to office equipment
+116,الاثاث والمهمات,1530,معدات مكتبية,Furniture - map to office equipment
+117,العدد والادوات,1510,معدات مقاولات,Tools and equipment - map to contracting equipment
+131,الخزينة,1110,النقدية,Cash box - map to cash
+132,البنوك,1120,البنوك,Banks - direct mapping
+134,العملاء,1210,العملاء,Customers - direct mapping
+211,راس المال,3100,رأس المال,Capital - direct mapping
+221,عملاء دفعات مقدمة,2130,دفعات مقدمة من العملاء,Customer advances - map to customer prepayments
+232,المقاولون,2110,الموردين,Contractors - map to suppliers
+233,العملاء تشوينات,2140,خصم ضمان أعمال,Customer retentions - map to work guarantee retention
+234,الموردين,2110,الموردين,Suppliers - direct mapping
+236,تامينات للغير,2140,خصم ضمان أعمال,Third party insurance - map to work guarantee retention
+526,مجمع اهلاك العدد و الادوات,1590,مخصص إهلاك,Accumulated depreciation - direct mapping
+1352,السلفيات,1410,مدفوعات مقدما,Advances - map to prepayments
+1354,المدينون والدائنون,1210,العملاء,Debtors and creditors - map to customers (need to split by sign)
+2352,ضرائب الخصم,2240,ضريبة خصم وتحصيل,Withholding tax - direct mapping
+2356,ضرائب القيمة المضافة,2210,ضريبة قيمة مضافة,VAT - direct mapping
+13111,تامينات العملاء,1230,خصم ضمان مستحق,Customer insurance - map to guarantee discount receivable
+131313,تامينات لدى الغير,1410,مدفوعات مقدما,Insurance with others - map to prepayments
