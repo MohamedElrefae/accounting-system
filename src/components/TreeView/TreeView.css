@@ -64,6 +64,27 @@
   display: flex;
   align-items: center;
   color: var(--text-secondary);
+  font-size: 0.85em;
+  padding: 0 4px;
+}
+
+.tree-node-extra .legacy-badge {
+  padding: 2px 8px;
+  background: var(--hover-bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.tree-node-extra .legacy-code {
+  font-family: var(--font-mono);
+  letter-spacing: 0.5px;
+}
+
+.tree-node-extra .legacy-name {
+  color: var(--text-primary);
+  font-weight: 500;
 }
 
 /* Variants for extra columns count (adds extra cells before actions) */
@@ -95,10 +116,12 @@
 .tree-node:not(.tree-header):not(.tree-subtotal):not(.tree-grandtotal):hover {
   box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent-primary) 20%, transparent);
 }
+
 .tree-node:not(.tree-header):not(.tree-subtotal):not(.tree-grandtotal):active {
   transform: scale(0.997);
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent-primary) 35%, transparent), 0 1px 2px rgba(0,0,0,0.15);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent-primary) 35%, transparent), 0 1px 2px rgba(0, 0, 0, 0.15);
 }
+
 .tree-node:not(.tree-header):not(.tree-subtotal):not(.tree-grandtotal):focus-within {
   outline: 2px solid var(--accent-primary);
   outline-offset: -2px;
@@ -106,8 +129,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tree-node { transition: background-color var(--transition-fast), box-shadow .15s ease; }
-  .tree-node:active { transform: none; }
+  .tree-node {
+    transition: background-color var(--transition-fast), box-shadow .15s ease;
+  }
+
+  .tree-node:active {
+    transform: none;
+  }
 }
 
 .tree-node.inactive {
@@ -253,11 +281,28 @@ html[data-theme='light'] .tree-node-code {
 }
 
 /* Parent emphasis for nodes with children */
-.tree-node.tree-parent { background: var(--hover-bg); font-weight: 700; }
-.tree-node.tree-parent.level-1 { background: color-mix(in oklab, var(--hover-bg) 70%, transparent); }
-.tree-node.tree-parent.level-2 { background: color-mix(in oklab, var(--hover-bg) 55%, transparent); }
-.tree-node.tree-parent.level-3 { background: color-mix(in oklab, var(--hover-bg) 40%, transparent); }
-.tree-node.tree-parent.level-4, .tree-node.tree-parent.level-5, .tree-node.tree-parent.level-6 { background: color-mix(in oklab, var(--hover-bg) 25%, transparent); }
+.tree-node.tree-parent {
+  background: var(--hover-bg);
+  font-weight: 700;
+}
+
+.tree-node.tree-parent.level-1 {
+  background: color-mix(in oklab, var(--hover-bg) 70%, transparent);
+}
+
+.tree-node.tree-parent.level-2 {
+  background: color-mix(in oklab, var(--hover-bg) 55%, transparent);
+}
+
+.tree-node.tree-parent.level-3 {
+  background: color-mix(in oklab, var(--hover-bg) 40%, transparent);
+}
+
+.tree-node.tree-parent.level-4,
+.tree-node.tree-parent.level-5,
+.tree-node.tree-parent.level-6 {
+  background: color-mix(in oklab, var(--hover-bg) 25%, transparent);
+}
 
 /* Tree Node Children */
 .tree-node-children {
@@ -292,7 +337,7 @@ html[data-theme='light'] .tree-node-code {
   overflow: hidden;
   user-select: none;
   backdrop-filter: blur(10px);
-  box-shadow: 
+  box-shadow:
     0 2px 4px rgba(0, 0, 0, 0.1),
     0 1px 2px rgba(0, 0, 0, 0.2),
     inset 0 1px 0 color-mix(in srgb, var(--on-accent) 10%, transparent);
@@ -307,7 +352,7 @@ html[data-theme='light'] .tree-node-code {
 
 .ultimate-btn:not(:disabled):hover {
   transform: translateY(-2px);
-  box-shadow: 
+  box-shadow:
     0 4px 8px rgba(0, 0, 0, 0.15),
     0 2px 4px rgba(0, 0, 0, 0.12),
     inset 0 1px 0 color-mix(in srgb, var(--on-accent) 20%, transparent);
@@ -339,8 +384,13 @@ html[data-theme='light'] .tree-node-code {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .btn-text {
@@ -407,23 +457,18 @@ html[data-theme='light'] .tree-node-code {
   opacity: 1;
 }
 
-/* Enable Button - Info */
+/* Enable Button - Info (Default/Inactive state) */
 .ultimate-btn-enable {
-  background: linear-gradient(135deg, var(--info) 0%, var(--info-strong) 100%);
-  color: var(--on-accent);
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
+  box-shadow: none;
 }
 
-.ultimate-btn-enable::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, var(--info-strong) 0%, var(--info) 100%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.ultimate-btn-enable:not(:disabled):hover::before {
-  opacity: 1;
+.ultimate-btn-enable:not(:disabled):hover {
+  background: var(--hover-bg);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
 }
 
 /* Delete Button - Error */
@@ -464,8 +509,13 @@ html[data-theme='light'] .tree-node-code {
 }
 
 @keyframes loading-pulse {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 .ultimate-btn.success {
@@ -478,9 +528,17 @@ html[data-theme='light'] .tree-node-code {
 }
 
 @keyframes checkmark {
-  0% { transform: scale(0) rotate(45deg); }
-  50% { transform: scale(1.2) rotate(45deg); }
-  100% { transform: scale(1) rotate(0deg); }
+  0% {
+    transform: scale(0) rotate(45deg);
+  }
+
+  50% {
+    transform: scale(1.2) rotate(45deg);
+  }
+
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
 }
 
 .ultimate-btn.error {
@@ -493,9 +551,19 @@ html[data-theme='light'] .tree-node-code {
 }
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-4px); }
-  75% { transform: translateX(4px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-4px);
+  }
+
+  75% {
+    transform: translateX(4px);
+  }
 }
 
 /* Responsive adjustments */
@@ -503,12 +571,12 @@ html[data-theme='light'] .tree-node-code {
   .tree-node-actions {
     flex-wrap: wrap;
   }
-  
+
   .ultimate-btn {
     min-height: 32px;
     padding: 0.4rem 0.8rem;
   }
-  
+
   .btn-text {
     font-size: 0.8rem;
   }
@@ -520,12 +588,12 @@ html[data-theme='light'] .tree-node-code {
     align-items: flex-start;
     padding: 1rem;
   }
-  
+
   .tree-node-content {
     width: 100%;
     margin-bottom: 0.5rem;
   }
-  
+
   .tree-node-actions {
     width: 100%;
     justify-content: flex-start;

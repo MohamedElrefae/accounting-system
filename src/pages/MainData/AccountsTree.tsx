@@ -25,6 +25,8 @@ interface AccountItem {
   account_type?: string; // optional for display only
   has_children?: boolean;
   has_active_children?: boolean;
+  legacy_code?: string;
+  legacy_name?: string;
 }
 
 interface AncestorItem {
@@ -438,15 +440,50 @@ const AccountsTreePage: React.FC = () => {
     setExpanded(toExpand);
   }, [fetchAccountRollups, fetchCanDeleteFlags, loadChildren, orgId, searchTerm, selectedProject]);
 
-  useEffect(() => {
-    // When org or project changes or search cleared, reload roots
-    if (!orgId) return;
-    if (!searchTerm) {
-      loadRoots().catch(() => { });
-    } else {
-      performSearch().catch(() => { });
+  const loadAllAccounts = useCallback(async () => {
+    setLoading(true);
+    if (!orgId) { setLoading(false); return; }
+
+    // Fetch ALL accounts without parent_id filter
+    let query = supabase
+      .from('v_accounts_tree_ui')
+      .select('*')
+      .eq('org_id', orgId)
+      .order('code', { ascending: true });
+
+    if (selectedProject) {
+      query = query.eq('project_id', selectedProject);
     }
-  }, [orgId, selectedProject, balanceMode, searchTerm, loadRoots, performSearch]);
+
+    const { data, error } = await query;
+    if (!error) {
+      const rows = (data || []).map(mapRow);
+      setAccounts(rows);
+      // We don't verify delete flags/rollups for ALL immediately to save bandwidth, 
+      // or we can do it in batches. For < 3000 rows, it's likely fine to just do it.
+      fetchCanDeleteFlags(rows.map(r => r.id)).catch(() => { });
+      fetchAccountRollups(rows.map(r => r.id)).catch(() => { });
+    }
+    setLoading(false);
+  }, [fetchAccountRollups, fetchCanDeleteFlags, orgId, selectedProject]);
+
+  useEffect(() => {
+    // When org or project changes or search cleared
+    if (!orgId) return;
+
+    if (searchTerm) {
+      performSearch().catch(() => { });
+      return;
+    }
+
+    // If in Table View, load ALL accounts to populate the flat table
+    if (viewMode === 'table') {
+      loadAllAccounts().catch(() => { });
+    } else {
+      // In Tree View, we can stick to lazy loading roots
+      loadRoots().catch(() => { });
+    }
+  }, [orgId, selectedProject, searchTerm, viewMode, loadAllAccounts, loadRoots, performSearch]);
 
   function mapRow(row: Record<string, unknown>): AccountItem {
     return {
@@ -460,6 +497,8 @@ const AccountsTreePage: React.FC = () => {
       account_type: ((row as any).category ? String((row as any).category) : undefined),
       has_children: Boolean((row as any).has_children),
       has_active_children: Boolean((row as any).has_active_children),
+      legacy_code: row.legacy_code ? String(row.legacy_code) : undefined,
+      legacy_name: row.legacy_name ? String(row.legacy_name) : undefined,
     };
   }
 
@@ -659,6 +698,8 @@ const AccountsTreePage: React.FC = () => {
   const exportData = useMemo(() => {
     const columns = createStandardColumns([
       { key: 'code', header: 'الكود', type: 'text' },
+      { key: 'legacy_code', header: 'كود قديم', type: 'text' },
+      { key: 'legacy_name', header: 'اسم قديم', type: 'text' },
       { key: 'name', header: 'الاسم', type: 'text' },
       { key: 'level', header: 'المستوى', type: 'number' },
       { key: 'status', header: 'الحالة', type: 'text' },
@@ -667,6 +708,8 @@ const AccountsTreePage: React.FC = () => {
     ]);
     const rows = filteredAndSorted.map((r) => ({
       code: r.code,
+      legacy_code: r.legacy_code || '',
+      legacy_name: r.legacy_name || '',
       name: r.name_ar || r.name,
       level: r.level,
       status: r.status,
@@ -850,8 +893,18 @@ const AccountsTreePage: React.FC = () => {
           <option value="all">جميع العمليات</option>
         </select>
 
-        <button className={`view-mode-btn ${viewMode === 'tree' ? 'active' : ''}`} onClick={() => setViewMode('tree')}>عرض شجرة</button>
-        <button className={`view-mode-btn ${viewMode === 'table' ? 'active' : ''}`} onClick={() => setViewMode('table')}>عرض جدول</button>
+        <button
+          className={`ultimate-btn ${viewMode === 'tree' ? 'ultimate-btn-edit' : 'ultimate-btn-enable'}`}
+          onClick={() => setViewMode('tree')}
+        >
+          <div className="btn-content"><span className="btn-text">عرض شجرة</span></div>
+        </button>
+        <button
+          className={`ultimate-btn ${viewMode === 'table' ? 'ultimate-btn-edit' : 'ultimate-btn-enable'}`}
+          onClick={() => setViewMode('table')}
+        >
+          <div className="btn-content"><span className="btn-text">عرض جدول</span></div>
+        </button>
       </div>
 
       <div className="content-area">
@@ -901,12 +954,30 @@ const AccountsTreePage: React.FC = () => {
               return 'حذف';
             }}
             maxLevel={4}
+            extraColumns={[
+              {
+                key: 'legacy_code',
+                header: 'كود قديم',
+                render: (node) => (
+                  <div className="legacy-badge">
+                    <span className="legacy-code">{node.legacy_code || '-'}</span>
+                  </div>
+                )
+              },
+              {
+                key: 'legacy_name',
+                header: 'اسم قديم',
+                render: (node) => <span className="legacy-name">{node.legacy_name || '-'}</span>
+              }
+            ]}
           />
         ) : (
           <div className="accounts-table-view">
             <table className="accounts-table">
               <colgroup>
                 <col style={{ width: '120px' }} />
+                <col style={{ width: '100px' }} />
+                <col style={{ width: '150px' }} />
                 <col />
                 <col style={{ width: '160px' }} />
                 <col style={{ width: '80px' }} />
@@ -915,6 +986,8 @@ const AccountsTreePage: React.FC = () => {
               <thead>
                 <tr>
                   <th>الكود</th>
+                  <th>كود قديم</th>
+                  <th>اسم قديم</th>
                   <th>اسم الحساب</th>
                   <th>نوع الحساب</th>
                   <th>المستوى</th>
@@ -930,6 +1003,12 @@ const AccountsTreePage: React.FC = () => {
                   return (
                     <tr key={item.id} data-inactive={!isActive}>
                       <td className={`table-code-cell contrast-table-code-${document.documentElement.getAttribute('data-theme') || 'light'}`}>{item.code}</td>
+                      <td className="table-center">
+                        <span className="legacy-cell-badge">{item.legacy_code || '—'}</span>
+                      </td>
+                      <td>
+                        <span className="legacy-cell-name">{item.legacy_name || '—'}</span>
+                      </td>
                       <td>{item.name_ar || item.name}</td>
                       <td className="table-center">{item.account_type || '—'}</td>
                       <td className="table-center">{item.level}</td>
@@ -985,345 +1064,349 @@ const AccountsTreePage: React.FC = () => {
       </div>
 
       {/* Unified Edit/Add Form */}
-      {dialogOpen && (
-        <DraggableResizablePanel
-          title={dialogMode === 'edit' ? 'تعديل الحساب' : 'إضافة حساب جديد'}
-          subtitle={draft?.code ? `الكود: ${draft.code}` : undefined}
-          headerGradient={`linear-gradient(90deg, ${tokens.palette.primary.dark}, ${tokens.palette.primary.main}, ${tokens.palette.info.main})`}
-          headerActions={(
-            <>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: tokens.palette.primary.contrastText, fontSize: 12, marginInlineEnd: 8 }}>
-                <input type="checkbox" checked={rememberPanel} onChange={(e) => setRememberPanel(e.target.checked)} />
-                تذكر التخطيط
-              </label>
-              <button className="ultimate-btn ultimate-btn-add" title="حفظ" onClick={() => formRef.current?.submit()} data-tour="accounts-tree-save">
-                <div className="btn-content"><span className="btn-text">حفظ</span></div>
-              </button>
-              <button className="ultimate-btn ultimate-btn-delete" title="إلغاء" onClick={() => {
-                const dirty = formRef.current?.hasUnsavedChanges?.();
-                if (dirty) {
-                  const ok = window.confirm('لديك تغييرات غير محفوظة. هل تريد إغلاق النافذة دون حفظ؟');
-                  if (!ok) return;
-                }
-                setDialogOpen(false);
-              }}>
-                <div className="btn-content"><span className="btn-text">إلغاء</span></div>
-              </button>
-            </>
-          )}
-          isOpen={dialogOpen}
-          onClose={() => {
-            const dirty = formRef.current?.hasUnsavedChanges?.();
-            if (dirty) {
-              const ok = window.confirm('لديك تغييرات غير محفوظة. هل تريد إغلاق النافذة دون حفظ؟');
-              if (!ok) return;
-            }
-            setDialogOpen(false);
-          }}
-          position={panelPosition}
-          size={panelSize}
-          isMaximized={panelMax}
-          isDocked={panelDocked}
-          dockPosition={panelDockPos}
-          onMove={setPanelPosition}
-          onResize={setPanelSize}
-          onMaximize={() => setPanelMax(m => !m)}
-          onDock={(pos) => { setPanelDocked(true); setPanelDockPos(pos); }}
-          onResetPosition={() => { setPanelDocked(false); setPanelMax(false); setPanelPosition({ x: 100, y: 100 }); setPanelSize({ width: 940, height: 640 }); }}
-        >
-          <div style={{ padding: '1rem' }}>
-            <UnifiedCRUDForm
-              ref={formRef}
-              config={unifiedConfig}
-              initialData={formInitialData}
-              isLoading={saving}
-              onSubmit={async (form) => {
-                setSaving(true);
-                try {
-                  if (dialogMode === 'edit' && draft.id) {
-                    // Map frontend enum values to database enum types
-                    const accountType = mapAccountTypeToDbEnum(String((form as any).category || ''));
-                    const status = mapStatusToDbEnum(!!(form as any).is_active);
+      {
+        dialogOpen && (
+          <DraggableResizablePanel
+            title={dialogMode === 'edit' ? 'تعديل الحساب' : 'إضافة حساب جديد'}
+            subtitle={draft?.code ? `الكود: ${draft.code}` : undefined}
+            headerGradient={`linear-gradient(90deg, ${tokens.palette.primary.dark}, ${tokens.palette.primary.main}, ${tokens.palette.info.main})`}
+            headerActions={(
+              <>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: tokens.palette.primary.contrastText, fontSize: 12, marginInlineEnd: 8 }}>
+                  <input type="checkbox" checked={rememberPanel} onChange={(e) => setRememberPanel(e.target.checked)} />
+                  تذكر التخطيط
+                </label>
+                <button className="ultimate-btn ultimate-btn-add" title="حفظ" onClick={() => formRef.current?.submit()} data-tour="accounts-tree-save">
+                  <div className="btn-content"><span className="btn-text">حفظ</span></div>
+                </button>
+                <button className="ultimate-btn ultimate-btn-delete" title="إلغاء" onClick={() => {
+                  const dirty = formRef.current?.hasUnsavedChanges?.();
+                  if (dirty) {
+                    const ok = window.confirm('لديك تغييرات غير محفوظة. هل تريد إغلاق النافذة دون حفظ؟');
+                    if (!ok) return;
+                  }
+                  setDialogOpen(false);
+                }}>
+                  <div className="btn-content"><span className="btn-text">إلغاء</span></div>
+                </button>
+              </>
+            )}
+            isOpen={dialogOpen}
+            onClose={() => {
+              const dirty = formRef.current?.hasUnsavedChanges?.();
+              if (dirty) {
+                const ok = window.confirm('لديك تغييرات غير محفوظة. هل تريد إغلاق النافذة دون حفظ؟');
+                if (!ok) return;
+              }
+              setDialogOpen(false);
+            }}
+            position={panelPosition}
+            size={panelSize}
+            isMaximized={panelMax}
+            isDocked={panelDocked}
+            dockPosition={panelDockPos}
+            onMove={setPanelPosition}
+            onResize={setPanelSize}
+            onMaximize={() => setPanelMax(m => !m)}
+            onDock={(pos) => { setPanelDocked(true); setPanelDockPos(pos); }}
+            onResetPosition={() => { setPanelDocked(false); setPanelMax(false); setPanelPosition({ x: 100, y: 100 }); setPanelSize({ width: 940, height: 640 }); }}
+          >
+            <div style={{ padding: '1rem' }}>
+              <UnifiedCRUDForm
+                ref={formRef}
+                config={unifiedConfig}
+                initialData={formInitialData}
+                isLoading={saving}
+                onSubmit={async (form) => {
+                  setSaving(true);
+                  try {
+                    if (dialogMode === 'edit' && draft.id) {
+                      // Map frontend enum values to database enum types
+                      const accountType = mapAccountTypeToDbEnum(String((form as any).category || ''));
+                      const status = mapStatusToDbEnum(!!(form as any).is_active);
 
-                    // Prepare account update data
+                      // Prepare account update data
 
-                    const { data, error } = await supabase.rpc('account_update', {
-                      p_org_id: orgId,
-                      p_id: draft.id,
-                      p_code: form.code,
-                      p_name: form.name_ar || form.name_en || 'Unnamed Account', // Ensure name is never empty
-                      p_name_ar: form.name_ar || form.name_en || 'Unnamed Account', // Ensure name_ar is never empty
-                      p_account_type: accountType,
-                      p_level: parseInt(String(form.level)) || 1,
-                      p_status: status,
-                    });
+                      const { data, error } = await supabase.rpc('account_update', {
+                        p_org_id: orgId,
+                        p_id: draft.id,
+                        p_code: form.code,
+                        p_name: form.name_ar || form.name_en || 'Unnamed Account', // Ensure name is never empty
+                        p_name_ar: form.name_ar || form.name_en || 'Unnamed Account', // Ensure name_ar is never empty
+                        p_account_type: accountType,
+                        p_level: parseInt(String(form.level)) || 1,
+                        p_status: status,
+                      });
 
-                    if (error) {
-                      throw error;
-                    }
+                      if (error) {
+                        throw error;
+                      }
 
-                    if (!data) {
-                      throw new Error('No data returned from update function');
-                    }
+                      if (!data) {
+                        throw new Error('No data returned from update function');
+                      }
 
-                    const updated = data as any;
+                      const updated = data as any;
 
-                    // Immediately enforce user's allow_transactions choice with a direct update
-                    try {
-                      const { error: allowErr } = await supabase
-                        .from('accounts')
-                        .update({ allow_transactions: !!form.allow_transactions })
-                        .eq('id', draft.id)
-                        .eq('org_id', orgId);
-                      if (allowErr) console.warn('allow_transactions update warning:', allowErr);
-                    } catch { }
-
-                    // Update core fields in local state - FIXED: Use form data as primary source
-                    setAccounts(prev => prev.map(a => (a.id === draft.id ? {
-                      ...a,
-                      // Use form data (user's current input) as primary source
-                      code: form.code,
-                      name: form.name_en || form.name_ar,
-                      name_ar: form.name_ar || form.name_en,
-                      level: parseInt(String(form.level)) || 1,
-                      status: form.is_active ? 'active' : 'inactive',
-                      account_type: accountType,
-                      // Only use server response for fields that should come from server
-                      parent_id: updated.parent_id || a.parent_id,
-                      org_id: updated.org_id || a.org_id,
-                      is_postable: updated.is_postable !== undefined ? updated.is_postable : a.is_postable,
-                      created_at: updated.created_at || a.created_at,
-                      updated_at: updated.updated_at || new Date().toISOString(),
-                    } : a)));
-
-                    // ADDITIONAL FIX: Clear form after successful save to prevent data reversion
-                    setDialogMode('view');
-                    setDraft(null);
-
-                    // Handle is_standard update separately (if permission and value changed)
-                    if (hasAccountsManage && (form.is_standard ?? false) !== ((draft as any).is_standard ?? false)) {
-                      const { error: stdErr } = await supabase
-                        .from('accounts')
-                        .update({ is_standard: !!form.is_standard })
-                        .eq('id', draft.id)
-                        .eq('org_id', orgId);
-                      if (stdErr) throw stdErr;
-                      setAccounts(prev => prev.map(a => a.id === draft.id ? { ...(a as any), is_standard: !!form.is_standard } : a));
-                    }
-
-                    showToast('تم تحديث الحساب بنجاح', { severity: 'success' });
-                  } else {
-                    // Map frontend enum values to database enum types
-                    const accountType = mapAccountTypeToDbEnum(String((form as any).category || ''));
-                    const status = mapStatusToDbEnum(!!(form as any).is_active);
-
-                    const { data, error } = await supabase.rpc('account_insert_child', {
-                      p_org_id: orgId,
-                      p_parent_id: form.parent_id || null,
-                      p_code: form.code,
-                      p_name: form.name_en || form.name_ar,
-                      p_name_ar: form.name_ar,
-                      p_account_type: accountType,
-                      p_level: parseInt(String(form.level)) || 1,
-                      p_status: status,
-                    });
-                    if (error) throw error;
-                    const inserted = data as any;
-                    if (inserted) {
-                      // Enforce allow_transactions per user choice after insert
+                      // Immediately enforce user's allow_transactions choice with a direct update
                       try {
                         const { error: allowErr } = await supabase
                           .from('accounts')
                           .update({ allow_transactions: !!form.allow_transactions })
-                          .eq('id', inserted.id)
+                          .eq('id', draft.id)
                           .eq('org_id', orgId);
-                        if (allowErr) console.warn('allow_transactions update warning (insert):', allowErr);
+                        if (allowErr) console.warn('allow_transactions update warning:', allowErr);
                       } catch { }
-                      setAccounts(prev => [...prev, inserted]);
-                      // If creator has permission and requested standard, set it now
-                      if (hasAccountsManage && (form.is_standard ?? false)) {
+
+                      // Update core fields in local state - FIXED: Use form data as primary source
+                      setAccounts(prev => prev.map(a => (a.id === draft.id ? {
+                        ...a,
+                        // Use form data (user's current input) as primary source
+                        code: form.code,
+                        name: form.name_en || form.name_ar,
+                        name_ar: form.name_ar || form.name_en,
+                        level: parseInt(String(form.level)) || 1,
+                        status: form.is_active ? 'active' : 'inactive',
+                        account_type: accountType,
+                        // Only use server response for fields that should come from server
+                        parent_id: updated.parent_id || a.parent_id,
+                        org_id: updated.org_id || a.org_id,
+                        is_postable: updated.is_postable !== undefined ? updated.is_postable : a.is_postable,
+                        created_at: updated.created_at || a.created_at,
+                        updated_at: updated.updated_at || new Date().toISOString(),
+                      } : a)));
+
+                      // ADDITIONAL FIX: Clear form after successful save to prevent data reversion
+                      setDialogMode('view');
+                      setDraft(null);
+
+                      // Handle is_standard update separately (if permission and value changed)
+                      if (hasAccountsManage && (form.is_standard ?? false) !== ((draft as any).is_standard ?? false)) {
                         const { error: stdErr } = await supabase
                           .from('accounts')
-                          .update({ is_standard: true })
-                          .eq('id', inserted.id)
+                          .update({ is_standard: !!form.is_standard })
+                          .eq('id', draft.id)
                           .eq('org_id', orgId);
-                        if (!stdErr) {
-                          setAccounts(prev => prev.map(a => a.id === inserted.id ? { ...(a as any), is_standard: true } : a));
+                        if (stdErr) throw stdErr;
+                        setAccounts(prev => prev.map(a => a.id === draft.id ? { ...(a as any), is_standard: !!form.is_standard } : a));
+                      }
+
+                      showToast('تم تحديث الحساب بنجاح', { severity: 'success' });
+                    } else {
+                      // Map frontend enum values to database enum types
+                      const accountType = mapAccountTypeToDbEnum(String((form as any).category || ''));
+                      const status = mapStatusToDbEnum(!!(form as any).is_active);
+
+                      const { data, error } = await supabase.rpc('account_insert_child', {
+                        p_org_id: orgId,
+                        p_parent_id: form.parent_id || null,
+                        p_code: form.code,
+                        p_name: form.name_en || form.name_ar,
+                        p_name_ar: form.name_ar,
+                        p_account_type: accountType,
+                        p_level: parseInt(String(form.level)) || 1,
+                        p_status: status,
+                      });
+                      if (error) throw error;
+                      const inserted = data as any;
+                      if (inserted) {
+                        // Enforce allow_transactions per user choice after insert
+                        try {
+                          const { error: allowErr } = await supabase
+                            .from('accounts')
+                            .update({ allow_transactions: !!form.allow_transactions })
+                            .eq('id', inserted.id)
+                            .eq('org_id', orgId);
+                          if (allowErr) console.warn('allow_transactions update warning (insert):', allowErr);
+                        } catch { }
+                        setAccounts(prev => [...prev, inserted]);
+                        // If creator has permission and requested standard, set it now
+                        if (hasAccountsManage && (form.is_standard ?? false)) {
+                          const { error: stdErr } = await supabase
+                            .from('accounts')
+                            .update({ is_standard: true })
+                            .eq('id', inserted.id)
+                            .eq('org_id', orgId);
+                          if (!stdErr) {
+                            setAccounts(prev => prev.map(a => a.id === inserted.id ? { ...(a as any), is_standard: true } : a));
+                          }
                         }
                       }
+                      showToast('تم إضافة الحساب', { severity: 'success' });
                     }
-                    showToast('تم إضافة الحساب', { severity: 'success' });
+                    setDialogOpen(false);
+                  } catch (e: any) {
+                    const msg = e?.message || e?.error_description || e?.hint || e?.details || '';
+                    const errCode = e?.code || e?.error?.code;
+                    const isDuplicateCode = (errCode === '23505') || (typeof msg === 'string' && msg.includes('accounts_code_unique_per_org'));
+
+                    console.error('save failed', e, msg);
+
+                    if (isDuplicateCode) {
+                      showToast('فشل حفظ التغييرات: هذا الكود مستخدم بالفعل داخل نفس المؤسسة. الرجاء اختيار كود مختلف.', { severity: 'error' });
+                      return;
+                    }
+
+                    showToast(`فشل حفظ التغييرات${msg ? `: ${msg}` : ''}`, { severity: 'error' });
+                    return;
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                onCancel={() => {
+                  const dirty = formRef.current?.hasUnsavedChanges?.();
+                  if (dirty) {
+                    const ok = window.confirm('لديك تغييرات غير محفوظة. هل تريد إلغاء دون حفظ؟');
+                    if (!ok) return;
                   }
                   setDialogOpen(false);
-                } catch (e: any) {
-                  const msg = e?.message || e?.error_description || e?.hint || e?.details || '';
-                  const errCode = e?.code || e?.error?.code;
-                  const isDuplicateCode = (errCode === '23505') || (typeof msg === 'string' && msg.includes('accounts_code_unique_per_org'));
-
-                  console.error('save failed', e, msg);
-
-                  if (isDuplicateCode) {
-                    showToast('فشل حفظ التغييرات: هذا الكود مستخدم بالفعل داخل نفس المؤسسة. الرجاء اختيار كود مختلف.', { severity: 'error' });
-                    return;
-                  }
-
-                  showToast(`فشل حفظ التغييرات${msg ? `: ${msg}` : ''}`, { severity: 'error' });
-                  return;
-                } finally {
-                  setSaving(false);
-                }
-              }}
-              onCancel={() => {
-                const dirty = formRef.current?.hasUnsavedChanges?.();
-                if (dirty) {
-                  const ok = window.confirm('لديك تغييرات غير محفوظة. هل تريد إلغاء دون حفظ؟');
-                  if (!ok) return;
-                }
-                setDialogOpen(false);
-              }}
-              showAutoFillNotification
-            />
-          </div>
-        </DraggableResizablePanel>
-      )}
+                }}
+                showAutoFillNotification
+              />
+            </div>
+          </DraggableResizablePanel>
+        )
+      }
 
       {/* Configuration Modal */}
-      {configModalOpen && (
-        <div className="config-modal-backdrop" onClick={() => setConfigModalOpen(false)}>
-          <div className="config-modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="config-modal-header">
-              <h3>إعدادات عرض شجرة الحسابات</h3>
-              <button
-                className="config-modal-close"
-                onClick={() => setConfigModalOpen(false)}
-                title="إغلاق"
-              >
-                ×
-              </button>
-            </div>
+      {
+        configModalOpen && (
+          <div className="config-modal-backdrop" onClick={() => setConfigModalOpen(false)}>
+            <div className="config-modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="config-modal-header">
+                <h3>إعدادات عرض شجرة الحسابات</h3>
+                <button
+                  className="config-modal-close"
+                  onClick={() => setConfigModalOpen(false)}
+                  title="إغلاق"
+                >
+                  ×
+                </button>
+              </div>
 
-            <div className="config-modal-body">
-              <div className="config-section">
-                <h4>إعدادات العرض</h4>
+              <div className="config-modal-body">
+                <div className="config-section">
+                  <h4>إعدادات العرض</h4>
 
-                <div className="config-field">
-                  <label className="config-label">
-                    <input
-                      type="checkbox"
-                      checked={configOptions.autoExpandRoots}
-                      onChange={(e) => setConfigOptions(prev => ({ ...prev, autoExpandRoots: e.target.checked }))}
-                    />
-                    توسيع الحسابات الرئيسية تلقائياً
-                  </label>
+                  <div className="config-field">
+                    <label className="config-label">
+                      <input
+                        type="checkbox"
+                        checked={configOptions.autoExpandRoots}
+                        onChange={(e) => setConfigOptions(prev => ({ ...prev, autoExpandRoots: e.target.checked }))}
+                      />
+                      توسيع الحسابات الرئيسية تلقائياً
+                    </label>
+                  </div>
+
+                  <div className="config-field">
+                    <label className="config-label">
+                      <input
+                        type="checkbox"
+                        checked={configOptions.showInactiveAccounts}
+                        onChange={(e) => setConfigOptions(prev => ({ ...prev, showInactiveAccounts: e.target.checked }))}
+                      />
+                      إظهار الحسابات المعطلة
+                    </label>
+                  </div>
+
+                  <div className="config-field">
+                    <label className="config-label">
+                      <input
+                        type="checkbox"
+                        checked={configOptions.showTransactionCounts}
+                        onChange={(e) => setConfigOptions(prev => ({ ...prev, showTransactionCounts: e.target.checked }))}
+                      />
+                      إظهار عدد العمليات المالية
+                    </label>
+                  </div>
+
+                  <div className="config-field">
+                    <label className="config-label-block">
+                      وضع العرض الافتراضي:
+                      <select
+                        value={configOptions.defaultViewMode}
+                        onChange={(e) => setConfigOptions(prev => ({ ...prev, defaultViewMode: e.target.value as 'tree' | 'table' }))}
+                        className="config-select"
+                      >
+                        <option value="tree">عرض شجرة</option>
+                        <option value="table">عرض جدول</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="config-field">
+                    <label className="config-label-block">
+                      الترتيب الافتراضي:
+                      <select
+                        value={configOptions.sortPref}
+                        onChange={(e) => setConfigOptions(prev => ({ ...prev, sortPref: e.target.value as 'code' | 'name' | 'level' }))}
+                        className="config-select"
+                      >
+                        <option value="code">ترتيب حسب الكود</option>
+                        <option value="name">ترتيب حسب الاسم</option>
+                        <option value="level">ترتيب حسب المستوى</option>
+                      </select>
+                    </label>
+                  </div>
                 </div>
 
-                <div className="config-field">
-                  <label className="config-label">
-                    <input
-                      type="checkbox"
-                      checked={configOptions.showInactiveAccounts}
-                      onChange={(e) => setConfigOptions(prev => ({ ...prev, showInactiveAccounts: e.target.checked }))}
-                    />
-                    إظهار الحسابات المعطلة
-                  </label>
-                </div>
+                <div className="config-section">
+                  <h4>إعدادات التصدير</h4>
 
-                <div className="config-field">
-                  <label className="config-label">
-                    <input
-                      type="checkbox"
-                      checked={configOptions.showTransactionCounts}
-                      onChange={(e) => setConfigOptions(prev => ({ ...prev, showTransactionCounts: e.target.checked }))}
-                    />
-                    إظهار عدد العمليات المالية
-                  </label>
-                </div>
-
-                <div className="config-field">
-                  <label className="config-label-block">
-                    وضع العرض الافتراضي:
-                    <select
-                      value={configOptions.defaultViewMode}
-                      onChange={(e) => setConfigOptions(prev => ({ ...prev, defaultViewMode: e.target.value as 'tree' | 'table' }))}
-                      className="config-select"
-                    >
-                      <option value="tree">عرض شجرة</option>
-                      <option value="table">عرض جدول</option>
-                    </select>
-                  </label>
-                </div>
-
-                <div className="config-field">
-                  <label className="config-label-block">
-                    الترتيب الافتراضي:
-                    <select
-                      value={configOptions.sortPref}
-                      onChange={(e) => setConfigOptions(prev => ({ ...prev, sortPref: e.target.value as 'code' | 'name' | 'level' }))}
-                      className="config-select"
-                    >
-                      <option value="code">ترتيب حسب الكود</option>
-                      <option value="name">ترتيب حسب الاسم</option>
-                      <option value="level">ترتيب حسب المستوى</option>
-                    </select>
-                  </label>
+                  <div className="config-field">
+                    <label className="config-label-block">
+                      تنسيق التصدير الافتراضي:
+                      <select
+                        value={configOptions.exportFormat}
+                        onChange={(e) => setConfigOptions(prev => ({ ...prev, exportFormat: e.target.value as 'excel' | 'pdf' | 'csv' }))}
+                        className="config-select"
+                      >
+                        <option value="excel">Excel (.xlsx)</option>
+                        <option value="pdf">PDF (.pdf)</option>
+                        <option value="csv">CSV (.csv)</option>
+                      </select>
+                    </label>
+                  </div>
                 </div>
               </div>
 
-              <div className="config-section">
-                <h4>إعدادات التصدير</h4>
+              <div className="config-modal-footer">
+                <button
+                  className="ultimate-btn ultimate-btn-add"
+                  onClick={() => setConfigModalOpen(false)}
+                >
+                  <div className="btn-content"><span className="btn-text">حفظ الإعدادات</span></div>
+                </button>
 
-                <div className="config-field">
-                  <label className="config-label-block">
-                    تنسيق التصدير الافتراضي:
-                    <select
-                      value={configOptions.exportFormat}
-                      onChange={(e) => setConfigOptions(prev => ({ ...prev, exportFormat: e.target.value as 'excel' | 'pdf' | 'csv' }))}
-                      className="config-select"
-                    >
-                      <option value="excel">Excel (.xlsx)</option>
-                      <option value="pdf">PDF (.pdf)</option>
-                      <option value="csv">CSV (.csv)</option>
-                    </select>
-                  </label>
-                </div>
+                <button
+                  className="ultimate-btn ultimate-btn-warning"
+                  onClick={() => {
+                    setConfigOptions({
+                      autoExpandRoots: false,
+                      showInactiveAccounts: true,
+                      showTransactionCounts: true,
+                      defaultViewMode: 'tree',
+                      exportFormat: 'excel',
+                      sortPref: 'code'
+                    });
+                  }}
+                >
+                  <div className="btn-content"><span className="btn-text">إعادة تعيين</span></div>
+                </button>
+
+                <button
+                  className="ultimate-btn ultimate-btn-delete"
+                  onClick={() => setConfigModalOpen(false)}
+                >
+                  <div className="btn-content"><span className="btn-text">إلغاء</span></div>
+                </button>
               </div>
-            </div>
-
-            <div className="config-modal-footer">
-              <button
-                className="ultimate-btn ultimate-btn-add"
-                onClick={() => setConfigModalOpen(false)}
-              >
-                <div className="btn-content"><span className="btn-text">حفظ الإعدادات</span></div>
-              </button>
-
-              <button
-                className="ultimate-btn ultimate-btn-warning"
-                onClick={() => {
-                  setConfigOptions({
-                    autoExpandRoots: false,
-                    showInactiveAccounts: true,
-                    showTransactionCounts: true,
-                    defaultViewMode: 'tree',
-                    exportFormat: 'excel',
-                    sortPref: 'code'
-                  });
-                }}
-              >
-                <div className="btn-content"><span className="btn-text">إعادة تعيين</span></div>
-              </button>
-
-              <button
-                className="ultimate-btn ultimate-btn-delete"
-                onClick={() => setConfigModalOpen(false)}
-              >
-                <div className="btn-content"><span className="btn-text">إلغاء</span></div>
-              </button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 };
 
