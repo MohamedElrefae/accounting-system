@@ -16,6 +16,7 @@ interface TransactionsHeaderControlsProps {
   onPageChange: (nextPage: number) => void
   onPageSizeChange: (nextSize: number) => void
   filterStorageKey?: string
+  filterConfig?: import('../Common/UnifiedFilterBar').FilterConfig
 }
 
 const TransactionsHeaderControls: React.FC<TransactionsHeaderControlsProps> = ({
@@ -32,6 +33,7 @@ const TransactionsHeaderControls: React.FC<TransactionsHeaderControlsProps> = ({
   onPageChange,
   onPageSizeChange,
   filterStorageKey = 'transactions_filters',
+  filterConfig,
 }) => {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize) || 1)
 
@@ -66,6 +68,7 @@ const TransactionsHeaderControls: React.FC<TransactionsHeaderControlsProps> = ({
         onReset={onResetFilters}
         isDirty={filtersDirty}
         storageKey={filterStorageKey}
+        config={filterConfig}
       />
 
       <div className="transactions-pagination">

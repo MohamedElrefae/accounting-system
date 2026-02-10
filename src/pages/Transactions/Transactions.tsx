@@ -708,8 +708,6 @@ const TransactionsPage: React.FC = () => {
     { key: 'entry_number', label: 'رقم القيد', visible: true, width: 120, minWidth: 100, maxWidth: 200, type: 'text', resizable: true },
     { key: 'entry_date', label: 'التاريخ', visible: true, width: 130, minWidth: 120, maxWidth: 180, type: 'date', resizable: true },
     { key: 'description', label: 'البيان', visible: true, width: 280, minWidth: 200, maxWidth: 480, type: 'text', resizable: true },
-    { key: 'line_items_count', label: 'عدد سطور التحليل', visible: true, width: 110, minWidth: 100, maxWidth: 160, type: 'number', resizable: true },
-    { key: 'line_items_total', label: 'اجمالي تحليل التكلفة', visible: true, width: 150, minWidth: 130, maxWidth: 220, type: 'currency', resizable: true },
     { key: 'total_debits', label: 'إجمالي المدين', visible: false, width: 150, minWidth: 130, maxWidth: 220, type: 'currency', resizable: true },
     { key: 'total_credits', label: 'إجمالي الدائن', visible: false, width: 150, minWidth: 130, maxWidth: 220, type: 'currency', resizable: true },
     { key: 'organization_name', label: 'المؤسسة', visible: true, width: 180, minWidth: 150, maxWidth: 250, type: 'text', resizable: true },
@@ -877,8 +875,6 @@ const TransactionsPage: React.FC = () => {
         entry_number: t.entry_number,
         entry_date: t.entry_date,
         description: t.description,
-        line_items_count: lineCount,
-        line_items_total: total,
         total_debits: Number((t as any).total_debits ?? 0),
         total_credits: Number((t as any).total_credits ?? 0),
         organization_name: orgName,
@@ -901,8 +897,6 @@ const TransactionsPage: React.FC = () => {
       { key: 'entry_number', header: 'رقم القيد', type: 'text' },
       { key: 'entry_date', header: 'التاريخ', type: 'date' },
       { key: 'description', header: 'البيان', type: 'text' },
-      { key: 'line_items_count', header: 'عدد سطور التحليل', type: 'number' },
-      { key: 'line_items_total', header: 'اجمالي تحليل التكلفة', type: 'currency' },
       { key: 'total_debits', header: 'إجمالي المدين', type: 'currency' },
       { key: 'total_credits', header: 'إجمالي الدائن', type: 'currency' },
       { key: 'organization_name', header: 'المؤسسة', type: 'text' },
@@ -918,8 +912,6 @@ const TransactionsPage: React.FC = () => {
       entry_number: t.entry_number,
       entry_date: t.entry_date,
       description: t.description,
-      line_items_count: Number((t as any).line_items_count ?? 0),
-      line_items_total: Number((t as any).line_items_total ?? (Math.max(Number((t as any).total_debits ?? 0), Number((t as any).total_credits ?? 0)))),
       total_debits: Number((t as any).total_debits ?? 0),
       total_credits: Number((t as any).total_credits ?? 0),
       organization_name: organizations.find(o => o.id === (t.org_id || ''))?.name || '',
@@ -1559,6 +1551,14 @@ const TransactionsPage: React.FC = () => {
             onPageChange={nextPage => setPage(nextPage)}
             onPageSizeChange={nextSize => { setPageSize(nextSize); setPage(1) }}
             filterStorageKey="transactions_filters"
+            filterConfig={{
+              showClassification: false,
+              showExpensesCategory: false,
+              showWorkItem: false,
+              showAnalysisWorkItem: false,
+              showCostCenter: false,
+              showAmountRange: false
+            }}
           />
 
           {/* Headers table (T1) */}
