@@ -26,12 +26,14 @@ export interface UnifiedFilters {
   dateTo?: string | null
   orgId?: string | null
   projectId?: string | null
-  costCenterId?: string | null
   postedOnly?: boolean
+  approvalStatus?: 'draft' | 'submitted' | 'approved' | 'rejected' | null  // Sync with transactions.approval_status field
   classificationId?: string | null
   analysisWorkItemId?: string | null
-  expensesCategoryId?: string | null
   subTreeId?: string | null
+  costCenterId?: string | null   // NEW: Cost center dimension
+  workItemId?: string | null     // NEW: Work item dimension
+  // REMOVED: expensesCategoryId (deprecated, migrated to sub_tree_id)
   limit?: number | null
   offset?: number | null
 }
@@ -139,14 +141,19 @@ export async function fetchGLSummary(filters: UnifiedFilters = {}): Promise<GLSu
   // Normalize empty strings to null for date parameters
   const dateFrom = filters.dateFrom && filters.dateFrom.trim() !== '' ? filters.dateFrom : null
   const dateTo = filters.dateTo && filters.dateTo.trim() !== '' ? filters.dateTo : null
-  const costCenterId = filters.costCenterId && String(filters.costCenterId).trim() !== '' ? filters.costCenterId : null
 
   console.log('🔍 Unified Financial Query - fetchGLSummary called with:', {
     dateFrom,
     dateTo,
     orgId: filters.orgId,
     projectId: filters.projectId,
-    postedOnly: filters.postedOnly
+    postedOnly: filters.postedOnly,
+    approvalStatus: filters.approvalStatus,
+    classificationId: filters.classificationId,
+    analysisWorkItemId: filters.analysisWorkItemId,
+    subTreeId: filters.subTreeId,
+    costCenterId: filters.costCenterId,
+    workItemId: filters.workItemId
   })
 
   const callRpc = async (args: Record<string, any>) => {
@@ -163,34 +170,20 @@ export async function fetchGLSummary(filters: UnifiedFilters = {}): Promise<GLSu
     p_posted_only: filters.postedOnly ?? false,
     p_limit: filters.limit ?? null,
     p_offset: filters.offset ?? null,
+    p_approval_status: filters.approvalStatus ?? null,  // Pass approval status directly (null = all)
     p_classification_id: filters.classificationId ?? null,
     p_analysis_work_item_id: filters.analysisWorkItemId ?? null,
-    p_expenses_category_id: filters.expensesCategoryId ?? null,
-    p_sub_tree_id: filters.subTreeId ?? null
+    p_sub_tree_id: filters.subTreeId ?? null,
+    p_cost_center_id: filters.costCenterId ?? null,  // NEW: Cost center dimension
+    p_work_item_id: filters.workItemId ?? null        // NEW: Work item dimension
   }
 
   let data: any
   try {
-    data = !costCenterId
-      ? await callRpc(baseArgs)
-      : await callRpc({
-          ...baseArgs,
-          p_cost_center_id: costCenterId,
-        })
+    data = await callRpc(baseArgs)
   } catch (error: any) {
-    const msg = String(error?.message || '')
-    // Backward-compatible: if DB function doesn't accept p_cost_center_id yet, retry without it.
-    if (costCenterId && (msg.includes('p_cost_center_id') || msg.toLowerCase().includes('function') || msg.toLowerCase().includes('candidate'))) {
-      try {
-        data = await callRpc(baseArgs)
-      } catch (e: any) {
-        console.error('❌ Unified Financial Query - GL Summary error:', e)
-        throw e
-      }
-    } else {
-      console.error('❌ Unified Financial Query - GL Summary error:', error)
-      throw error
-    }
+    console.error('❌ Unified Financial Query - GL Summary error:', error)
+    throw error
   }
 
   console.log('✅ Unified Financial Query - GL Summary returned', data?.length || 0, 'rows')

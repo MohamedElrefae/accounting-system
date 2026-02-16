@@ -15,6 +15,7 @@ import UnifiedFilterBar from '../../components/Common/UnifiedFilterBar'
 import { useTransactionsFilters } from '../../hooks/useTransactionsFilters'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useUnifiedSync } from '../../hooks/useUnifiedSync'
+import TransactionsSummaryBar from '../../components/Transactions/TransactionsSummaryBar'
 
 const AllLinesEnrichedPage = () => {
   const {
@@ -45,6 +46,11 @@ const AllLinesEnrichedPage = () => {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [columnsConfigOpen, setColumnsConfigOpen] = useState(false)
+  const [summaryStats, setSummaryStats] = useState({
+    totalDebit: 0,
+    totalCredit: 0,
+    lineCount: 0,
+  })
 
   const navigate = useNavigate()
   const hasPerm = useHasPermission()
@@ -124,17 +130,70 @@ const AllLinesEnrichedPage = () => {
       query = query.eq('transactions.approval_status', appliedFilters.approvalStatus)
     }
 
+    // Fetch summary stats (without pagination) for totals
+    let summaryQuery = supabase
+      .from('transaction_lines')
+      .select(`
+        debit_amount,
+        credit_amount,
+        transactions!inner (
+          id,
+          org_id,
+          project_id,
+          approval_status,
+          entry_date,
+          entry_number,
+          description
+        )
+      `)
+
+    // Apply same filters to summary query
+    if (appliedFilters.search) {
+      summaryQuery = summaryQuery.or(`description.ilike.%${appliedFilters.search}%,transactions.description.ilike.%${appliedFilters.search}%,transactions.entry_number.ilike.%${appliedFilters.search}%`)
+    }
+    if (appliedFilters.dateFrom) {
+      summaryQuery = summaryQuery.gte('transactions.entry_date', appliedFilters.dateFrom)
+    }
+    if (appliedFilters.dateTo) {
+      summaryQuery = summaryQuery.lte('transactions.entry_date', appliedFilters.dateTo)
+    }
+    if (appliedFilters.orgId) {
+      summaryQuery = summaryQuery.eq('transactions.org_id', appliedFilters.orgId)
+    }
+    if (appliedFilters.projectId) {
+      summaryQuery = summaryQuery.eq('project_id', appliedFilters.projectId)
+    }
+    if (appliedFilters.debitAccountId) {
+      summaryQuery = summaryQuery.eq('account_id', appliedFilters.debitAccountId).gt('debit_amount', 0)
+    }
+    if (appliedFilters.creditAccountId) {
+      summaryQuery = summaryQuery.eq('account_id', appliedFilters.creditAccountId).gt('credit_amount', 0)
+    }
+    if (appliedFilters.approvalStatus) {
+      summaryQuery = summaryQuery.eq('transactions.approval_status', appliedFilters.approvalStatus)
+    }
+
     // Pagination
     const from = (page - 1) * pageSize
     const to = from + pageSize - 1
     query = query.range(from, to).order('created_at', { ascending: false })
 
-    const { data, error, count } = await query
+    const [{ data, error, count }, { data: summaryData }] = await Promise.all([
+      query,
+      summaryQuery
+    ])
 
     if (error) {
       console.error('Error fetching all lines:', error)
       throw error
     }
+
+    // Calculate summary stats
+    const totalDebit = (summaryData || []).reduce((sum, line: any) => sum + (Number(line.debit_amount) || 0), 0)
+    const totalCredit = (summaryData || []).reduce((sum, line: any) => sum + (Number(line.credit_amount) || 0), 0)
+    const lineCount = summaryData?.length || 0
+
+    setSummaryStats({ totalDebit, totalCredit, lineCount })
 
     // Flatten the joined data
     const rows = (data || []).map((row: any) => {
@@ -258,6 +317,49 @@ const AllLinesEnrichedPage = () => {
     return o ? `${o.code} - ${o.name}` : id
   }, [organizations])
 
+  // Generate active filter labels for summary bar
+  const getActiveFilterLabels = useCallback((): string[] => {
+    const labels: string[] = []
+    
+    if (appliedFilters.search) {
+      labels.push(`بحث: ${appliedFilters.search}`)
+    }
+    if (appliedFilters.dateFrom || appliedFilters.dateTo) {
+      const from = appliedFilters.dateFrom || '...'
+      const to = appliedFilters.dateTo || '...'
+      labels.push(`التاريخ: ${from} - ${to}`)
+    }
+    if (appliedFilters.orgId) {
+      const org = organizations.find(o => o.id === appliedFilters.orgId)
+      labels.push(`المؤسسة: ${org?.name || appliedFilters.orgId}`)
+    }
+    if (appliedFilters.projectId) {
+      const proj = projects.find(p => p.id === appliedFilters.projectId)
+      labels.push(`المشروع: ${proj?.name || appliedFilters.projectId}`)
+    }
+    if (appliedFilters.debitAccountId) {
+      const acc = accounts.find(a => a.id === appliedFilters.debitAccountId)
+      labels.push(`حساب مدين: ${acc?.name_ar || acc?.name || appliedFilters.debitAccountId}`)
+    }
+    if (appliedFilters.creditAccountId) {
+      const acc = accounts.find(a => a.id === appliedFilters.creditAccountId)
+      labels.push(`حساب دائن: ${acc?.name_ar || acc?.name || appliedFilters.creditAccountId}`)
+    }
+    if (appliedFilters.approvalStatus) {
+      const statusMap: Record<string, string> = {
+        draft: 'مسودة',
+        submitted: 'مُرسلة',
+        pending: 'قيد المراجعة',
+        approved: 'معتمدة',
+        rejected: 'مرفوضة',
+        posted: 'مرحلة',
+      }
+      labels.push(`الحالة: ${statusMap[appliedFilters.approvalStatus] || appliedFilters.approvalStatus}`)
+    }
+    
+    return labels
+  }, [appliedFilters, organizations, projects, accounts])
+
 
   // Prepare table data with labels
   const tableData = useMemo(() => {
@@ -301,8 +403,45 @@ const AllLinesEnrichedPage = () => {
       }
       return out
     })
-    return prepareTableData(createStandardColumns(defs as any), exportRows)
-  }, [columns, tableData])
+
+    // Add filter information and summary row
+    const filterLabels = getActiveFilterLabels()
+    const filterInfo = filterLabels.length > 0 
+      ? `الفلاتر المطبقة: ${filterLabels.join(' | ')}`
+      : 'كل البيانات (بدون فلاتر)'
+
+    // Create summary row
+    const summaryRow: any = {}
+    for (const col of visibleCols) {
+      if (col.key === 'entry_number') {
+        summaryRow[col.key] = 'الإجمالي'
+      } else if (col.key === 'debit_amount') {
+        summaryRow[col.key] = summaryStats.totalDebit
+      } else if (col.key === 'credit_amount') {
+        summaryRow[col.key] = summaryStats.totalCredit
+      } else if (col.key === 'line_no') {
+        summaryRow[col.key] = summaryStats.lineCount
+      } else {
+        summaryRow[col.key] = ''
+      }
+    }
+
+    // Add filter info row and summary row
+    const allRows = [
+      // Filter info row
+      Object.fromEntries(visibleCols.map((col, idx) => [col.key, idx === 0 ? filterInfo : ''])),
+      // Empty separator row
+      Object.fromEntries(visibleCols.map(col => [col.key, ''])),
+      // Data rows
+      ...exportRows,
+      // Empty separator row
+      Object.fromEntries(visibleCols.map(col => [col.key, ''])),
+      // Summary row
+      summaryRow,
+    ]
+
+    return prepareTableData(createStandardColumns(defs as any), allRows)
+  }, [columns, tableData, summaryStats, getActiveFilterLabels])
 
   // Global refresh handler
   useEffect(() => {
@@ -375,6 +514,16 @@ const AllLinesEnrichedPage = () => {
             </select>
           </div>
         </div>
+
+        {/* Summary Bar */}
+        <TransactionsSummaryBar
+          totalCount={totalCount}
+          totalDebit={summaryStats.totalDebit}
+          totalCredit={summaryStats.totalCredit}
+          lineCount={summaryStats.lineCount}
+          activeFilters={getActiveFilterLabels()}
+          onClearFilters={handleResetFiltersWithPaging}
+        />
 
 
         {/* Lines Table */}

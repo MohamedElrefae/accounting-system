@@ -22,7 +22,7 @@
 
 /* MAIN CONTAINER */
 .standard-financial-statements {
-  max-width: 1200px;
+  max-width: 1400px; /* Increased from 1200px for wider professional view */
   margin: 0 auto;
   padding: 2rem;
   background: var(--background-color);
@@ -92,8 +92,9 @@
   box-shadow: var(--shadow-light);
 }
 .trial-balance-header {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr 200px 200px 200px 200px; /* Increased from 150px to 200px for better spacing */
+  gap: 0;
   align-items: center;
   padding: 1rem;
   background: var(--accent);
@@ -103,19 +104,31 @@
   font-weight: 700;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
-.account-column { flex: 2; text-align: center; font-size: 1.1rem; font-weight: 700; }
-.amounts-columns { display: flex; flex: 1; justify-content: space-between; }
-.debit-column, .credit-column { flex: 1; text-align: center; font-size: 1.1rem; font-weight: 700; }
+.account-column { 
+  text-align: right; 
+  font-size: 1.1rem; 
+  font-weight: 700; 
+  padding-right: 1rem;
+}
+.amounts-columns { 
+  display: contents; /* Use grid layout directly */
+}
+.debit-column, .credit-column { 
+  text-align: center; 
+  font-size: 1.1rem; 
+  font-weight: 700; 
+}
 
 .financial-group { margin-bottom: 1.5rem; background: var(--surface); border-radius: 8px; border: 1px solid var(--border-color); overflow: hidden; }
 
 /* Collapsible Group Header */
 .group-header { background: var(--field_bg); padding: 0.75rem 1rem; border-bottom: 2px solid var(--border-color); }
 .group-header.collapsible-header { 
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px 1fr 200px 200px 200px 200px; /* Increased from 150px to 200px for better spacing */
+  gap: 0;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  padding: 0.75rem 1rem;
   background: var(--hover-bg);
   transition: background-color 0.2s ease;
   cursor: pointer;
@@ -149,13 +162,20 @@
   outline-offset: 2px;
 }
 
-.group-title { font-size: 1.1rem; font-weight: 600; color: var(--heading); margin: 0; text-align: center; flex: 1; }
+.group-title { 
+  font-size: 1.1rem; 
+  font-weight: 600; 
+  color: var(--heading); 
+  margin: 0; 
+  text-align: right; 
+  padding-right: 1rem;
+}
 .group-title.clickable {
   cursor: pointer;
   transition: color 0.2s ease;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.5rem;
 }
 .group-title.clickable:hover {
@@ -170,26 +190,21 @@
 }
 
 .group-totals-preview {
-  display: flex;
-  gap: 2rem;
-  align-items: center;
-  flex-shrink: 0;
+  display: contents; /* Use grid layout directly */
 }
 .preview-debit, .preview-credit {
   font-family: 'Courier New', monospace;
   font-weight: 600;
   font-size: 0.9rem;
   color: var(--text);
-  min-width: 100px;
-  text-align: right;
+  text-align: center;
 }
 .preview-amount {
   font-family: 'Courier New', monospace;
   font-weight: 600;
   font-size: 0.9rem;
   color: var(--text);
-  min-width: 120px;
-  text-align: right;
+  text-align: center;
 }
 
 /* Group Content Animation */
@@ -200,24 +215,106 @@
   max-height: none;
   overflow: visible;
 }
-.group-subtotal { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: var(--selected_bg); border-top: 1px solid var(--border-color); font-weight: 600; }
-.subtotal-label { font-size: 0.95rem; font-weight: 600; color: var(--text); }
-.subtotal-amounts { display: flex; gap: 2rem; }
-.subtotal-debit, .subtotal-credit, .subtotal-balance { font-size: 0.95rem; font-weight: 600; font-family: 'Courier New', monospace; color: var(--text); }
+.group-subtotal { 
+  display: grid;
+  grid-template-columns: 40px 1fr 200px 200px 200px 200px; /* Increased from 150px to 200px for better spacing */
+  gap: 0;
+  align-items: center;
+  padding: 0.75rem 1rem; 
+  background: var(--selected_bg); 
+  border-top: 1px solid var(--border-color); 
+  font-weight: 600; 
+}
+.subtotal-label { 
+  grid-column: 1 / 3; /* Span first two columns */
+  font-size: 0.95rem; 
+  font-weight: 600; 
+  color: var(--text); 
+  text-align: right;
+  padding-right: 1rem;
+}
+.subtotal-amounts { 
+  display: contents; /* Use grid layout directly */
+}
+.subtotal-debit, .subtotal-credit, .subtotal-balance { 
+  font-size: 0.95rem; 
+  font-weight: 600; 
+  font-family: 'Courier New', monospace; 
+  color: var(--text); 
+  text-align: center;
+}
 
-.account-line { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 1rem; border-bottom: 1px solid var(--border-color); transition: background-color 0.2s ease; background: var(--surface); }
+.account-line { 
+  display: grid;
+  grid-template-columns: 40px 1fr 200px 200px 200px 200px; /* Increased from 150px to 200px for better spacing */
+  gap: 0;
+  align-items: center;
+  padding: 0.5rem 1rem; 
+  border-bottom: 1px solid var(--border-color); 
+  transition: background-color 0.2s ease; 
+  background: var(--surface); 
+}
 .account-line:hover { background-color: var(--hover-bg); }
 .account-line:last-of-type { border-bottom: none; }
-.account-info { display: flex; align-items: center; gap: 1rem; flex: 1; }
-.account-code { font-family: 'Courier New', monospace; font-weight: 600; color: var(--accent); min-width: 80px; font-size: 0.9rem; }
-.account-name { color: var(--text); font-weight: 500; flex: 1; }
-.account-amounts { display: flex; gap: 2rem; align-items: center; }
-.debit-amount, .credit-amount, .balance-amount { font-family: 'Courier New', monospace; font-weight: 600; font-size: 0.95rem; min-width: 120px; text-align: right; color: var(--text); }
+.account-info { 
+  grid-column: 1 / 3; /* Span first two columns */
+  display: flex; 
+  align-items: center; 
+  gap: 1rem; 
+}
+.account-code { 
+  font-family: 'Courier New', monospace; 
+  font-weight: 600; 
+  color: var(--accent); 
+  min-width: 80px; 
+  font-size: 0.9rem; 
+}
+.account-name { 
+  color: var(--text); 
+  font-weight: 500; 
+  flex: 1; 
+}
+.account-amounts { 
+  display: contents; /* Use grid layout directly */
+}
+.debit-amount, .credit-amount, .balance-amount { 
+  font-family: 'Courier New', monospace; 
+  font-weight: 600; 
+  font-size: 0.95rem; 
+  text-align: center; 
+  color: var(--text); 
+}
 
-.trial-balance-totals { display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding: 1rem; background: var(--accent); color: var(--on-accent); border-radius: 8px; font-size: 1.1rem; font-weight: 700; box-shadow: var(--shadow-light); }
-.totals-label { font-size: 1.1rem; font-weight: 700; }
-.totals-amounts { display: flex; gap: 2rem; }
-.total-debits, .total-credits, .total-balance { font-size: 1.1rem; font-weight: 700; font-family: 'Courier New', monospace; }
+.trial-balance-totals { 
+  display: grid;
+  grid-template-columns: 40px 1fr 200px 200px 200px 200px; /* Increased from 150px to 200px for better spacing */
+  gap: 0;
+  align-items: center;
+  margin-top: 1.5rem; 
+  padding: 1rem; 
+  background: var(--accent); 
+  color: var(--on-accent); 
+  border-radius: 8px; 
+  font-size: 1.1rem; 
+  font-weight: 700; 
+  box-shadow: var(--shadow-light); 
+}
+.totals-label { 
+  grid-column: 1 / 3; /* Span first two columns */
+  font-size: 1.1rem; 
+  font-weight: 700; 
+  text-align: right;
+  padding-right: 1rem;
+}
+.totals-amounts { 
+  display: contents; /* Use grid layout directly */
+}
+.total-debits, .total-credits, .total-balance { 
+  font-size: 1.1rem; 
+  font-weight: 700; 
+  font-family: 'Courier New', monospace; 
+  text-align: center;
+}
 
 .balance-status { display: inline-block; padding: 0.75rem 1.5rem; border-radius: 25px; font-weight: 600; font-size: 1rem; box-shadow: var(--shadow-light); }
 .balance-status.balanced { background: var(--success); color: var(--on-success); }

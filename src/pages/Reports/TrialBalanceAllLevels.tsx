@@ -53,6 +53,7 @@ export default function TrialBalanceAllLevels() {
   const [dateFrom, setDateFrom] = useState<string>(startOfYearISO())
   const [dateTo, setDateTo] = useState<string>(todayISO())
   const [postedOnly, setPostedOnly] = useState<boolean>(false)
+  const [approvalStatus, setApprovalStatus] = useState<'draft' | 'submitted' | 'approved' | 'rejected' | null>(null)  // NEW: Approval status filter
 
   // Toggles
   const [numbersOnly, setNumbersOnly] = useState<boolean>(true) // export numbers only
@@ -112,6 +113,7 @@ export default function TrialBalanceAllLevels() {
         orgId: currentOrg?.id || null,
         projectId: currentProject?.id || null,
         postedOnly,
+        approvalStatus,  // NEW: Pass approval status filter
       }
       const summaryRows = await fetchGLSummary(filters)
       const amountsById = new Map<string, TBAmounts>()
@@ -197,7 +199,7 @@ export default function TrialBalanceAllLevels() {
       }
     }, 250)
     return () => { canceled = true; clearTimeout(t) }
-  }, [mode, postedOnly, currentOrg?.id, currentProject?.id, dateFrom, dateTo])
+  }, [mode, postedOnly, approvalStatus, currentOrg?.id, currentProject?.id, dateFrom, dateTo])
 
   // Expand to target level 1..4
   async function expandToLevel(targetLevel: number) {
@@ -731,6 +733,22 @@ export default function TrialBalanceAllLevels() {
           {mode === 'asof' && (
             <input className={styles.filterInput} type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} aria-label={uiLang === 'ar' ? 'حتى' : 'As of'} />
           )}
+          
+          {/* NEW: Approval Status Filter */}
+          <select
+            className={styles.filterInput}
+            value={approvalStatus || 'all'}
+            onChange={e => setApprovalStatus(e.target.value === 'all' ? null : e.target.value as any)}
+            aria-label={uiLang === 'ar' ? 'حالة الاعتماد' : 'Approval Status'}
+            title={uiLang === 'ar' ? 'تصفية حسب حالة الاعتماد' : 'Filter by approval status'}
+            style={{ minWidth: '150px' }}
+          >
+            <option value="all">{uiLang === 'ar' ? 'كل الحالات' : 'All Status'}</option>
+            <option value="draft">{uiLang === 'ar' ? 'مسودة' : 'Draft'}</option>
+            <option value="submitted">{uiLang === 'ar' ? 'مقدمة' : 'Submitted'}</option>
+            <option value="approved">{uiLang === 'ar' ? 'معتمدة' : 'Approved'}</option>
+            <option value="rejected">{uiLang === 'ar' ? 'مرفوضة' : 'Rejected'}</option>
+          </select>
         </div>
 
         {/* Center: language + group controls + toggles */}

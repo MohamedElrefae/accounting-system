@@ -33,6 +33,7 @@ const TransactionLinesTable = React.lazy(() => import('./TransactionLinesTable')
 import TransactionsHeaderControls from '../../components/Transactions/TransactionsHeaderControls'
 import TransactionsLinesFilters from '../../components/Transactions/TransactionsLinesFilters'
 import TransactionsDocumentsPanel from '../../components/Transactions/TransactionsDocumentsPanel'
+import TransactionsSummaryBar from '../../components/Transactions/TransactionsSummaryBar'
 import { type UnifiedCRUDFormHandle, type FormField } from '../../components/Common/UnifiedCRUDForm'
 import formStyles from '../../components/Common/UnifiedCRUDForm.module.css'
 import UnifiedTransactionDetailsPanel from '../../components/Transactions/UnifiedTransactionDetailsPanel'
@@ -766,6 +767,13 @@ const TransactionsPage: React.FC = () => {
 
   // Server-side load
   const [totalCount, setTotalCount] = useState(0)
+  const [summaryStats, setSummaryStats] = useState({
+    totalDebit: 0,
+    totalCredit: 0,
+    lineCount: 0,
+    transactionCount: 0,
+  })
+  
   const reload = useCallback(async () => {
     await measurePerformance('transactions.reload', async () => {
       const effectiveFilters = headerAppliedFilters
@@ -825,6 +833,26 @@ const TransactionsPage: React.FC = () => {
       setTransactions(rows || [])
       setTotalCount(total)
 
+      // Fetch ALL matching transactions (without pagination) for accurate summary totals
+      // This is a parallel query similar to AllLinesEnriched implementation
+      const { rows: allRows } = await getTransactions({
+        filters: filtersToUse,
+        page: 1,
+        pageSize: 999999, // Get all matching transactions
+      })
+
+      // Calculate summary statistics from ALL matching data (not just current page)
+      const totalDebit = (allRows || []).reduce((sum, tx: any) => sum + Number(tx.total_debits || 0), 0)
+      const totalCredit = (allRows || []).reduce((sum, tx: any) => sum + Number(tx.total_credits || 0), 0)
+      const lineCount = (allRows || []).reduce((sum, tx: any) => sum + Number(tx.line_items_count || 0), 0)
+      
+      setSummaryStats({
+        totalDebit,
+        totalCredit,
+        lineCount,
+        transactionCount: (allRows || []).length,
+      })
+
       // Note: categories, workItems now come from TransactionsDataContext
       // No need to fetch them here - context provides them
 
@@ -837,6 +865,64 @@ const TransactionsPage: React.FC = () => {
       } catch { }
     })
   }, [headerAppliedFilters, mode, page, pageSize, measurePerformance])
+
+  // Helper function to get active filter labels
+  const getActiveFilterLabels = useCallback((): string[] => {
+    const labels: string[] = []
+    const filters = headerAppliedFilters
+
+    if (filters.search) labels.push(`بحث: ${filters.search}`)
+    if (filters.dateFrom) labels.push(`من تاريخ: ${filters.dateFrom}`)
+    if (filters.dateTo) labels.push(`إلى تاريخ: ${filters.dateTo}`)
+    if (filters.amountFrom) labels.push(`من مبلغ: ${filters.amountFrom}`)
+    if (filters.amountTo) labels.push(`إلى مبلغ: ${filters.amountTo}`)
+    if (filters.orgId) {
+      const org = organizations.find(o => o.id === filters.orgId)
+      if (org) labels.push(`مؤسسة: ${org.name_ar || org.name}`)
+    }
+    if (filters.projectId) {
+      const project = projects.find(p => p.id === filters.projectId)
+      if (project) labels.push(`مشروع: ${project.name_ar || project.name}`)
+    }
+    if (filters.debitAccountId) {
+      const account = accounts.find(a => a.id === filters.debitAccountId)
+      if (account) labels.push(`حساب مدين: ${account.name_ar || account.name}`)
+    }
+    if (filters.creditAccountId) {
+      const account = accounts.find(a => a.id === filters.creditAccountId)
+      if (account) labels.push(`حساب دائن: ${account.name_ar || account.name}`)
+    }
+    if (filters.classificationId) {
+      const classification = classifications.find(c => c.id === filters.classificationId)
+      if (classification) labels.push(`تصنيف: ${classification.name_ar || classification.name}`)
+    }
+    if (filters.expensesCategoryId) {
+      const category = categories.find(c => c.id === filters.expensesCategoryId)
+      if (category) labels.push(`فئة مصروفات: ${category.name_ar || category.name}`)
+    }
+    if (filters.workItemId) {
+      const workItem = workItems.find(w => w.id === filters.workItemId)
+      if (workItem) labels.push(`عنصر عمل: ${workItem.name_ar || workItem.name}`)
+    }
+    if (filters.costCenterId) {
+      const costCenter = costCenters.find(c => c.id === filters.costCenterId)
+      if (costCenter) labels.push(`مركز تكلفة: ${costCenter.name_ar || costCenter.name}`)
+    }
+    if (filters.approvalStatus) {
+      const statusLabels: Record<string, string> = {
+        draft: 'مسودة',
+        submitted: 'مُرسلة',
+        approved: 'معتمدة',
+        rejected: 'مرفوضة',
+        revision_requested: 'طلب تعديل',
+        cancelled: 'ملغاة',
+        posted: 'مرحلة'
+      }
+      labels.push(`حالة: ${statusLabels[filters.approvalStatus] || filters.approvalStatus}`)
+    }
+
+    return labels
+  }, [headerAppliedFilters, organizations, projects, accounts, classifications, categories, workItems, costCenters])
 
   // When opening the CRUD form, log for debugging
   // Note: accounts, categories, costCenters now come from TransactionsDataContext
@@ -893,7 +979,13 @@ const TransactionsPage: React.FC = () => {
 
   // Export data
   const exportData = useMemo(() => {
+    const activeFilters = getActiveFilterLabels()
+    const filterInfo = activeFilters.length > 0 
+      ? `الفلاتر المطبقة: ${activeFilters.join(' | ')}`
+      : 'عرض جميع البيانات (بدون فلاتر)'
+    
     const columns = createStandardColumns([
+      { key: 'filter_info', header: 'معلومات الفلتر', type: 'text' },
       { key: 'entry_number', header: 'رقم القيد', type: 'text' },
       { key: 'entry_date', header: 'التاريخ', type: 'date' },
       { key: 'description', header: 'البيان', type: 'text' },
@@ -908,7 +1000,27 @@ const TransactionsPage: React.FC = () => {
       { key: 'posted_at', header: 'تاريخ الترحيل', type: 'date' },
       { key: 'approval_status', header: 'حالة الاعتماد', type: 'text' },
     ])
+    
+    // Add summary row at the top
+    const summaryRow = {
+      filter_info: filterInfo,
+      entry_number: `الإجمالي: ${summaryStats.transactionCount} معاملة`,
+      entry_date: '',
+      description: `عدد السطور: ${summaryStats.lineCount}`,
+      total_debits: summaryStats.totalDebit,
+      total_credits: summaryStats.totalCredit,
+      organization_name: '',
+      project_name: '',
+      reference_number: '',
+      notes: '',
+      created_by: '',
+      posted_by: '',
+      posted_at: null,
+      approval_status: '',
+    }
+    
     const rows = paged.map((t: any) => ({
+      filter_info: '', // Only show in summary row
       entry_number: t.entry_number,
       entry_date: t.entry_date,
       description: t.description,
@@ -925,8 +1037,9 @@ const TransactionsPage: React.FC = () => {
         ? 'مرحلة'
         : (({ draft: 'مسودة', submitted: 'مُرسلة', revision_requested: 'طلب تعديل', approved: 'معتمدة', rejected: 'مرفوضة', cancelled: 'ملغاة' } as any)[(t as any).approval_status || 'draft'] || 'مسودة'),
     }))
-    return prepareTableData(columns, rows)
-  }, [paged, userNames, organizations, projects])
+    
+    return prepareTableData(columns, [summaryRow, ...rows])
+  }, [paged, userNames, organizations, projects, summaryStats, getActiveFilterLabels])
 
   // Snapshot initial form data at open time to prevent clearing user selections
   const initialFormDataRef = React.useRef<any | null>(null)
@@ -1559,6 +1672,17 @@ const TransactionsPage: React.FC = () => {
               showCostCenter: false,
               showAmountRange: false
             }}
+            summaryBar={
+              <TransactionsSummaryBar
+                totalCount={totalCount}
+                totalDebit={summaryStats.totalDebit}
+                totalCredit={summaryStats.totalCredit}
+                lineCount={summaryStats.lineCount}
+                transactionCount={summaryStats.transactionCount}
+                activeFilters={getActiveFilterLabels()}
+                onClearFilters={handleResetFilters}
+              />
+            }
           />
 
           {/* Headers table (T1) */}

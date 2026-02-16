@@ -1,5 +1,5 @@
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import { supabase } from '../../utils/supabase'
 import { formatArabicCurrency } from '../../utils/ArabicTextEngine'
 import { exportToExcel, exportToCSV } from '../../utils/UniversalExportManager'
@@ -27,11 +27,14 @@ import {
 import PictureAsPdf from '@mui/icons-material/PictureAsPdf';
 import { PDFGenerator, type PDFOptions, type PDFTableData } from '../../services/pdf-generator';
 import { fetchGLSummary, type UnifiedFilters } from '../../services/reports/unified-financial-query';
+import TransactionsSummaryBar from '../../components/Transactions/TransactionsSummaryBar';
 
 interface TBRow {
   account_id: string
   code: string
   name: string
+  period_debit?: number      // NEW: Period debit total
+  period_credit?: number     // NEW: Period credit total
   debit: number
   credit: number
   account_type?: 'assets' | 'liabilities' | 'equity' | 'revenue' | 'expenses'
@@ -54,8 +57,8 @@ export default function TrialBalanceOriginal() {
   const lang = useAppStore(s => s.language)
   const isAr = lang === 'ar'
 
-  const [dateFrom, setDateFrom] = useState<string>(startOfYearISO())
-  const [dateTo, setDateTo] = useState<string>(todayISO())
+  const [dateFrom, setDateFrom] = useState<string>('')
+  const [dateTo, setDateTo] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
   const [rows, setRows] = useState<TBRow[]>([])
   const [error, setError] = useState<string>('')
@@ -66,6 +69,7 @@ export default function TrialBalanceOriginal() {
   const [_prefixRules, _setPrefixRules] = useState<PrefixRule[]>([])
   const [_breakPerGroup, _setBreakPerGroup] = useState<boolean>(false)
   const [postedOnly, setPostedOnly] = useState<boolean>(false)
+  const [approvalStatus, setApprovalStatus] = useState<'draft' | 'submitted' | 'approved' | 'rejected' | null>(null)  // UPDATED: Sync with transactions.approval_status field
   // Numbers-only setting (hide currency symbol)
   const [numbersOnly, setNumbersOnly] = useState<boolean>(true)
   // Collapse/expand state for account groups
@@ -82,13 +86,68 @@ export default function TrialBalanceOriginal() {
   }, [numbersOnly])
 
   const totals = useMemo(() => {
+    const period_debit = rows.reduce((sum, r) => sum + (r.period_debit || 0), 0)
+    const period_credit = rows.reduce((sum, r) => sum + (r.period_credit || 0), 0)
     const debit = rows.reduce((sum, r) => sum + r.debit, 0)
     const credit = rows.reduce((sum, r) => sum + r.credit, 0)
-    return { debit, credit, diff: +(debit - credit).toFixed(2) }
+    return { 
+      period_debit, 
+      period_credit, 
+      debit, 
+      credit, 
+      diff: +(debit - credit).toFixed(2) 
+    }
   }, [rows])
 
+  // Generate active filter labels for summary bar
+  const getActiveFilterLabels = useCallback((): string[] => {
+    const labels: string[] = []
+    
+    if (dateFrom || dateTo) {
+      const from = dateFrom || '...'
+      const to = dateTo || '...'
+      labels.push(`${uiLang === 'ar' ? 'التاريخ' : 'Date'}: ${from} - ${to}`)
+    }
+    if (currentOrg) {
+      labels.push(`${uiLang === 'ar' ? 'المؤسسة' : 'Org'}: ${currentOrg.name}`)
+    }
+    if (currentProject) {
+      labels.push(`${uiLang === 'ar' ? 'المشروع' : 'Project'}: ${currentProject.name}`)
+    }
+    if (approvalStatus) {
+      const statusMap: Record<string, string> = {
+        draft: uiLang === 'ar' ? 'مسودة' : 'Draft',
+        submitted: uiLang === 'ar' ? 'مقدمة' : 'Submitted',
+        approved: uiLang === 'ar' ? 'معتمدة' : 'Approved',
+        rejected: uiLang === 'ar' ? 'مرفوضة' : 'Rejected',
+      }
+      labels.push(`${uiLang === 'ar' ? 'الحالة' : 'Status'}: ${statusMap[approvalStatus] || approvalStatus}`)
+    }
+    if (postedOnly) {
+      labels.push(uiLang === 'ar' ? 'المعتمد فقط' : 'Posted Only')
+    }
+    if (activeGroupsOnly) {
+      labels.push(uiLang === 'ar' ? 'النشط فقط' : 'Active Only')
+    }
+    if (!includeZeros) {
+      labels.push(uiLang === 'ar' ? 'بدون أصفار' : 'No Zeros')
+    }
+    
+    return labels
+  }, [dateFrom, dateTo, currentOrg, currentProject, approvalStatus, postedOnly, activeGroupsOnly, includeZeros, uiLang])
+
+  // Clear all filters handler (keep context filters: org/project)
+  const handleClearFilters = useCallback(() => {
+    setDateFrom('')
+    setDateTo('')
+    setIncludeZeros(false)
+    setPostedOnly(false)
+    setActiveGroupsOnly(false)
+    setApprovalStatus(null)
+  }, [])
+
   const grouped = useMemo(() => {
-    const groups: { key: string; titleAr: string; titleEn: string; rows: TBRow[]; totals: { debit: number; credit: number } }[] = []
+    const groups: { key: string; titleAr: string; titleEn: string; rows: TBRow[]; totals: { period_debit: number; period_credit: number; debit: number; credit: number } }[] = []
     const order = ['assets', 'liabilities', 'equity', 'revenue', 'expenses']
     const title = (k: string) => ({
       assets: { ar: 'الأصول (Assets)', en: 'Assets' },
@@ -98,37 +157,30 @@ export default function TrialBalanceOriginal() {
       expenses: { ar: 'المصروفات (Expenses)', en: 'Expenses' },
     } as any)[k] || { ar: k, en: k }
     for (const k of order) {
-      const r = rows.filter(x => x.account_type === k)
-      const debit = r.reduce((s, x) => s + x.debit, 0)
-      const credit = r.reduce((s, x) => s + x.credit, 0)
-      if (r.length) groups.push({ key: k, titleAr: title(k).ar, titleEn: title(k).en, rows: r, totals: { debit, credit } })
+      // Get all rows for this account type (unfiltered for totals)
+      const allRowsForType = rows.filter(x => x.account_type === k)
+      
+      // Apply includeZeros filter ONLY for display, not for totals
+      const displayRows = includeZeros ? allRowsForType : allRowsForType.filter(r => r.debit !== 0 || r.credit !== 0)
+      
+      // Calculate totals from ALL rows (including zeros) for accuracy
+      const period_debit = allRowsForType.reduce((s, x) => s + (x.period_debit || 0), 0)
+      const period_credit = allRowsForType.reduce((s, x) => s + (x.period_credit || 0), 0)
+      const debit = allRowsForType.reduce((s, x) => s + x.debit, 0)
+      const credit = allRowsForType.reduce((s, x) => s + x.credit, 0)
+      
+      // Only add group if there are rows to display
+      if (displayRows.length) groups.push({ key: k, titleAr: title(k).ar, titleEn: title(k).en, rows: displayRows, totals: { period_debit, period_credit, debit, credit } })
     }
     const filtered = activeGroupsOnly ? groups.filter(g => (g.totals.debit !== 0 || g.totals.credit !== 0)) : groups
     return filtered
-  }, [rows, activeGroupsOnly])
+  }, [rows, activeGroupsOnly, includeZeros])
 
   useEffect(() => {
     // Auto-load once
     loadInitialData().then(() => load())
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  // Auto-set date range from first to last transaction for current project (all projects if none)
-  useEffect(() => {
-    (async () => {
-      try {
-        const r = await fetchTransactionsDateRange({
-          orgId: null,
-          projectId: currentProject?.id || null,
-          postedOnly: postedOnly,
-        })
-        if (r) {
-          if (r.min_date) setDateFrom(r.min_date)
-          if (r.max_date) setDateTo(r.max_date)
-        }
-      } catch { }
-    })()
-  }, [currentProject?.id, postedOnly])
 
   async function loadInitialData() {
     try { const cfg = await getCompanyConfig(); setCompanyName(cfg.company_name || ''); } catch { }
@@ -147,6 +199,7 @@ export default function TrialBalanceOriginal() {
         orgId: currentOrg?.id || null,
         projectId: currentProject?.id || null,
         postedOnly,
+        approvalStatus: approvalStatus,  // UPDATED: Pass approval status directly (null = all)
       }
 
       const glSummaryData = await fetchGLSummary(filters)
@@ -168,19 +221,20 @@ export default function TrialBalanceOriginal() {
 
       // Convert GL Summary data to Trial Balance format
       // GL Summary returns closing_debit and closing_credit which are the account balances
-      let out: TBRow[] = (glSummaryData || []).map((row: any) => ({
+      // Also includes period_debits and period_credits for transaction volume
+      const out: TBRow[] = (glSummaryData || []).map((row: any) => ({
         account_id: row.account_id,
         code: row.account_code,
         name: row.account_name_ar || row.account_name_en || 'Unknown',
+        period_debit: Number(row.period_debits || 0),      // NEW: Period transaction volume
+        period_credit: Number(row.period_credits || 0),    // NEW: Period transaction volume
         debit: Number(row.closing_debit || 0),
         credit: Number(row.closing_credit || 0),
         account_type: classifyAccountByCode(row.account_code),
       } as TBRow))
 
-      if (!includeZeros) {
-        out = out.filter(r => r.debit !== 0 || r.credit !== 0)
-      }
-
+      // Store ALL rows (including zeros) for accurate totals calculation
+      // The includeZeros filter is applied in the grouped memo, not here
       setRows(out)
     } catch (e: any) {
       setError(e?.message || 'حدث خطأ أثناء تحميل ميزان المراجعة')
@@ -195,36 +249,45 @@ export default function TrialBalanceOriginal() {
     let canceled = false
     const t = setTimeout(() => { if (!canceled && !document.hidden) load() }, 250)
     return () => { canceled = true; clearTimeout(t) }
-  }, [dateFrom, dateTo, currentOrg?.id, currentProject?.id, postedOnly, includeZeros, activeGroupsOnly])
+  }, [dateFrom, dateTo, currentOrg?.id, currentProject?.id, postedOnly, includeZeros, activeGroupsOnly, approvalStatus])
 
   function doExport(kind: 'excel' | 'csv') {
     const cols = [
       { key: 'code', header: uiLang === 'ar' ? 'رمز الحساب' : 'Account Code', type: 'text' as const },
       { key: 'name', header: uiLang === 'ar' ? 'اسم الحساب' : 'Account Name', type: 'text' as const },
-      { key: 'debit', header: uiLang === 'ar' ? 'مدين' : 'Debit', type: 'currency' as const, currency: numbersOnly ? 'none' : 'EGP' },
-      { key: 'credit', header: uiLang === 'ar' ? 'دائن' : 'Credit', type: 'currency' as const, currency: numbersOnly ? 'none' : 'EGP' },
+      { key: 'period_debit', header: uiLang === 'ar' ? 'مدين الفترة' : 'Period Debit', type: 'currency' as const, currency: numbersOnly ? 'none' : 'EGP' },
+      { key: 'period_credit', header: uiLang === 'ar' ? 'دائن الفترة' : 'Period Credit', type: 'currency' as const, currency: numbersOnly ? 'none' : 'EGP' },
+      { key: 'debit', header: uiLang === 'ar' ? 'مدين ختامي' : 'Closing Debit', type: 'currency' as const, currency: numbersOnly ? 'none' : 'EGP' },
+      { key: 'credit', header: uiLang === 'ar' ? 'دائن ختامي' : 'Closing Credit', type: 'currency' as const, currency: numbersOnly ? 'none' : 'EGP' },
     ]
     // Flatten grouped structure to export with section headers and subtotals
     const exportRows: any[] = []
     grouped.forEach(g => {
-      exportRows.push({ code: uiLang === 'ar' ? g.titleAr : g.titleEn, name: '', debit: g.totals.debit, credit: g.totals.credit })
-      g.rows.forEach(r => exportRows.push({ code: r.code, name: r.name, debit: r.debit, credit: r.credit }))
-      exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtotal ${g.titleEn}`, name: '', debit: g.totals.debit, credit: g.totals.credit })
+      exportRows.push({ code: uiLang === 'ar' ? g.titleAr : g.titleEn, name: '', period_debit: g.totals.period_debit, period_credit: g.totals.period_credit, debit: g.totals.debit, credit: g.totals.credit })
+      g.rows.forEach(r => exportRows.push({ code: r.code, name: r.name, period_debit: r.period_debit || 0, period_credit: r.period_credit || 0, debit: r.debit, credit: r.credit }))
+      exportRows.push({ code: uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtotal ${g.titleEn}`, name: '', period_debit: g.totals.period_debit, period_credit: g.totals.period_credit, debit: g.totals.debit, credit: g.totals.credit })
     })
     // Append grand total and difference rows
-    exportRows.push({ code: uiLang === 'ar' ? 'الإجمالي العام' : 'Grand Total', name: '', debit: totals.debit, credit: totals.credit })
+    exportRows.push({ code: uiLang === 'ar' ? 'الإجمالي العام' : 'Grand Total', name: '', period_debit: totals.period_debit, period_credit: totals.period_credit, debit: totals.debit, credit: totals.credit })
     if (Math.abs(totals.debit - totals.credit) > 0.0001) {
-      exportRows.push({ code: uiLang === 'ar' ? 'الفرق' : 'Difference', name: '', debit: '', credit: Math.abs(totals.debit - totals.credit) })
+      exportRows.push({ code: uiLang === 'ar' ? 'الفرق' : 'Difference', name: '', period_debit: '', period_credit: '', debit: '', credit: Math.abs(totals.debit - totals.credit) })
     }
+    
+    // Build filter information for metadata
+    const filterInfo: string[] = []
+    filterInfo.push([uiLang === 'ar' ? 'الشركة' : 'Company', companyName || (uiLang === 'ar' ? 'غير محدد' : 'N/A')])
+    filterInfo.push([uiLang === 'ar' ? 'الفترة' : 'Period', `${dateFrom} → ${dateTo}`])
+    filterInfo.push([uiLang === 'ar' ? 'المشروع' : 'Project', currentProject ? (currentProject.code + ' — ' + (currentProject.name || '')) : (uiLang === 'ar' ? 'الكل' : 'All')])
+    filterInfo.push([uiLang === 'ar' ? 'حالة الاعتماد' : 'Approval Status', approvalStatus === null ? (uiLang === 'ar' ? 'الكل' : 'All') : approvalStatus])
+    filterInfo.push([uiLang === 'ar' ? 'قيود معتمدة فقط' : 'Posted Only', postedOnly ? (uiLang === 'ar' ? 'نعم' : 'Yes') : (uiLang === 'ar' ? 'لا' : 'No')])
+    filterInfo.push([uiLang === 'ar' ? 'إظهار الأصفار' : 'Include Zeros', includeZeros ? (uiLang === 'ar' ? 'نعم' : 'Yes') : (uiLang === 'ar' ? 'لا' : 'No')])
+    filterInfo.push([uiLang === 'ar' ? 'المجموعات النشطة فقط' : 'Active Groups Only', activeGroupsOnly ? (uiLang === 'ar' ? 'نعم' : 'Yes') : (uiLang === 'ar' ? 'لا' : 'No')])
+    
     const data = {
       columns: cols,
       rows: exportRows,
       metadata: {
-        prependRows: [
-          [uiLang === 'ar' ? 'الشركة' : 'Company', companyName || (uiLang === 'ar' ? 'غير محدد' : 'N/A')],
-          [uiLang === 'ar' ? 'الفترة' : 'Period', `${dateFrom} → ${dateTo}`],
-          [uiLang === 'ar' ? 'المشروع' : 'Project', currentProject ? (currentProject.code + ' — ' + (currentProject.name || '')) : (uiLang === 'ar' ? 'الكل' : 'All')],
-        ]
+        prependRows: filterInfo as any
       }
     }
     const opts = { title: uiLang === 'ar' ? 'ميزان المراجعة (أصلي)' : 'Trial Balance (Original)', rtlLayout: uiLang === 'ar' }
@@ -239,8 +302,10 @@ export default function TrialBalanceOriginal() {
       const columns = [
         { key: 'code', header: uiLang === 'ar' ? 'رمز الحساب' : 'Account Code', width: '100px', align: 'center' as const, type: 'text' as const },
         { key: 'name', header: uiLang === 'ar' ? 'اسم الحساب' : 'Account Name', width: 'auto', align: 'right' as const, type: 'text' as const },
-        { key: 'debit', header: uiLang === 'ar' ? 'مدين' : 'Debit', width: '120px', align: 'right' as const, type: 'currency' as const },
-        { key: 'credit', header: uiLang === 'ar' ? 'دائن' : 'Credit', width: '120px', align: 'right' as const, type: 'currency' as const },
+        { key: 'period_debit', header: uiLang === 'ar' ? 'مدين الفترة' : 'Period Debit', width: '100px', align: 'right' as const, type: 'currency' as const },
+        { key: 'period_credit', header: uiLang === 'ar' ? 'دائن الفترة' : 'Period Credit', width: '100px', align: 'right' as const, type: 'currency' as const },
+        { key: 'debit', header: uiLang === 'ar' ? 'مدين ختامي' : 'Closing Debit', width: '100px', align: 'right' as const, type: 'currency' as const },
+        { key: 'credit', header: uiLang === 'ar' ? 'دائن ختامي' : 'Closing Credit', width: '100px', align: 'right' as const, type: 'currency' as const },
       ]
 
       // Build table data with group headers and rows
@@ -250,6 +315,8 @@ export default function TrialBalanceOriginal() {
         tableRows.push({
           code: '',
           name: uiLang === 'ar' ? group.titleAr : group.titleEn,
+          period_debit: '',
+          period_credit: '',
           debit: '',
           credit: '',
           isGroupHeader: true,
@@ -261,6 +328,8 @@ export default function TrialBalanceOriginal() {
           tableRows.push({
             code: row.code,
             name: row.name,
+            period_debit: row.period_debit || 0,
+            period_credit: row.period_credit || 0,
             debit: row.debit,
             credit: row.credit,
             isGroupHeader: false,
@@ -268,6 +337,17 @@ export default function TrialBalanceOriginal() {
           })
         })
       })
+
+      // Build filter information
+      const filterInfo = [
+        `${uiLang === 'ar' ? 'الشركة' : 'Company'}: ${companyName || (uiLang === 'ar' ? 'غير محدد' : 'N/A')}`,
+        `${uiLang === 'ar' ? 'الفترة' : 'Period'}: ${dateFrom} → ${dateTo}`,
+        `${uiLang === 'ar' ? 'المشروع' : 'Project'}: ${currentProject ? (currentProject.code + ' — ' + (currentProject.name || '')) : (uiLang === 'ar' ? 'الكل' : 'All')}`,
+        `${uiLang === 'ar' ? 'حالة الاعتماد' : 'Approval Status'}: ${approvalStatus === null ? (uiLang === 'ar' ? 'الكل' : 'All') : approvalStatus}`,
+        `${uiLang === 'ar' ? 'قيود معتمدة فقط' : 'Posted Only'}: ${postedOnly ? (uiLang === 'ar' ? 'نعم' : 'Yes') : (uiLang === 'ar' ? 'لا' : 'No')}`,
+        `${uiLang === 'ar' ? 'إظهار الأصفار' : 'Include Zeros'}: ${includeZeros ? (uiLang === 'ar' ? 'نعم' : 'Yes') : (uiLang === 'ar' ? 'لا' : 'No')}`,
+        `${uiLang === 'ar' ? 'المجموعات النشطة فقط' : 'Active Groups Only'}: ${activeGroupsOnly ? (uiLang === 'ar' ? 'نعم' : 'Yes') : (uiLang === 'ar' ? 'لا' : 'No')}`
+      ]
 
       const tableData: PDFTableData = {
         columns,
@@ -284,6 +364,7 @@ export default function TrialBalanceOriginal() {
         subtitle: `${uiLang === 'ar' ? 'الفترة من' : 'Period from'} ${dateFrom} ${uiLang === 'ar' ? 'إلى' : 'to'} ${dateTo}`,
         companyName: companyName || (uiLang === 'ar' ? 'الشركة التجارية للمقاولات' : 'Commercial Contracting Company'),
         reportDate: `${dateFrom} ← ${dateTo}`,
+        filterInfo: filterInfo,
         orientation: 'portrait',
         pageSize: 'A4',
         showHeader: true,
@@ -306,30 +387,52 @@ export default function TrialBalanceOriginal() {
     if (!element) return
 
     try {
-      const canvas = await html2canvas(element, {
+      // Create a temporary container with filter information
+      const tempContainer = document.createElement('div')
+      tempContainer.style.padding = '20px'
+      tempContainer.style.backgroundColor = '#ffffff'
+      tempContainer.style.fontFamily = 'Arial, sans-serif'
+      tempContainer.style.fontSize = '12px'
+      tempContainer.style.direction = 'rtl'
+      tempContainer.style.textAlign = 'right'
+
+      // Add filter header
+      const filterHeader = document.createElement('div')
+      filterHeader.style.marginBottom = '15px'
+      filterHeader.style.borderBottom = '2px solid #000'
+      filterHeader.style.paddingBottom = '10px'
+      filterHeader.innerHTML = `
+        <div style="font-weight: bold; font-size: 14px; margin-bottom: 10px;">${uiLang === 'ar' ? 'معلومات التصفية' : 'Filter Information'}</div>
+        <div>${uiLang === 'ar' ? 'الشركة' : 'Company'}: ${companyName || (uiLang === 'ar' ? 'غير محدد' : 'N/A')}</div>
+        <div>${uiLang === 'ar' ? 'الفترة' : 'Period'}: ${dateFrom} → ${dateTo}</div>
+        <div>${uiLang === 'ar' ? 'المشروع' : 'Project'}: ${currentProject ? (currentProject.code + ' — ' + (currentProject.name || '')) : (uiLang === 'ar' ? 'الكل' : 'All')}</div>
+        <div>${uiLang === 'ar' ? 'حالة الاعتماد' : 'Approval Status'}: ${approvalStatus === null ? (uiLang === 'ar' ? 'الكل' : 'All') : approvalStatus}</div>
+        <div>${uiLang === 'ar' ? 'قيود معتمدة فقط' : 'Posted Only'}: ${postedOnly ? (uiLang === 'ar' ? 'نعم' : 'Yes') : (uiLang === 'ar' ? 'لا' : 'No')}</div>
+        <div>${uiLang === 'ar' ? 'إظهار الأصفار' : 'Include Zeros'}: ${includeZeros ? (uiLang === 'ar' ? 'نعم' : 'Yes') : (uiLang === 'ar' ? 'لا' : 'No')}</div>
+        <div>${uiLang === 'ar' ? 'المجموعات النشطة فقط' : 'Active Groups Only'}: ${activeGroupsOnly ? (uiLang === 'ar' ? 'نعم' : 'Yes') : (uiLang === 'ar' ? 'لا' : 'No')}</div>
+      `
+      tempContainer.appendChild(filterHeader)
+      tempContainer.appendChild(element.cloneNode(true))
+
+      const canvas = await html2canvas(tempContainer, {
         scale: 3,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
         logging: false,
-        width: element.scrollWidth,
-        height: element.scrollHeight,
+        width: tempContainer.scrollWidth,
+        height: tempContainer.scrollHeight,
         onclone: (doc) => {
-          const el = doc.getElementById('financial-report-content') as HTMLElement | null
+          const el = doc.querySelector('div') as HTMLElement | null
           if (el) {
             el.style.direction = 'rtl'
             el.style.textAlign = 'right'
             el.style.fontFamily = 'Arial, sans-serif'
-            el.style.fontSize = '14px'
+            el.style.fontSize = '12px'
             el.style.lineHeight = '1.5'
             el.style.color = '#000000'
               ; (el.style as any).WebkitFontSmoothing = 'antialiased'
               ; (el.style as any).MozOsxFontSmoothing = 'grayscale'
-            // Show the statement header for PDF capture
-            const header = el.querySelector('.statement-header') as HTMLElement
-            if (header) {
-              header.style.display = 'block'
-            }
           }
         },
       })
@@ -373,6 +476,7 @@ export default function TrialBalanceOriginal() {
     // Prepare report data
     const currentDate = new Date().toLocaleDateString('ar-EG')
     const projectName = currentProject ? currentProject.name : (uiLang === 'ar' ? 'كل المشاريع' : 'All Projects')
+    const approvalStatusText = approvalStatus === null ? (uiLang === 'ar' ? 'الكل' : 'All') : approvalStatus
 
     // Build professional commercial report HTML
     const reportHTML = `
@@ -638,9 +742,12 @@ export default function TrialBalanceOriginal() {
             <div class="report-title">${uiLang === 'ar' ? 'ميزان المراجعة' : 'Trial Balance'}</div>
             <div class="report-period">${uiLang === 'ar' ? 'من' : 'From'}: ${dateFrom} ${uiLang === 'ar' ? 'إلى' : 'To'}: ${dateTo}</div>
             <div class="report-filters">
+              <span class="filter-item">${uiLang === 'ar' ? 'الشركة' : 'Company'}: ${companyName || (uiLang === 'ar' ? 'غير محدد' : 'N/A')}</span>
               <span class="filter-item">${uiLang === 'ar' ? 'المشروع' : 'Project'}: ${projectName}</span>
+              <span class="filter-item">${uiLang === 'ar' ? 'حالة الاعتماد' : 'Approval Status'}: ${approvalStatusText}</span>
               <span class="filter-item">${uiLang === 'ar' ? 'تاريخ الطباعة' : 'Print Date'}: ${currentDate}</span>
               ${postedOnly ? `<span class="filter-item">${uiLang === 'ar' ? 'قيود معتمدة فقط' : 'Posted Only'}</span>` : ''}
+              ${includeZeros ? '' : `<span class="filter-item">${uiLang === 'ar' ? 'إخفاء الأصفار' : 'Hide Zeros'}</span>`}
               ${activeGroupsOnly ? `<span class="filter-item">${uiLang === 'ar' ? 'مجموعات نشطة فقط' : 'Active Groups Only'}</span>` : ''}
             </div>
           </div>
@@ -668,15 +775,17 @@ export default function TrialBalanceOriginal() {
   function generatePrintContent(): string {
     let html = ''
 
-    // Trial Balance Table
+    // Trial Balance Table with all 4 columns
     html += `
       <table class="trial-balance-table">
         <thead class="table-header">
           <tr>
-            <th style="width: 100px;">${uiLang === 'ar' ? 'رمز الحساب' : 'Account Code'}</th>
-            <th style="width: 300px;">${uiLang === 'ar' ? 'اسم الحساب' : 'Account Name'}</th>
-            <th style="width: 120px;">${uiLang === 'ar' ? 'مدين' : 'Debit'}</th>
-            <th style="width: 120px;">${uiLang === 'ar' ? 'دائن' : 'Credit'}</th>
+            <th style="width: 80px;">${uiLang === 'ar' ? 'رمز الحساب' : 'Account Code'}</th>
+            <th style="width: 250px;">${uiLang === 'ar' ? 'اسم الحساب' : 'Account Name'}</th>
+            <th style="width: 90px;">${uiLang === 'ar' ? 'مدين الفترة' : 'Period Debit'}</th>
+            <th style="width: 90px;">${uiLang === 'ar' ? 'دائن الفترة' : 'Period Credit'}</th>
+            <th style="width: 90px;">${uiLang === 'ar' ? 'مدين ختامي' : 'Closing Debit'}</th>
+            <th style="width: 90px;">${uiLang === 'ar' ? 'دائن ختامي' : 'Closing Credit'}</th>
           </tr>
         </thead>
         <tbody>
@@ -687,12 +796,14 @@ export default function TrialBalanceOriginal() {
       // Group Header
       html += `
         <tr class="group-header-row">
-          <td colspan="4">${uiLang === 'ar' ? group.titleAr : group.titleEn}</td>
+          <td colspan="6">${uiLang === 'ar' ? group.titleAr : group.titleEn}</td>
         </tr>
       `
 
       // Group Accounts
       group.rows.forEach(row => {
+        const periodDebit = row.period_debit !== 0 ? formatArabicCurrency(row.period_debit || 0, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr }) : ''
+        const periodCredit = row.period_credit !== 0 ? formatArabicCurrency(row.period_credit || 0, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr }) : ''
         const debitAmount = row.debit !== 0 ? formatArabicCurrency(row.debit, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr }) : ''
         const creditAmount = row.credit !== 0 ? formatArabicCurrency(row.credit, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr }) : ''
 
@@ -700,16 +811,20 @@ export default function TrialBalanceOriginal() {
           <tr class="account-row">
             <td class="account-code">${row.code}</td>
             <td class="account-name">${row.name}</td>
+            <td class="amount-debit">${periodDebit}</td>
+            <td class="amount-credit">${periodCredit}</td>
             <td class="amount-debit">${debitAmount}</td>
             <td class="amount-credit">${creditAmount}</td>
           </tr>
         `
       })
 
-      // Group Subtotal
+      // Group Subtotal with all 4 columns
       html += `
         <tr class="group-subtotal">
           <td colspan="2">${uiLang === 'ar' ? `إجمالي ${group.titleAr}` : `Total ${group.titleEn}`}</td>
+          <td class="amount-debit">${formatArabicCurrency(group.totals.period_debit || 0, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</td>
+          <td class="amount-credit">${formatArabicCurrency(group.totals.period_credit || 0, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</td>
           <td class="amount-debit">${formatArabicCurrency(group.totals.debit, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</td>
           <td class="amount-credit">${formatArabicCurrency(group.totals.credit, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</td>
         </tr>
@@ -721,19 +836,25 @@ export default function TrialBalanceOriginal() {
       </table>
     `
 
-    // Grand Total Section
+    // Grand Total Section with all 4 columns
     const balanceStatus = Math.abs(totals.diff) < 0.01 ? 'balanced' : 'unbalanced'
     html += `
       <div class="grand-total">
         <div class="grand-total-header">${uiLang === 'ar' ? 'المجاميع العامة' : 'Grand Totals'}</div>
         <div class="total-row">
-          <div class="total-label">${uiLang === 'ar' ? 'إجمالي المدين' : 'Total Debits'}</div>
-          <div class="total-debit">${formatArabicCurrency(totals.debit, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</div>
-          <div class="total-credit"></div>
+          <div class="total-label">${uiLang === 'ar' ? 'إجمالي مدين الفترة' : 'Total Period Debits'}</div>
+          <div class="total-debit">${formatArabicCurrency(totals.period_debit || 0, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</div>
         </div>
         <div class="total-row">
-          <div class="total-label">${uiLang === 'ar' ? 'إجمالي الدائن' : 'Total Credits'}</div>
-          <div class="total-debit"></div>
+          <div class="total-label">${uiLang === 'ar' ? 'إجمالي دائن الفترة' : 'Total Period Credits'}</div>
+          <div class="total-credit">${formatArabicCurrency(totals.period_credit || 0, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</div>
+        </div>
+        <div class="total-row">
+          <div class="total-label">${uiLang === 'ar' ? 'إجمالي مدين ختامي' : 'Total Closing Debits'}</div>
+          <div class="total-debit">${formatArabicCurrency(totals.debit, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</div>
+        </div>
+        <div class="total-row">
+          <div class="total-label">${uiLang === 'ar' ? 'إجمالي دائن ختامي' : 'Total Closing Credits'}</div>
           <div class="total-credit">${formatArabicCurrency(totals.credit, numbersOnly ? 'none' : 'EGP', { useArabicNumerals: isAr })}</div>
         </div>
         <div class="total-row">
@@ -791,7 +912,7 @@ export default function TrialBalanceOriginal() {
     // Auto reload when inputs change
     if (currentOrg?.id) load()  // Only load when we have an org_id
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFrom, dateTo, currentProject?.id, includeZeros, activeGroupsOnly, postedOnly, currentOrg?.id])
+  }, [dateFrom, dateTo, currentProject?.id, includeZeros, activeGroupsOnly, postedOnly, approvalStatus, currentOrg?.id])
 
   return (
     <div className={styles.container}>
@@ -826,6 +947,22 @@ export default function TrialBalanceOriginal() {
             aria-label={uiLang === 'ar' ? 'إلى' : 'To'}
             title={uiLang === 'ar' ? 'تاريخ نهاية الفترة' : 'Period end date'}
           />
+          
+          {/* UPDATED: Approval Status Filter - Synced with transactions.approval_status field */}
+          <select
+            className={styles.filterInput}
+            value={approvalStatus || 'all'}
+            onChange={e => setApprovalStatus(e.target.value === 'all' ? null : e.target.value as any)}
+            aria-label={uiLang === 'ar' ? 'حالة الاعتماد' : 'Approval Status'}
+            title={uiLang === 'ar' ? 'تصفية حسب حالة الاعتماد' : 'Filter by approval status'}
+            style={{ minWidth: '150px' }}
+          >
+            <option value="all">{uiLang === 'ar' ? 'كل الحالات' : 'All Status'}</option>
+            <option value="draft">{uiLang === 'ar' ? 'مسودة' : 'Draft'}</option>
+            <option value="submitted">{uiLang === 'ar' ? 'مقدمة' : 'Submitted'}</option>
+            <option value="approved">{uiLang === 'ar' ? 'معتمدة' : 'Approved'}</option>
+            <option value="rejected">{uiLang === 'ar' ? 'مرفوضة' : 'Rejected'}</option>
+          </select>
         </div>
 
         {/* Center Section: Language + Group Controls + Icon Toggles */}
@@ -1023,6 +1160,20 @@ export default function TrialBalanceOriginal() {
         <div className={styles.errorAlert}>{error}</div>
       )}
 
+      {/* Summary Bar */}
+      {!loading && rows.length > 0 && (
+        <div style={{ marginBottom: '16px' }}>
+          <TransactionsSummaryBar
+            totalCount={rows.length}
+            totalDebit={totals.period_debit}
+            totalCredit={totals.period_credit}
+            lineCount={rows.length}
+            activeFilters={getActiveFilterLabels()}
+            onClearFilters={handleClearFilters}
+          />
+        </div>
+      )}
+
       {/* Legacy report layout replicated from original app */}
       <div className="standard-financial-statements">
         {/* Dedicated export button (legacy approach, not universal) */}
@@ -1044,8 +1195,10 @@ export default function TrialBalanceOriginal() {
               <div className="trial-balance-header">
                 <div className="account-column">{uiLang === 'ar' ? 'اسم الحساب' : 'Account Name'}</div>
                 <div className="amounts-columns">
-                  <div className="debit-column">{uiLang === 'ar' ? 'مدين' : 'Debit'}</div>
-                  <div className="credit-column">{uiLang === 'ar' ? 'دائن' : 'Credit'}</div>
+                  <div className="debit-column">{uiLang === 'ar' ? 'مدين الفترة' : 'Period Debit'}</div>
+                  <div className="credit-column">{uiLang === 'ar' ? 'دائن الفترة' : 'Period Credit'}</div>
+                  <div className="debit-column">{uiLang === 'ar' ? 'رصيد مدين' : 'Closing Debit'}</div>
+                  <div className="credit-column">{uiLang === 'ar' ? 'رصيد دائن' : 'Closing Credit'}</div>
                 </div>
               </div>
 
@@ -1078,6 +1231,8 @@ export default function TrialBalanceOriginal() {
                         <span className="account-count">({g.rows.length})</span>
                       </h3>
                       <div className="group-totals-preview">
+                        <span className="preview-debit">{formatArabicCurrency(g.totals.period_debit, numbersOnly ? 'none' : 'EGP')}</span>
+                        <span className="preview-credit">{formatArabicCurrency(g.totals.period_credit, numbersOnly ? 'none' : 'EGP')}</span>
                         <span className="preview-debit">{formatArabicCurrency(g.totals.debit, numbersOnly ? 'none' : 'EGP')}</span>
                         <span className="preview-credit">{formatArabicCurrency(g.totals.credit, numbersOnly ? 'none' : 'EGP')}</span>
                       </div>
@@ -1092,6 +1247,8 @@ export default function TrialBalanceOriginal() {
                                 <span className="account-name">{r.name}</span>
                               </div>
                               <div className="account-amounts">
+                                <span className="debit-amount">{(r.period_debit || 0) > 0 ? formatArabicCurrency(r.period_debit || 0, numbersOnly ? 'none' : 'EGP') : '—'}</span>
+                                <span className="credit-amount">{(r.period_credit || 0) > 0 ? formatArabicCurrency(r.period_credit || 0, numbersOnly ? 'none' : 'EGP') : '—'}</span>
                                 <span className="debit-amount">{r.debit > 0 ? formatArabicCurrency(r.debit, numbersOnly ? 'none' : 'EGP') : '—'}</span>
                                 <span className="credit-amount">{r.credit > 0 ? formatArabicCurrency(r.credit, numbersOnly ? 'none' : 'EGP') : '—'}</span>
                               </div>
@@ -1101,6 +1258,8 @@ export default function TrialBalanceOriginal() {
                         <div className="group-subtotal">
                           <span className="subtotal-label">{uiLang === 'ar' ? `إجمالي ${g.titleAr}` : `Subtotal ${g.titleEn}`}</span>
                           <div className="subtotal-amounts">
+                            <span className="subtotal-debit">{formatArabicCurrency(g.totals.period_debit, numbersOnly ? 'none' : 'EGP')}</span>
+                            <span className="subtotal-credit">{formatArabicCurrency(g.totals.period_credit, numbersOnly ? 'none' : 'EGP')}</span>
                             <span className="subtotal-debit">{formatArabicCurrency(g.totals.debit, numbersOnly ? 'none' : 'EGP')}</span>
                             <span className="subtotal-credit">{formatArabicCurrency(g.totals.credit, numbersOnly ? 'none' : 'EGP')}</span>
                           </div>
@@ -1114,6 +1273,8 @@ export default function TrialBalanceOriginal() {
               <div className="trial-balance-totals">
                 <span className="totals-label">{uiLang === 'ar' ? 'الإجمالي العام' : 'Grand Total'}</span>
                 <div className="totals-amounts">
+                  <span className="total-debits">{formatArabicCurrency(totals.period_debit, numbersOnly ? 'none' : 'EGP')}</span>
+                  <span className="total-credits">{formatArabicCurrency(totals.period_credit, numbersOnly ? 'none' : 'EGP')}</span>
                   <span className="total-debits">{formatArabicCurrency(totals.debit, numbersOnly ? 'none' : 'EGP')}</span>
                   <span className="total-credits">{formatArabicCurrency(totals.credit, numbersOnly ? 'none' : 'EGP')}</span>
                 </div>
