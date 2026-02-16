@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getLandingPreference } from '../services/user-preferences'
 import useAppStore from '../store/useAppStore'
 import { useScopeOptional } from '../contexts/ScopeContext'
+import DashboardShellSkeleton from '../components/layout/DashboardShellSkeleton'
 
 const Dashboard = React.lazy(() => import('./Dashboard'))
 const Welcome = React.lazy(() => import('./Welcome'))
@@ -42,14 +43,14 @@ const LandingDecider: React.FC = () => {
   }, [demoMode, qc])
 
   // Show loading state briefly
-  if (!demoMode && isLoading) return <div style={{ padding: '20px' }}>Loading...</div>
+  if (!demoMode && isLoading) return <DashboardShellSkeleton />
 
   // If there's an error or no preference, default to welcome (not dashboard)
   // Dashboard requires specific permissions, so welcome is safer default
   const effectivePref = demoMode ? 'dashboard' : (error ? 'welcome' : (pref || 'welcome'))
 
   return (
-    <React.Suspense fallback={<div style={{ padding: '20px' }}>Loading dashboard...</div>}>
+    <React.Suspense fallback={<DashboardShellSkeleton />}>
       {effectivePref === 'dashboard' ? <Dashboard /> : <Welcome />}
     </React.Suspense>
   )

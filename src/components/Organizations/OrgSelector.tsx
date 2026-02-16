@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { TextField, MenuItem } from '@mui/material';
-import { getOrganizations, type Organization } from '../../services/organization';
+import type { Organization } from '../../types';
 import { useScopeOptional } from '../../contexts/ScopeContext';
 
 interface Props {
@@ -14,7 +14,7 @@ interface Props {
 
 export default function OrgSelector({ value, onChange, label = 'Organization', persist = true, sx, size = 'small' }: Props) {
   const scope = useScopeOptional();
-  const [orgs, setOrgs] = useState<Organization[]>([]);
+  const orgs = scope?.availableOrgs || [];
   const [orgId, setOrgId] = useState<string>('');
 
   const effectiveValue = useMemo(() => {
@@ -23,26 +23,18 @@ export default function OrgSelector({ value, onChange, label = 'Organization', p
   }, [scope?.currentOrg?.id, value]);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const list = await getOrganizations();
-        setOrgs(list);
+    if (!orgs.length) return;
 
-        const candidate = effectiveValue;
-        if (candidate && list.some(o => o.id === candidate)) {
-          setOrgId(candidate);
-        } else if (list.length > 0) {
-          const first = list[0].id as string;
-          setOrgId(first);
-          if (persist && scope) { void scope.setOrganization(first) }
-          onChange?.(first);
-        }
-      } catch (err) {
-        console.error('[OrgSelector] Error:', err);
-        setOrgs([]);
-      }
-    })();
-  }, [effectiveValue, persist, scope, onChange]);
+    const candidate = effectiveValue;
+    if (candidate && orgs.some(o => o.id === candidate)) {
+      setOrgId(candidate);
+    } else if (orgs.length > 0) {
+      const first = orgs[0].id as string;
+      setOrgId(first);
+      if (persist && scope) { void scope.setOrganization(first) }
+      onChange?.(first);
+    }
+  }, [effectiveValue, persist, scope, onChange, orgs]);
 
   useEffect(() => {
     setOrgId(effectiveValue);

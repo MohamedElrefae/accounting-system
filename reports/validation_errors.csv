@@ -1,0 +1,7 @@
+row_number,field_name,error_type,error_message,actual_value,expected_value,severity
+1,account_code,account_code,Account code '999' not found in valid codes,999,,ERROR
+1,debit/credit,business_rule,Transaction line cannot have both debit and credit,"debit=1000.0, credit=1000.0",,ERROR
+3,account_code,required_field,Required field 'account_code' is null or empty,,,ERROR
+3,debit/credit,business_rule,Transaction line cannot have both debit and credit,"debit=500.0, credit=500.0",,ERROR
+4,debit,range,Debit cannot be negative: -100.0,-100.0,>= 0,ERROR
+5,debit/credit,business_rule,Transaction line must have either debit or credit (not both zero),"debit=0.0, credit=0.0",,ERROR

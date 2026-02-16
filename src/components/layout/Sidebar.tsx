@@ -9,6 +9,7 @@ import Box from '@mui/material/Box';
 import Collapse from '@mui/material/Collapse';
 import Badge from '@mui/material/Badge';
 import Tooltip from '@mui/material/Tooltip';
+import Skeleton from '@mui/material/Skeleton';
 import {
   ExpandLess,
   ExpandMore,
@@ -41,7 +42,7 @@ import {
 import useAppStore from '../../store/useAppStore';
 import { navigationItems } from '../../data/navigation';
 import type { NavigationItem } from '../../types';
-import { useOptimizedAuth } from '../../hooks/useOptimizedAuth';
+import useOptimizedAuth from '../../hooks/useOptimizedAuth';
 import { derivePermissionFromId } from '../../lib/permissions';
 import BrandHeader from './BrandHeader';
 
@@ -104,9 +105,9 @@ const Sidebar: React.FC<SidebarProps> = () => {
 
   const {
     user,
-    hasGlobalPermission,
+    loading,
     hasRoleInOrg,
-    hasRoleInProject,
+    canPerformActionInProject,
     // fallback to legacy check if item has no strict scope
     hasActionAccess, // "hasPermission" equivalent
   } = useOptimizedAuth();
@@ -252,7 +253,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
       }
     } else if (item.scope === 'global') {
       if (item.requiredPermission) {
-        if (!hasGlobalPermission(item.requiredPermission)) return false;
+        if (!hasActionAccess(item.requiredPermission as any)) return false;
       }
     } else {
       // Legacy / Unscoped mode (fallback)
@@ -271,7 +272,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
 
       if (permissionToCheck) {
         // Use legacy global check
-        const hasAccess = hasActionAccess && hasActionAccess(permissionToCheck);
+        const hasAccess = hasActionAccess && hasActionAccess(permissionToCheck as any);
 
         if (import.meta.env.DEV) {
           // console.log(`[Sidebar Debug] Item: ${item.id} | Req: ${permissionToCheck} | Granted: ${hasAccess} | UserRoles: ${user?.app_metadata?.roles}`);
@@ -480,7 +481,19 @@ const Sidebar: React.FC<SidebarProps> = () => {
 
       <Box sx={{ overflow: 'auto' }}>
         <List>
-          {navigationItems.map((item) => renderNavigationItem(item))}
+          {loading ? (
+            // Show skeletons while auth is loading
+            Array.from(new Array(6)).map((_, index) => (
+              <ListItem key={`skeleton-${index}`} disablePadding sx={{ py: 0.5, px: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, width: '100%', minHeight: 48 }}>
+                  <Skeleton variant="circular" width={24} height={24} />
+                  {!sidebarCollapsed && <Skeleton variant="text" width="60%" height={24} />}
+                </Box>
+              </ListItem>
+            ))
+          ) : (
+            navigationItems.map((item) => renderNavigationItem(item))
+          )}
         </List>
       </Box>
     </Box>

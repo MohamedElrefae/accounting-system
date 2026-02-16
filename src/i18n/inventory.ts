@@ -48,6 +48,8 @@ export const INVENTORY_TEXTS = {
   quantity: { en: 'Quantity', ar: 'الكمية' },
   unitCost: { en: 'Unit Cost', ar: 'تكلفة الوحدة' },
   totalCost: { en: 'Total Cost', ar: 'التكلفة الإجمالية' },
+  active: { en: 'Active', ar: 'نشط' },
+  inactive: { en: 'Inactive', ar: 'غير نشط' },
 } as const;
 
 export type InventoryTextKey = keyof typeof INVENTORY_TEXTS;

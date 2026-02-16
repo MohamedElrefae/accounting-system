@@ -5,8 +5,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getAccounts, getProjects, getCurrentUserId, type Account, type Project } from '../services/transactions'
-import { getOrganizations } from '../services/organization'
+import { getAccounts, getCurrentUserId, type Account, type Project } from '../services/transactions'
 import { getAllTransactionClassifications, type TransactionClassification } from '../services/transaction-classification'
 import { getExpensesCategoriesList } from '../services/sub-tree'
 import { getCostCentersForSelector } from '../services/cost-centers'
@@ -18,6 +17,8 @@ import type { WorkItemRow } from '../types/work-items'
 
 import { queryKeys } from '../lib/queryKeys'
 import { useUnifiedSync } from '../hooks/useUnifiedSync'
+import { useAuthScopeData } from '../hooks/useAuthScopeData'
+import { useScopeOptional } from './ScopeContext'
 
 // Cost center type with org_id for filtering
 export interface CostCenterOption {
@@ -87,6 +88,8 @@ interface TransactionsDataProviderProps {
 
 export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> = ({ children }) => {
   const queryClient = useQueryClient()
+  const scope = useScopeOptional()
+  const currentOrgId = scope?.currentOrg?.id
 
   // =========================================================================
   // 1. CORE DATA (React Query)
@@ -99,19 +102,12 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
 
-  // Projects
-  const { data: projects = [], isLoading: projectsLoading } = useQuery({
-    queryKey: queryKeys.projects.all(),
-    queryFn: getProjects,
-    staleTime: 5 * 60 * 1000,
-  })
+  // Use Unified Auth Data
+  const authScopeData = useAuthScopeData();
+  const organizationsFromAuth = authScopeData.organizations;
+  const projectsFromAuth = authScopeData.projects;
 
-  // Organizations
-  const { data: organizations = [], isLoading: orgsLoading } = useQuery({
-    queryKey: queryKeys.organizations.all(),
-    queryFn: getOrganizations,
-    staleTime: Infinity, // Rarely changes
-  })
+  // Manual queries only for non-unified data
 
   // Classifications
   const { data: classifications = [], isLoading: classLoading } = useQuery({
@@ -141,23 +137,7 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
     }
   })
 
-  // Auto-refresh projects on change
-  useUnifiedSync({
-    channelId: 'context-projects-sync',
-    tables: ['projects'],
-    onDataChange: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.projects.all() })
-    }
-  })
-
-  // Auto-refresh organizations on change
-  useUnifiedSync({
-    channelId: 'context-orgs-sync',
-    tables: ['organizations'],
-    onDataChange: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all() })
-    }
-  })
+  // Redundant sync hooks removed (now handled by auth state)
 
   // =========================================================================
   // 3. DIMENSIONS (Manual State - preserved for "Accumulate" behavior)
@@ -177,7 +157,7 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
   const [error, setError] = useState<string | null>(null)
 
   // Combined loading state
-  const isLoading = accountsLoading || projectsLoading || orgsLoading || classLoading || userLoading || compLoading
+  const isLoading = accountsLoading || classLoading || userLoading || compLoading || !authScopeData.isReady
 
   /**
    * Load dimension data (cost centers, work items, categories) for a specific org
@@ -267,18 +247,21 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
 
   /**
    * Initial Load Effect
-   * Attempt to load dimensions for ALL available organizations on mount if not too many
-   * to replicate original behavior of "loadAllDimensions"
+   * Targeted loading: only fetch dimensions for the CURRENT organization.
+   * This fixes the 15s login delay caused by bulk-fetching up to 45 orgs at once.
    */
   useEffect(() => {
-    if (orgsLoading || !organizations.length) return
+    if (!authScopeData.isReady || !currentOrgId) return
 
-    // If < 10 orgs, load all dimensions automatically
-    if (organizations.length > 0 && organizations.length < 10) {
-      ensureDimensionsLoaded(organizations.map(o => o.id))
-      loadAnalysisItems(organizations)
+    // Load dimensions only for the current organization in scope
+    ensureDimensionsLoaded([currentOrgId])
+
+    // Load analysis items only for the current organization
+    const org = organizationsFromAuth.find(o => o.id === currentOrgId)
+    if (org) {
+      loadAnalysisItems([org])
     }
-  }, [organizations, orgsLoading, ensureDimensionsLoaded, loadAnalysisItems])
+  }, [currentOrgId, authScopeData.isReady, organizationsFromAuth, ensureDimensionsLoaded, loadAnalysisItems])
 
 
   /**
@@ -289,24 +272,23 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
   const refreshAll = useCallback(async () => {
     setIsRefreshing(true)
     try {
-      // 1. Invalidate core data
+      // 1. Invalidate core data and refresh auth profile
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.projects.all() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all() }),
         queryClient.invalidateQueries({ queryKey: queryKeys.classifications.all() }),
+        authScopeData.refresh(),
       ])
 
       // 2. Clear dimension cache markers so next ensureLoaded fetches fresh data
       loadedDimensionsRef.current.clear()
 
       // 3. Re-fetch for currently known orgs
-      if (organizations.length > 0) {
-        // We only re-fetch for orgs that were previously loaded? 
-        // Or just all if small count. 
+      if (organizationsFromAuth.length > 0) {
+        // We only re-fetch for orgs that were previously loaded?
+        // Or just all if small count.
         // Let's re-run the auto-load logic by triggering ensureDimensionsLoaded
-        await ensureDimensionsLoaded(organizations.map(o => o.id))
-        await loadAnalysisItems(organizations)
+        await ensureDimensionsLoaded(organizationsFromAuth.map(o => o.id))
+        await loadAnalysisItems(organizationsFromAuth)
       }
 
     } catch (err: any) {
@@ -314,7 +296,7 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
     } finally {
       setIsRefreshing(false)
     }
-  }, [queryClient, organizations, ensureDimensionsLoaded, loadAnalysisItems])
+  }, [queryClient, organizationsFromAuth, ensureDimensionsLoaded, loadAnalysisItems])
 
   /**
    * Specific Refresh (Project/Dim)
@@ -361,8 +343,8 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
   }, [])
 
   const refreshAnalysisItems = useCallback(async () => {
-    await loadAnalysisItems(organizations)
-  }, [loadAnalysisItems, organizations])
+    await loadAnalysisItems(organizationsFromAuth)
+  }, [loadAnalysisItems, organizationsFromAuth])
 
   // =========================================================================
   // Getters
@@ -388,8 +370,8 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
 
   // Memoize value
   const value = useMemo<TransactionsDataContextValue>(() => ({
-    organizations,
-    projects,
+    organizations: organizationsFromAuth,
+    projects: projectsFromAuth,
     accounts,
     costCenters,
     workItems,
@@ -409,7 +391,7 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
     refreshDimensions,
     refreshAnalysisItems,
   }), [
-    organizations, projects, accounts, costCenters, workItems, categories, classifications, analysisItemsMap,
+    organizationsFromAuth, projectsFromAuth, accounts, costCenters, workItems, categories, classifications, analysisItemsMap,
     currentUserId, isLoading, isRefreshing, error,
     getCostCentersForOrg, getWorkItemsForOrg, getCategoriesForOrg,
     loadDimensionsForOrg, ensureDimensionsLoaded,

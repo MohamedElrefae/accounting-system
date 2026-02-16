@@ -8,7 +8,6 @@ import { listWorkItemsAll } from '@/services/work-items'
 import type { AnalysisWorkItemFull } from '@/types/analysis-work-items'
 import type { WorkItemRow } from '@/types/work-items'
 import { getCostCentersList, type CostCenterRow } from '@/services/cost-centers'
-import { getActiveProjectsByOrg, type Project } from '@/services/projects'
 import { listInventoryLocations, type InventoryLocationRow } from '@/services/inventory/locations'
 import { createInventoryDocument, addInventoryDocumentLine, approveInventoryDocument, postInventoryDocument, type DocType } from '@/services/inventory/documents'
 import { listUOMs, type UomRow } from '@/services/inventory/uoms'
@@ -32,7 +31,7 @@ const IssueMaterialsPage: React.FC = () => {
   const [locations, setLocations] = useState<InventoryLocationRow[]>([])
   const [loading, setLoading] = useState(false)
   const [uoms, setUoms] = useState<UomRow[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
+  const projects = scope?.availableProjects || []
   const [projectId, setProjectId] = useState<string>('')
   const [costCenters, setCostCenters] = useState<CostCenterRow[]>([])
   const [costCenterId, _setCostCenterId] = useState<string>('')
@@ -50,7 +49,7 @@ const IssueMaterialsPage: React.FC = () => {
     materialId: z.string().uuid('Invalid material'),
     uomId: z.string().uuid('Invalid UOM'),
     quantity: z.coerce.number().positive('Quantity must be > 0'),
-    priceSource: z.enum(['moving_average','last_purchase','manual']).default('moving_average'),
+    priceSource: z.enum(['moving_average', 'last_purchase', 'manual']).default('moving_average'),
     notes: z.string().optional().or(z.literal('')),
   })
   const headerSchema = z.object({
@@ -107,22 +106,20 @@ const IssueMaterialsPage: React.FC = () => {
       if (!orgId) return
       setLoading(true)
       try {
-        const [mats, locs, uomsRes, projs, ccs, awi] = await Promise.all([
+        const [mats, locs, uomsRes, ccs, awi] = await Promise.all([
           listMaterials(orgId),
           listInventoryLocations(orgId),
           listUOMs(orgId),
-          getActiveProjectsByOrg(orgId).catch(() => [] as any),
           getCostCentersList(orgId).catch(() => [] as any),
           listAnalysisWorkItems({ orgId, projectId: projectId || null, includeInactive: true }).catch(() => []),
         ])
         setMaterials(mats)
         setLocations(locs)
         setUoms(uomsRes)
-        setProjects(projs as any)
         setCostCenters(ccs as any)
         setAnalysisItems(awi as any)
         // Work items (org wide)
-        try { const wis = await listWorkItemsAll(orgId, true); setWorkItems(wis as any) } catch {}
+        try { const wis = await listWorkItemsAll(orgId, true); setWorkItems(wis as any) } catch { }
       } catch (e: any) {
         showToast(e?.message || 'Failed to load lookups', { severity: 'error' })
       } finally {
@@ -172,7 +169,7 @@ const IssueMaterialsPage: React.FC = () => {
       }])
       setLoading(true)
       // 1) Create issue document (draft)
-      const doc = await createInventoryDocument({ org_id: orgId, doc_type: 'issue' as DocType, document_date: new Date().toISOString().slice(0,10), location_from_id: values.locationId, status: 'draft' })
+      const doc = await createInventoryDocument({ org_id: orgId, doc_type: 'issue' as DocType, document_date: new Date().toISOString().slice(0, 10), location_from_id: values.locationId, status: 'draft' })
       // 2) Add lines (multi-line support)
       let lineNo = 1
       for (const ln of payloads) {
@@ -252,46 +249,46 @@ const IssueMaterialsPage: React.FC = () => {
                 />
               </Grid>
               <Grid item xs={12} md={4}>
-                <TextField select fullWidth label="UOM / وحدة" {...register('uomId')} error={!!errors.uomId} helperText={errors.uomId?.message} value={uomId} onChange={() => {}}>
+                <TextField select fullWidth label="UOM / وحدة" {...register('uomId')} error={!!errors.uomId} helperText={errors.uomId?.message} value={uomId} onChange={() => { }}>
                   {uoms.map(u => (<MenuItem key={u.id} value={u.id}>{u.code} - {u.name}</MenuItem>))}
                 </TextField>
               </Grid>
               <Grid item xs={12} md={3}>
-                <TextField type="number" fullWidth label="Quantity / الكمية" {...register('quantity', { valueAsNumber: true })} error={!!errors.quantity} helperText={errors.quantity?.message} value={quantity} onChange={() => {}} />
+                <TextField type="number" fullWidth label="Quantity / الكمية" {...register('quantity', { valueAsNumber: true })} error={!!errors.quantity} helperText={errors.quantity?.message} value={quantity} onChange={() => { }} />
               </Grid>
               <Grid item xs={12} md={3}>
-                <TextField select fullWidth label="Price Source / طريقة التسعير" {...register('priceSource')} error={!!errors.priceSource} helperText={errors.priceSource?.message} value={priceSource} onChange={() => {}}>
+                <TextField select fullWidth label="Price Source / طريقة التسعير" {...register('priceSource')} error={!!errors.priceSource} helperText={errors.priceSource?.message} value={priceSource} onChange={() => { }}>
                   <MenuItem value="moving_average">Moving Average</MenuItem>
                   <MenuItem value="last_purchase">Last Purchase</MenuItem>
                   <MenuItem value="manual">Manual (requires unit cost; disabled here)</MenuItem>
                 </TextField>
               </Grid>
               <Grid item xs={12} md={3}>
-                <TextField select fullWidth label="Project / المشروع" {...register('projectId')} error={!!errors.projectId} helperText={errors.projectId?.message} value={projectId || ''} onChange={() => {}}>
+                <TextField select fullWidth label="Project / المشروع" {...register('projectId')} error={!!errors.projectId} helperText={errors.projectId?.message} value={projectId || ''} onChange={() => { }}>
                   <MenuItem value="">—</MenuItem>
                   {projects.map(p => (<MenuItem key={p.id} value={p.id}>{p.code} - {p.name}</MenuItem>))}
                 </TextField>
               </Grid>
               <Grid item xs={12} md={3}>
-                <TextField select fullWidth label="Cost Center / مركز التكلفة" {...register('costCenterId')} error={!!errors.costCenterId} helperText={errors.costCenterId?.message} value={costCenterId || ''} onChange={() => {}}>
+                <TextField select fullWidth label="Cost Center / مركز التكلفة" {...register('costCenterId')} error={!!errors.costCenterId} helperText={errors.costCenterId?.message} value={costCenterId || ''} onChange={() => { }}>
                   <MenuItem value="">—</MenuItem>
                   {costCenters.map(c => (<MenuItem key={c.id} value={c.id}>{c.code} - {c.name}</MenuItem>))}
                 </TextField>
               </Grid>
               <Grid item xs={12} md={3}>
-                <TextField select fullWidth label="Analysis Work Item / بند تحليلي" {...register('analysisItemId')} error={!!errors.analysisItemId} helperText={errors.analysisItemId?.message} value={analysisItemId || ''} onChange={() => {}}>
+                <TextField select fullWidth label="Analysis Work Item / بند تحليلي" {...register('analysisItemId')} error={!!errors.analysisItemId} helperText={errors.analysisItemId?.message} value={analysisItemId || ''} onChange={() => { }}>
                   <MenuItem value="">—</MenuItem>
                   {analysisItems.map(a => (<MenuItem key={a.id} value={a.id}>{a.code} - {a.name}</MenuItem>))}
                 </TextField>
               </Grid>
               <Grid item xs={12} md={3}>
-                <TextField select fullWidth label="Work Item / بند أعمال" {...register('workItemId')} error={!!errors.workItemId} helperText={errors.workItemId?.message} value={workItemId || ''} onChange={() => {}}>
+                <TextField select fullWidth label="Work Item / بند أعمال" {...register('workItemId')} error={!!errors.workItemId} helperText={errors.workItemId?.message} value={workItemId || ''} onChange={() => { }}>
                   <MenuItem value="">—</MenuItem>
                   {workItems.map(w => (<MenuItem key={w.id} value={w.id}>{w.code} - {w.name}</MenuItem>))}
                 </TextField>
               </Grid>
               <Grid item xs={12}>
-                <TextField fullWidth label="Notes / ملاحظات" {...register('notes')} error={!!errors.notes} helperText={errors.notes?.message} value={notes || ''} onChange={() => {}} />
+                <TextField fullWidth label="Notes / ملاحظات" {...register('notes')} error={!!errors.notes} helperText={errors.notes?.message} value={notes || ''} onChange={() => { }} />
               </Grid>
             </Grid>
             <Divider sx={{ my: 2 }} />
@@ -309,9 +306,9 @@ const IssueMaterialsPage: React.FC = () => {
               <Typography variant="subtitle1">Pending Lines / الأسطر المضافة</Typography>
               {lines.map((ln, idx) => (
                 <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '4px 0' }}>
-                  <span>{idx+1}.</span>
-                  <span>Mat: {materials.find(m=>m.id===ln.materialId)?.material_code}</span>
-                  <span>UOM: {uoms.find(u=>u.id===ln.uomId)?.code}</span>
+                  <span>{idx + 1}.</span>
+                  <span>Mat: {materials.find(m => m.id === ln.materialId)?.material_code}</span>
+                  <span>UOM: {uoms.find(u => u.id === ln.uomId)?.code}</span>
                   <span>Qty: {ln.quantity}</span>
                   <Button size="small" onClick={() => removeLine(idx)}>Remove</Button>
                 </div>

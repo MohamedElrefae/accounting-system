@@ -11,6 +11,7 @@ import DataLoadingErrorBoundary from './components/Common/DataLoadingErrorBounda
 import DataLoadingState from './components/Common/DataLoadingState';
 import { Box } from '@mui/material';
 import PerformanceOptimizer from './components/Common/PerformanceOptimizer';
+import DashboardShellSkeleton from './components/layout/DashboardShellSkeleton';
 // Debug components removed for production
 
 // Lazy load unified routes
@@ -66,11 +67,7 @@ const OptimizedApp: React.FC = () => {
           <Route path="/*" element={
             <OptimizedProtectedRoute>
               <DataLoadingErrorBoundary>
-                <Suspense fallback={
-                  <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-                    <DataLoadingState message="جاري تحميل التطبيق..." showProgress={false} />
-                  </Box>
-                }>
+                <Suspense fallback={<DashboardShellSkeleton />}>
                   <DashboardLayout>
                     <OptimizedSuspense>
                       <UnifiedRoutes />

@@ -1,0 +1,25 @@
+EXCEL DATA MIGRATION - WINDOWS EXECUTION
+
+COPY AND PASTE THIS COMMAND INTO POWERSHELL:
+
+.\RUN_MIGRATION.ps1
+
+OR use this single-line command:
+
+python scripts/prepare_migration_data.py --org-id d5789445-11e3-4ad6-9297-b56521675114 --excel-file transactions/KIRO_v4_Transactions.xlsx --output-dir data/prepared
+
+AFTER RUNNING:
+
+1. Review mapping report:
+   Get-Content data\prepared\mapping_report.json
+
+2. Check CSV files:
+   Get-Content data\prepared\transactions_prepared.csv | Select-Object -First 5
+
+3. Upload via Supabase Dashboard:
+   https://app.supabase.com
+
+EXPECTED RESULTS:
+- 2,164 transactions
+- 14,224 transaction lines
+- All foreign keys resolved

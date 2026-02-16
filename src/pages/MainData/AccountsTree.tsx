@@ -1136,6 +1136,7 @@ const AccountsTreePage: React.FC = () => {
                         p_account_type: accountType,
                         p_level: parseInt(String(form.level)) || 1,
                         p_status: status,
+                        p_allow_transactions: !!form.allow_transactions, // Pass user choice explicitly
                       });
 
                       if (error) {
@@ -1147,16 +1148,7 @@ const AccountsTreePage: React.FC = () => {
                       }
 
                       const updated = data as any;
-
-                      // Immediately enforce user's allow_transactions choice with a direct update
-                      try {
-                        const { error: allowErr } = await supabase
-                          .from('accounts')
-                          .update({ allow_transactions: !!form.allow_transactions })
-                          .eq('id', draft.id)
-                          .eq('org_id', orgId);
-                        if (allowErr) console.warn('allow_transactions update warning:', allowErr);
-                      } catch { }
+                      // Redundant update removed - RPC now handles it atomically
 
                       // Update core fields in local state - FIXED: Use form data as primary source
                       setAccounts(prev => prev.map(a => (a.id === draft.id ? {
@@ -1206,19 +1198,12 @@ const AccountsTreePage: React.FC = () => {
                         p_account_type: accountType,
                         p_level: parseInt(String(form.level)) || 1,
                         p_status: status,
+                        p_allow_transactions: !!form.allow_transactions, // Pass user choice explicitly
                       });
                       if (error) throw error;
                       const inserted = data as any;
                       if (inserted) {
-                        // Enforce allow_transactions per user choice after insert
-                        try {
-                          const { error: allowErr } = await supabase
-                            .from('accounts')
-                            .update({ allow_transactions: !!form.allow_transactions })
-                            .eq('id', inserted.id)
-                            .eq('org_id', orgId);
-                          if (allowErr) console.warn('allow_transactions update warning (insert):', allowErr);
-                        } catch { }
+                        // Redundant enforce removed - RPC now handles it
                         setAccounts(prev => [...prev, inserted]);
                         // If creator has permission and requested standard, set it now
                         if (hasAccountsManage && (form.is_standard ?? false)) {

@@ -1,0 +1,92 @@
+{
+  "excel_columns": [
+    "الحساب",
+    "Unnamed: 1",
+    "Unnamed: 2",
+    "العقد",
+    "Unnamed: 4",
+    "Unnamed: 5",
+    "بنود الاعمال",
+    "Unnamed: 7",
+    "Unnamed: 8",
+    "اكواد مصروفات التكاليف",
+    "Unnamed: 10",
+    "اكواد البيان",
+    "Unnamed: 12",
+    "Unnamed: 13",
+    "اكواد مصروفات التكاليف.1",
+    "Unnamed: 15"
+  ],
+  "suggested_mappings": {
+    "الحساب": {
+      "supabase_table": "transaction_lines",
+      "supabase_column": "account_id",
+      "transformation": "Legacy code → New code → UUID lookup"
+    },
+    "Unnamed: 1": {
+      "supabase_table": "transaction_lines",
+      "supabase_column": "description",
+      "transformation": "Direct mapping"
+    },
+    "Unnamed: 2": {
+      "supabase_table": "transaction_lines",
+      "supabase_column": "description",
+      "transformation": "Direct mapping"
+    },
+    "العقد": {},
+    "Unnamed: 4": {
+      "supabase_table": "transaction_lines",
+      "supabase_column": "description",
+      "transformation": "Direct mapping"
+    },
+    "Unnamed: 5": {
+      "supabase_table": "transaction_lines",
+      "supabase_column": "description",
+      "transformation": "Direct mapping"
+    },
+    "بنود الاعمال": {},
+    "Unnamed: 7": {
+      "supabase_table": "transaction_lines",
+      "supabase_column": "description",
+      "transformation": "Direct mapping"
+    },
+    "Unnamed: 8": {
+      "supabase_table": "transaction_lines",
+      "supabase_column": "description",
+      "transformation": "Direct mapping"
+    },
+    "اكواد مصروفات التكاليف": {},
+    "Unnamed: 10": {
+      "supabase_table": "transaction_lines",
+      "supabase_column": "description",
+      "transformation": "Direct mapping"
+    },
+    "اكواد البيان": {
+      "supabase_table": [
+        "transactions",
+        "transaction_lines"
+      ],
+      "supabase_column": [
+        "description",
+        "reference_number"
+      ],
+      "transformation": "Use for both header and lines"
+    },
+    "Unnamed: 12": {
+      "supabase_table": "transaction_lines",
+      "supabase_column": "description",
+      "transformation": "Direct mapping"
+    },
+    "Unnamed: 13": {
+      "supabase_table": "transaction_lines",
+      "supabase_column": "description",
+      "transformation": "Direct mapping"
+    },
+    "اكواد مصروفات التكاليف.1": {},
+    "Unnamed: 15": {
+      "supabase_table": "transaction_lines",
+      "supabase_column": "description",
+      "transformation": "Direct mapping"
+    }
+  }
+}

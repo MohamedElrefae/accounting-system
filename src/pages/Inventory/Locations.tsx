@@ -6,7 +6,6 @@ import ColumnConfiguration from '@/components/Common/ColumnConfiguration'
 import type { ColumnConfig } from '@/components/Common/ColumnConfiguration'
 import useColumnPreferences from '@/hooks/useColumnPreferences'
 import { listInventoryLocations, type InventoryLocationRow, createInventoryLocation, updateInventoryLocation, deleteInventoryLocation } from '@/services/inventory/locations'
-import { getActiveProjectsByOrg, type Project } from '@/services/projects'
 import { getCostCentersList, type CostCenterRow } from '@/services/cost-centers'
 import { useToast } from '@/contexts/ToastContext'
 import { useArabicLanguage } from '@/services/ArabicLanguageService'
@@ -22,7 +21,7 @@ const LocationsPage: React.FC = () => {
   const orgId = scope?.currentOrg?.id || ''
   const [rows, setRows] = useState<InventoryLocationRow[]>([])
   const [loading, setLoading] = useState(false)
-  const [projects, setProjects] = useState<Project[]>([])
+  const projects = scope?.availableProjects || []
   const [costCenters, setCostCenters] = useState<CostCenterRow[]>([])
   const formRef = useRef<UnifiedCRUDFormHandle>(null)
   const [panelOpen, setPanelOpen] = useState(false)
@@ -102,13 +101,11 @@ const LocationsPage: React.FC = () => {
 
     setLoading(true)
     try {
-      const [locs, projs, ccs] = await Promise.all([
+      const [locs, ccs] = await Promise.all([
         listInventoryLocations(scope.currentOrg.id),
-        getActiveProjectsByOrg(scope.currentOrg.id).catch(() => [] as any),
         getCostCentersList(scope.currentOrg.id).catch(() => [] as any),
       ])
       setRows(locs)
-      setProjects(projs as any)
       setCostCenters(ccs as any)
     } catch (error) {
       console.error('Error loading locations:', error)
@@ -119,7 +116,7 @@ const LocationsPage: React.FC = () => {
   }, [showToast, isRTL, scope])
 
   useEffect(() => {
-    fetchData().catch(() => {})
+    fetchData().catch(() => { })
   }, [fetchData])
 
   const openCreate = () => {

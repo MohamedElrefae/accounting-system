@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation, useParams, useNavigate } from 'react-router-dom';
 import { useOptimizedAuth } from '../../hooks/useOptimizedAuth';
+import DashboardShellSkeleton from '../layout/DashboardShellSkeleton';
 
 interface OptimizedProtectedRouteProps {
   children: React.ReactNode;
@@ -71,7 +72,7 @@ const OptimizedProtectedRoute: React.FC<OptimizedProtectedRouteProps> = ({
 
   // 1. Loading State
   if (loading) {
-    return <MinimalLoader />;
+    return <DashboardShellSkeleton />;
   }
 
   // 2. Auth State

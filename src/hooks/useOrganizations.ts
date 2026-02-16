@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getOrganizations, clearOrganizationsCache } from '../services/organization';
+import { getOrganizations } from '../services/organization';
 import type { Organization } from '../types';
 
 // Query key for organizations
@@ -15,8 +15,8 @@ export function useOrganizations() {
   return useQuery<Organization[], Error>({
     queryKey: ORGANIZATIONS_QUERY_KEY,
     queryFn: getOrganizations,
-    staleTime: 10 * 60 * 1000, // 10 minutes - organizations rarely change
-    gcTime: 30 * 60 * 1000, // 30 minutes cache time
+    staleTime: 10 * 60 * 1000,
+    cacheTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     retry: 1,
@@ -31,7 +31,6 @@ export function useInvalidateOrganizations() {
   const queryClient = useQueryClient();
   
   return () => {
-    clearOrganizationsCache(); // Clear localStorage cache
     queryClient.invalidateQueries({ queryKey: ORGANIZATIONS_QUERY_KEY });
   };
 }

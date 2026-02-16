@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-02-13T19:28:55.714506",
+  "tests": {
+    "Basic Grouping": true,
+    "Balance Validation": true,
+    "Skip Unbalanced Strategy": true,
+    "Auto-Balance Strategy": false,
+    "Export Reports": true,
+    "Transaction ID Generation": true
+  },
+  "summary": {
+    "passed": 5,
+    "total": 6,
+    "success": false
+  }
+}

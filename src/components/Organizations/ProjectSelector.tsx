@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { TextField, MenuItem } from '@mui/material';
-import { getActiveProjectsByOrg, type Project } from '../../services/projects';
+import { type Project } from '../../services/projects';
 import { useScopeOptional } from '../../contexts/ScopeContext';
+import { useAuthScopeData } from '../../hooks/useAuthScopeData';
 
 interface Props {
   orgId?: string;
@@ -16,11 +17,17 @@ interface Props {
 
 export default function ProjectSelector({ orgId, value, onChange, label = 'Project', persist = true, allowAll = true, sx, size = 'small' }: Props) {
   const scope = useScopeOptional();
-  const [projects, setProjects] = useState<Project[]>([]);
+  const authScopeData = useAuthScopeData();
   const [projectId, setProjectId] = useState<string>('');
+
   const effectiveOrg = useMemo(() => {
     return orgId || scope?.currentOrg?.id || '';
   }, [orgId, scope?.currentOrg?.id]);
+
+  const projects = useMemo(() => {
+    if (!effectiveOrg) return [];
+    return authScopeData.projects.filter(p => p.org_id === effectiveOrg);
+  }, [authScopeData.projects, effectiveOrg]);
 
   const effectiveValue = useMemo(() => {
     if (value !== undefined) return value;
@@ -28,34 +35,26 @@ export default function ProjectSelector({ orgId, value, onChange, label = 'Proje
   }, [scope?.currentProject?.id, value]);
 
   useEffect(() => {
-    (async () => {
-      try {
-        if (!effectiveOrg) {
-          setProjects([]);
-          setProjectId('');
-          return;
-        }
-        const list = await getActiveProjectsByOrg(effectiveOrg);
-        setProjects(list);
+    if (!authScopeData.isReady) return;
 
-        const candidate = effectiveValue;
-        if (candidate && list.some(p => p.id === candidate)) {
-          setProjectId(candidate);
-        } else if (!allowAll && list.length > 0) {
-          const first = list[0].id as string;
-          setProjectId(first);
-          if (persist && scope) { void scope.setProject(first) }
-          onChange?.(first);
-        } else {
-          setProjectId('');
-          if (persist && scope) { void scope.setProject(null) }
-        }
-      } catch {
-        setProjects([]);
-        setProjectId('');
-      }
-    })();
-  }, [allowAll, effectiveOrg, effectiveValue, onChange, persist, scope]);
+    if (!effectiveOrg) {
+      setProjectId('');
+      return;
+    }
+
+    const candidate = effectiveValue;
+    if (candidate && projects.some(p => p.id === candidate)) {
+      setProjectId(candidate);
+    } else if (!allowAll && projects.length > 0) {
+      const first = projects[0].id as string;
+      setProjectId(first);
+      if (persist && scope) { void scope.setProject(first) }
+      onChange?.(first);
+    } else {
+      setProjectId('');
+      if (persist && scope) { void scope.setProject(null) }
+    }
+  }, [allowAll, effectiveOrg, effectiveValue, onChange, persist, scope, authScopeData.isReady, projects]);
 
   useEffect(() => {
     setProjectId(effectiveValue);
@@ -68,8 +67,8 @@ export default function ProjectSelector({ orgId, value, onChange, label = 'Proje
   }, [persist, onChange, scope]);
 
   const hasProjects = projects.length > 0;
-  const noProjectsMessage = effectiveOrg && !hasProjects 
-    ? 'لا توجد مشاريع مخصصة لك في هذه المؤسسة' 
+  const noProjectsMessage = effectiveOrg && !hasProjects
+    ? 'لا توجد مشاريع مخصصة لك في هذه المؤسسة'
     : undefined;
 
   return (

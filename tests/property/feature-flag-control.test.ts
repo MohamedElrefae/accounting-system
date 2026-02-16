@@ -373,20 +373,24 @@ describe('Property 22: Feature Flag Control', () => {
           
           const { flagId, rolloutPercentage, evaluationCount } = testData;
           
+          // Create a fresh flag manager for this property test iteration
+          const freshFlagManager = new FeatureFlagManager();
+          freshFlagManager.createOptimizationFlags();
+          
           // Enable flag with specific rollout
-          flagManager.enableFlag(flagId);
-          flagManager.setRolloutPercentage(flagId, rolloutPercentage);
+          freshFlagManager.enableFlag(flagId);
+          freshFlagManager.setRolloutPercentage(flagId, rolloutPercentage);
           
           // Perform evaluations with different users
           for (let i = 0; i < evaluationCount; i++) {
             const context: FeatureFlagEvaluationContext = {
               userId: `user-${i}`,
             };
-            flagManager.evaluateFlag(flagId, context);
+            freshFlagManager.evaluateFlag(flagId, context);
           }
           
           // Get statistics
-          const stats = flagManager.getEvaluationStats(flagId);
+          const stats = freshFlagManager.getEvaluationStats(flagId);
           
           // Verify counts
           expect(stats.totalEvaluations).toBe(evaluationCount);

@@ -34,14 +34,15 @@ const OrganizationManagement: React.FC = () => {
   });
 
   const { showToast } = useToast();
-  const { hasActionAccess } = useOptimizedAuth();
-  
+  const auth = useOptimizedAuth();
+  const { hasActionAccess, refreshProfile } = auth;
+
   // Check permissions - use existing permission codes
   // Organizations are managed by users with settings.manage or users.manage permissions
   const canCreate = hasActionAccess('settings.manage') || hasActionAccess('users.manage');
   const canUpdate = hasActionAccess('settings.manage') || hasActionAccess('users.manage');
   const canDelete = hasActionAccess('settings.manage') || hasActionAccess('users.manage');
-  
+
   // Allow viewing organizations for all authenticated users
   // Most users need to see organizations to select them for transactions
   const hasAnyManagementPermission = canCreate || canUpdate || canDelete;
@@ -68,7 +69,7 @@ const OrganizationManagement: React.FC = () => {
       showToast('ليس لديك صلاحية لإضافة مؤسسات', { severity: 'error' });
       return;
     }
-    
+
     setEditingOrg(null);
     setFormData({
       code: '',
@@ -88,7 +89,7 @@ const OrganizationManagement: React.FC = () => {
       showToast('ليس لديك صلاحية لتعديل المؤسسات', { severity: 'error' });
       return;
     }
-    
+
     setEditingOrg(org);
     setFormData({
       code: org.code,
@@ -115,10 +116,12 @@ const OrganizationManagement: React.FC = () => {
       if (editingOrg) {
         const updated = await updateOrganization(editingOrg.id, formData);
         setOrganizations(prev => prev.map(org => org.id === editingOrg.id ? updated : org));
+        await refreshProfile(); // Sync unified state
         showToast('تم تحديث المؤسسة بنجاح', { severity: 'success' });
       } else {
         const created = await createOrganization(formData);
         setOrganizations(prev => [...prev, created]);
+        await refreshProfile(); // Sync unified state
         showToast('تم إضافة المؤسسة بنجاح', { severity: 'success' });
       }
       setDialogOpen(false);
@@ -135,13 +138,14 @@ const OrganizationManagement: React.FC = () => {
       showToast('ليس لديك صلاحية لتفريغ بيانات المؤسسات', { severity: 'error' });
       return;
     }
-    
+
     const warning = `تنبيه مهم:\nسيتم حذف جميع البيانات المرتبطة بالمؤسسة "${org.code} — ${org.name}" (مشاريع، إعدادات، المخزون، التقارير ...)، مع الإبقاء على سجل المؤسسة.\nلا يمكن التراجع عن هذه العملية. هل تريد المتابعة؟`;
     if (!window.confirm(warning)) return;
     setSaving(true);
     try {
       await purgeOrganizationData(org.id);
       await loadOrganizations();
+      await refreshProfile(); // Sync unified state
       showToast('تم تفريغ بيانات المؤسسة بنجاح (مع بقاء المؤسسة)', { severity: 'success' });
     } catch (error: any) {
       console.error('Error purging organization data:', error);
@@ -157,13 +161,14 @@ const OrganizationManagement: React.FC = () => {
       showToast('ليس لديك صلاحية لحذف المؤسسات', { severity: 'error' });
       return;
     }
-    
+
     const warning = `تنبيه مهم:\nسيتم حذف المؤسسة "${org.code} — ${org.name}" وجميع البيانات المرتبطة بها نهائيًا (مشاريع، إعدادات، المخزون، التقارير ...).\nلا يمكن التراجع عن هذه العملية. هل تريد المتابعة؟`;
     if (!window.confirm(warning)) return;
 
     try {
       await deleteOrganizationCascade(org.id);
       setOrganizations(prev => prev.filter(o => o.id !== org.id));
+      await refreshProfile(); // Sync unified state
       showToast('تم حذف المؤسسة وكافة بياناتها المرتبطة', { severity: 'success' });
     } catch (error: any) {
       console.error('Error deleting organization:', error);
@@ -235,11 +240,11 @@ const OrganizationManagement: React.FC = () => {
                       {org.is_active ? 'نشطة' : 'غير نشطة'}
                     </div>
                   </div>
-                  
+
                   {org.description && (
                     <p className={styles.description}>{org.description}</p>
                   )}
-                  
+
                   <div className={styles.details}>
                     {org.address && (
                       <div className={styles.detailItem}>
@@ -302,7 +307,7 @@ const OrganizationManagement: React.FC = () => {
               <h2>{editingOrg ? 'تعديل المؤسسة' : 'إضافة مؤسسة جديدة'}</h2>
               <button className={styles.closeButton} onClick={() => setDialogOpen(false)}>×</button>
             </div>
-            
+
             <div className={styles.modalBody}>
               <form onSubmit={handleSubmit}>
                 <div className={styles.formGrid}>
@@ -399,19 +404,19 @@ const OrganizationManagement: React.FC = () => {
                 </div>
               </form>
             </div>
-            
+
             <div className={styles.modalActions}>
-              <button 
-                type="button" 
-                className={styles.cancelButton} 
-                onClick={() => setDialogOpen(false)} 
+              <button
+                type="button"
+                className={styles.cancelButton}
+                onClick={() => setDialogOpen(false)}
                 disabled={saving}
               >
                 إلغاء
               </button>
-              <button 
-                type="submit" 
-                className={styles.saveButton} 
+              <button
+                type="submit"
+                className={styles.saveButton}
                 disabled={saving}
                 onClick={handleSubmit}
               >

@@ -98,40 +98,49 @@ export class FeatureFlagManager {
   evaluateFlag(flagId: string, context?: FeatureFlagEvaluationContext): boolean {
     const flag = this.flags.get(flagId);
     if (!flag) {
+      // Record evaluation even for non-existent flags
+      this.evaluationHistory.push({
+        flagId,
+        context: context || {},
+        result: false,
+        timestamp: new Date(),
+      });
       return false;
     }
+
+    let result = true;
 
     // If flag is disabled, return false
     if (!flag.enabled) {
-      return false;
+      result = false;
     }
 
     // Check rollout percentage
-    if (flag.rolloutPercentage < 100) {
+    if (result && flag.rolloutPercentage < 100) {
       const hash = this.hashContext(context);
       const rolloutValue = hash % 100;
       if (rolloutValue >= flag.rolloutPercentage) {
-        return false;
+        result = false;
       }
     }
 
     // Check target audience
-    if (flag.targetAudience && flag.targetAudience.length > 0) {
+    if (result && flag.targetAudience && flag.targetAudience.length > 0) {
       const isInAudience = this.isInTargetAudience(context, flag.targetAudience);
       if (!isInAudience) {
-        return false;
+        result = false;
       }
     }
 
-    // Record evaluation
+    // Record evaluation (always record, not just successful ones)
     this.evaluationHistory.push({
       flagId,
       context: context || {},
-      result: true,
+      result,
       timestamp: new Date(),
     });
 
-    return true;
+    return result;
   }
 
   /**

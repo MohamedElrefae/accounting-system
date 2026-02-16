@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../utils/supabase';
 import type { Profile } from '../types/auth';
+import type { Organization, Project } from '../types';
 import featureFlags from '../utils/featureFlags';
 import { ApplicationPerformanceMonitor } from '../services/ApplicationPerformanceMonitor';
 import {
@@ -37,140 +38,16 @@ interface OptimizedAuthState {
   resolvedPermissions: ResolvedRole | null;
   
   // Scope-aware fields for org/project access validation
-  userOrganizations: string[];
-  userProjects: string[];
+  userOrganizations: Organization[];
+  userProjects: Project[];
   defaultOrgId: string | null;
   
   // NEW: Scoped roles (Phase 6)
   orgRoles: OrgRole[];
   projectRoles: ProjectRole[];
-}
 
-// Auth cache configuration with versioning and stampede protection
-const CACHE_VERSION = 'v7'; // Increment on schema changes - v7: Force permission refresh for Accountant role fixes
-const AUTH_CACHE_KEY = `auth_data_cache_${CACHE_VERSION}`;
-const AUTH_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes (extended from 5)
-
-interface AuthCacheEntry {
-  profile: Profile | null;
-  roles: RoleSlug[];
-  timestamp: number;
-  userId: string;
-  cacheVersion: string;
-  
-  // Scope data for org/project access
-  userOrganizations: string[];
-  userProjects: string[];
-  defaultOrgId: string | null;
-  
-  // NEW: Scoped roles (Phase 6)
-  orgRoles: OrgRole[];
-  projectRoles: ProjectRole[];
-}
-
-// Get cached auth data from localStorage with stampede protection
-function getCachedAuthData(userId: string): { 
-  profile: Profile | null; 
-  roles: RoleSlug[];
-  userOrganizations: string[];
-  userProjects: string[];
-  defaultOrgId: string | null;
-  orgRoles: OrgRole[];
-  projectRoles: ProjectRole[];
-} | null {
-  try {
-    const cached = localStorage.getItem(AUTH_CACHE_KEY);
-    if (!cached) return null;
-    
-    const entry: AuthCacheEntry = JSON.parse(cached);
-    
-    // Check if cache is for the same user and not expired
-    if (entry.userId !== userId) return null;
-    if (entry.cacheVersion !== CACHE_VERSION) {
-    if (import.meta.env.DEV) {
-      console.log('[Auth] Cache version mismatch, clearing old cache');
-    }
-      localStorage.removeItem(AUTH_CACHE_KEY);
-      return null;
-    }
-    
-    const expirationTime = entry.timestamp + AUTH_CACHE_DURATION;
-    const currentTime = Date.now();
-    
-    // Probabilistic early expiration (5% chance) to prevent stampede
-    if (currentTime > expirationTime || 
-        (currentTime > expirationTime * 0.9 && Math.random() < 0.05)) {
-      return null;
-    }
-    
-    if (import.meta.env.DEV) {
-      console.log('[Auth] Using cached auth data with stampede protection');
-    }
-    return { 
-      profile: entry.profile, 
-      roles: entry.roles,
-      userOrganizations: entry.userOrganizations || [],
-      userProjects: entry.userProjects || [],
-      defaultOrgId: entry.defaultOrgId || null,
-      orgRoles: entry.orgRoles || [],
-      projectRoles: entry.projectRoles || []
-    };
-  } catch (error) {
-    console.warn('[Auth] Cache read error:', error);
-    return null;
-  }
-}
-
-// Save auth data to localStorage cache
-function setCachedAuthData(
-  userId: string, 
-  profile: Profile | null, 
-  roles: RoleSlug[],
-  userOrganizations: string[],
-  userProjects: string[],
-  defaultOrgId: string | null,
-  orgRoles: OrgRole[] = [],
-  projectRoles: ProjectRole[] = []
-): void {
-  try {
-    const entry: AuthCacheEntry = {
-      profile,
-      roles,
-      timestamp: Date.now(),
-      userId,
-      cacheVersion: CACHE_VERSION,
-      userOrganizations,
-      userProjects,
-      defaultOrgId,
-      orgRoles,
-      projectRoles
-    };
-    localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(entry));
-    if (import.meta.env.DEV) {
-      console.log('[Auth] Saved auth data to cache');
-    }
-  } catch (error) {
-    console.warn('[Auth] Cache write error:', error);
-    // Ignore storage errors
-  }
-}
-
-// Clear auth cache (call on logout)
-export function clearAuthCache(): void {
-  try {
-    // Clear all cache versions
-    Object.keys(localStorage).forEach(key => {
-      if (key.startsWith('auth_data_cache_')) {
-        localStorage.removeItem(key);
-      }
-    });
-    if (import.meta.env.DEV) {
-      console.log('[Auth] Cleared all auth cache versions');
-    }
-  } catch (error) {
-    console.warn('[Auth] Cache clear error:', error);
-    // Ignore
-  }
+  // NEW: Unified data (Sprint 2)
+  landingPreference: 'welcome' | 'dashboard' | null;
 }
 
 // Singleton auth state for better performance
@@ -189,6 +66,9 @@ let authState: OptimizedAuthState = {
   // Initialize scoped roles (Phase 6)
   orgRoles: [],
   projectRoles: [],
+
+  // NEW: Unified data (Sprint 2)
+  landingPreference: 'welcome',
 };
 
 const authListeners: Set<(state: OptimizedAuthState) => void> = new Set();
@@ -198,101 +78,6 @@ let authInitialized = false;
 const routeCache = new Map<string, boolean>();
 const actionCache = new Map<string, boolean>();
 
-// Permission cache persistence (Phase 2)
-const PERMISSION_CACHE_VERSION = 'v1';
-const PERMISSION_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
-const PERMISSION_CACHE_KEY = (userId: string) => `permission_cache_${PERMISSION_CACHE_VERSION}_${userId}`;
-
-let permissionCacheCleanup: (() => void) | null = null;
-let permissionCacheUserId: string | null = null;
-
-const getRolesSignature = (roles: RoleSlug[]) => roles.join(',');
-
-const hydratePermissionCaches = (userId: string, rolesSig: string) => {
-  if (!featureFlags.isEnabled('PERMISSION_CACHING')) return;
-
-  try {
-    const raw = localStorage.getItem(PERMISSION_CACHE_KEY(userId));
-    if (!raw) return;
-
-    const parsed = JSON.parse(raw) as {
-      timestamp: number;
-      rolesSig: string;
-      routeCache: Record<string, boolean>;
-      actionCache: Record<string, boolean>;
-    };
-
-    if (!parsed || typeof parsed.timestamp !== 'number') return;
-    if (Date.now() - parsed.timestamp > PERMISSION_CACHE_DURATION) return;
-    if (parsed.rolesSig !== rolesSig) return;
-
-    Object.entries(parsed.routeCache || {}).forEach(([k, v]) => routeCache.set(k, v));
-    Object.entries(parsed.actionCache || {}).forEach(([k, v]) => actionCache.set(k, v));
-  } catch (e) {
-    console.warn('[Auth] Permission cache invalid:', e);
-  }
-};
-
-const persistPermissionCaches = (userId: string, rolesSig: string) => {
-  if (!featureFlags.isEnabled('PERMISSION_CACHING')) return;
-
-  try {
-    const routeObj: Record<string, boolean> = {};
-    const actionObj: Record<string, boolean> = {};
-
-    routeCache.forEach((v, k) => {
-      routeObj[k] = v;
-    });
-    actionCache.forEach((v, k) => {
-      actionObj[k] = v;
-    });
-
-    localStorage.setItem(
-      PERMISSION_CACHE_KEY(userId),
-      JSON.stringify({
-        timestamp: Date.now(),
-        rolesSig,
-        routeCache: routeObj,
-        actionCache: actionObj,
-      })
-    );
-  } catch (e) {
-    console.warn('[Auth] Permission cache write error:', e);
-  }
-};
-
-const setupPermissionCachePersistence = (userId: string, rolesSig: string) => {
-  if (!featureFlags.isEnabled('PERMISSION_CACHING')) return;
-
-  if (permissionCacheCleanup) {
-    permissionCacheCleanup();
-    permissionCacheCleanup = null;
-    permissionCacheUserId = null;
-  }
-
-  permissionCacheUserId = userId;
-
-  const save = () => {
-    if (!permissionCacheUserId) return;
-    persistPermissionCaches(permissionCacheUserId, rolesSig);
-  };
-
-  const intervalId = window.setInterval(save, 5 * 60 * 1000);
-  window.addEventListener('beforeunload', save);
-
-  permissionCacheCleanup = () => {
-    window.clearInterval(intervalId);
-    window.removeEventListener('beforeunload', save);
-  };
-};
-
-const teardownPermissionCachePersistence = () => {
-  if (permissionCacheCleanup) {
-    permissionCacheCleanup();
-    permissionCacheCleanup = null;
-    permissionCacheUserId = null;
-  }
-};
 
 const withTimeout = async <T>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> => {
   return Promise.race([
@@ -313,18 +98,34 @@ const initializeAuth = async () => {
   const initialSessionPromise = new Promise<any | null>((resolve) => {
     resolveInitialSession = resolve;
   });
+  
+  let currentLoadPromise: Promise<void> | null = null;
 
   const applyAuthenticatedUser = async (userId: string) => {
-    try {
-      await withTimeout(loadAuthData(userId), 8000, 'Auth data load timeout');
-    } catch (loadError) {
-      console.warn('Auth data load failed, using fallback:', loadError);
-      const fallbackRoles: RoleSlug[] = ['super_admin'];
-      authState.roles = fallbackRoles;
-      authState.resolvedPermissions = flattenPermissions(fallbackRoles);
-      clearCaches();
-      notifyListeners();
+    if (!userId) return;
+    
+    // Return existing promise if already loading for this session
+    if (currentLoadPromise) {
+      if (import.meta.env.DEV) console.log('[Auth] Attaching to existing load promise...');
+      return currentLoadPromise;
     }
+
+    currentLoadPromise = (async () => {
+      try {
+        await withTimeout(loadAuthData(userId), 30000, 'Auth data load timeout');
+      } catch (loadError) {
+        console.warn('Auth data load failed, using fallback:', loadError);
+        const fallbackRoles: RoleSlug[] = ['super_admin'];
+        authState.roles = fallbackRoles;
+        authState.resolvedPermissions = flattenPermissions(fallbackRoles);
+        clearCaches();
+        notifyListeners();
+      } finally {
+        currentLoadPromise = null;
+      }
+    })();
+
+    return currentLoadPromise;
   };
 
   // Set up auth listener first so we don't miss INITIAL_SESSION
@@ -340,7 +141,15 @@ const initializeAuth = async () => {
         authState.loading = true;
         notifyListeners();
 
-        await applyAuthenticatedUser(authSession.user.id);
+        // CRITICAL DEBOUNCE: Do NOT await this. 
+        // Awaiting here blocks the Supabase client's notification loop ("_notifyAllSubscribers"),
+        // which holds the client lock. If applyAuthenticatedUser tries to use the client (e.g. RPC)
+        // while the lock is held, it causes a DEADLOCK that lasts until the 30s timeout.
+        applyAuthenticatedUser(authSession.user.id).catch(err => {
+             console.error('[Auth] Background auth load failed:', err);
+             authState.loading = false;
+             notifyListeners();
+        });
 
         authState.loading = false;
         notifyListeners();
@@ -356,6 +165,7 @@ const initializeAuth = async () => {
           defaultOrgId: null,
           orgRoles: [],
           projectRoles: [],
+          landingPreference: 'welcome'
         };
         clearCaches();
         notifyListeners();
@@ -377,8 +187,13 @@ const initializeAuth = async () => {
     const session = await Promise.race([
       initialSessionPromise,
       withTimeout(
-        supabase.auth.getSession().then((r) => r.data.session ?? null),
-        8000,
+        (async () => {
+          const sStart = performance.now();
+          const sess = await supabase.auth.getSession().then((r) => r.data.session ?? null);
+          if (import.meta.env.DEV) console.log(`[Auth] getSession took ${(performance.now() - sStart).toFixed(0)}ms`);
+          return sess;
+        })(),
+        30000,
         'Session timeout'
       ),
     ]);
@@ -417,54 +232,14 @@ const loadAuthData = async (userId: string) => {
   }
 
   const startTime = performance.now();
-  const defaultRoles: RoleSlug[] = ['viewer']; // FAIL SAFE: Default to Viewer
+  performance.mark('auth_rpc_start');
+  const defaultRoles: RoleSlug[] = []; // No default role — keep loading:true until server resolves
   if (import.meta.env.DEV) {
     console.log('[Auth] loadAuthData start', { userId, defaultRoles });
   } 
   const defaultPermissions = flattenPermissions(defaultRoles);
-  
-  // Check localStorage cache first for instant load
-  const cachedData = getCachedAuthData(userId);
-  if (cachedData) {
-    authState.profile = cachedData.profile;
-    authState.roles = cachedData.roles;
-    authState.resolvedPermissions = flattenPermissions(cachedData.roles);
-    
-    // Restore scope data from cache
-    authState.userOrganizations = cachedData.userOrganizations;
-    authState.userProjects = cachedData.userProjects;
-    authState.defaultOrgId = cachedData.defaultOrgId;
-    
-    clearCaches();
+  const rpcStart = performance.now();
 
-    // Restore cached permission decisions (Phase 2)
-    const rolesSig = getRolesSignature(authState.roles);
-    hydratePermissionCaches(userId, rolesSig);
-    setupPermissionCachePersistence(userId, rolesSig);
-    
-    // CRITICAL: Mark loading as complete after cache restore
-    authState.loading = false;
-    notifyListeners();
-    
-    const cacheLoadTime = performance.now() - startTime;
-    if (import.meta.env.DEV) {
-      console.log(`[Auth] Loaded from cache in ${cacheLoadTime.toFixed(0)}ms`);
-    }
-    
-    // Log cache hit for monitoring
-    logAuthPerformance({
-      loadTime: cacheLoadTime,
-      cacheHit: true,
-      rpcSuccess: false,
-      profileSuccess: false,
-      networkType: 'unknown' // navigator.connection is not available in all browsers
-    });
-    
-    // Still fetch fresh data in background to update cache
-    fetchAndCacheAuthData(userId, defaultRoles).catch(console.warn);
-    return;
-  }
-  
   try {
     // Phase 2: parallel auth queries (RPC + profile) with timeouts
     if (featureFlags.isEnabled('PARALLEL_AUTH_QUERIES')) {
@@ -561,7 +336,9 @@ const loadAuthData = async (userId: string) => {
         }
 
         const shouldBeSuperAdmin = isProfileSuperAdmin || finalRoles.includes('super_admin');
-        const resolvedRoles: RoleSlug[] = shouldBeSuperAdmin ? ['super_admin'] : (finalRoles.length === 0 ? defaultRoles : finalRoles);
+        const resolvedRoles: RoleSlug[] = shouldBeSuperAdmin 
+          ? ['super_admin'] 
+          : (finalRoles.length > 0 ? finalRoles : defaultRoles);
 
         // Process scope data from RPC
         const organizations = authData.organizations || [];
@@ -574,15 +351,6 @@ const loadAuthData = async (userId: string) => {
         authState.userProjects = projects;
         authState.defaultOrgId = defaultOrg;
         
-        setCachedAuthData(
-          userId, 
-          authState.profile, 
-          resolvedRoles,
-          organizations,
-          projects,
-          defaultOrg
-        );
-
         const totalLoadTime = performance.now() - parallelStart;
         logAuthPerformance({
           loadTime: totalLoadTime,
@@ -593,9 +361,6 @@ const loadAuthData = async (userId: string) => {
         });
 
         clearCaches();
-        const rolesSig = getRolesSignature(authState.roles);
-        hydratePermissionCaches(userId, rolesSig);
-        setupPermissionCachePersistence(userId, rolesSig);
         notifyListeners();
         return true;
       };
@@ -615,7 +380,9 @@ const loadAuthData = async (userId: string) => {
           extractedRoles = [];
         }
 
-        const finalRoles: RoleSlug[] = isProfileSuperAdmin || extractedRoles.length === 0 ? defaultRoles : extractedRoles;
+        const finalRoles: RoleSlug[] = isProfileSuperAdmin 
+          ? ['super_admin'] 
+          : (extractedRoles.length > 0 ? extractedRoles : defaultRoles);
         authState.roles = finalRoles;
         authState.resolvedPermissions = flattenPermissions(finalRoles);
         
@@ -626,17 +393,6 @@ const loadAuthData = async (userId: string) => {
         authState.orgRoles = [];
         authState.projectRoles = [];
         
-        setCachedAuthData(
-          userId, 
-          authState.profile, 
-          finalRoles,
-          [],
-          [],
-          null,
-          [],
-          []
-        );
-
         const totalLoadTime = performance.now() - parallelStart;
         logAuthPerformance({
           loadTime: totalLoadTime,
@@ -647,9 +403,6 @@ const loadAuthData = async (userId: string) => {
         });
 
         clearCaches();
-        const rolesSig = getRolesSignature(authState.roles);
-        hydratePermissionCaches(userId, rolesSig);
-        setupPermissionCachePersistence(userId, rolesSig);
         notifyListeners();
         return true;
       };
@@ -660,8 +413,9 @@ const loadAuthData = async (userId: string) => {
 
       throw new Error('Parallel auth queries failed');
     }
-
-    // Try optimized single RPC call first
+    
+    // If we are here, PARALLEL_AUTH_QUERIES is off or we are in UNIFIED_AUTH_DATA mode
+    if (import.meta.env.DEV) console.log('[Auth] Executing Single RPC Handshake (Unified Mode)');
     const { data: authData, error: rpcError } = await supabase.rpc('get_user_auth_data', { p_user_id: userId });
     
     if (!rpcError && authData) {
@@ -747,8 +501,8 @@ const loadAuthData = async (userId: string) => {
       authState.userOrganizations = organizations;
       authState.userProjects = projects;
       authState.defaultOrgId = defaultOrg;
-      authState.orgRoles = orgRoles;
       authState.projectRoles = projectRoles;
+      authState.landingPreference = authData.landing_preference || 'welcome';
       
       if (import.meta.env.DEV) {
         console.log('[Auth] Loaded scope data:', {
@@ -784,17 +538,6 @@ const loadAuthData = async (userId: string) => {
       authState.resolvedPermissions = flattenPermissions(finalRoles);
       
       // Cache the auth data for next time (including scope data and scoped roles)
-      setCachedAuthData(
-        userId, 
-        authState.profile, 
-        finalRoles,
-        authState.userOrganizations,
-        authState.userProjects,
-        authState.defaultOrgId,
-        authState.orgRoles,
-        authState.projectRoles
-      );
-      
       const totalLoadTime = performance.now() - startTime;
       if (import.meta.env.DEV) {
         console.log(`[Auth] RPC load completed in ${totalLoadTime.toFixed(0)}ms`);
@@ -809,10 +552,12 @@ const loadAuthData = async (userId: string) => {
         networkType: 'unknown'
       });
       
+      const totalHandshakeTime = performance.now() - rpcStart;
+      if (import.meta.env.DEV) {
+        console.log(`[Auth] RPC handshake completed in ${totalHandshakeTime.toFixed(0)}ms`);
+      }
+      
       clearCaches();
-      const rolesSig = getRolesSignature(authState.roles);
-      hydratePermissionCaches(userId, rolesSig);
-      setupPermissionCachePersistence(userId, rolesSig);
       notifyListeners();
       return;
     }
@@ -847,7 +592,9 @@ const loadAuthData = async (userId: string) => {
       extractedRoles = [];
     }
 
-    const finalRoles = shouldBeSuperAdmin || extractedRoles.length === 0 ? defaultRoles : extractedRoles;
+    const finalRoles: RoleSlug[] = shouldBeSuperAdmin 
+      ? ['super_admin'] 
+      : (extractedRoles.length > 0 ? extractedRoles : defaultRoles);
 
     if (shouldBeSuperAdmin || extractedRoles.length === 0) {
       if (import.meta.env.DEV) {
@@ -870,17 +617,6 @@ const loadAuthData = async (userId: string) => {
     authState.projectRoles = [];
     
     // Cache the auth data
-    setCachedAuthData(
-      userId, 
-      authState.profile, 
-      finalRoles,
-      [],
-      [],
-      null,
-      [],
-      []
-    );
-    
     const fallbackLoadTime = performance.now() - startTime;
     if (import.meta.env.DEV) {
       console.log(`[Auth] Fallback queries took ${fallbackLoadTime.toFixed(0)}ms`);
@@ -896,9 +632,6 @@ const loadAuthData = async (userId: string) => {
     });
     
     clearCaches();
-    const rolesSig = getRolesSignature(authState.roles);
-    hydratePermissionCaches(userId, rolesSig);
-    setupPermissionCachePersistence(userId, rolesSig);
     notifyListeners();
 
   } catch (error) {
@@ -906,120 +639,13 @@ const loadAuthData = async (userId: string) => {
     if (import.meta.env.DEV) {
       console.log('🔧 Emergency fallback: Granting superadmin access');
     }
+    // Error fallback: keep roles empty (loading state will persist)
+    // This prevents flashing 'viewer' role when there's a temporary error
     authState.roles = defaultRoles;
     authState.resolvedPermissions = defaultPermissions;
+    authState.loading = false; // Signal that auth attempt completed (even in error)
     clearCaches();
-    const rolesSig = getRolesSignature(authState.roles);
-    hydratePermissionCaches(userId, rolesSig);
-    setupPermissionCachePersistence(userId, rolesSig);
     notifyListeners();
-  }
-};
-
-// Background fetch to update cache without blocking UI
-const fetchAndCacheAuthData = async (userId: string, defaultRoles: RoleSlug[]) => {
-  try {
-    const { data: authData, error } = await supabase.rpc('get_user_auth_data', { p_user_id: userId });
-    
-    if (!error && authData) {
-      const roleMapping: { [key: string]: RoleSlug } = {
-        'super_admin': 'super_admin',
-        'admin': 'admin',
-        'manager': 'manager',
-        'accountant': 'accountant',
-        'auditor': 'auditor',
-        'viewer': 'viewer',
-      };
-      
-      const roleNames = authData.roles || [];
-      const extractedRoles: RoleSlug[] = (roleNames as string[])
-        .map((name: string) => {
-            const cleanName = String(name || '').trim().toLowerCase().replace(/\s+/g, '_');
-            
-            // 1. Try Exact Match
-            let mapped = roleMapping[cleanName];
-            
-            // 2. Try Fuzzy Match for Arabic (Common issue with variations)
-            if (!mapped) {
-              if (cleanName.includes('محاسب')) mapped = 'accountant';
-              else if (cleanName.includes('مدير')) mapped = 'manager';
-              else if (cleanName.includes('مشرف') || cleanName.includes('مسؤول')) mapped = 'admin';
-              else if (cleanName.includes('مراقب') || cleanName.includes('مراجع')) mapped = 'auditor';
-              else if (cleanName.includes('قائد فريق')) mapped = 'team_leader';
-              else if (cleanName.includes('موارد')) mapped = 'hr';
-            }
-
-            if (!mapped) {
-               console.error(`[Auth] CRITICAL: Background Role mapping failed for: "${name}" (cleaned: "${cleanName}")`);
-            }
-            return mapped;
-        })
-        .filter((r): r is RoleSlug => r !== undefined);
-      
-      const profile = authData.profile as Profile | null;
-      const isProfileSuperAdmin = profile?.is_super_admin === true;
-      const finalRoles = isProfileSuperAdmin || extractedRoles.length === 0 ? defaultRoles : extractedRoles;
-      
-      // Extract scope data
-      const organizations = authData.organizations || [];
-      const projects = authData.projects || [];
-      const defaultOrg = authData.default_org || null;
-      
-      // Extract scoped roles (Phase 6)
-      const orgRoles = authData.org_roles || [];
-      const projectRoles = authData.project_roles || [];
-      
-      // GUARD: Only update cache if we extracted valid roles
-      // This prevents cache corruption with default 'viewer' role
-      if (extractedRoles.length > 0) {
-        // Update cache silently (including scope data and scoped roles)
-        setCachedAuthData(
-          userId, 
-          profile, 
-          finalRoles,
-          organizations,
-          projects,
-          defaultOrg,
-          orgRoles,
-          projectRoles
-        );
-        if (import.meta.env.DEV) {
-          console.log('[Auth] Background cache updated with roles:', finalRoles);
-        }
-      } else {
-        if (import.meta.env.DEV) {
-          console.warn('[Auth] Background RPC returned no roles. Attempting fallback fetch...');
-        }
-
-        // FALLBACK: Try to fetch legacy roles directly if RPC missed them
-        try {
-           const legacyRoles = await fetchUserRolesSafely(userId);
-           if (legacyRoles.length > 0) {
-              console.log('[Auth] Fallback fetch recovered roles:', legacyRoles);
-              
-              // Recalculate final roles with legacy fallbacks
-              const recoveredRoles = isProfileSuperAdmin ? defaultRoles : legacyRoles;
-
-              setCachedAuthData(
-                userId, 
-                profile, 
-                recoveredRoles,
-                organizations,
-                projects,
-                defaultOrg,
-                orgRoles,
-                projectRoles
-              );
-           } else {
-             console.warn('[Auth] Background cache NOT updated - no valid roles extracted from RPC or Fallback');
-           }
-        } catch (err) {
-           console.error('[Auth] Background fallback fetch failed', err);
-        }
-      }
-    }
-  } catch (e) {
-    console.warn('[Auth] Background cache update failed:', e);
   }
 };
 
@@ -1030,7 +656,13 @@ const logAuthPerformance = (data: {
   rpcSuccess: boolean;
   profileSuccess: boolean;
   networkType?: string;
+  roleFlicker?: boolean;
 }) => {
+  performance.mark('auth_complete');
+  try {
+    performance.measure('auth_load', 'auth_rpc_start', 'auth_complete');
+  } catch { /* marks may not exist in all paths */ }
+  
   ApplicationPerformanceMonitor.record('auth_init_duration_ms', data.loadTime);
 
   // Log to analytics if available
@@ -1042,6 +674,7 @@ const logAuthPerformance = (data: {
       rpcSuccess: data.rpcSuccess,
       profileSuccess: data.profileSuccess,
       networkType: data.networkType || 'unknown',
+      roleFlicker: data.roleFlicker || false,
       timestamp: Date.now(),
     });
   }
@@ -1051,6 +684,7 @@ const logAuthPerformance = (data: {
       rpc_success: data.rpcSuccess,
       profile_fallback_used: !data.rpcSuccess && data.profileSuccess,
       cache_hit_ratio: data.cacheHit ? 1 : 0,
+      role_flicker: data.roleFlicker || false,
       network_type: data.networkType || 'unknown',
       user_agent: navigator.userAgent,
       timestamp: Date.now(),
@@ -1082,7 +716,7 @@ const clearCaches = () => {
 
 // Optimized permission checking with caching
 const hasRouteAccess = (pathname: string): boolean => {
-  const cacheKey = `${pathname}|${getRolesSignature(authState.roles)}`;
+  const cacheKey = `${pathname}|${authState.roles.join(',')}`;
 
   // Check cache first
   if (routeCache.has(cacheKey)) {
@@ -1118,7 +752,7 @@ const hasRouteAccess = (pathname: string): boolean => {
 };
 
 const hasActionAccess = (action: PermissionCode): boolean => {
-  const cacheKey = `${String(action)}|${getRolesSignature(authState.roles)}`;
+  const cacheKey = `${String(action)}|${authState.roles.join(',')}`;
 
   // Check cache first
   if (actionCache.has(cacheKey)) {
@@ -1161,7 +795,7 @@ const belongsToOrg = (orgId: string): boolean => {
   if (isSuperAdmin) return true;
   
   // Check membership
-  return authState.userOrganizations.includes(orgId);
+  return authState.userOrganizations.some(o => o.id === orgId);
 };
 
 /**
@@ -1178,7 +812,7 @@ const canAccessProject = (projectId: string): boolean => {
   if (isSuperAdmin) return true;
   
   // Check access (includes both direct project memberships and org-level access)
-  return authState.userProjects.includes(projectId);
+  return authState.userProjects.some(p => p.id === projectId);
 };
 
 /**
@@ -1265,10 +899,9 @@ const signOut = async () => {
     defaultOrgId: null,
     orgRoles: [],
     projectRoles: [],
+    landingPreference: 'welcome'
   };
   clearCaches();
-  clearAuthCache(); // Clear localStorage auth cache
-  teardownPermissionCachePersistence();
   notifyListeners();
 };
 
@@ -1572,6 +1205,7 @@ export const useOptimizedAuth = () => {
     canPerformActionInProject: canPerformActionInProjectMemo,
     getUserRolesInOrg: getUserRolesInOrgMemo,
     getUserRolesInProject: getUserRolesInProjectMemo,
+    landingPreference: state.landingPreference,
   };
 };
 

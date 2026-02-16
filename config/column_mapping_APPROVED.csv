@@ -1,0 +1,18 @@
+Excel_Column,English_Name,Supabase_Table,Supabase_Column,Data_Type,Required,Mapping_Type,Notes
+entry no,entry_no,transactions,entry_number,string,Yes,direct,Entry/Transaction Number
+entry date,entry_date,transactions,entry_date,date,Yes,direct,Entry Date
+description,description,transactions,description,string,Yes,direct,Transaction Description (NOT NULL)
+account code,account_code,transaction_lines,account_id,uuid,Yes,lookup,Maps to accounts.id via accounts.code
+account name,account_name,transaction_lines,N/A,string,No,skip,Account Name (reference only)
+transaction classification code,transaction_classification_code,transaction_lines,classification_id,uuid,No,lookup,Maps to transaction_classification.id via code
+classification code,classification_code,transaction_lines,classification_id,uuid,No,lookup,Maps to transaction_classification.id via code
+classification name,classification_name,transaction_lines,N/A,string,No,skip,Classification Name (reference only)
+project code,project_code,transaction_lines,project_id,uuid,No,lookup,Maps to projects.id via projects.code
+project name,project_name,transaction_lines,N/A,string,No,skip,Project Name (reference only)
+work analysis code,work_analysis_code,transaction_lines,analysis_work_item_id,uuid,No,lookup,Maps to analysis_work_items.id via code
+work analysis name,work_analysis_name,transaction_lines,N/A,string,No,skip,Work Analysis Name (reference only)
+sub_tree code,sub_tree_code,transaction_lines,sub_tree_id,uuid,No,lookup,Maps to sub_tree.id via code
+sub_tree name,sub_tree_name,transaction_lines,N/A,string,No,skip,Sub Tree Name (reference only)
+debit,debit,transaction_lines,debit_amount,numeric,No,direct,Debit Amount (15 and 4 precision)
+credit,credit,transaction_lines,credit_amount,numeric,No,direct,Credit Amount (15 and 4 precision)
+notes,notes,transaction_lines,description,string,No,direct,Notes/Description for line item

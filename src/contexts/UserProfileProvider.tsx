@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../hooks/useAuth';
+import featureFlags from '../utils/featureFlags';
 import {
   UserProfileContext,
   type AppUserProfile,
@@ -42,6 +43,12 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const load = useCallback(async (userId: string) => {
     try {
+      if (featureFlags.isEnabled('UNIFIED_AUTH_DATA') && authProfile) {
+        if (import.meta.env.DEV) console.log('[UserProfile] UnifiedAuth: Skipping redundant profile fetch');
+        // Data is already synced via the authProfile effect
+        return;
+      }
+
       setLoading(true);
       setError(null);
 
@@ -89,7 +96,7 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
       try {
         const isSuper = roles.includes('super_admin') || (data as any)?.is_super_admin === true;
         localStorage.setItem('is_super_admin', isSuper ? 'true' : 'false');
-      } catch {}
+      } catch { }
     } catch (e: any) {
       console.error('[UserProfile] Failed to load profile:', e?.message ?? e);
       setError(e?.message || 'Failed to load user profile');
@@ -104,13 +111,17 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   useEffect(() => {
     if (user?.id) {
+      if (featureFlags.isEnabled('UNIFIED_AUTH_DATA') && authProfile) {
+        if (import.meta.env.DEV) console.log('[UserProfile] UnifiedAuth: Correctly skipping initial load');
+        return;
+      }
       load(user.id);
     } else {
       setProfile(null);
       setLoading(false);
       setError(null);
     }
-  }, [user?.id, load]);
+  }, [user?.id, load, authProfile]);
 
   const refreshProfile = useCallback(async () => {
     if (user?.id) await load(user.id);

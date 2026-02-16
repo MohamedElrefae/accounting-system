@@ -1,0 +1,54 @@
+INFO:analyzer.transaction_grouper:Initialized TransactionGrouper with tolerance=0.01
+INFO:analyzer.transaction_grouper:Grouping 8 transaction lines
+INFO:analyzer.transaction_grouper:Grouped 8 lines into 3 transactions
+INFO:analyzer.transaction_grouper:Balanced: 3, Unbalanced: 0
+INFO:analyzer.transaction_grouper:Balance validation: 3/3 balanced
+INFO:analyzer.transaction_grouper:No balance errors to export
+INFO:analyzer.transaction_grouper:Transactions exported to C:\5\accounting-systemr5\reports\task05_transactions_report.csv
+INFO:analyzer.transaction_grouper:Grouping 5 transaction lines
+INFO:analyzer.transaction_grouper:Grouped 5 lines into 2 transactions
+INFO:analyzer.transaction_grouper:Balanced: 1, Unbalanced: 1
+INFO:analyzer.transaction_grouper:Removing 1 unbalanced transactions
+INFO:analyzer.transaction_grouper:After filtering: 1 transactions, 2 lines
+
+============================================================
+TASK 5: TRANSACTION GROUPING CHECKPOINT VALIDATION
+============================================================
+
+[TEST 1] TransactionGrouper Initialization
+  [PASS] TransactionGrouper created successfully
+
+[TEST 2] Transaction Grouping
+  [PASS] Grouped 8 lines into 3 transactions
+  [PASS] All 3 transactions are balanced
+
+[TEST 3] Balance Validation
+  [PASS] Validated 3 transactions
+  [PASS] Balance rate: 100.0%
+
+[TEST 4] Transaction ID Generation
+  [PASS] Generated 3 unique transaction IDs
+  [PASS] Transaction IDs: ['1_20250115', '2_20250116', '3_20250117']
+
+[TEST 5] Export Functionality
+  [PASS] Balance report exported
+  [PASS] Transactions report exported
+
+[TEST 6] Unbalanced Transaction Handling
+  [PASS] Detected 1 unbalanced transaction
+  [PASS] Skip strategy: 1 balanced transaction remains
+
+============================================================
+CHECKPOINT RESULTS
+============================================================
+
+Overall Status: PASS
+Components Tested: 6
+  - TransactionGrouper: PASS
+  - TransactionGrouping: PASS
+  - BalanceValidation: PASS
+  - TransactionIDGeneration: PASS
+  - ExportFunctionality: PASS
+  - UnbalancedHandling: PASS
+
+Results saved to C:\5\accounting-systemr5\reports\task05_checkpoint_results.json

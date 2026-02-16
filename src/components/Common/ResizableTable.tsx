@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react'
 import './ResizableTable.css'
 import DateFormatter from './DateFormatter'
 import CurrencyFormatter from './CurrencyFormatter'
+import TableSkeleton from './TableSkeleton'
 
 // Column configuration interface - defined inline to avoid import issues
 export interface ColumnConfig {
@@ -63,11 +64,11 @@ function ResizableTable<T extends RowRecord>({
       // First sort by frozen status and pin priority
       const aFrozen = a.frozen ? 1 : 0
       const bFrozen = b.frozen ? 1 : 0
-      
+
       if (aFrozen !== bFrozen) {
         return bFrozen - aFrozen // Frozen columns first
       }
-      
+
       // If both are frozen, sort by pin priority (higher first)
       if (a.frozen && b.frozen) {
         const aPriority = a.pinPriority || 0
@@ -76,7 +77,7 @@ function ResizableTable<T extends RowRecord>({
           return bPriority - aPriority // Higher priority first
         }
       }
-      
+
       // Maintain original order for same priority/frozen status
       const aIndex = columns.indexOf(a)
       const bIndex = columns.indexOf(b)
@@ -160,7 +161,7 @@ function ResizableTable<T extends RowRecord>({
 
   const formatCellValue = (value: unknown, column: ColumnConfig) => {
     if (value === null || value === undefined) return '—'
-    
+
     switch (column.type) {
       case 'currency':
         // Use CurrencyFormatter only for numeric values
@@ -180,24 +181,19 @@ function ResizableTable<T extends RowRecord>({
   const getCellContent = (row: T, column: ColumnConfig, rowIndex: number) => {
     const rec = row as RowRecord
     const value = rec[column.key]
-    
+
     if (renderCell) {
       const customContent = renderCell(value, column, row, rowIndex)
       if (customContent !== undefined) {
         return customContent
       }
     }
-    
+
     return formatCellValue(value, column)
   }
 
   if (isLoading) {
-    return (
-      <div className="resizable-table-loading">
-        <div className="loading-spinner" />
-        <span>جاري التحميل...</span>
-      </div>
-    )
+    return <TableSkeleton columns={visibleColumns.length || 5} rows={10} />
   }
 
   return (
@@ -209,7 +205,7 @@ function ResizableTable<T extends RowRecord>({
               <th
                 key={column.key}
                 className={`resizable-th ${column.type || 'text'}-cell ${frozenByFlag[idx] ? 'frozen' : ''} ${isRTL ? 'rtl' : 'ltr'}`}
-                style={{ 
+                style={{
                   width: `${column.width}px`,
                   minWidth: `${(column.minWidth ?? 20)}px`,
                   ...(typeof column.maxWidth === 'number' ? { maxWidth: `${column.maxWidth}px` } : { maxWidth: 'none' as any }),
@@ -221,9 +217,8 @@ function ResizableTable<T extends RowRecord>({
                   <span className="th-label">{column.label}</span>
                   {column.resizable !== false && (
                     <div
-                      className={`column-resizer ${
-                        isResizing === column.key ? 'resizing' : ''
-                      }`}
+                      className={`column-resizer ${isResizing === column.key ? 'resizing' : ''
+                        }`}
                       onMouseDown={(e) => handleMouseDown(e, column.key, column.width)}
                     />
                   )}
@@ -255,7 +250,7 @@ function ResizableTable<T extends RowRecord>({
                     <td
                       key={column.key}
                       className={`resizable-td ${column.type || 'text'}-cell ${frozenByFlag[cidx] ? 'frozen' : ''} ${isRTL ? 'rtl' : 'ltr'}`}
-                      style={{ 
+                      style={{
                         width: `${column.width}px`,
                         minWidth: `${(column.minWidth ?? 20)}px`,
                         ...(typeof column.maxWidth === 'number' ? { maxWidth: `${column.maxWidth}px` } : { maxWidth: 'none' as any }),
@@ -274,7 +269,7 @@ function ResizableTable<T extends RowRecord>({
           )}
         </tbody>
       </table>
-      
+
       {/* Resize overlay */}
       {isResizing && <div className="resize-overlay" />}
     </div>

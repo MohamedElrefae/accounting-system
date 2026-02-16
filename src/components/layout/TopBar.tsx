@@ -12,6 +12,7 @@ import Box from '@mui/material/Box';
 import Tooltip from '@mui/material/Tooltip';
 import Divider from '@mui/material/Divider';
 import Button from '@mui/material/Button';
+import Skeleton from '@mui/material/Skeleton';
 import { alpha, styled } from '@mui/material/styles';
 import {
   MenuIcon,
@@ -265,6 +266,13 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
                   <Typography component="span" sx={{ fontWeight: 600, color: 'text.primary' }}>
                     {' '}({getUserRole()})
                   </Typography>
+                )}
+                {!getUserRole() && !profile && (
+                  <Skeleton
+                    width={60}
+                    height={18}
+                    sx={{ display: 'inline-block', ml: 0.5, verticalAlign: 'middle' }}
+                  />
                 )}
               </Typography>
             </Box>

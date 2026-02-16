@@ -1,0 +1,55 @@
+{
+  "timestamp": "2026-02-13T13:44:21.137021",
+  "supabase_url": "https://gridbhusfotahmgulgdd.supabase.co",
+  "tables": {
+    "accounts": {
+      "table_name": "accounts",
+      "columns": [],
+      "primary_keys": [],
+      "foreign_keys": [],
+      "indexes": []
+    },
+    "transactions": {
+      "table_name": "transactions",
+      "columns": [],
+      "primary_keys": [],
+      "foreign_keys": [],
+      "indexes": []
+    },
+    "transaction_lines": {
+      "table_name": "transaction_lines",
+      "columns": [],
+      "primary_keys": [],
+      "foreign_keys": [],
+      "indexes": []
+    },
+    "projects": {
+      "table_name": "projects",
+      "columns": [],
+      "primary_keys": [],
+      "foreign_keys": [],
+      "indexes": []
+    },
+    "classifications": {
+      "table_name": "classifications",
+      "columns": [],
+      "primary_keys": [],
+      "foreign_keys": [],
+      "indexes": []
+    },
+    "work_analysis": {
+      "table_name": "work_analysis",
+      "columns": [],
+      "primary_keys": [],
+      "foreign_keys": [],
+      "indexes": []
+    },
+    "sub_tree": {
+      "table_name": "sub_tree",
+      "columns": [],
+      "primary_keys": [],
+      "foreign_keys": [],
+      "indexes": []
+    }
+  }
+}

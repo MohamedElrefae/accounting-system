@@ -6,13 +6,14 @@
  */
 
 import React, { useCallback } from 'react';
-import { 
-  FormControl, 
-  InputLabel, 
-  Select, 
-  MenuItem, 
-  CircularProgress, 
-  Box
+import {
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  CircularProgress,
+  Box,
+  Skeleton
 } from '@mui/material';
 import { useScope } from '../../contexts/ScopeContext';
 import useAppStore from '../../store/useAppStore';
@@ -25,17 +26,17 @@ interface Props {
   variant?: 'outlined' | 'filled' | 'standard';
 }
 
-export const ScopedOrgSelector: React.FC<Props> = ({ 
-  size = 'small', 
+export const ScopedOrgSelector: React.FC<Props> = ({
+  size = 'small',
   label,
   sx,
   showLoading = true,
   variant = 'outlined'
 }) => {
   const { language } = useAppStore();
-  const { 
-    currentOrg, 
-    availableOrgs, 
+  const {
+    currentOrg,
+    availableOrgs,
     setOrganization,
     isLoadingOrgs,
     error
@@ -87,9 +88,8 @@ export const ScopedOrgSelector: React.FC<Props> = ({
         renderValue={(selected) => {
           if (isLoadingOrgs && !selected) {
             return (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <CircularProgress size={14} />
-                <span style={{ color: '#999' }}>{loadingText}</span>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                <Skeleton variant="text" width="80%" height={24} />
               </Box>
             );
           }

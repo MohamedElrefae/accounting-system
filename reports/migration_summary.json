@@ -1,0 +1,23 @@
+{
+  "success": true,
+  "dry_run": true,
+  "start_time": "2026-02-14T18:20:28.288805",
+  "end_time": "2026-02-14T18:20:28.682067",
+  "total_execution_time": 0.393262,
+  "transactions": {
+    "attempted": 14224,
+    "succeeded": 14224,
+    "failed": 0
+  },
+  "lines": {
+    "attempted": 14224,
+    "succeeded": 14224,
+    "failed": 0
+  },
+  "batch_count": {
+    "transaction_batches": 143,
+    "line_batches": 143
+  },
+  "errors": [],
+  "warnings": []
+}

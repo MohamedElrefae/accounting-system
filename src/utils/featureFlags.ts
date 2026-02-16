@@ -18,6 +18,9 @@ interface FeatureFlagConfig {
   PERMISSION_CACHING: boolean;
   SMART_ROUTE_PRELOADING: boolean;
   
+  // Phase 3: Auth Optimization (Flag-controlled)
+  UNIFIED_AUTH_DATA: boolean;
+  
   // Debug flags
   PERFORMANCE_LOGGING: boolean;
   DEBUG_CACHE: boolean;
@@ -30,10 +33,13 @@ const DEFAULT_FLAGS: FeatureFlagConfig = {
   NETWORK_AWARE_PRELOADING: true,
   ENHANCED_LOADING_INDICATORS: true,
   
-  // Phase 2: Core Optimizations - disabled by default for safe rollout
-  PARALLEL_AUTH_QUERIES: false,
-  PERMISSION_CACHING: false,
-  SMART_ROUTE_PRELOADING: false,
+  // Phase 2: Core Optimizations - enabled by default for stability
+  PARALLEL_AUTH_QUERIES: true,
+  PERMISSION_CACHING: true,
+  SMART_ROUTE_PRELOADING: true,
+  
+  // Phase 3: Auth Optimization - enabled by default for unified handshake
+  UNIFIED_AUTH_DATA: true,
   
   // Debug flags - disabled in production
   PERFORMANCE_LOGGING: import.meta.env.DEV,
@@ -41,7 +47,7 @@ const DEFAULT_FLAGS: FeatureFlagConfig = {
 };
 
 // Feature flag storage key
-const FEATURE_FLAG_STORAGE_KEY = 'accounting_app_feature_flags';
+const FEATURE_FLAG_STORAGE_KEY = 'accounting_app_feature_flags_v2'; // Bumped version to force reset
 
 /**
  * Feature Flags Manager
@@ -200,10 +206,16 @@ export class FeatureFlags {
       'ENHANCED_LOADING_INDICATORS',
       'PARALLEL_AUTH_QUERIES',
       'PERMISSION_CACHING',
-      'SMART_ROUTE_PRELOADING'
+      'SMART_ROUTE_PRELOADING',
+      // Phase 3 flags — treat missing as false (backward compat with older stored configs)
     ];
     
-    return requiredFlags.every(flag => typeof config[flag] === 'boolean');
+    // Core flags must exist. Phase 3+ flags are optional (default to false if missing)
+    const coreValid = requiredFlags.every(flag => typeof config[flag] === 'boolean');
+    if (coreValid && config.UNIFIED_AUTH_DATA === undefined) {
+      config.UNIFIED_AUTH_DATA = false;
+    }
+    return coreValid;
   }
   
   /**
@@ -234,6 +246,11 @@ export class FeatureFlags {
     
     if (params.has('smart_preload')) {
       this.setFlag('SMART_ROUTE_PRELOADING', params.get('smart_preload') === 'true');
+    }
+    
+    // Phase 3 flag override
+    if (params.has('unified_auth')) {
+      this.setFlag('UNIFIED_AUTH_DATA', params.get('unified_auth') === 'true');
     }
     
     // Debug flags

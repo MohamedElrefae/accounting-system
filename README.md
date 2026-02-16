@@ -1,121 +1,143 @@
-# Accounting System – Fiscal Management Enhancements (Summary)
+# Excel Data Migration to Supabase
 
-This repository contains the enterprise fiscal year management implementation using React + Supabase.
+This project implements a data migration system to transfer accounting data from an Excel file to a Supabase production database.
 
-Highlights:
-- Fiscal schema and functions (Phase 1)
-- Opening balance import + validation UI (Phase 2)
-- Period management with checklists, closing, and reconciliation (Phase 3)
-- Construction dashboards and services (Phase 4)
-- Test scaffolding (Phase 5)
+## Overview
 
-Run locally:
-- Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.
-- `npm run dev`
+This migration tool:
+- Analyzes Excel file structure and content
+- Compares Excel and Supabase schemas
+- Maps legacy account codes to new Supabase codes
+- Validates data quality before migration
+- Safely migrates transactions and transaction lines
+- Verifies migration success
 
-Notes:
-- SQL migrations mirrored under `supabase/migrations`.
-- Construction dashboards read from minimal schema tables added in Phase 4.
-- IMPORTANT: Organization memberships are roleless (binary). See `docs/ROLELESS_ORG_MEMBERSHIPS.md`.
-- Opening Balance Import service API note: subscribeToImport now requires a single params object. See docs/OPENING_BALANCE_IMPORT_PLAN.md (API consistency update).
-- Inventory Implementation Plan: see `docs/inventory-implementation-plan.md`.
-- Inventory Smoke Playbook: see `docs/inventory-smoke-playbook.md`.
+## Phase 0: Pre-Implementation Discovery (COMPLETED)
 
-Example: subscribeToImport usage (params-only)
+All Phase 0 tasks have been completed:
+- ✅ Supabase Schema Inspection (Task 0.1)
+- ✅ Excel Structure Validation (Task 0.2)
+- ✅ Column Mapping Matrix Creation (Task 0.3)
+- ✅ Account Code Verification (Task 0.4)
+- ✅ Transaction Balance Audit (Task 0.5)
+- ✅ Data Profiling Report (Task 0.6)
+- ✅ Migration Feasibility Report (Task 0.7)
 
-```ts path=null start=null
-import { OpeningBalanceImportService } from '@/services/OpeningBalanceImportService'
+Phase 0 reports are available in the `docs/` directory:
+- `docs/supabase_schema.json` - Supabase database schema (JSON)
+- `docs/supabase_schema.md` - Supabase schema documentation
+- `docs/feasibility_report.json` - Feasibility report (JSON)
+- `docs/feasibility_report.md` - Feasibility report (Markdown)
 
-const sub = OpeningBalanceImportService.subscribeToImport({
-  importId: 'your-import-id',
-  onTick: (status) => {
-    // status: { importId, status: 'pending'|'processing'|'completed'|'failed'|'partially_completed', ... }
-    console.log('Import status updated:', status)
-  },
-})
+Additional Phase 0 configuration files are in `config/`:
+- `config/column_mapping_APPROVED.csv` - Approved column mappings
+- `config/column_mapping.csv` - Original column mappings
+- `config/column_mapping.md` - Column mapping documentation
 
-// Later, when you want to stop listening
-sub.unsubscribe()
+## Project Structure
+
+```
+.
+├── src/                    # Source code
+│   ├── migrations/        # Migration scripts
+│   ├── analyzer/          # Schema and structure analyzers
+│   ├── validator/         # Data validation logic
+│   ├── executor/          # Migration executor
+│   └── utils/             # Utility functions
+│       └── logger.py      # Logging configuration (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+├── tests/                 # Test files
+│   ├── unit/             # Unit tests
+│   ├── integration/      # Integration tests
+│   └── property/         # Property-based tests
+├── config/                # Configuration files (Phase 0 outputs)
+├── docs/                  # Documentation (Phase 0 reports)
+├── reports/               # Generated reports (Phase 0 outputs)
+├── logs/                  # Log files (created during execution)
+├── scripts/               # Phase 0 analysis scripts
+├── requirements.txt       # Python dependencies (supabase-py, openpyxl, pandas, etc.)
+├── .env.example          # Environment variable template (SUPABASE_URL, SUPABASE_KEY)
+└── README.md             # This file
 ```
 
-Testing:
-- Placeholder tests are in `src/services/__tests__` and `src/components/__tests__`.
-- Add a test runner like Vitest or Jest with jsdom to execute component tests.
-- Suggested dev dependencies: vitest, @vitest/ui, @testing-library/react, @testing-library/jest-dom, jsdom.
-- Example scripts: "test": "vitest", "test:ui": "vitest --ui".
+## Setup
 
-# React + TypeScript + Vite
+### 1. Install Dependencies
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pip install -r requirements.txt
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 2. Configure Environment
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Copy `.env.example` to `.env` and fill in your values:
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cp .env.example .env
 ```
 
-[permanent preview seed] 2025-09-18T19:37:03.8494776+03:00
+Edit `.env` with your Supabase credentials and Excel file path.
 
-[verify develop preview] 2025-09-18T20:05:10.2817490+03:00
+### 3. Run Analysis
 
-[auto-update test] 2025-09-18T20:34:40.8315899+03:00
+```bash
+# Analyze Supabase schema
+python -m src.analyzer.supabase_schema
+
+# Analyze Excel structure
+python -m src.analyzer.excel_structure
+
+# Generate comparison report
+python -m src.analyzer.comparison
+```
+
+### 4. Execute Migration
+
+```bash
+# Dry run (no database writes)
+python -m src.executor.migration --mode dry-run
+
+# Execute migration
+python -m src.executor.migration --mode execute
+```
+
+## Logging
+
+The system uses multiple log levels:
+- **DEBUG**: Detailed debugging information
+- **INFO**: General information about migration progress
+- **WARNING**: Non-critical issues
+- **ERROR**: Errors that don't stop the migration
+- **CRITICAL**: Critical errors that stop the migration
+
+Log files are stored in the `logs/` directory with timestamps.
+
+## Requirements
+
+See `requirements.md` for detailed requirements documentation.
+
+## Design
+
+See `design.md` for technical design documentation.
+
+## Tasks
+
+See `tasks.md` for the implementation task list.
+
+## Risk Mitigation Checklist
+
+Before executing migration:
+- [ ] Phase 0 completed and approved
+- [ ] All 21 account codes mapped (100%)
+- [ ] Unbalanced transactions strategy decided
+- [ ] Column mappings approved by user
+- [ ] Backup created and verified
+- [ ] Dry-run executed successfully
+- [ ] Dry-run results reviewed and approved
+- [ ] All validation tests passing
+- [ ] Migration plan reviewed by user
+- [ ] Rollback procedure tested and ready
+- [ ] User has provided final go-ahead
+
+## Support
+
+For issues or questions, refer to the documentation in the `docs/` directory.

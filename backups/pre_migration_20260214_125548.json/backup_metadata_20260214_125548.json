@@ -1,0 +1,8 @@
+{
+  "timestamp": "20260214_125548",
+  "backup_time": "2026-02-14T12:55:50.003626",
+  "transactions_file": "backups\\pre_migration_20260214_125548.json\\transactions_backup_20260214_125548.json",
+  "transaction_lines_file": "backups\\pre_migration_20260214_125548.json\\transaction_lines_backup_20260214_125548.json",
+  "transactions_count": 0,
+  "transaction_lines_count": 0
+}

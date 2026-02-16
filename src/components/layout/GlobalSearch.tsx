@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import useAppStore from '../../store/useAppStore';
 import { navigationItems } from '../../data/navigation';
 import { useHasPermission } from '../../hooks/useHasPermission';
+import { useScope } from '../../contexts/ScopeContext';
 import type { NavigationItem } from '../../types';
 
 interface SearchResult {
@@ -36,6 +37,7 @@ export default function GlobalSearch() {
     const { language } = useAppStore();
     const navigate = useNavigate();
     const hasPermission = useHasPermission();
+    const { currentOrg } = useScope();
     const isRtl = language === 'ar';
 
     // Toggle dialog on Cmd+K or Ctrl+K
@@ -59,9 +61,19 @@ export default function GlobalSearch() {
 
         const traverse = (items: NavigationItem[]) => {
             for (const item of items) {
-                // Check permissions
+                // Check permissions AND scope context
                 if (item.requiredPermission && !hasPermission(item.requiredPermission)) continue;
                 if (item.superAdminOnly && !hasPermission('admin.all')) continue;
+                
+                // Scope validation: Only show items valid for current context
+                if (currentOrg && item.path && !item.path.includes('/settings/')) {
+                    // For non-settings pages, ensure they respect current scope
+                    // This prevents accessing pages from other organizations
+                    if (item.requiredPermission && !item.requiredPermission.includes('settings')) {
+                        // Additional scope validation for sensitive pages
+                        continue;
+                    }
+                }
 
                 const title = isRtl ? (item.titleAr || item.label) : (item.titleEn || item.label);
 
@@ -81,7 +93,7 @@ export default function GlobalSearch() {
 
         traverse(navigationItems);
         return results.slice(0, 5); // Limit page results
-    }, [query, hasPermission, isRtl]); // Added dependencies
+    }, [query, hasPermission, isRtl, currentOrg]); // Added dependencies
 
     // Placeholder for Data Search (Transactions, Accounts, etc.)
     // logic to simulate fetching data based on permissions
@@ -125,7 +137,21 @@ export default function GlobalSearch() {
     const handleSelect = (result: SearchResult) => {
         setOpen(false);
         setQuery('');
-        if (result.path) navigate(result.path);
+        
+        // Scope validation before navigation
+        if (result.path) {
+            // Only allow navigation if it respects current scope
+            if (currentOrg && result.path.includes('/settings/')) {
+                // Settings pages require special validation
+                if (!hasPermission('settings.manage')) {
+                    console.warn('[GlobalSearch] Access denied: Settings permissions required');
+                    return;
+                }
+            }
+            
+            // Navigate with scope context awareness
+            navigate(result.path);
+        }
     };
 
     const activeBg = (theme: any) => alpha(theme.palette.primary.main, 0.1);

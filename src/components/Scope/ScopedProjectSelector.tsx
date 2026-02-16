@@ -7,13 +7,14 @@
  */
 
 import React, { useCallback } from 'react';
-import { 
-  FormControl, 
-  InputLabel, 
-  Select, 
-  MenuItem, 
-  CircularProgress, 
-  Box
+import {
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  CircularProgress,
+  Box,
+  Skeleton
 } from '@mui/material';
 import { useScope } from '../../contexts/ScopeContext';
 import useAppStore from '../../store/useAppStore';
@@ -27,8 +28,8 @@ interface Props {
   variant?: 'outlined' | 'filled' | 'standard';
 }
 
-export const ScopedProjectSelector: React.FC<Props> = ({ 
-  size = 'small', 
+export const ScopedProjectSelector: React.FC<Props> = ({
+  size = 'small',
   label,
   allowAll = true,
   sx,
@@ -36,12 +37,12 @@ export const ScopedProjectSelector: React.FC<Props> = ({
   variant = 'outlined'
 }) => {
   const { language } = useAppStore();
-  const { 
+  const {
     currentOrg,
-    currentProject, 
-    availableProjects, 
+    currentProject,
+    availableProjects,
     setProject,
-    isLoadingProjects 
+    isLoadingProjects
   } = useScope();
 
   const defaultLabel = language === 'ar' ? 'المشروع' : 'Project';
@@ -65,11 +66,11 @@ export const ScopedProjectSelector: React.FC<Props> = ({
   const isDisabled = !currentOrg || isLoadingProjects || !hasProjects;
 
   return (
-    <FormControl 
-      size={size} 
-      sx={{ minWidth: 180, ...sx }} 
+    <FormControl
+      size={size}
+      sx={{ minWidth: 180, ...sx }}
       disabled={isDisabled}
-      error={currentOrg && !hasProjects && !isLoadingProjects}
+      error={!!(currentOrg && !hasProjects && !isLoadingProjects)}
     >
       <InputLabel>{label || defaultLabel}</InputLabel>
       <Select
@@ -92,9 +93,8 @@ export const ScopedProjectSelector: React.FC<Props> = ({
           // Loading projects
           if (isLoadingProjects) {
             return (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <CircularProgress size={14} />
-                <span style={{ color: '#999' }}>{loadingText}</span>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                <Skeleton variant="text" width="80%" height={24} />
               </Box>
             );
           }

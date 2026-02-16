@@ -16,6 +16,7 @@
 import React, { useMemo, useCallback, useState } from 'react'
 import { useTransactionsData } from '../../contexts/TransactionsDataContext'
 import SearchableSelect, { type SearchableSelectOption } from './SearchableSelect'
+import { Skeleton, Box } from '@mui/material'
 import useFilterOptions from '../../hooks/useFilterOptions'
 import type { FilterState } from '../../hooks/useFilterState'
 import { ScopeChips } from '../Scope/ScopeChips'
@@ -279,15 +280,24 @@ export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
 
   if (isLoading) {
     return (
-      <div className={`unified-filter-bar ${className}`} style={{ 
-        display: 'flex', 
-        alignItems: 'center',
-        gap: '0.5rem',
-        padding: '0.5rem',
-        ...style 
-      }}>
-        <span className="text-gray-500">جاري تحميل الفلاتر...</span>
-      </div>
+      <Box
+        className={`unified-filter-bar ${className}`}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: '8px',
+          overflow: 'hidden',
+          ...style
+        }}
+      >
+        <Skeleton variant="rectangular" width={100} height={36} sx={{ borderRadius: 1 }} />
+        <Skeleton variant="rectangular" width={150} height={36} sx={{ borderRadius: 1 }} />
+        <Skeleton variant="rectangular" width={120} height={36} sx={{ borderRadius: 1 }} />
+        <Skeleton variant="rectangular" width={120} height={36} sx={{ borderRadius: 1 }} />
+        <Skeleton variant="rectangular" width={180} height={36} sx={{ borderRadius: 1 }} />
+        <Skeleton variant="rectangular" width={180} height={36} sx={{ borderRadius: 1 }} />
+      </Box>
     )
   }
 
@@ -300,16 +310,16 @@ export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
   }
 
   return (
-    <div 
-      className={`unified-filter-bar ${className}`} 
-      style={{ 
-        display: 'flex', 
-        flexWrap: 'wrap', 
-        gap: '0.5rem', 
+    <div
+      className={`unified-filter-bar ${className}`}
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '0.5rem',
         padding: '0.5rem',
         alignItems: 'center',
         direction: 'rtl',
-        ...style 
+        ...style
       }}
     >
       {/* Current Scope Display - Shows org/project from TopBar */}
@@ -327,9 +337,9 @@ export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
 
       {/* Search with icon and clear button */}
       {cfg.showSearch && isFilterVisible('search') && (
-        <div style={{ 
-          position: 'relative', 
-          width: resolvedWidths.search, 
+        <div style={{
+          position: 'relative',
+          width: resolvedWidths.search,
           minWidth: 120,
         }}>
           <span style={{
@@ -348,7 +358,7 @@ export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
             onChange={handleSearchChange}
             placeholder="بحث..."
             className="filter-input"
-            style={{ 
+            style={{
               width: '100%',
               padding: '0.5rem 2rem 0.5rem 1.5rem',
               ...themedInputStyle,
@@ -380,9 +390,9 @@ export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
 
       {/* Date Range with labels */}
       {cfg.showDateRange && (isFilterVisible('dateFrom') || isFilterVisible('dateTo')) && (
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
           gap: '0.25rem',
           backgroundColor: 'var(--bg-muted, #f9fafb)',
           padding: '0.25rem 0.5rem',
@@ -398,7 +408,7 @@ export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
                 value={values.dateFrom || ''}
                 onChange={e => onChange('dateFrom', e.target.value)}
                 className="filter-input"
-                style={{ 
+                style={{
                   width: resolvedWidths.dateFrom,
                   padding: '0.35rem',
                   fontSize: '0.875rem',
@@ -415,7 +425,7 @@ export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
                 value={values.dateTo || ''}
                 onChange={e => onChange('dateTo', e.target.value)}
                 className="filter-input"
-                style={{ 
+                style={{
                   width: resolvedWidths.dateTo,
                   padding: '0.35rem',
                   fontSize: '0.875rem',
@@ -437,7 +447,7 @@ export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
               onChange={e => onChange('amountFrom', e.target.value)}
               placeholder="من مبلغ"
               className="filter-input"
-              style={{ 
+              style={{
                 width: resolvedWidths.amountFrom,
                 padding: '0.5rem',
                 ...themedInputStyle,
@@ -451,7 +461,7 @@ export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
               onChange={e => onChange('amountTo', e.target.value)}
               placeholder="إلى مبلغ"
               className="filter-input"
-              style={{ 
+              style={{
                 width: resolvedWidths.amountTo,
                 padding: '0.5rem',
                 ...themedInputStyle,
@@ -627,7 +637,7 @@ export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
             onClick={onReset}
             disabled={activeFilterCount === 0}
             className="ultimate-btn"
-            style={{ 
+            style={{
               position: 'relative',
               padding: '0.5rem 1rem',
               borderRadius: '0.375rem',

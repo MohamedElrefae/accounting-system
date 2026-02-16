@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "total_records": 14224,
+  "valid_records": 14224,
+  "invalid_records": 0,
+  "errors": [],
+  "warnings": [],
+  "summary": {
+    "error_count": 0,
+    "warning_count": 0,
+    "error_types": {},
+    "warning_types": {}
+  }
+}

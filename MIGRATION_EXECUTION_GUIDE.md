@@ -1,337 +1,131 @@
-# Transaction Migration - Execution Guide
+# Excel Data Migration Execution Guide
 
-**Status:** Ready for Execution  
-**Date:** January 29, 2025  
-**Phase:** Phase 1 - Data Migration
+## Overview
+The migration executor has been updated to accept and require the `--org-id` parameter. This is necessary because Row Level Security (RLS) policies in Supabase require all records to have an `org_id` field.
 
----
+## Organization ID
+**Organization ID**: `731a3a00-6fa6-4282-9bec-8b5a8678e127`
 
-## 📋 PRE-EXECUTION CHECKLIST
+## Migration Commands
 
-Before running any migration scripts, verify:
-
-- [ ] Database backup completed
-- [ ] Team notified of migration window
-- [ ] Low-traffic time scheduled
-- [ ] Rollback procedure reviewed
-- [ ] All migration files created:
-  - [ ] `migration_audit_queries.sql`
-  - [ ] `supabase/migrations/20250129_migration_infrastructure.sql`
-  - [ ] `supabase/migrations/20250129_migration_functions.sql`
-  - [ ] `migration_validation_queries.sql`
-
----
-
-## 🚀 EXECUTION STEPS
-
-### Step 1: Run Pre-Migration Audit
-
-**Purpose:** Understand current data state
-
+### 1. Validate Excel Data (No org_id required)
 ```bash
-# Execute audit queries
-psql -f migration_audit_queries.sql > audit_report.txt
-
-# Review the output
-cat audit_report.txt
+python migrate.py validate
 ```
+This validates the Excel file without connecting to Supabase.
 
-**Expected Output:**
-- Count of legacy vs multi-line transactions
-- Any data quality issues
-- Total transactions needing migration
-
-**Decision Point:** If data quality issues found, fix them before proceeding.
-
----
-
-### Step 2: Deploy Migration Infrastructure
-
-**Purpose:** Create tracking tables and backup
-
+### 2. Create Backup (No org_id required)
 ```bash
-# Deploy to Supabase
-supabase db push
-
-# Or execute directly
-psql -f supabase/migrations/20250129_migration_infrastructure.sql
+python migrate.py backup
 ```
+Creates a backup of current Supabase data before migration.
 
-**Verify:**
-```sql
--- Check tables created
-SELECT table_name FROM information_schema.tables 
-WHERE table_name IN ('migration_log', 'transactions_legacy_backup');
-
--- Check backup row count
-SELECT COUNT(*) FROM transactions_legacy_backup;
-
--- Check migration log initialized
-SELECT migration_status, COUNT(*) FROM migration_log GROUP BY migration_status;
-```
-
-**Expected:** 
-- `migration_log` table exists with 'pending' entries
-- `transactions_legacy_backup` table exists with backup data
-
----
-
-### Step 3: Deploy Migration Functions
-
-**Purpose:** Create migration logic
-
+### 3. Dry-Run Migration (Test without writing to database)
 ```bash
-# Deploy functions
-psql -f supabase/migrations/20250129_migration_functions.sql
+python migrate.py --mode dry-run --batch-size 100 --org-id 731a3a00-6fa6-4282-9bec-8b5a8678e127
 ```
+- Tests the migration process without writing to the database
+- Validates data transformation and mapping
+- Shows what would be inserted
 
-**Verify:**
-```sql
--- Check functions exist
-SELECT routine_name FROM information_schema.routines 
-WHERE routine_name IN (
-  'validate_migration_readiness',
-  'migrate_legacy_transaction',
-  'migrate_all_legacy_transactions'
-);
-```
-
----
-
-### Step 4: Run Validation
-
-**Purpose:** Verify system is ready
-
-```sql
--- Run validation
-SELECT * FROM validate_migration_readiness();
-```
-
-**Expected Output:**
-```
-check_name                          | status | details
-------------------------------------|--------|------------------
-Legacy fields exist                 | PASS   | X transactions...
-Accounts referential integrity      | PASS   | All account...
-No pre-existing lines conflict      | PASS   | 0 legacy...
-Backup table exists                 | PASS   | Backup table...
-Migration log ready                 | PASS   | X transactions...
-```
-
-**Decision Point:** All checks must be PASS before proceeding. If any FAIL, investigate and fix.
-
----
-
-### Step 5: Test Migration (Development/Staging Only)
-
-**Purpose:** Test on small dataset first
-
-```sql
--- Test on first 10 transactions
-DO $$
-DECLARE
-  v_tx_id UUID;
-  v_result RECORD;
-BEGIN
-  FOR v_tx_id IN (
-    SELECT id FROM transactions
-    WHERE debit_account_id IS NOT NULL 
-      AND credit_account_id IS NOT NULL 
-      AND amount IS NOT NULL
-    LIMIT 10
-  ) LOOP
-    SELECT * INTO v_result FROM migrate_legacy_transaction(v_tx_id);
-    RAISE NOTICE 'TX %: Status %, Lines %', v_tx_id, v_result.status, v_result.lines_created;
-  END LOOP;
-END $$;
-
--- Check results
-SELECT migration_status, COUNT(*) FROM migration_log GROUP BY migration_status;
-
--- Verify first migrated transaction
-SELECT 
-  t.id, t.entry_number, 
-  t.has_line_items, t.line_items_count,
-  t.total_debits, t.total_credits,
-  COUNT(tl.id) as actual_line_count
-FROM transactions t
-LEFT JOIN transaction_lines tl ON t.id = tl.transaction_id
-WHERE t.debit_account_id IS NULL  -- Migrated
-GROUP BY t.id, t.entry_number, t.has_line_items, t.line_items_count, t.total_debits, t.total_credits
-LIMIT 5;
-```
-
-**Expected:** All 10 transactions show 'success' status with 2 lines each.
-
----
-
-### Step 6: Production Migration
-
-**⚠️ CRITICAL: Only execute in production after successful testing**
-
-```sql
--- PRODUCTION MIGRATION
-BEGIN;
-
--- Step 1: Final count
-SELECT 
-  COUNT(*) as total_to_migrate,
-  SUM(amount) as total_amount
-FROM transactions
-WHERE debit_account_id IS NOT NULL 
-  AND credit_account_id IS NOT NULL 
-  AND amount IS NOT NULL
-  AND NOT EXISTS (SELECT 1 FROM transaction_lines WHERE transaction_id = transactions.id);
-
--- Step 2: Execute migration
-SELECT * FROM migrate_all_legacy_transactions(100);
-
--- Step 3: Check results
-SELECT * FROM v_migration_status;
-
--- Step 4: If success rate > 95%, COMMIT. Otherwise, ROLLBACK.
--- Review failed migrations:
-SELECT 
-  ml.transaction_id,
-  t.entry_number,
-  ml.error_message
-FROM migration_log ml
-INNER JOIN transactions t ON ml.transaction_id = t.id
-WHERE ml.migration_status = 'failed'
-LIMIT 10;
-
--- Decision: COMMIT or ROLLBACK
-COMMIT;  -- Only if satisfied with results
--- ROLLBACK;  -- If issues found
-```
-
----
-
-### Step 7: Post-Migration Validation
-
-**Purpose:** Verify data integrity
-
+### 4. Execute Migration (Write to database)
 ```bash
-# Run all validation queries
-psql -f migration_validation_queries.sql > validation_report.txt
-
-# Review results
-cat validation_report.txt
+python migrate.py --mode execute --batch-size 100 --org-id 731a3a00-6fa6-4282-9bec-8b5a8678e127
 ```
+- Performs the actual migration
+- Writes data to `transactions` and `transaction_lines` tables
+- Requires user confirmation before proceeding
+- Creates a backup before starting
 
-**Expected Results:**
-- ✓ Check 1: PASS - All legacy transactions migrated
-- ✓ Check 2: No unbalanced transactions
-- ✓ Check 3: PASS - No XOR violations
-- ✓ Check 4: PASS - All aggregates correct
-- ✓ Check 6: 95%+ success rate
-- ✓ Check 9: Total amounts match
-
-**Decision Point:** If any check fails, investigate immediately.
-
----
-
-## 🔄 ROLLBACK PROCEDURE
-
-If critical issues detected:
-
-```sql
--- EMERGENCY ROLLBACK
-BEGIN;
-
--- Step 1: Delete migrated lines
-DELETE FROM transaction_lines 
-WHERE transaction_id IN (
-  SELECT transaction_id FROM migration_log 
-  WHERE migration_status = 'success'
-);
-
--- Step 2: Restore legacy fields from backup
-UPDATE transactions t SET
-  debit_account_id = b.debit_account_id,
-  credit_account_id = b.credit_account_id,
-  amount = b.amount,
-  has_line_items = false,
-  line_items_count = NULL,
-  total_debits = NULL,
-  total_credits = NULL
-FROM transactions_legacy_backup b
-WHERE t.id = b.id;
-
--- Step 3: Mark as rolled back
-UPDATE migration_log SET
-  migration_status = 'rolled_back',
-  rolled_back_at = NOW()
-WHERE migration_status = 'success';
-
--- Step 4: Verify rollback
-SELECT 
-  COUNT(*) as restored_count,
-  SUM(amount) as restored_amount
-FROM transactions
-WHERE debit_account_id IS NOT NULL 
-  AND credit_account_id IS NOT NULL 
-  AND amount IS NOT NULL;
-
-COMMIT;
+### 5. Rollback from Backup
+```bash
+python migrate.py rollback --backup-timestamp 20260214_143022
 ```
+Restores data from a previous backup (use the timestamp from the backup file).
 
----
+## Parameter Details
 
-## 📊 SUCCESS CRITERIA
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `--mode` | No | `dry-run` (default) or `execute` |
+| `--batch-size` | No | Number of records per batch (default: 100) |
+| `--org-id` | **Yes** | Organization ID for RLS policies |
 
-Migration is successful when:
+## Recommended Workflow
 
-1. ✅ All validation checks pass
-2. ✅ Success rate ≥ 95%
-3. ✅ No unbalanced transactions
-4. ✅ Total amounts match backup
-5. ✅ No XOR violations
-6. ✅ All aggregates correct
-7. ✅ Failed migrations < 5% and documented
+1. **Validate data first**:
+   ```bash
+   python migrate.py validate
+   ```
 
----
+2. **Create a backup**:
+   ```bash
+   python migrate.py backup
+   ```
 
-## 📝 POST-MIGRATION TASKS
+3. **Run dry-run to test**:
+   ```bash
+   python migrate.py --mode dry-run --batch-size 100 --org-id 731a3a00-6fa6-4282-9bec-8b5a8678e127
+   ```
 
-After successful migration:
+4. **Review the dry-run results** in `reports/migration_report.md`
 
-1. [ ] Document migration results
-2. [ ] Archive migration logs
-3. [ ] Notify team of completion
-4. [ ] Update status in project tracker
-5. [ ] Proceed to Phase 2 (UI Refactor)
+5. **Execute the migration**:
+   ```bash
+   python migrate.py --mode execute --batch-size 100 --org-id 731a3a00-6fa6-4282-9bec-8b5a8678e127
+   ```
 
----
+## What Happens During Migration
 
-## 🆘 TROUBLESHOOTING
+### Transactions Table
+- Reads transaction data from Excel
+- Adds `org_id` field to each record (if not present)
+- Inserts into `transactions` table in Supabase
 
-### Issue: High failure rate (>5%)
+### Transaction Lines Table
+- Reads transaction line items from Excel
+- Adds `org_id` field to each record (if not present)
+- Inserts into `transaction_lines` table in Supabase
 
-**Solution:**
-1. Review error messages in migration_log
-2. Identify common patterns
-3. Fix data quality issues
-4. Rollback and retry
+## Output Files
 
-### Issue: Unbalanced transactions
+After migration, check these files:
+- `reports/migration_report.md` - Detailed migration report
+- `reports/migration_summary.json` - JSON summary of results
+- `backups/pre_migration_*.json` - Backup file (created before execute mode)
 
-**Solution:**
-1. Query specific unbalanced transactions
-2. Check source data in backup
-3. Manually fix if needed
-4. Re-run migration for those transactions
+## Troubleshooting
 
-### Issue: Performance slow
+### Error: "Could not find the 'account_code' column"
+This error indicates the `org_id` was not being passed. The fix has been applied - ensure you're using the updated `migrate.py` with the `--org-id` parameter.
 
-**Solution:**
-1. Reduce batch size
-2. Run during low-traffic hours
-3. Add indexes if needed
-4. Consider parallel execution
+### Error: "Failed to connect to Supabase"
+Check your `.env.local` file:
+- Verify `SUPABASE_URL` is correct
+- Verify `SUPABASE_SERVICE_ROLE_KEY` is correct
+- Ensure you're using project `bgxknceshxxifwytalex`
 
----
+### Migration fails with RLS errors
+Ensure:
+- The `org_id` parameter is provided
+- The organization exists in the database
+- RLS policies are properly configured
 
-**Document Status:** Ready for Execution  
-**Next Phase:** Phase 2 - UI Refactor  
-**Contact:** Database Administrator / Team Lead
+## Key Changes Made
+
+1. **migrate.py**:
+   - Added `--org-id` parameter (required)
+   - Updated `migrate_command()` to pass `org_id` to executor
+   - Updated examples in docstring and epilog
+
+2. **migration_executor.py** (previously updated):
+   - `__init__()` accepts `org_id` parameter
+   - `_clean_record()` automatically adds `org_id` to records
+   - `create_migration_executor()` accepts and passes `org_id`
+
+## Next Steps
+
+1. Run the dry-run migration to test
+2. Review the migration report
+3. Execute the migration when ready
+4. Verify data in Supabase

@@ -477,15 +477,7 @@ const baseNavigation: NavigationItem[] = [
         path: "/settings/audit",
         requiredPermission: "settings.audit"
       },
-      {
-        id: "audit-management",
-        label: "Audit Management (New)",
-        titleEn: "Audit Management",
-        titleAr: "إدارة التدقيق",
-        icon: "Security",
-        path: "/admin/audit",
-        requiredPermission: "settings.audit"
-      },
+
       {
         id: "diagnostics",
         label: "Diagnostics",

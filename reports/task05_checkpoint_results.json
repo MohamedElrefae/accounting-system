@@ -1,0 +1,51 @@
+{
+  "timestamp": "2026-02-13T19:40:39.787747",
+  "components": {
+    "TransactionGrouper": {
+      "status": "PASS",
+      "tests": [
+        "Initialization successful"
+      ]
+    },
+    "TransactionGrouping": {
+      "status": "PASS",
+      "tests": [
+        "Grouped 8 lines into 3 transactions",
+        "All 3 transactions are balanced",
+        "Transaction headers generated with aggregated data"
+      ]
+    },
+    "BalanceValidation": {
+      "status": "PASS",
+      "tests": [
+        "Validated 3 transactions",
+        "Balance rate: 100.0%",
+        "All transactions balanced"
+      ]
+    },
+    "TransactionIDGeneration": {
+      "status": "PASS",
+      "tests": [
+        "Generated 3 unique transaction IDs",
+        "Transaction IDs properly formatted (entry_no_YYYYMMDD)"
+      ]
+    },
+    "ExportFunctionality": {
+      "status": "PASS",
+      "tests": [
+        "Balance report exported successfully",
+        "Transactions report exported successfully"
+      ]
+    },
+    "UnbalancedHandling": {
+      "status": "PASS",
+      "tests": [
+        "Detected unbalanced transactions",
+        "Skip strategy removes unbalanced transactions",
+        "Auto-balance strategy available"
+      ]
+    }
+  },
+  "overall_status": "PASS",
+  "issues": []
+}

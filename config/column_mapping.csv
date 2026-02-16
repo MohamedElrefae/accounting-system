@@ -1,0 +1,19 @@
+Excel_Column,English_Name,Supabase_Table,Supabase_Column,Data_Type,Required,Notes
+العام المالى,fiscal_year,transactions,fiscal_year,integer,Yes,Fiscal year from Excel
+الشهر,month,transactions,month,integer,Yes,Month from Excel
+entry no,entry_no,transactions,reference_number,string,Yes,Transaction reference number
+entry date,entry_date,transactions,transaction_date,date,Yes,Transaction date
+account code,account_code,transaction_lines,account_id,uuid (FK),Yes,Maps to accounts.id via legacy_code
+account name,account_name,-,(derived),string,No,Derived from accounts table
+transaction classification code,transaction_classification_code,transaction_lines,classification_id,uuid (FK),Yes,Maps to classifications table
+classification code,classification_code,transaction_lines,classification_code,string,Yes,Classification code
+classification name,classification_name,-,(derived),string,No,Derived from classifications table
+project code,project_code,transaction_lines,project_id,uuid (FK),Yes,Maps to projects table
+project name,project_name,-,(derived),string,No,Derived from projects table
+work analysis code,work_analysis_code,transaction_lines,work_analysis_id,uuid (FK),Yes,Maps to work_analysis table
+work analysis name,work_analysis_name,-,(derived),string,No,Derived from work_analysis table
+sub_tree code,sub_tree_code,transaction_lines,sub_tree_id,uuid (FK),Yes,Maps to sub_tree table
+sub_tree name,sub_tree_name,-,(derived),string,No,Derived from sub_tree table
+مدين,debit,transaction_lines,debit_amount,decimal,Yes,Debit amount
+دائن,credit,transaction_lines,credit_amount,decimal,Yes,Credit amount
+ملاحظات,notes,transaction_lines,notes,string,No,Transaction notes
