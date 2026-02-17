@@ -1,0 +1,259 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║           DIMENSION MIGRATION: expenses_category_id → sub_tree_id            ║
+║                    + NEW DIMENSIONS (cost_center, work_item)                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ MIGRATION SUMMARY                                                            │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    OLD SYSTEM                          NEW SYSTEM
+    ├─ expenses_category_id (❌)   →   ├─ sub_tree_id (✅)
+    ├─ classification_id (✅)      →   ├─ classification_id (✅)
+    ├─ analysis_work_item_id (✅) →   ├─ analysis_work_item_id (✅)
+    └─ (limited filtering)         →   ├─ cost_center_id (✅ NEW)
+                                        ├─ work_item_id (✅ NEW)
+                                        └─ approval_status (✅ NEW)
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ FUNCTION SIGNATURE CHANGES                                                   │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    BEFORE (11 parameters):
+    ┌────────────────────────────────────────────────────────────────────┐
+    │ get_gl_account_summary_filtered(                                   │
+    │   p_date_from,                                                     │
+    │   p_date_to,                                                       │
+    │   p_org_id,                                                        │
+    │   p_project_id,                                                    │
+    │   p_posted_only,                                                   │
+    │   p_limit,                                                         │
+    │   p_offset,                                                        │
+    │   p_classification_id,                                             │
+    │   p_analysis_work_item_id,                                         │
+    │   p_expenses_category_id,  ← REMOVED                               │
+    │   p_sub_tree_id                                                    │
+    │ )                                                                  │
+    └────────────────────────────────────────────────────────────────────┘
+
+    AFTER (13 parameters):
+    ┌────────────────────────────────────────────────────────────────────┐
+    │ get_gl_account_summary_filtered(                                   │
+    │   p_date_from,                                                     │
+    │   p_date_to,                                                       │
+    │   p_org_id,                                                        │
+    │   p_project_id,                                                    │
+    │   p_posted_only,                                                   │
+    │   p_limit,                                                         │
+    │   p_offset,                                                        │
+    │   p_approval_status,       ← NEW                                   │
+    │   p_classification_id,                                             │
+    │   p_analysis_work_item_id,                                         │
+    │   p_sub_tree_id,                                                   │
+    │   p_cost_center_id,        ← NEW                                   │
+    │   p_work_item_id           ← NEW                                   │
+    │ )                                                                  │
+    └────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ TYPESCRIPT INTERFACE CHANGES                                                 │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    BEFORE:
+    ┌────────────────────────────────────────────────────────────────────┐
+    │ export interface UnifiedFilters {                                  │
+    │   dateFrom?: string | null                                         │
+    │   dateTo?: string | null                                           │
+    │   orgId?: string | null                                            │
+    │   projectId?: string | null                                        │
+    │   costCenterId?: string | null                                     │
+    │   postedOnly?: boolean                                             │
+    │   classificationId?: string | null                                 │
+    │   analysisWorkItemId?: string | null                               │
+    │   expensesCategoryId?: string | null  ← REMOVED                    │
+    │   subTreeId?: string | null                                        │
+    │   limit?: number | null                                            │
+    │   offset?: number | null                                           │
+    │ }                                                                  │
+    └────────────────────────────────────────────────────────────────────┘
+
+    AFTER:
+    ┌────────────────────────────────────────────────────────────────────┐
+    │ export interface UnifiedFilters {                                  │
+    │   dateFrom?: string | null                                         │
+    │   dateTo?: string | null                                           │
+    │   orgId?: string | null                                            │
+    │   projectId?: string | null                                        │
+    │   costCenterId?: string | null                                     │
+    │   postedOnly?: boolean                                             │
+    │   approvalStatus?: 'draft' | 'submitted' |                         │
+    │                    'approved' | 'rejected' | null  ← NEW           │
+    │   classificationId?: string | null                                 │
+    │   analysisWorkItemId?: string | null                               │
+    │   subTreeId?: string | null                                        │
+    │   workItemId?: string | null           ← NEW                       │
+    │   limit?: number | null                                            │
+    │   offset?: number | null                                           │
+    │ }                                                                  │
+    └────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ DATA FLOW                                                                    │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    USER SELECTS FILTERS
+           │
+           ▼
+    ┌─────────────────────────────────────────┐
+    │  Trial Balance UI Component             │
+    │  - Approval status dropdown             │
+    │  - Date range inputs                    │
+    │  - Organization/Project selectors       │
+    └─────────────────────────────────────────┘
+           │
+           │ UnifiedFilters object
+           ▼
+    ┌─────────────────────────────────────────┐
+    │  unified-financial-query.ts             │
+    │  - fetchGLSummary(filters)              │
+    │  - Maps to RPC parameters               │
+    └─────────────────────────────────────────┘
+           │
+           │ RPC call with parameters:
+           │ - p_approval_status
+           │ - p_cost_center_id
+           │ - p_work_item_id
+           │ - p_sub_tree_id
+           │ - (no p_expenses_category_id)
+           ▼
+    ┌─────────────────────────────────────────┐
+    │  Database Function (PostgreSQL)         │
+    │  - get_gl_account_summary_filtered()    │
+    │  - Filters by all dimensions            │
+    │  - Returns GL summary data              │
+    └─────────────────────────────────────────┘
+           │
+           │ GL Summary Data
+           ▼
+    ┌─────────────────────────────────────────┐
+    │  Trial Balance Report Display           │
+    │  - Shows filtered accounts              │
+    │  - Period totals (905M)                 │
+    │  - Closing balances (204M)              │
+    └─────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ DIMENSION FILTERING MATRIX                                                   │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────┬──────────┬──────────┬─────────────────────┐
+    │ Dimension            │ Status   │ Column   │ Purpose             │
+    ├──────────────────────┼──────────┼──────────┼─────────────────────┤
+    │ Approval Status      │ ✅ NEW   │ N/A      │ Filter by approval  │
+    │ Cost Center          │ ✅ NEW   │ Yes      │ Cost center filter  │
+    │ Work Item            │ ✅ NEW   │ Yes      │ Work item filter    │
+    │ Sub-Tree             │ ✅ KEPT  │ Yes      │ Replaces expenses   │
+    │ Classification       │ ✅ KEPT  │ Yes      │ Classification      │
+    │ Analysis Work Item   │ ✅ KEPT  │ Yes      │ Analysis tracking   │
+    │ Expenses Category    │ ❌ REMOVED│ No      │ Migrated to sub-tree│
+    └──────────────────────┴──────────┴──────────┴─────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ DEPLOYMENT CHECKLIST                                                         │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    ☐ Step 1: Deploy SQL Function
+       File: sql/create_approval_aware_gl_summary_FIXED.sql
+       Action: Run in Supabase SQL Editor
+       
+    ☐ Step 2: Verify Function Created
+       Query: SELECT routine_name FROM information_schema.routines
+              WHERE routine_name = 'get_gl_account_summary_filtered'
+       
+    ☐ Step 3: Test UI
+       URL: /reports/trial-balance
+       Check: Approval status dropdown appears
+       Check: Report loads without errors
+       Check: All 2,161 transactions show
+       
+    ☐ Step 4: Verify Filtering
+       Test: Change approval status → Report updates
+       Test: Change date range → Report updates
+       Test: Export to Excel → Includes filters
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ BENEFITS                                                                     │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    ✅ Clean Architecture
+       - Removed deprecated parameters
+       - Consistent naming across layers
+       - No backward compatibility hacks
+
+    ✅ Enhanced Filtering
+       - Approval status filtering
+       - Cost center dimension
+       - Work item dimension
+       - All dimensions work together
+
+    ✅ Future-Proof
+       - Easy to add more dimensions
+       - Consistent parameter pattern
+       - Clear migration path
+
+    ✅ Full Sync
+       - SQL function aligned
+       - TypeScript service aligned
+       - UI components aligned
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ FILES MODIFIED                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    ✅ sql/create_approval_aware_gl_summary_FIXED.sql
+       - Removed p_expenses_category_id
+       - Added p_approval_status
+       - Added p_cost_center_id
+       - Added p_work_item_id
+
+    ✅ src/services/reports/unified-financial-query.ts
+       - Removed expensesCategoryId
+       - Added approvalStatus
+       - Added workItemId
+       - Cleaned up backward compatibility code
+
+    ✅ src/pages/Reports/TrialBalanceOriginal.tsx
+       - Added approval status dropdown
+       - Auto-reload on filter change
+
+    ✅ src/pages/Reports/TrialBalanceAllLevels.tsx
+       - Added approval status dropdown
+       - Auto-reload on filter change
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ NEXT STEPS                                                                   │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    1. Deploy SQL function (2 minutes)
+       → Open Supabase SQL Editor
+       → Run sql/create_approval_aware_gl_summary_FIXED.sql
+
+    2. Test in UI (2 minutes)
+       → Navigate to /reports/trial-balance
+       → Verify approval status dropdown appears
+       → Test filtering
+
+    3. Optional: Add UI filters (future)
+       → Cost center dropdown
+       → Work item dropdown
+       → Enhanced dimension filtering
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║  ✅ MIGRATION COMPLETE                                                       ║
+║  ✅ ALL CODE ALIGNED                                                         ║
+║  ✅ READY TO DEPLOY                                                          ║
+║                                                                              ║
+║  NEXT ACTION: Deploy SQL file (5 minutes total)                             ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝

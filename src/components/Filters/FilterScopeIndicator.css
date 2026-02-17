@@ -1,0 +1,48 @@
+.scope-badge-compact {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 10px;
+  text-align: center;
+  line-height: 16px;
+  margin-right: 6px;
+  vertical-align: middle;
+  opacity: 0.8;
+}
+
+.scope-badge-compact.global {
+  background: #2563eb;
+}
+
+.scope-badge-compact.module {
+  background: #7c3aed;
+}
+
+.scope-badge-compact.page {
+  background: #059669;
+}
+
+.scope-badge-compact.session {
+  background: #dc2626;
+}
+
+.scope-badge-compact.inherited {
+  opacity: 0.6;
+  border: 1px dashed rgba(255, 255, 255, 0.5);
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .scope-badge {
+    background: rgba(0, 0, 0, 0.3);
+  }
+  
+  .scope-badge.inherited {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  .scope-source {
+    color: #9ca3af;
+  }
+}

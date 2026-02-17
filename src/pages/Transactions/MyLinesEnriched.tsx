@@ -154,6 +154,21 @@ const MyLinesEnrichedPage = () => {
     if (appliedFilters.approvalStatus) {
       query = query.eq('transactions.approval_status', appliedFilters.approvalStatus)
     }
+    if (appliedFilters.classificationId) {
+      query = query.eq('classification_id', appliedFilters.classificationId)
+    }
+    if (appliedFilters.costCenterId) {
+      query = query.eq('cost_center_id', appliedFilters.costCenterId)
+    }
+    if (appliedFilters.workItemId) {
+      query = query.eq('work_item_id', appliedFilters.workItemId)
+    }
+    if (appliedFilters.analysisItemId) {
+      query = query.eq('analysis_work_item_id', appliedFilters.analysisItemId)
+    }
+    if (appliedFilters.expensesCategoryId) {
+      query = query.eq('sub_tree_id', appliedFilters.expensesCategoryId)
+    }
 
     // Pagination - order by transaction date then line number
     const from = (page - 1) * pageSize

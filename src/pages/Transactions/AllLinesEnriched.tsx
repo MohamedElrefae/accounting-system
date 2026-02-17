@@ -129,6 +129,21 @@ const AllLinesEnrichedPage = () => {
     if (appliedFilters.approvalStatus) {
       query = query.eq('transactions.approval_status', appliedFilters.approvalStatus)
     }
+    if (appliedFilters.classificationId) {
+      query = query.eq('classification_id', appliedFilters.classificationId)
+    }
+    if (appliedFilters.costCenterId) {
+      query = query.eq('cost_center_id', appliedFilters.costCenterId)
+    }
+    if (appliedFilters.workItemId) {
+      query = query.eq('work_item_id', appliedFilters.workItemId)
+    }
+    if (appliedFilters.analysisItemId) {
+      query = query.eq('analysis_work_item_id', appliedFilters.analysisItemId)
+    }
+    if (appliedFilters.expensesCategoryId) {
+      query = query.eq('sub_tree_id', appliedFilters.expensesCategoryId)
+    }
 
     // Fetch summary stats (without pagination) for totals
     let summaryQuery = supabase
@@ -171,6 +186,21 @@ const AllLinesEnrichedPage = () => {
     }
     if (appliedFilters.approvalStatus) {
       summaryQuery = summaryQuery.eq('transactions.approval_status', appliedFilters.approvalStatus)
+    }
+    if (appliedFilters.classificationId) {
+      summaryQuery = summaryQuery.eq('classification_id', appliedFilters.classificationId)
+    }
+    if (appliedFilters.costCenterId) {
+      summaryQuery = summaryQuery.eq('cost_center_id', appliedFilters.costCenterId)
+    }
+    if (appliedFilters.workItemId) {
+      summaryQuery = summaryQuery.eq('work_item_id', appliedFilters.workItemId)
+    }
+    if (appliedFilters.analysisItemId) {
+      summaryQuery = summaryQuery.eq('analysis_work_item_id', appliedFilters.analysisItemId)
+    }
+    if (appliedFilters.expensesCategoryId) {
+      summaryQuery = summaryQuery.eq('sub_tree_id', appliedFilters.expensesCategoryId)
     }
 
     // Pagination
@@ -320,7 +350,7 @@ const AllLinesEnrichedPage = () => {
   // Generate active filter labels for summary bar
   const getActiveFilterLabels = useCallback((): string[] => {
     const labels: string[] = []
-    
+
     if (appliedFilters.search) {
       labels.push(`بحث: ${appliedFilters.search}`)
     }
@@ -329,6 +359,8 @@ const AllLinesEnrichedPage = () => {
       const to = appliedFilters.dateTo || '...'
       labels.push(`التاريخ: ${from} - ${to}`)
     }
+    // Org and Project filters are persistent in the Top Bar ScopeContext, so we don’t need to show them as badges again
+    /*
     if (appliedFilters.orgId) {
       const org = organizations.find(o => o.id === appliedFilters.orgId)
       labels.push(`المؤسسة: ${org?.name || appliedFilters.orgId}`)
@@ -337,6 +369,7 @@ const AllLinesEnrichedPage = () => {
       const proj = projects.find(p => p.id === appliedFilters.projectId)
       labels.push(`المشروع: ${proj?.name || appliedFilters.projectId}`)
     }
+    */
     if (appliedFilters.debitAccountId) {
       const acc = accounts.find(a => a.id === appliedFilters.debitAccountId)
       labels.push(`حساب مدين: ${acc?.name_ar || acc?.name || appliedFilters.debitAccountId}`)
@@ -356,7 +389,7 @@ const AllLinesEnrichedPage = () => {
       }
       labels.push(`الحالة: ${statusMap[appliedFilters.approvalStatus] || appliedFilters.approvalStatus}`)
     }
-    
+
     return labels
   }, [appliedFilters, organizations, projects, accounts])
 
@@ -406,7 +439,7 @@ const AllLinesEnrichedPage = () => {
 
     // Add filter information and summary row
     const filterLabels = getActiveFilterLabels()
-    const filterInfo = filterLabels.length > 0 
+    const filterInfo = filterLabels.length > 0
       ? `الفلاتر المطبقة: ${filterLabels.join(' | ')}`
       : 'كل البيانات (بدون فلاتر)'
 
@@ -484,46 +517,49 @@ const AllLinesEnrichedPage = () => {
       />
 
       <div className="transactions-content">
-        <div className="transactions-tablebar">
-          <div className="transactions-toolbar">
-            <span className="transactions-count">عدد السطور: {totalCount}</span>
-            <label className="wrap-toggle">
-              <input type="checkbox" checked={wrapMode} onChange={(e) => setWrapMode(e.target.checked)} />
-              <span>التفاف النص</span>
-            </label>
-            <button className="ultimate-btn" onClick={() => refetch().catch(() => { })}>
-              <div className="btn-content"><span className="btn-text">تحديث 🔁</span></div>
-            </button>
-            <button className="ultimate-btn ultimate-btn-warning" onClick={() => { setWrapMode(false); resetToDefaults() }} title="استعادة الإعدادات الافتراضية">
-              <div className="btn-content"><span className="btn-text">استعادة الافتراضي</span></div>
-            </button>
-          </div>
-          <div className="transactions-pagination">
-            <button className="ultimate-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+        <div className="transactions-tablebar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+
+          <div className="transactions-pagination" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            <button className="ultimate-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ minHeight: '32px', padding: '4px 12px' }}>
               <div className="btn-content"><span className="btn-text">السابق</span></div>
             </button>
-            <span>صفحة {page} من {Math.max(1, Math.ceil(totalCount / pageSize))}</span>
-            <button className="ultimate-btn" onClick={() => setPage(p => Math.min(Math.ceil(totalCount / pageSize) || 1, p + 1))} disabled={page >= Math.ceil(totalCount / pageSize)}>
+            <span style={{ fontSize: '13px', fontWeight: 500 }}>صفحة {page} من {Math.max(1, Math.ceil(totalCount / pageSize))}</span>
+            <button className="ultimate-btn" onClick={() => setPage(p => Math.min(Math.ceil(totalCount / pageSize) || 1, p + 1))} disabled={page >= Math.ceil(totalCount / pageSize)} style={{ minHeight: '32px', padding: '4px 12px' }}>
               <div className="btn-content"><span className="btn-text">التالي</span></div>
             </button>
-            <select className="filter-select" value={pageSize} onChange={e => { setPageSize(parseInt(e.target.value) || 20); setPage(1) }}>
+            <select className="filter-select" value={pageSize} onChange={e => { setPageSize(parseInt(e.target.value) || 20); setPage(1) }} style={{ height: '32px', padding: '2px 8px' }}>
               <option value={10}>10</option>
               <option value={20}>20</option>
               <option value={50}>50</option>
               <option value={100}>100</option>
             </select>
           </div>
-        </div>
 
-        {/* Summary Bar */}
-        <TransactionsSummaryBar
-          totalCount={totalCount}
-          totalDebit={summaryStats.totalDebit}
-          totalCredit={summaryStats.totalCredit}
-          lineCount={summaryStats.lineCount}
-          activeFilters={getActiveFilterLabels()}
-          onClearFilters={handleResetFiltersWithPaging}
-        />
+          {/* Integrated Summary - Location 4 */}
+          <div className="header-summary-integration" style={{ flex: 1, display: 'flex', justifyContent: 'center', minWidth: '300px' }}>
+            <TransactionsSummaryBar
+              totalCount={totalCount}
+              totalDebit={summaryStats.totalDebit}
+              totalCredit={summaryStats.totalCredit}
+              lineCount={summaryStats.lineCount}
+              activeFilters={getActiveFilterLabels()}
+            />
+          </div>
+
+          <div className="transactions-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            <span className="transactions-count">عدد السطور: {totalCount}</span>
+            <label className="wrap-toggle" style={{ whiteSpace: 'nowrap' }}>
+              <input type="checkbox" checked={wrapMode} onChange={(e) => setWrapMode(e.target.checked)} />
+              <span>التفاف النص</span>
+            </label>
+            <button className="ultimate-btn" onClick={() => refetch().catch(() => { })} style={{ minHeight: '32px', padding: '4px 12px' }}>
+              <div className="btn-content"><span className="btn-text">تحديث 🔁</span></div>
+            </button>
+            <button className="ultimate-btn ultimate-btn-warning" onClick={() => { setWrapMode(false); resetToDefaults() }} title="استعادة الإعدادات الافتراضية" style={{ minHeight: '32px', padding: '4px 12px' }}>
+              <div className="btn-content"><span className="btn-text">استعادة الافتراضي</span></div>
+            </button>
+          </div>
+        </div>
 
 
         {/* Lines Table */}

@@ -1,0 +1,32 @@
+.filter-section {
+  display: contents;
+}
+
+.section-title {
+  display: none;
+}
+
+.section-content {
+  display: contents;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .filter-section {
+    border-color: transparent;
+    background: transparent;
+  }
+  
+  .section-title {
+    background: transparent;
+    border-bottom-color: transparent;
+    color: #d1d5db;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .filter-section {
+    flex-basis: 100%;
+  }
+}

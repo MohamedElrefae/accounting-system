@@ -773,7 +773,7 @@ const TransactionsPage: React.FC = () => {
     lineCount: 0,
     transactionCount: 0,
   })
-  
+
   const reload = useCallback(async () => {
     await measurePerformance('transactions.reload', async () => {
       const effectiveFilters = headerAppliedFilters
@@ -845,7 +845,7 @@ const TransactionsPage: React.FC = () => {
       const totalDebit = (allRows || []).reduce((sum, tx: any) => sum + Number(tx.total_debits || 0), 0)
       const totalCredit = (allRows || []).reduce((sum, tx: any) => sum + Number(tx.total_credits || 0), 0)
       const lineCount = (allRows || []).reduce((sum, tx: any) => sum + Number(tx.line_items_count || 0), 0)
-      
+
       setSummaryStats({
         totalDebit,
         totalCredit,
@@ -876,14 +876,15 @@ const TransactionsPage: React.FC = () => {
     if (filters.dateTo) labels.push(`إلى تاريخ: ${filters.dateTo}`)
     if (filters.amountFrom) labels.push(`من مبلغ: ${filters.amountFrom}`)
     if (filters.amountTo) labels.push(`إلى مبلغ: ${filters.amountTo}`)
-    if (filters.orgId) {
-      const org = organizations.find(o => o.id === filters.orgId)
-      if (org) labels.push(`مؤسسة: ${org.name_ar || org.name}`)
-    }
-    if (filters.projectId) {
-      const project = projects.find(p => p.id === filters.projectId)
-      if (project) labels.push(`مشروع: ${project.name_ar || project.name}`)
-    }
+    // Org and Project filters are persistent in the Top Bar ScopeContext, so we don't need to show them as badges again
+    // if (filters.orgId) {
+    //   const org = organizations.find(o => o.id === filters.orgId)
+    //   if (org) labels.push(`مؤسسة: ${org.name_ar || org.name}`)
+    // }
+    // if (filters.projectId) {
+    //   const project = projects.find(p => p.id === filters.projectId)
+    //   if (project) labels.push(`مشروع: ${project.name_ar || project.name}`)
+    // }
     if (filters.debitAccountId) {
       const account = accounts.find(a => a.id === filters.debitAccountId)
       if (account) labels.push(`حساب مدين: ${account.name_ar || account.name}`)
@@ -980,10 +981,10 @@ const TransactionsPage: React.FC = () => {
   // Export data
   const exportData = useMemo(() => {
     const activeFilters = getActiveFilterLabels()
-    const filterInfo = activeFilters.length > 0 
+    const filterInfo = activeFilters.length > 0
       ? `الفلاتر المطبقة: ${activeFilters.join(' | ')}`
       : 'عرض جميع البيانات (بدون فلاتر)'
-    
+
     const columns = createStandardColumns([
       { key: 'filter_info', header: 'معلومات الفلتر', type: 'text' },
       { key: 'entry_number', header: 'رقم القيد', type: 'text' },
@@ -1000,7 +1001,7 @@ const TransactionsPage: React.FC = () => {
       { key: 'posted_at', header: 'تاريخ الترحيل', type: 'date' },
       { key: 'approval_status', header: 'حالة الاعتماد', type: 'text' },
     ])
-    
+
     // Add summary row at the top
     const summaryRow = {
       filter_info: filterInfo,
@@ -1018,7 +1019,7 @@ const TransactionsPage: React.FC = () => {
       posted_at: null,
       approval_status: '',
     }
-    
+
     const rows = paged.map((t: any) => ({
       filter_info: '', // Only show in summary row
       entry_number: t.entry_number,
@@ -1037,7 +1038,7 @@ const TransactionsPage: React.FC = () => {
         ? 'مرحلة'
         : (({ draft: 'مسودة', submitted: 'مُرسلة', revision_requested: 'طلب تعديل', approved: 'معتمدة', rejected: 'مرفوضة', cancelled: 'ملغاة' } as any)[(t as any).approval_status || 'draft'] || 'مسودة'),
     }))
-    
+
     return prepareTableData(columns, [summaryRow, ...rows])
   }, [paged, userNames, organizations, projects, summaryStats, getActiveFilterLabels])
 
