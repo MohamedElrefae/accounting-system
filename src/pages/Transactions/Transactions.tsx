@@ -6,6 +6,7 @@ import {
   updateTransaction,
   getTransactionAudit,
   postTransaction,
+  submitTransaction,
   getUserDisplayMap,
   type TransactionRecord,
   type TransactionAudit,
@@ -1577,6 +1578,8 @@ const TransactionsPage: React.FC = () => {
         await deleteTransaction(id)
         showToast('تم حذف المعاملة', { severity: 'success' })
       })
+      // Refresh table data from server after successful deletion
+      await reload()
     } catch (e: any) {
       // rollback
       setTransactions(prev)
@@ -2333,8 +2336,21 @@ const TransactionsPage: React.FC = () => {
               // Reload transactions
               await reload()
 
-              // Success - the wizard will show success message
-              console.log('Transaction created successfully!')
+              // Handle approval submission if needed
+              if (data.submitForApproval) {
+                try {
+                  await submitTransaction(transaction.id)
+                  console.log('Transaction submitted for approval successfully!')
+                } catch (submitError: any) {
+                  console.error('Failed to submit transaction for approval:', submitError)
+                  throw new Error(submitError?.message || 'فشل إرسال المعاملة للاعتماد')
+                }
+              } else {
+                console.log('Transaction saved as draft successfully!')
+              }
+
+              // Success - wizard will show success message
+              console.log('Transaction processed successfully!')
             } catch (error: any) {
               console.error('Transaction creation failed:', error)
               throw error // Re-throw to let the wizard handle the error
@@ -2418,6 +2434,7 @@ const TransactionsPage: React.FC = () => {
             canManage={hasPerm('transactions.manage')}
             autoOpenDeleteModal={autoOpenDeleteModal}
             onDeleteModalHandled={() => setAutoOpenDeleteModal(false)}
+            onRefresh={reload} // Pass reload function for refreshing after deletion
             onClose={handleDetailsPanelClose}
             onUpdate={async (updatedTransaction: TransactionRecord) => {
               try {

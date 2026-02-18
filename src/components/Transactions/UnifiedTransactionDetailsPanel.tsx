@@ -64,6 +64,7 @@ export interface UnifiedTransactionDetailsPanelProps {
   onEditWithWizard?: (transaction: TransactionRecord) => Promise<void>
   onOpenEnhancedReview?: (transactionId: string) => void
   onOpenLineReview?: (line: any) => void
+  onRefresh?: () => Promise<void> // New callback for refreshing data after deletion
 
   // Permissions
   canEdit?: boolean
@@ -103,6 +104,7 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
   onEditWithWizard,
   onOpenEnhancedReview,
   onOpenLineReview,
+  onRefresh: _onRefresh, // New callback for refreshing data after deletion
   canEdit = false,
   canDelete = false,
   canReview = false,
@@ -485,6 +487,8 @@ const UnifiedTransactionDetailsPanel: React.FC<UnifiedTransactionDetailsPanelPro
       await deleteTransaction(effectiveTransaction.id)
       setDeleteModalOpen(false)
       showToast('تم حذف المعاملة بنجاح', { severity: 'success' })
+      // Refresh table data from server after successful deletion
+      await _onRefresh?.()
       onClose()
     } catch (err: any) {
       setError(err.message)

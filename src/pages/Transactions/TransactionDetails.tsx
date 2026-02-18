@@ -6,6 +6,18 @@ import EnhancedLineApprovalManager from '@/components/Approvals/EnhancedLineAppr
 import { findInventoryDocumentByTransaction, listInventoryPostingsByTransaction, listMovementsByDocument, listTransactionsLinkedToDocuments, type InventoryPostingLink } from '@/services/inventory/documents'
 import { getTransactionById, getTransactionAudit, getUserDisplayMap, type TransactionRecord, getAccounts, getProjects } from '@/services/transactions'
 import { useScopeOptional } from '@/contexts/ScopeContext'
+import { useTransactionsData } from '@/contexts/TransactionsDataContext'
+
+// Approval history type - moved to local definition
+type ApprovalHistoryRow = {
+  id: string
+  request_id: string
+  step_order: number
+  action: 'approve' | 'reject' | 'request_changes' | 'comment'
+  reason: string | null
+  actor_user_id: string
+  created_at: string
+}
 
 const TransactionDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -13,12 +25,25 @@ const TransactionDetailsPage: React.FC = () => {
   const scope = useScopeOptional()
   const orgId = scope?.currentOrg?.id ?? null
 
+  // Get complete data from TransactionsDataContext
+  const {
+    organizations,
+    projects,
+    accounts,
+    costCenters,
+    workItems,
+    categories,
+    classifications,
+    analysisItemsMap,
+    currentUserId,
+    isLoading: contextLoading,
+  } = useTransactionsData()
+
   const [loading, setLoading] = useState(true)
   const [tx, setTx] = useState<TransactionRecord | null>(null)
   const [audit, setAudit] = useState<any[]>([])
   const [userMap, setUserMap] = useState<Record<string, string>>({})
-  const [accounts, setAccounts] = useState<any[]>([])
-  const [projects, setProjects] = useState<any[]>([])
+  const [approvalHistory, setApprovalHistory] = useState<ApprovalHistoryRow[]>([])
   const [linkedDocId, setLinkedDocId] = useState<string | null>(null)
   const [postings, setPostings] = useState<InventoryPostingLink[]>([])
   const [movements, setMovements] = useState<any[]>([])
@@ -79,17 +104,26 @@ const TransactionDetailsPage: React.FC = () => {
     const load = async () => {
       if (!id) { setLoading(false); return }
       try {
-        const [txRow, auditRows, acct, proj] = await Promise.all([
+        const [txRow, auditRows] = await Promise.all([
           getTransactionById(id),
           getTransactionAudit(id),
-          getAccounts(orgId),
-          getProjects(),
         ])
         if (!mounted) return
         setTx(txRow)
         setAudit(auditRows)
-        setAccounts(acct)
-        setProjects(proj)
+        // Load approval history if transaction exists
+        if (txRow) {
+          try {
+            const { getLineReviewsForTransaction } = await import('../../services/lineReviewService')
+            const lines = await getLineReviewsForTransaction(txRow.id)
+            const hist = lines.flatMap(line => line.approval_history || [])
+            setApprovalHistory(hist)
+            if (import.meta.env.DEV) console.log(`✅ Loaded ${hist.length} approval history records`)
+          } catch (error) {
+            console.error('❌ Failed to fetch approval history:', error)
+            setApprovalHistory([])
+          }
+        }
         // Find linked inventory document via postings
         if (txRow && txRow.org_id) {
           const [link, links] = await Promise.all([
@@ -108,7 +142,7 @@ const TransactionDetailsPage: React.FC = () => {
               } catch { }
             }
             setMovements(allMovs)
-            // Fetch other GL transactions linked to the same documents
+            // Fetch other GL transactions linked to same documents
             try {
               const docIds = links.map(l => l.document_id)
               const others = await listTransactionsLinkedToDocuments({ orgId: txRow.org_id, documentIds: docIds, excludeTransactionId: txRow.id })
@@ -308,16 +342,17 @@ const TransactionDetailsPage: React.FC = () => {
       <UnifiedTransactionDetailsPanel
         transaction={tx}
         audit={audit}
-        approvalHistory={[]}
+        approvalHistory={approvalHistory}
         userNames={userMap}
         accounts={accounts}
         projects={projects}
-        organizations={[]}
-        classifications={[]}
-        categories={[]}
-        workItems={[]}
-        costCenters={[]}
-        analysisItemsMap={{}}
+        organizations={organizations || []}
+        classifications={classifications || []}
+        categories={categories || []}
+        workItems={workItems || []}
+        costCenters={costCenters || []}
+        analysisItemsMap={analysisItemsMap || {}}
+        currentUserId={currentUserId}
         onClose={handleClose}
         canEdit={false}
         canDelete={false}
