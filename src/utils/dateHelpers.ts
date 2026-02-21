@@ -22,6 +22,7 @@ export const DATE_FORMATS = {
 // Get company date format preference
 let cachedDateFormat: string | null = null
 let cacheTime = 0
+let pendingPromise: Promise<string> | null = null
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
 export async function getCompanyDateFormat(): Promise<string> {
@@ -30,16 +31,26 @@ export async function getCompanyDateFormat(): Promise<string> {
   if (cachedDateFormat && now - cacheTime < CACHE_DURATION) {
     return cachedDateFormat
   }
-  
-  try {
-    const config = await getCompanyConfig()
-    cachedDateFormat = config.date_format || DATE_FORMATS.ISO
-    cacheTime = now
-    return cachedDateFormat
-  } catch (error) {
-    console.error('Error getting company date format:', error)
-    return DATE_FORMATS.ISO
+
+  if (pendingPromise) {
+    return pendingPromise
   }
+  
+  pendingPromise = (async () => {
+    try {
+      const config = await getCompanyConfig()
+      cachedDateFormat = config.date_format || DATE_FORMATS.ISO
+      cacheTime = Date.now()
+      return cachedDateFormat
+    } catch (error) {
+      console.error('Error getting company date format:', error)
+      return DATE_FORMATS.ISO
+    } finally {
+      pendingPromise = null
+    }
+  })()
+
+  return pendingPromise
 }
 
 /**

@@ -120,6 +120,7 @@ CREATE INDEX IF NOT EXISTS idx_transactions_approval_status
   ON transactions(all_lines_approved, status);
 
 -- 5. Function: Submit transaction lines for approval
+DROP FUNCTION IF EXISTS public.submit_transaction_for_line_approval(uuid, uuid);
 CREATE OR REPLACE FUNCTION submit_transaction_for_line_approval(
   p_transaction_id UUID,
   p_submitted_by UUID
@@ -148,6 +149,7 @@ BEGIN
   UPDATE transactions
   SET 
     status = 'pending',
+    approval_status = 'submitted',
     approval_method = 'line_based',
     lines_total_count = v_line_count,
     lines_approved_count = 0,
@@ -160,11 +162,10 @@ BEGIN
     WHERE transaction_id = p_transaction_id 
       AND line_status = 'draft'
   LOOP
-    -- Determine approver based on dimensions
-    -- Priority: 1) Org manager (fallback for now)
-    SELECT COALESCE(
-      (SELECT manager_id FROM organizations WHERE id = v_line.org_id)
-    ) INTO v_approver_id;
+    -- Determine approver based on permissions and roles
+    -- TODO: Implement proper permission-based approver assignment
+    -- For now, set to null and let approval system handle assignment
+    SELECT NULL INTO v_approver_id;
     
     -- Update line
     UPDATE transaction_lines
@@ -212,6 +213,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 6. Function: Approve a line
+DROP FUNCTION IF EXISTS public.approve_line(uuid, uuid, text);
 CREATE OR REPLACE FUNCTION approve_line(
   p_line_id UUID,
   p_approved_by UUID,
@@ -316,6 +318,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 7. Function: Reject a line
+DROP FUNCTION IF EXISTS public.reject_line(uuid, uuid, text);
 CREATE OR REPLACE FUNCTION reject_line(
   p_line_id UUID,
   p_rejected_by UUID,

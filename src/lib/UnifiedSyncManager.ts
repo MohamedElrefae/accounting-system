@@ -1,4 +1,5 @@
 import { supabase } from '../utils/supabase'
+import { getConnectionMonitor } from '../utils/connectionMonitor'
 
 export interface SyncEvent {
   type: 'DATA_CHANGE' | 'USER_UPDATE' | 'SYSTEM_EVENT'
@@ -21,7 +22,6 @@ class UnifiedSyncManager {
   private static instance: UnifiedSyncManager
   private channels = new Map<string, any>()
   private listeners = new Map<string, Set<SyncCallback>>()
-  private presenceState = new Map<string, any[]>()
   private isPaused = false
   private pausedChannels = new Set<string>()
 
@@ -34,6 +34,26 @@ class UnifiedSyncManager {
 
   private constructor() {
     this.setupSystemListeners()
+    this.setupConnectivityListener()
+    
+    // Initial state check
+    const monitor = getConnectionMonitor()
+    if (!monitor.getHealth().isOnline) {
+      supabase.realtime.disconnect()
+    }
+  }
+
+  private setupConnectivityListener() {
+    const monitor = getConnectionMonitor()
+    monitor.subscribe((health) => {
+      if (!health.isOnline) {
+        if (import.meta.env.DEV) console.log('[UnifiedSync] Offline: Ensuring Realtime is disconnected');
+        supabase.realtime.disconnect()
+      } else {
+        if (import.meta.env.DEV) console.log('[UnifiedSync] Online: Reconnecting Realtime');
+        supabase.realtime.connect()
+      }
+    })
   }
 
   private setupSystemListeners() {
@@ -73,6 +93,12 @@ class UnifiedSyncManager {
   private initChannel(config: SubscriptionConfig) {
     const { channelId, tables, enablePresence } = config
     
+    const monitor = getConnectionMonitor()
+    if (!monitor.getHealth().isOnline) {
+      if (import.meta.env.DEV) console.log(`[UnifiedSync] Offline: Skipping channel init for ${channelId}`);
+      return;
+    }
+
     // Create one channel for this ID (e.g., 'report-123' or 'transactions-list')
     const channel = supabase.channel(channelId)
 

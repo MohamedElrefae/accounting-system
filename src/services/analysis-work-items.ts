@@ -20,7 +20,43 @@ export async function listAnalysisWorkItems(params: {
   const key = JSON.stringify({ orgId, search, onlyWithTx, includeInactive })
   if (cache.byOrg.has(key)) return cache.byOrg.get(key)!
 
+  // 0. If offline, use local metadata cache
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  if (!getConnectionMonitor().getHealth().isOnline) {
+    try {
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema')
+      const db = getOfflineDB()
+      const cacheData = await db.metadata.get('analysis_work_items_cache')
+      if (cacheData && Array.isArray(cacheData.value)) {
+        console.log('📦 Analysis items loaded from offline cache:', (cacheData.value as any[]).length)
+        const allItems = cacheData.value as any[]
+        // Filter by org and activity in memory
+        const filtered = allItems.filter(item => 
+          item.org_id === orgId && 
+          (params.includeInactive ? true : item.is_active)
+        )
+        // Match Search if provided
+        const finalRows = params.search 
+          ? filtered.filter(f => f.name?.toLowerCase().includes(params.search!.toLowerCase()) || f.code?.toLowerCase().includes(params.search!.toLowerCase()))
+          : filtered
+
+        return finalRows.map(item => ({ 
+          ...item, 
+          transaction_count: 0, 
+          total_debit_amount: 0, 
+          total_credit_amount: 0, 
+          net_amount: 0, 
+          has_transactions: false 
+        })) as AnalysisWorkItemFull[]
+      }
+    } catch (err) {
+      console.error('❌ Analysis items offline fallback failed:', err)
+    }
+  }
+
+
   // First try the main RPC function without project filter so we never hide org items
+
   let data, error
   
   try {
@@ -60,7 +96,9 @@ export async function listAnalysisWorkItems(params: {
   }
   
   if (error) {
-    console.error('All attempts to load analysis work items failed:', error)
+    if (navigator.onLine) {
+        console.error('All attempts to load analysis work items failed:', error)
+    }
     // Return empty array instead of throwing to prevent UI crashes
     return []
   }

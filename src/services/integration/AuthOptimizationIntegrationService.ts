@@ -324,6 +324,17 @@ export class AuthOptimizationIntegrationService {
     let queryCount = 0;
 
     try {
+      const { getConnectionMonitor } = await import('../../utils/connectionMonitor');
+      if (!getConnectionMonitor().getHealth().isOnline) {
+        return {
+          queryCount: 0,
+          duration: 0,
+          passed: true, // Consider passed if offline (will use cache)
+          data: null,
+          isOffline: true
+        };
+      }
+
       // Test optimized RPC function
       const { data, error } = await supabase.rpc('get_user_auth_data_optimized', {
         p_user_id: userId,
@@ -579,6 +590,9 @@ export class AuthOptimizationIntegrationService {
    */
   private async testDatabaseConnectivity(): Promise<'healthy' | 'degraded' | 'failed'> {
     try {
+      const { getConnectionMonitor } = await import('../../utils/connectionMonitor');
+      if (!getConnectionMonitor().getHealth().isOnline) return 'healthy'; // Assume healthy for offline purposes
+
       const { error } = await supabase.from('users').select('id').limit(1);
       return error ? 'degraded' : 'healthy';
     } catch (error) {

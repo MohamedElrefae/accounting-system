@@ -19,19 +19,43 @@ export type TransactionClassificationUpdate = Partial<Omit<TransactionClassifica
  * Get all transaction classifications for an organization
  */
 export async function getTransactionClassifications(orgId: string): Promise<TransactionClassification[]> {
-  const { data, error } = await supabase
-    .from('transaction_classification')
-    .select('id, code, name, post_to_costs, org_id, created_at, updated_at')
-    .eq('org_id', orgId)
-    .order('code', { ascending: true })
-    .limit(1000);
+  // 1. If offline, use local metadata cache
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  const isOnline = getConnectionMonitor().getHealth().isOnline;
 
-  if (error) {
-    console.error('Error fetching transaction classifications:', error);
-    return []; // Return empty array instead of throwing
+  if (!isOnline) {
+    try {
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema')
+      const db = getOfflineDB()
+      const cache = await db.metadata.get('classifications_cache')
+      if (cache && Array.isArray(cache.value)) {
+        console.log('📦 Classifications loaded from offline cache:', (cache.value as any[]).length)
+        const allCls = cache.value as any[]
+        return allCls.filter(cls => cls.org_id === orgId) as TransactionClassification[]
+      }
+    } catch (err) {
+      console.error('❌ Classifications offline fallback failed:', err)
+    }
   }
-  
-  return (data as TransactionClassification[]) || [];
+
+  // 2. Direct query
+  try {
+      const { data, error } = await supabase
+        .from('transaction_classification')
+        .select('id, code, name, post_to_costs, org_id, created_at, updated_at')
+        .eq('org_id', orgId)
+        .order('code', { ascending: true })
+        .limit(1000);
+
+      if (error) throw error;
+      return (data as TransactionClassification[]) || [];
+  } catch (error: any) {
+      if (error.message?.includes('fetch') || !isOnline) {
+          return [];
+      }
+      console.error('Error fetching transaction classifications:', error);
+      return [];
+  }
 }
 
 /**
@@ -44,15 +68,38 @@ export async function getTransactionClassifications(orgId: string): Promise<Tran
  *   via auth.uid() inside the function.
  */
 export async function getAllTransactionClassifications(): Promise<TransactionClassification[]> {
-  const { data, error } = await supabase
-    .rpc('get_all_transaction_classifications_secure');
+  // 1. If offline, use local metadata cache
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  const isOnline = getConnectionMonitor().getHealth().isOnline;
 
-  if (error) {
-    console.error('Error fetching all transaction classifications:', error);
+  if (!isOnline) {
+    try {
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema')
+      const db = getOfflineDB()
+      const cache = await db.metadata.get('classifications_cache')
+      if (cache && Array.isArray(cache.value)) {
+        console.log('📦 Classifications loaded from offline cache:', (cache.value as any[]).length)
+        return cache.value as TransactionClassification[]
+      }
+    } catch (err) {
+       console.error('❌ Classifications offline fallback failed:', err)
+    }
+  }
+
+  // 2. Use RPC
+  try {
+    const { data, error } = await supabase
+      .rpc('get_all_transaction_classifications_secure');
+
+    if (error) throw error;
+    
+    return (data as TransactionClassification[]) || [];
+  } catch (err: any) {
+    if (isOnline && !err.message?.includes('fetch')) {
+        console.warn('Network error fetching classifications:', err);
+    }
     return [];
   }
-  
-  return (data as TransactionClassification[]) || [];
 }
 
 /**

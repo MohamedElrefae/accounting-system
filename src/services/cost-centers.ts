@@ -1,4 +1,5 @@
 import { supabase } from '../utils/supabase'
+import { getConnectionMonitor } from '../utils/connectionMonitor'
 
 // Types
 export type CostCenter = {
@@ -64,6 +65,8 @@ export type CostCenterUpdate = {
 // API Functions
 export async function getCostCentersTree(orgId: string, includeInactive = false): Promise<CostCenterTreeNode[]> {
   try {
+    if (!navigator.onLine) return [];
+
     const { data, error } = await supabase.rpc('get_cost_centers_tree', {
       p_org_id: orgId,
       p_include_inactive: includeInactive
@@ -72,7 +75,9 @@ export async function getCostCentersTree(orgId: string, includeInactive = false)
     return (data as CostCenterTreeNode[]) || []
   } catch (e: any) {
     // Fallback: build tree from base table if RPC is missing/unavailable
-    console.warn('get_cost_centers_tree RPC failed, using fallback from base table:', e?.message || e)
+    if (navigator.onLine) {
+        console.warn('get_cost_centers_tree RPC failed, using fallback from base table:', e?.message || e)
+    }
     const { data, error } = await supabase
       .from('cost_centers')
       .select('id, org_id, project_id, parent_id, code, name, name_ar, description, is_active, position, created_at, updated_at, created_by, updated_by')
@@ -96,6 +101,8 @@ export async function getCostCentersTree(orgId: string, includeInactive = false)
 
 export async function getCostCentersList(orgId: string, includeInactive = false): Promise<CostCenterRow[]> {
   try {
+    if (!navigator.onLine) return [];
+
     const { data: viewData, error } = await supabase
       .from('v_cost_centers')
       .select('*')
@@ -113,7 +120,9 @@ export async function getCostCentersList(orgId: string, includeInactive = false)
       })) as CostCenterRow[]
   } catch (e: any) {
     // Fallback to base table if the view is missing
-    console.warn('v_cost_centers view unavailable, using fallback from base table:', e?.message || e)
+    if (navigator.onLine) {
+        console.warn('v_cost_centers view unavailable, using fallback from base table:', e?.message || e)
+    }
     const { data, error } = await supabase
       .from('cost_centers')
       .select('id, org_id, project_id, parent_id, code, name, name_ar, description, is_active, position, created_at, updated_at, created_by, updated_by')
@@ -135,12 +144,9 @@ export async function getCostCentersList(orgId: string, includeInactive = false)
 }
 
 export async function getCostCenter(id: string): Promise<CostCenter | null> {
-  const { data, error } = await supabase
-    .from('cost_centers')
-    .select('*')
-    .eq('id', id)
-    .single()
-
+  if (!navigator.onLine) return null;
+  const { data, error } = await supabase.rpc('get_cost_center', { p_id: id }) // Note: Usually CC is cached, but this is direct fetch
+  
   if (error) {
     if (error.code === 'PGRST116') return null
     throw new Error(`Failed to fetch cost center: ${error.message}`)
@@ -149,6 +155,7 @@ export async function getCostCenter(id: string): Promise<CostCenter | null> {
 }
 
 export async function createCostCenter(input: CostCenterCreate): Promise<CostCenter> {
+  if (!navigator.onLine) throw new Error('Offline: Cannot create cost center');
   const { data, error } = await supabase
     .from('cost_centers')
     .insert([{
@@ -165,6 +172,7 @@ export async function createCostCenter(input: CostCenterCreate): Promise<CostCen
 }
 
 export async function updateCostCenter(input: CostCenterUpdate): Promise<CostCenter> {
+  if (!navigator.onLine) throw new Error('Offline: Cannot update cost center');
   const { id, org_id, ...updates } = input
   
   const { data, error } = await supabase
@@ -183,6 +191,7 @@ export async function updateCostCenter(input: CostCenterUpdate): Promise<CostCen
 }
 
 export async function deleteCostCenter(id: string, orgId: string): Promise<void> {
+  if (!navigator.onLine) throw new Error('Offline: Cannot delete cost center');
   const { error } = await supabase
     .from('cost_centers')
     .delete()
@@ -193,6 +202,7 @@ export async function deleteCostCenter(id: string, orgId: string): Promise<void>
 }
 
 export async function fetchNextCostCenterCode(orgId: string, parentId?: string | null): Promise<string> {
+  if (!navigator.onLine) return '1';
   const { data, error } = await supabase.rpc('get_next_cost_center_code', {
     p_org_id: orgId,
     p_parent_id: parentId
@@ -212,7 +222,34 @@ export async function getCostCentersForSelector(orgId: string, projectId?: strin
   project_id?: string | null
   level: number
 }>> {
-  // Try RPC first (security definer bypasses RLS)
+  // 1. If offline, use local metadata cache
+  const monitor = getConnectionMonitor()
+  if (!monitor.getHealth().isOnline) {
+    try {
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema')
+      const db = getOfflineDB()
+      const cache = await db.metadata.get('cost_centers_cache')
+      if (cache && Array.isArray(cache.value)) {
+        console.log('📦 Cost centers loaded from offline cache:', (cache.value as any[]).length)
+        const allCC = cache.value as any[]
+        // Filter by org and project (if specified) in memory
+        const filtered = allCC.filter(cc => 
+          cc.org_id === orgId && 
+          cc.is_active && 
+          (!projectId || cc.project_id === null || cc.project_id === projectId)
+        )
+        return filtered.map(cc => ({
+          ...cc,
+          level: calculateLevel(cc.code)
+        }))
+      }
+    } catch (err) {
+      console.error('❌ Cost centers offline fallback failed:', err)
+    }
+    return [] // Ensure we return empty even if cache fails/is empty while offline
+  }
+
+  // 2. Try RPC first (security definer bypasses RLS)
   try {
     const { data: rpcData, error: rpcError } = await supabase.rpc('get_cost_centers_for_selector', {
       p_org_id: orgId,
@@ -237,29 +274,33 @@ export async function getCostCentersForSelector(orgId: string, projectId?: strin
   }
   
   // Fallback to direct query
-  let query = supabase
-    .from('cost_centers')
-    .select('id, code, name, name_ar, project_id')
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-    .order('code')
+  try {
+    let query = supabase
+      .from('cost_centers')
+      .select('id, code, name, name_ar, project_id')
+      .eq('org_id', orgId)
+      .eq('is_active', true)
+      .order('code')
 
-  if (projectId) {
-    // If project specified, get cost centers for that project OR global ones (project_id is null)
-    query = query.or(`project_id.is.null,project_id.eq.${projectId}`)
+    if (projectId) {
+      // If project specified, get cost centers for that project OR global ones (project_id is null)
+      query = query.or(`project_id.is.null,project_id.eq.${projectId}`)
+    }
+
+    const { data, error } = await query
+
+    if (error) throw error;
+
+    return ((data as any[]) || []).map((cc: any) => ({
+      ...cc,
+      level: calculateLevel(cc.code)
+    }))
+  } catch (err: any) {
+    if (monitor.getHealth().isOnline && !err.message?.includes('fetch')) {
+        console.error('❌ Cost centers direct query failed:', err.message || err)
+    }
+    return []
   }
-
-  const { data, error } = await query
-
-  if (error) {
-    console.error('❌ Cost centers direct query failed:', error.message)
-    return [] // Return empty array instead of throwing to prevent cascade failures
-  }
-
-  return ((data as any[]) || []).map((cc: any) => ({
-    ...cc,
-    level: calculateLevel(cc.code)
-  }))
 }
 
 // Helper function to calculate level from code structure

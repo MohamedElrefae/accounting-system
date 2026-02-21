@@ -21,6 +21,7 @@ import { useUnifiedSync } from '../../hooks/useUnifiedSync'
 import ReportControls from '../../components/Reports/GroupingPanel'
 import { useReportGrouping } from '../../hooks/useReportGrouping'
 import SummaryBar from '../../components/Reports/SummaryBar'
+import { getConnectionMonitor } from '../../utils/connectionMonitor'
 
 const TransactionLinesReportPage = () => {
     const lang = useAppStore((s: { language: string }) => s.language)
@@ -110,6 +111,7 @@ const TransactionLinesReportPage = () => {
 
     // Fetch ALL lines with transaction header data (no user filter)
     const fetchAllLines = useCallback(async () => {
+        if (!navigator.onLine) return { rows: [], total: 0 };
         // Build query for ALL transaction lines
         let query = supabase
             .from('transaction_lines')
@@ -225,6 +227,8 @@ const TransactionLinesReportPage = () => {
     // Actually, the spec says "Support ~200 transactions/month (no performance optimization needed)", 
     // so we can fetch all filtered lines if grouping is active to calculate correct subtotals.
     const fetchAllFilteredLines = useCallback(async () => {
+        const monitor = getConnectionMonitor();
+        if (!monitor.getHealth().isOnline) return [];
         let query = supabase
             .from('transaction_lines')
             .select(`
@@ -277,7 +281,7 @@ const TransactionLinesReportPage = () => {
     const { data: allData, isLoading: allLoading } = useQuery({
         queryKey: ['transaction-lines-report-all', appliedFilters],
         queryFn: fetchAllFilteredLines,
-        enabled: grouping !== 'none' && !contextLoading,
+        enabled: grouping !== 'none' && !contextLoading && getConnectionMonitor().getHealth().isOnline,
     })
 
     const {
@@ -288,7 +292,7 @@ const TransactionLinesReportPage = () => {
     } = useQuery({
         queryKey: ['transaction-lines-report', appliedFilters, page, pageSize],
         queryFn: fetchAllLines,
-        enabled: !contextLoading && grouping === 'none', // Only fetch paginated data if not grouped
+        enabled: !contextLoading && grouping === 'none' && getConnectionMonitor().getHealth().isOnline, // Only fetch paginated data if not grouped
         staleTime: 30000,
     })
 

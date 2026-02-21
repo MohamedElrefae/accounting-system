@@ -47,6 +47,12 @@ export class TransactionValidationService {
     const now = Date.now()
     if (now - this.lastAccountsRefresh > this.ACCOUNTS_CACHE_TTL) {
       try {
+        const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+        if (!getConnectionMonitor().getHealth().isOnline) {
+             console.log('Skipping validation accounts refresh (offline)');
+             return;
+        }
+
         // First try with all expected columns including is_active
         let data: AccountInfo[] | null = null;
         const { data: initialData, error } = await supabase

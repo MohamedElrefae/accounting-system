@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useAuth } from './useAuth';
 import { useScopeOptional } from '../contexts/ScopeContext';
 import { presenceHeartbeat } from '../services/presence';
+import { getConnectionMonitor } from '../utils/connectionMonitor';
 
 export function usePresenceHeartbeat(options?: {
   intervalMs?: number;
@@ -36,7 +37,10 @@ export function usePresenceHeartbeat(options?: {
     const send = async () => {
       if (!mountedRef.current) return;
       if (inFlightRef.current) return;
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+      
+      const monitor = getConnectionMonitor();
+      if (!monitor.getHealth().isOnline || !navigator.onLine) return;
+      
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
 
       const now = Date.now();

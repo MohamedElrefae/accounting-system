@@ -7,9 +7,25 @@ export type LandingPreference = 'welcome' | 'dashboard'
 export async function getLandingPreference(orgId?: string): Promise<LandingPreference> {
 
   try {
-    const { data: auth } = await supabase.auth.getUser()
-    const user = auth?.user
+    const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+    const isOnline = getConnectionMonitor().getHealth().isOnline;
+
+    let user;
+    
+    if (isOnline) {
+        const { data: auth } = await supabase.auth.getUser()
+        user = auth?.user
+    } else {
+        const { data: { session } } = await supabase.auth.getSession();
+        user = session?.user;
+    }
+
     if (!user) return 'welcome' // Default to welcome for new users
+
+    // If offline, we can't fetch prefs from DB. Return 'dashboard' as safe default for existing users
+    if (!isOnline) {
+        return 'dashboard'; 
+    }
 
     const effectiveOrgId = orgId ?? null
 

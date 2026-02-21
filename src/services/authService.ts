@@ -10,14 +10,29 @@ export class AuthService {
    */
   static async getCurrentUserId(): Promise<string | null> {
     try {
+      // Offline-first check
+      const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+      const isOnline = getConnectionMonitor().getHealth().isOnline;
+
+      if (!isOnline) {
+         // When offline, trust the local session cache
+         const { data: { session } } = await supabase.auth.getSession();
+         return session?.user?.id || null;
+      }
+
       const { data: { user }, error } = await supabase.auth.getUser();
       if (error) {
-        console.error('Failed to get current user:', error);
+        // Only log if online or if it's not a network error
+        if (isOnline && !error.message?.includes('fetch')) {
+             console.error('Failed to get current user:', error);
+        }
         return null;
       }
       return user?.id || null;
-    } catch (error) {
-      console.error('Error getting current user:', error);
+    } catch (error: any) {
+      if (!error.message?.includes('fetch') && !error.message?.includes('network')) {
+          console.error('Error getting current user:', error);
+      }
       return null;
     }
   }
@@ -44,14 +59,27 @@ export class AuthService {
    */
   static async getCurrentUser() {
     try {
+      // Offline-first check
+      const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+      const isOnline = getConnectionMonitor().getHealth().isOnline;
+
+      if (!isOnline) {
+         const { data: { session } } = await supabase.auth.getSession();
+         return session?.user || null;
+      }
+
       const { data: { user }, error } = await supabase.auth.getUser();
       if (error) {
-        console.error('Failed to get user:', error);
+        if (isOnline && !error.message?.includes('fetch')) {
+             console.error('Failed to get user:', error);
+        }
         return null;
       }
       return user;
-    } catch (error) {
-      console.error('Error getting user:', error);
+    } catch (error: any) {
+      if (!error.message?.includes('fetch')) {
+         console.error('Error getting user:', error);
+      }
       return null;
     }
   }

@@ -107,9 +107,10 @@ const Sidebar: React.FC<SidebarProps> = () => {
     user,
     loading,
     hasRoleInOrg,
+    hasRoleInProject,
+    canPerformActionInOrg,
     canPerformActionInProject,
-    // fallback to legacy check if item has no strict scope
-    hasActionAccess, // "hasPermission" equivalent
+    hasActionAccess, // Destructured for correct usage
   } = useOptimizedAuth();
 
   // Force component update when language changes

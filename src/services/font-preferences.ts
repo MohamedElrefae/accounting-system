@@ -126,6 +126,9 @@ function saveLocalPrefs(prefs: Partial<FontUpdatePayload> & { id?: string; user_
 /**
  * Get current user's font preferences
  */
+/**
+ * Get current user's font preferences
+ */
 export async function getUserFontPreferences(): Promise<FontPreferences> {
   const now = Date.now()
   
@@ -134,22 +137,55 @@ export async function getUserFontPreferences(): Promise<FontPreferences> {
     return preferencesCache
   }
 
+  // Check connection status first
+  let isOnline = true;
   try {
-    // Try RPC first
-    const { data, error } = await supabase.rpc('get_user_font_preferences')
+      const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+      isOnline = getConnectionMonitor().getHealth().isOnline;
+  } catch (e) {
+      // If monitor fails to load, assume online or proceed with standard checks
+      isOnline = navigator.onLine;
+  }
 
-    if (!error && data) {
-      preferencesCache = data as FontPreferences
-      preferencesCacheTime = now
-      saveLocalPrefs(preferencesCache)
-      return preferencesCache
+  // 1. Try to load from local storage first if OFFLINE (fastest and safest)
+  if (!isOnline) {
+       // We might not know the user ID yet if we can't call getUser()
+       // Try to infer from session in local storage
+       const { data: { session } } = await supabase.auth.getSession();
+       const uid = session?.user?.id;
+       
+       if (uid) {
+            const userLocal = loadLocalPrefs(uid);
+            if (userLocal) {
+                preferencesCache = userLocal;
+                preferencesCacheTime = now;
+                return userLocal;
+            }
+       } else {
+           // No user ID, try anonymous local
+           const local = loadLocalPrefs(null);
+           if (local) return local;
+       }
+  }
+
+  try {
+    // 2. Try RPC if Online
+    if (isOnline) {
+        const { data, error } = await supabase.rpc('get_user_font_preferences')
+        if (!error && data) {
+            preferencesCache = data as FontPreferences
+            preferencesCacheTime = now
+            saveLocalPrefs(preferencesCache)
+            return preferencesCache
+        }
     }
 
-    // Fallback: direct table read by authenticated user_id
-    const { data: authData } = await supabase.auth.getUser()
-    const uid = authData?.user?.id || null
-
-    if (uid) {
+    // 3. Fallback: direct table read by authenticated user_id
+    const { data: { session } } = await supabase.auth.getSession();
+    const uid = session?.user?.id || null;
+    
+    // If we have a user and we are online, try to fetch from table if RPC failed
+    if (uid && isOnline) {
       const { data: row, error: selErr } = await supabase
         .from('user_font_preferences')
         .select('*')
@@ -186,13 +222,15 @@ export async function getUserFontPreferences(): Promise<FontPreferences> {
         return preferencesCache
       }
     }
-    // Final fallback when no authenticated user and no server data
-    const local = loadLocalPrefs(null)
+
+    // 4. Final fallback: Local storage (if enabled) or Defaults
+    const local = loadLocalPrefs(uid)
     if (local) {
       preferencesCache = local
       preferencesCacheTime = now
       return local
     }
+    
     return {
       ...DEFAULT_FONT_PREFERENCES,
       id: 'default',
@@ -200,26 +238,16 @@ export async function getUserFontPreferences(): Promise<FontPreferences> {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     } as FontPreferences
+
   } catch (error) {
     console.warn('Falling back to local font preferences due to error:', error)
     // Attempt to get current user id for namespaced key
     let uid: string | null = null
     try {
-      const { data } = await supabase.auth.getUser()
-      uid = data?.user?.id || null
+      const { data } = await supabase.auth.getSession()
+      uid = data?.session?.user?.id || null
     } catch {}
-    // Migrate legacy key to namespaced key if needed
-    try {
-      if (uid) {
-        const nsKey = mkLocalKey(uid)
-        const hasNs = localStorage.getItem(nsKey)
-        const legacy = localStorage.getItem(LOCAL_KEY_BASE)
-        if (!hasNs && legacy) {
-          localStorage.setItem(nsKey, legacy)
-          try { localStorage.removeItem(LOCAL_KEY_BASE) } catch {}
-        }
-      }
-    } catch {}
+    
     // Fallback to local storage if available, otherwise default
     const local = loadLocalPrefs(uid)
     if (local) {

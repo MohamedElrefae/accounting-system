@@ -8,51 +8,11 @@ const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  // Add other critical assets
+  '/favicon.ico',
+  '/vite.svg'
 ];
 
-// API endpoints to cache
-const API_CACHE_PATTERNS = [
-  /\/api\/user_profiles/,
-  /\/api\/user_roles/,
-  /\/api\/organizations/,
-];
-
-// Install event - cache static assets
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(STATIC_CACHE)
-      .then((cache) => {
-        console.log('SW: Caching static assets');
-        return cache.addAll(STATIC_ASSETS);
-      })
-      .then(() => {
-        return self.skipWaiting();
-      })
-  );
-});
-
-// Activate event - clean up old caches
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then((cacheNames) => {
-        return Promise.all(
-          cacheNames.map((cacheName) => {
-            if (cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
-              console.log('SW: Deleting old cache:', cacheName);
-              return caches.delete(cacheName);
-            }
-          })
-        );
-      })
-      .then(() => {
-        return self.clients.claim();
-      })
-  );
-});
-
-// Fetch event - implement caching strategies
+// Handle different types of requests
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -62,66 +22,101 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle different types of requests
-  if (request.url.includes('/api/')) {
-    // API requests - network first with cache fallback
+  // 1. Google Fonts and Material Icons (Stale-While-Revalidate)
+  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
+    event.respondWith(staleWhileRevalidateStrategy(request, 'fonts-cache'));
+    return;
+  }
+
+  // 2. Local API requests - network first
+  if (url.pathname.includes('/api/')) {
     event.respondWith(networkFirstStrategy(request));
-  } else if (request.destination === 'script' || request.destination === 'style') {
-    // JS/CSS files - cache first
+  }
+  // 3. Static Assets (Scripts, Styles) - cache first
+  else if (request.destination === 'script' || request.destination === 'style') {
     event.respondWith(cacheFirstStrategy(request));
-  } else if (request.destination === 'image') {
-    // Images - cache first with network fallback
+  }
+  // 4. Images - cache first with network fallback
+  else if (request.destination === 'image') {
     event.respondWith(cacheFirstStrategy(request));
-  } else {
-    // HTML and other requests - network first
+  }
+  // 5. Everything else (including HTML) - network first
+  else {
     event.respondWith(networkFirstStrategy(request));
   }
 });
+
+// Stale-While-Revalidate strategy
+async function staleWhileRevalidateStrategy(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  const cachedResponse = await cache.match(request);
+
+  const fetchPromise = fetch(request).then((networkResponse) => {
+    if (networkResponse.ok) {
+      cache.put(request, networkResponse.clone());
+    }
+    return networkResponse;
+  }).catch(() => null); // Silent fail for background fetch
+
+  return cachedResponse || fetchPromise;
+}
 
 // Network first strategy (good for API calls)
 async function networkFirstStrategy(request) {
   try {
     const networkResponse = await fetch(request);
-    
-    // Cache successful responses
-    if (networkResponse.ok) {
+
+    // Cache successful responses for fallback
+    if (networkResponse && networkResponse.ok) {
       const cache = await caches.open(DYNAMIC_CACHE);
       cache.put(request, networkResponse.clone());
+      return networkResponse;
     }
-    
-    return networkResponse;
   } catch (error) {
-    // Network failed, try cache
+    console.log('SW: Network fetch failed or offline, trying cache:', request.url);
+  }
+
+  // Network failed or returned error, try cache
+  try {
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {
       return cachedResponse;
     }
-    
-    // Return offline page or error response
-    throw error;
+  } catch (cacheErr) {
+    console.warn('SW: Cache lookup failed:', cacheErr);
   }
+
+  // Final fallback for failed fetches to avoid unhandled rejection
+  // For HTML requests, return a generic offline page if possible, otherwise status 503
+  return new Response('Offline', {
+    status: 503,
+    statusText: 'Offline',
+    headers: { 'Content-Type': 'text/plain' }
+  });
 }
 
 // Cache first strategy (good for static assets)
 async function cacheFirstStrategy(request) {
   const cachedResponse = await caches.match(request);
-  
+
   if (cachedResponse) {
     return cachedResponse;
   }
-  
+
   try {
     const networkResponse = await fetch(request);
-    
-    if (networkResponse.ok) {
+
+    if (networkResponse && networkResponse.ok) {
       const cache = await caches.open(STATIC_CACHE);
       cache.put(request, networkResponse.clone());
+      return networkResponse;
     }
-    
-    return networkResponse;
   } catch (error) {
-    throw error;
+    console.log('SW: Cache miss and network failed:', request.url);
   }
+
+  // Both failed, return a fallback instead of throwing
+  return new Response('Asset not found offline', { status: 404 });
 }
 
 // Background sync for offline actions

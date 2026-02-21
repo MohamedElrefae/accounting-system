@@ -83,14 +83,14 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
   const authScopeData = useAuthScopeData();
   const initializedFromAuthRef = useRef(false);
 
-  // Load projects for a specific org with retry mechanism
+  // Load projects for a specific org with retry mechanism and connectivity awareness
   const loadProjectsForOrg = useCallback(async (orgId: string, retryCount = 0): Promise<Project[]> => {
     if (useUnifiedAuth && authScopeData.isReady) {
       if (import.meta.env.DEV) console.log('[ScopeProvider] UnifiedAuth: Using projects from auth state for org:', orgId);
       const filteredProjects = authScopeData.projects.filter((p: Project) => p.org_id === orgId);
       setAvailableProjects(filteredProjects);
 
-      // Handle project restoration logic (shared with legacy path)
+      // Handle project restoration logic
       const storedProjectId = getStoredProjectId();
       const matchingProject = filteredProjects.find((p: Project) => p.id === storedProjectId);
       if (matchingProject) {
@@ -102,67 +102,28 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
       return filteredProjects;
     }
 
-    if (import.meta.env.DEV) console.log('[ScopeProvider] Loading projects for org:', orgId, { retryCount });
+    // Unified check moved inside service calls
+
     setIsLoadingProjects(true);
-
     try {
-      // Load projects using RPC (already filtered by access control)
-      // The RPC get_user_accessible_projects() handles:
-      // - org_memberships.can_access_all_projects = true → ALL projects
-      // - org_memberships.can_access_all_projects = false → Only project_memberships
       const projects = await getActiveProjectsByOrg(orgId);
+      if (!mountedRef.current) return [];
 
-      if (!mountedRef.current) return projects;
-
-      // Set available projects (no additional filtering needed - RPC already did it)
       setAvailableProjects(projects);
 
-      // Provide user feedback about project access
-      if (projects.length === 0) {
-        console.warn('[ScopeProvider] ⚠️ No projects accessible for user in this organization');
-        console.warn('[ScopeProvider] This could mean:');
-        console.warn('[ScopeProvider]   1. User has no project memberships');
-        console.warn('[ScopeProvider]   2. User cannot access all projects in org');
-        console.warn('[ScopeProvider]   3. No active projects exist in this organization');
+      const storedProjectId = getStoredProjectId();
+      const matchingProject = projects.find(p => p.id === storedProjectId);
 
-        // Clear any previously selected project since it's no longer accessible
+      if (matchingProject) {
+        setCurrentProject(matchingProject);
+      } else {
         setCurrentProject(null);
         setStoredProjectId(null);
-      } else {
-        if (import.meta.env.DEV) console.log('[ScopeProvider] ✅ Loaded projects:', projects.length);
-
-        // Restore project from localStorage if still valid and accessible
-        const storedProjectId = getStoredProjectId();
-        const matchingProject = projects.find(p => p.id === storedProjectId);
-
-        if (matchingProject) {
-          if (import.meta.env.DEV) console.log('[ScopeProvider] Restored project from storage:', matchingProject.code);
-          setCurrentProject(matchingProject);
-        } else {
-          // Either no stored project or it's no longer accessible
-          if (storedProjectId) {
-            console.warn('[ScopeProvider] Previously selected project is no longer accessible, clearing selection');
-          }
-          setCurrentProject(null);
-          setStoredProjectId(null);
-        }
       }
-
       return projects;
     } catch (err) {
-      console.error('[ScopeProvider] Failed to load projects:', err);
-
-      // Implement retry logic for projects
-      if (retryCount < 2) {
-        if (import.meta.env.DEV) console.log(`[ScopeProvider] Retrying projects load (${retryCount + 1}/3)`);
-        setTimeout(() => loadProjectsForOrg(orgId, retryCount + 1), 1000 * (retryCount + 1));
-        return [];
-      }
-
-      if (mountedRef.current) {
-        setAvailableProjects([]);
-        setCurrentProject(null);
-        setError('Failed to load projects. Please check your permissions and try again.');
+      if (import.meta.env.DEV && monitor.getHealth().isOnline) {
+        console.error('[ScopeProvider] Failed to load projects:', err);
       }
       return [];
     } finally {
@@ -170,122 +131,87 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
         setIsLoadingProjects(false);
       }
     }
-  }, []);
+  }, [useUnifiedAuth, authScopeData]);
 
   // Load organizations with retry mechanism and connection awareness
   const loadOrganizations = useCallback(async (retryCount = 0) => {
-    if (import.meta.env.DEV) console.log('[ScopeProvider] Loading organizations...', { retryCount });
+    if (!mountedRef.current) return;
 
-    // Check connection health first
-    const connectionHealth = connectionHealthRef.current;
-    if (connectionHealth && !connectionHealth.isOnline) {
-      console.warn('[ScopeProvider] Skipping load due to connection issues');
-      setConnectionIssue(true);
-      setError('Connection issues detected. Retrying when connection is restored...');
-      return;
-    }
+    const monitor = getConnectionMonitor();
+    const isOnline = monitor.getHealth().isOnline;
 
     setIsLoadingOrgs(true);
-    setError(null);
-    setConnectionIssue(false);
 
-    // CRITICAL: Double check if unified data became ready while waiting
+    // 1. Try to initialize from unified auth data if ready
     if (useUnifiedAuth && authScopeData.isReady) {
-      if (import.meta.env.DEV) console.log('[ScopeProvider] UnifiedAuth Ready: Skipping legacy load in loadOrganizations');
       const orgs = authScopeData.organizations;
       setAvailableOrgs(orgs);
 
       const storedOrgId = getStoredOrgId();
-      const matchingOrg = orgs.find((o: Organization) => o.id === storedOrgId);
-      if (matchingOrg) {
-        setCurrentOrg(matchingOrg);
-        await loadProjectsForOrg(matchingOrg.id);
-      } else if (orgs.length > 0) {
-        setCurrentOrg(orgs[0]);
-        setStoredOrgId(orgs[0].id);
-        await loadProjectsForOrg(orgs[0].id);
+      const matchingOrg = orgs.find((o: Organization) => o.id === (storedOrgId || authScopeData.defaultOrgId));
+      const orgToSet = matchingOrg || orgs[0] || null;
+
+      if (orgToSet) {
+        setCurrentOrg(orgToSet);
+        setStoredOrgId(orgToSet.id);
+        await loadProjectsForOrg(orgToSet.id);
       }
+
+      initializedFromAuthRef.current = true;
       setIsLoadingOrgs(false);
       setLastUpdated(new Date());
-      initializedFromAuthRef.current = true;
       return;
     }
 
+    // Unified check moved inside service calls via getOrganizations()
+
     try {
       const orgs = await getOrganizations();
-      if (import.meta.env.DEV) console.log('[ScopeProvider] Loaded organizations:', orgs.length, orgs.map(o => o.code));
-
       if (!mountedRef.current) return;
 
       setAvailableOrgs(orgs);
+      setError(null);
+      setConnectionIssue(false);
 
-      // Restore from localStorage or select first
       const storedOrgId = getStoredOrgId();
-      if (import.meta.env.DEV) console.log('[ScopeProvider] Stored org ID:', storedOrgId);
       const matchingOrg = orgs.find(o => o.id === storedOrgId);
+      const orgToSet = matchingOrg || orgs[0] || null;
 
-      if (matchingOrg) {
-        if (import.meta.env.DEV) console.log('[ScopeProvider] Restored org from storage:', matchingOrg.code);
-        setCurrentOrg(matchingOrg);
-        await loadProjectsForOrg(matchingOrg.id);
-      } else if (orgs.length > 0) {
-        if (import.meta.env.DEV) console.log('[ScopeProvider] Auto-selecting first org:', orgs[0].code);
-        setCurrentOrg(orgs[0]);
-        setStoredOrgId(orgs[0].id);
-        await loadProjectsForOrg(orgs[0].id);
+      if (orgToSet) {
+        setCurrentOrg(orgToSet);
+        setStoredOrgId(orgToSet.id);
+        await loadProjectsForOrg(orgToSet.id);
       }
 
       setLastUpdated(new Date());
     } catch (err) {
-      console.error('[ScopeProvider] Failed to load organizations:', err);
-
-      // Implement retry logic
-      if (retryCount < 2) {
-        if (import.meta.env.DEV) console.log(`[ScopeProvider] Retrying organizations load (${retryCount + 1}/3)`);
-        setTimeout(() => loadOrganizations(retryCount + 1), 1000 * (retryCount + 1));
-        return;
+      if (import.meta.env.DEV && monitor.getHealth().isOnline) {
+        console.error('[ScopeProvider] Failed to load organizations:', err);
       }
-
-      if (mountedRef.current) {
-        setError('Failed to load organizations after multiple attempts');
-        // Set fallback state to prevent app from being unusable
-        setAvailableOrgs([]);
-        setCurrentOrg(null);
-        setCurrentProject(null);
-        setAvailableProjects([]);
+      if (retryCount < 2 && monitor.getHealth().isOnline) {
+        setTimeout(() => loadOrganizations(retryCount + 1), 2000);
       }
     } finally {
       if (mountedRef.current) {
         setIsLoadingOrgs(false);
       }
     }
-  }, [loadProjectsForOrg]);
+  }, [loadProjectsForOrg, useUnifiedAuth, authScopeData]);
 
   // Load organizations on mount and monitor connection
   useEffect(() => {
     mountedRef.current = true;
-    if (import.meta.env.DEV) console.log('[ScopeProvider] Mounting, loading organizations...');
 
-    // Set up connection monitoring
     const monitor = getConnectionMonitor();
-    connectionHealthRef.current = monitor.getHealth();
-
     const unsubscribe = monitor.subscribe((health) => {
       connectionHealthRef.current = health;
-
-      // If connection is restored and we have issues, try to reload
       if (health.isOnline && connectionIssueRef.current) {
-        if (import.meta.env.DEV) console.log('[ScopeProvider] Connection restored, reloading data...');
         loadOrganizations();
       }
-
-      // Update connection issue state
-      const nextIssue = !health.isOnline;
-      connectionIssueRef.current = nextIssue;
-      setConnectionIssue(nextIssue);
+      connectionIssueRef.current = !health.isOnline;
+      setConnectionIssue(!health.isOnline);
     });
 
-    // Initial load
     if (!useUnifiedAuth || !authScopeData.isReady) {
       loadOrganizations();
     }
@@ -294,20 +220,17 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
       mountedRef.current = false;
       unsubscribe();
     };
-  }, [loadOrganizations]);
+  }, [loadOrganizations, useUnifiedAuth, authScopeData.isReady]);
 
   // Re-initialize if unified auth becomes ready late
   useEffect(() => {
     if (useUnifiedAuth && authScopeData.isReady && !initializedFromAuthRef.current) {
-      if (import.meta.env.DEV) console.log('[ScopeProvider] UnifiedAuth became ready, initializing...');
       loadOrganizations();
     }
   }, [useUnifiedAuth, authScopeData.isReady, loadOrganizations]);
 
   // Set organization - CLEARS PROJECT
   const setOrganization = useCallback(async (orgId: string | null) => {
-    if (import.meta.env.DEV) console.log('[ScopeProvider] setOrganization:', orgId);
-
     if (!orgId) {
       setCurrentOrg(null);
       setCurrentProject(null);
@@ -318,23 +241,15 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
     }
 
     const org = availableOrgs.find(o => o.id === orgId);
-    if (!org) {
-      console.error('[ScopeProvider] Invalid org ID:', orgId);
-      return;
-    }
+    if (!org) return;
 
-    // Update org
     setCurrentOrg(org);
     setStoredOrgId(orgId);
-
-    // CRITICAL: Clear project when org changes
     setCurrentProject(null);
     setStoredProjectId(null);
 
-    // Load projects for new org
     await loadProjectsForOrg(orgId);
 
-    // Invalidate org-scoped queries
     queryClient.invalidateQueries({ queryKey: queryKeys.accounts.byOrg(orgId) });
     queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.byOrg(orgId) });
     queryClient.invalidateQueries({ queryKey: queryKeys.categories.byOrg(orgId) });
@@ -344,36 +259,20 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
     setLastUpdated(new Date());
   }, [availableOrgs, loadProjectsForOrg, queryClient]);
 
-  // Set project - validates org ownership (access already validated by RPC)
+  // Set project
   const setProject = useCallback(async (projectId: string | null) => {
-    if (import.meta.env.DEV) console.log('[ScopeProvider] setProject:', projectId);
-
     if (!projectId) {
       setCurrentProject(null);
       setStoredProjectId(null);
       return;
     }
 
-    // 1. Validate project is in available projects (already filtered by RPC)
     const project = availableProjects.find(p => p.id === projectId);
-    if (!project) {
-      console.error('[ScopeProvider] Invalid project ID or no access:', projectId);
-      setError('Project not found or no access');
-      return;
-    }
+    if (!project || !currentOrg) return;
 
-    // 2. Validate org is selected
-    if (!currentOrg) {
-      console.error('[ScopeProvider] No organization selected');
-      setError('Organization required');
-      return;
-    }
-
-    // 3. Set project (access already validated by RPC get_user_accessible_projects)
     setCurrentProject(project);
     setStoredProjectId(projectId);
 
-    // Invalidate project-scoped queries
     queryClient.invalidateQueries({
       queryKey: queryKeys.costCenters.byOrg(currentOrg.id, projectId)
     });
@@ -390,41 +289,28 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
     setStoredProjectId(null);
   }, []);
 
-  // Refresh scope with error handling
+  // Refresh scope
   const refreshScope = useCallback(async () => {
-    try {
-      await loadOrganizations();
-    } catch (err) {
-      console.error('[ScopeProvider] Refresh failed:', err);
-      setError('Failed to refresh data');
-    }
+    await loadOrganizations();
   }, [loadOrganizations]);
 
-  // Getters
-  const getOrgId = useCallback(() => currentOrg?.id ?? null, [currentOrg]);
-  const getProjectId = useCallback(() => currentProject?.id ?? null, [currentProject]);
-
-  // Manual refresh function for topbar
+  // Manual refresh
   const manualRefresh = useCallback(async () => {
-    if (import.meta.env.DEV) console.log('[ScopeProvider] Manual refresh triggered');
     setError(null);
     setConnectionIssue(false);
-
     if (useUnifiedAuth) {
-      if (import.meta.env.DEV) console.log('[ScopeProvider] UnifiedAuth: Triggering auth refresh');
       await authScopeData.refresh();
-      // loadOrganizations() is NOT needed here because it reads from auth state,
-      // and we have an effect that syncing availableOrgs when auth state changes.
-      // However, to ensure instant update, we can call it.
       await loadOrganizations();
     } else {
       await loadOrganizations();
     }
   }, [loadOrganizations, useUnifiedAuth, authScopeData]);
 
-  // Context value
+  // Getters
+  const getOrgId = useCallback(() => currentOrg?.id ?? null, [currentOrg]);
+  const getProjectId = useCallback(() => currentProject?.id ?? null, [currentProject]);
+
   const value: ScopeContextValue = useMemo(() => ({
-    // State
     currentOrg,
     currentProject,
     availableOrgs,
@@ -433,8 +319,6 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
     isLoadingProjects,
     error,
     lastUpdated,
-
-    // Actions
     setOrganization,
     setProject,
     clearScope,

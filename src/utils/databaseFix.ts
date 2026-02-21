@@ -4,17 +4,20 @@
 
 import { supabase } from './supabase';
 import type { RoleSlug } from '../lib/permissions';
-import { getRolesFromAuthMetadata } from './authFallback';
+import { getConnectionMonitor } from './connectionMonitor';
 
 /**
  * Safely fetch user roles matching the actual database schema
  */
-export const fetchUserRolesSafely = async (userId: string, user?: any): Promise<RoleSlug[]> => {
+export const fetchUserRolesSafely = async (userId: string): Promise<RoleSlug[]> => {
   // If no userId provided, return empty array
   if (!userId) {
     console.warn('⚠️ fetchUserRolesSafely: Called with empty userId');
     return [];
   }
+
+  const monitor = getConnectionMonitor();
+  if (!monitor.getHealth().isOnline) return [];
 
   console.log(`🔍 fetchUserRolesSafely: Starting (User: ${userId})`);
 
@@ -88,6 +91,9 @@ export const fetchUserProfileSafely = async (userId: string) => {
     return { is_super_admin: false };
   }
 
+  const monitor = getConnectionMonitor();
+  if (!monitor.getHealth().isOnline) return { is_super_admin: false };
+
   try {
     // Skip table check and try direct query
     const { data, error } = await supabase
@@ -119,6 +125,11 @@ export const checkDatabaseHealth = async (): Promise<{
   const errors: string[] = [];
   let userRolesExists = false;
   let userProfilesExists = false;
+
+  const monitor = getConnectionMonitor();
+  if (!monitor.getHealth().isOnline) {
+    return { userRolesExists, userProfilesExists, errors };
+  }
 
   try {
     const { error: rolesError } = await supabase

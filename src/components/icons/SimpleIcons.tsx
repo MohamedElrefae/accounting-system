@@ -681,6 +681,102 @@ export const BugReportIcon: React.FC<SvgIconProps> = (props) => (
   </SvgIcon>
 );
 
+export const WarningAmberRoundedIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M12 5.99L19.53 19H4.47L12 5.99M12 2L1 21h22L12 2zm1 14h-2v2h2v-2zm0-6h-2v4h2v-4z" />
+  </SvgIcon>
+);
+
+export const MergeTypeRoundedIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M17 20.41L18.41 19 15 15.59V13.5l3.5-3.5-1.41-1.41L13.5 12.18V8h-2v4.18l-3.59-3.59L6.5 10l3.5 3.5v2.09L6.59 19 8 20.41l3.5-3.5V21h2v-4.09l3.5 3.5z" />
+  </SvgIcon>
+);
+
+export const CloudOffIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M22.56 19.1L4.11 1.2M23.64 7c-.45-.34-4.93-4-11.64-4C6.48 3 2.52 6.82 2.35 7l-.35.36L.71 8.16l.35.35C1.23 9.09 5.48 12.83 12 12.83c1.25 0 2.42-.19 3.51-.53l-1.44-1.44c-.67.2-1.36.31-2.07.31-4.97 0-9.14-3.03-11-4.88l1.42-1.42L1 23l1.41 1.41L23 4l-1.36-1.36z" />
+  </SvgIcon>
+);
+
+export const SyncRoundedIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm-6.04-1.03l-1.46-1.46C3.46 2.97 3 4.43 3 6c0 4.42 3.58 8 8 8v3l4-4-4-4v3c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8z" />
+  </SvgIcon>
+);
+
+export const StorageRoundedIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M2 20h20v-4H2v4zm2-3h2v2H4v-2zM2 4v4h20V4H2zm4 3H4V5h2v2zm-4 7h20v-4H2v4zm2-3h2v2H4v-2z" />
+  </SvgIcon>
+);
+
+export const MinimizeRoundedIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M6 19h12v2H6z" />
+  </SvgIcon>
+);
+
+export const AttachFileRoundedIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M16.5 6l-6.5 6.5c-1.38 1.38-3.61 1.38-5 0-1.38-1.38-1.38-3.61 0-5l6.5-6.5 1.41 1.41-6.5 6.5c-.6.6-.6 1.58 0 2.18.6.6 1.58.6 2.18 0l6.5-6.5L16.5 6z" />
+  </SvgIcon>
+);
+
+export const ReceiptRoundedIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M18 17H6v-2h12v2zm0-4H6v-2h12v2zm0-4H6V7h12v2zM3 22l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5L18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20z" />
+  </SvgIcon>
+);
+
+export const DeleteSweepRoundedIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M15 16h4v2h-4zm0-8h7v2h-7zm0 4h6v2h-6zM3 18c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2V8H3v10zm2-8h6v8H5v-8zm5-6H6L5 5H2v2h12V5h-3l-1-1z" />
+  </SvgIcon>
+);
+
+export const PhoneAndroidRoundedIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M16 1H8C6.34 1 5 2.34 5 4v16c0 1.66 1.34 3 3 3h8c1.66 0 3-1.34 3-3V4c0-1.66-1.34-3-3-3zm-2 20h-4v-1h4v1zm3.25-3H6.75V4h10.5v14z" />
+  </SvgIcon>
+);
+
+export const CloudQueueIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4h2c0-3.31-2.69-6-6-6s-6 2.69-6 6 2.69 6 6 6h13c1.65 0 3-1.35 3-3s-1.35-3-3-3V11c2.76 0 5 2.24 5 5s-2.24 5-5 5z" />
+  </SvgIcon>
+);
+
+export const DeleteForeverIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zm2.46-7.12l1.41-1.41L12 12.59l2.12-2.12 1.41 1.41L13.41 14l2.12 2.12-1.41 1.41L12 15.41l-2.12 2.12-1.41-1.41L10.59 14l-2.13-2.12zM15.5 4l-1-1h-5l-1 1H5v2h14V4z" />
+  </SvgIcon>
+);
+
+export const DescriptionOutlinedIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M9 5v2h12V5H9zm0 6h12v-2H9v2zm0 4h12v-2H9v2zm0 4h12v-2H9v2zM5 5h2v2H5V5zm0 6h2v-2H5v2zm0 4h2v-2H5v2zm0 4h2v-2H5v2z" />
+  </SvgIcon>
+);
+
+export const SignalWifiOffIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M23.64 7c-.45-.34-4.93-4-11.64-4-1.5 0-2.89.19-4.15.53L1.13 1.13 0 2.25l22.42 22.42 1.13-1.13-2.15-2.15c.16-.06.31-.13.46-.21L23.64 7zM12 10c0-1.1-.9-2-2-2-.19 0-.36.03-.52.08l2.44 2.44c.05-.16.08-.33.08-.52zM4.78 4.78l1.78 1.78C5.07 7.31 3.52 8.44 2.35 9L12 21l3.56-4.44L4.78 4.78z" />
+  </SvgIcon>
+);
+
+export const SyncProblemIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M3 12c0 2.21.91 4.2 2.36 5.64L3 20h7v-7l-2.35 2.35C6.67 14.37 6 13.26 6 12c0-3.31 2.69-6 6-6s6 2.69 6 6c0 1.1-.3 2.12-.81 3l1.47 1.47C19.53 15.19 20 13.65 20 12c0-4.42-3.58-8-8-8s-8 3.58-8 8zm9-3h-2v5h2V9zm0 6h-2v2h2v-2z" />
+  </SvgIcon>
+);
+
+export const CloudDoneIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4c-2.72 0-5.11 1.47-6.4 3.69C2.42 8.13 0 10.8 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM10 17l-3.5-3.5 1.41-1.41L10 14.17l5.09-5.09L16.5 10.5 10 17z" />
+  </SvgIcon>
+);
+
 // Export all icons with their MUI names for compatibility
 export {
   MenuIcon as Menu,
@@ -811,7 +907,35 @@ export {
   AttachMoneyIcon as AttachMoney,
   ImportExportIcon as ImportExport,
   DeselectOutlinedIcon as DeselectOutlined,
-  BugReportIcon as BugReport
+  BugReportIcon as BugReport,
+  WarningAmberRoundedIcon as WarningAmberRounded,
+  MergeTypeRoundedIcon as MergeTypeRounded,
+  PersonIcon as PersonRounded,
+  CheckCircleIcon as CheckCircleRounded,
+  InfoIcon as InfoRounded,
+  ExpandMoreIcon as ExpandMoreRounded,
+  SyncRoundedIcon as Sync,
+  SyncRoundedIcon as SyncRounded,
+  CloudOffIcon as CloudOff,
+  ErrorIcon as ErrorRounded,
+  WarningIcon as WarningRounded,
+  MinimizeRoundedIcon as MinimizeRounded,
+  CloseIcon as CloseRounded,
+  History as HistoryRounded,
+  StorageRoundedIcon as StorageRounded,
+  RefreshIcon as RefreshRounded,
+  PlayArrowIcon as PlayArrowRounded,
+  SettingsIcon as SettingsRounded,
+  AttachFileRoundedIcon as AttachFileRounded,
+  ReceiptRoundedIcon as ReceiptRounded,
+  DeleteSweepRoundedIcon as DeleteSweepRounded,
+  PhoneAndroidRoundedIcon as PhoneAndroidRounded,
+  CloudQueueIcon as CloudQueue,
+  DeleteForeverIcon as DeleteForever,
+  DescriptionOutlinedIcon as DescriptionOutlined,
+  SignalWifiOffIcon as SignalWifiOff,
+  SyncProblemIcon as SyncProblem,
+  CloudDoneIcon as CloudDone
 };
 
 // Default export for compatibility with default imports
@@ -943,7 +1067,13 @@ const icons = {
   AttachMoney: AttachMoneyIcon,
   ImportExport: ImportExportIcon,
   DeselectOutlined: DeselectOutlinedIcon,
-  BugReport: BugReportIcon
+  BugReport: BugReportIcon,
+  WarningAmberRounded: WarningAmberRoundedIcon,
+  MergeTypeRounded: MergeTypeRoundedIcon,
+  PersonRounded: PersonIcon,
+  CheckCircleRounded: CheckCircleIcon,
+  InfoRounded: InfoIcon,
+  ExpandMoreRounded: ExpandMoreIcon
 };
 
 export default icons;

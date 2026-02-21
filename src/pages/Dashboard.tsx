@@ -36,9 +36,9 @@ import {
   TrendingUp,
   ExpandMore,
 } from '../components/icons/SimpleIcons';
-import { 
-  dashboardStats, 
-  translations 
+import {
+  dashboardStats,
+  translations
 } from '../data/mockData';
 import { supabase } from '../utils/supabase';
 import { getCompanyConfig } from '../services/company-config';
@@ -63,7 +63,7 @@ const Dashboard: React.FC = () => {
   const { language, demoMode } = useAppStore();
   const navigate = useNavigate();
   const t = translations[language];
-  
+
   // Use centralized scope context for org/project selection
   const { currentOrg, currentProject, getOrgId, getProjectId } = useScope();
 
@@ -88,7 +88,7 @@ const Dashboard: React.FC = () => {
   const [numbersOnlyDashboard, setNumbersOnlyDashboard] = React.useState<boolean>(false);
   const [showFilters, setShowFilters] = React.useState<boolean>(false);
   const [postedOnly, setPostedOnly] = React.useState<boolean>(false); // Default: show all transactions
-  
+
   // Query-driven, hydrated by prefetch - now using ScopeContext
   const orgIdForQuery = getOrgId() || undefined;
   const projectIdForQuery = getProjectId() || undefined;
@@ -228,7 +228,7 @@ const Dashboard: React.FC = () => {
     try {
       if (from) localStorage.setItem('dashboard_date_from', from); else localStorage.removeItem('dashboard_date_from');
       if (to) localStorage.setItem('dashboard_date_to', to); else localStorage.removeItem('dashboard_date_to');
-    } catch {}
+    } catch { }
   };
 
   const activePreset = React.useMemo<PresetKey | null>(() => {
@@ -245,10 +245,10 @@ const Dashboard: React.FC = () => {
     try {
       const v = localStorage.getItem('dashboard_compact_ticks');
       if (v !== null) setCompactTicks(v === 'true');
-    } catch {}
+    } catch { }
   }, []);
   React.useEffect(() => {
-    try { localStorage.setItem('dashboard_compact_ticks', String(compactTicks)); } catch {}
+    try { localStorage.setItem('dashboard_compact_ticks', String(compactTicks)); } catch { }
   }, [compactTicks]);
 
   // Load filter bar collapsed state
@@ -256,11 +256,11 @@ const Dashboard: React.FC = () => {
     try {
       const collapsed = localStorage.getItem('dashboard_filters_collapsed');
       if (collapsed !== null) setShowFilters(collapsed !== 'true');
-    } catch {}
+    } catch { }
   }, []);
 
   React.useEffect(() => {
-    try { localStorage.setItem('dashboard_filters_collapsed', String(!showFilters)); } catch {}
+    try { localStorage.setItem('dashboard_filters_collapsed', String(!showFilters)); } catch { }
   }, [showFilters]);
 
   // Load per-user shortcuts from localStorage
@@ -271,14 +271,14 @@ const Dashboard: React.FC = () => {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) setUserShortcuts(parsed);
       }
-    } catch {}
+    } catch { }
   }, []);
 
   const manageUserShortcuts = () => {
     try {
       const current = JSON.stringify(userShortcuts || [], null, 2);
       const promptText = language === 'ar'
-        ? 'ألصق اختصارات المستخدم (JSON Array)' 
+        ? 'ألصق اختصارات المستخدم (JSON Array)'
         : 'Paste user shortcuts (JSON Array)';
       const input = window.prompt(promptText, current);
       if (input == null) return;
@@ -329,7 +329,7 @@ const Dashboard: React.FC = () => {
       if (dt) setDateTo(dt);
       if (no) setNumbersOnlyDashboard(no === 'true');
       if (po) setPostedOnly(po === 'true');
-    } catch {}
+    } catch { }
   }, []);
 
   const load = React.useCallback(async () => {
@@ -337,7 +337,6 @@ const Dashboard: React.FC = () => {
       setError(null);
       setLoading(false);
       setLastUpdated(new Date());
-      // Provide a small demo chart dataset (no DB)
       const now = new Date();
       const months: string[] = [];
       for (let i = 5; i >= 0; i--) {
@@ -347,174 +346,142 @@ const Dashboard: React.FC = () => {
       setChartData(months.map((m, i) => ({ month: m, revenue: 120000 + i * 8000, expenses: 85000 + i * 5000 })));
       return;
     }
+
+    const monitor = getConnectionMonitor();
+    const isOnline = monitor.getHealth().isOnline;
+
     setLoading(true);
     setError(null);
     try {
-      // Use org/project from ScopeContext (centralized state)
       const orgId = getOrgId();
       const projectId = getProjectId();
 
-      // Helper to apply filters
-      const applyScope = (q: any) => {
-        if (orgId) q = q.eq('org_id', orgId);
-        if (projectId) q = q.eq('project_id', projectId);
-        return q;
-      };
-
-      // Load company config (currency and number format)
+      // 1. Load company config (hardened)
       const cfg = await getCompanyConfig();
       setCurrencySymbol(cfg.currency_symbol || 'none');
       setNumberFormat(cfg.number_format || (language === 'ar' ? 'ar-SA' : 'en-US'));
       setDateFormat(cfg.date_format || 'YYYY-MM-DD');
       setCustomShortcuts(Array.isArray((cfg as any).shortcuts) ? ((cfg as any).shortcuts as any) : []);
 
-      // Use unified balance service for consistency with all reports
-      // Get accounts for transaction categorization (support id and code lookups)
-      const { data: accts, error: acctErr } = await supabase
-        .from('accounts')
-        .select('id, code, name, category, normal_balance');
-      if (acctErr) throw acctErr;
-      const acctById: Record<string, { id: string; code?: string | null; name?: string | null; category?: string | null; normal_balance?: 'debit' | 'credit' | null }> = {};
-      const acctByCode: Record<string, { id: string; code?: string | null; name?: string | null; category?: string | null; normal_balance?: 'debit' | 'credit' | null }> = {};
-      for (const a of accts || []) {
-        const rec = { id: a.id, code: (a as any).code ?? null, name: (a as any).name ?? null, category: (a as any).category ?? null, normal_balance: (a as any).normal_balance ?? null };
-        acctById[a.id] = rec;
-        if ((a as any).code) acctByCode[(a as any).code] = rec;
-      }
+      // 2. Fetch Highlight Accounts (with offline fallback)
+      let highlights: any[] = [];
+      if (isOnline) {
+        try {
+          const { data: accountsData, error: accountsError } = await supabase
+            .from('accounts')
+            .select('id, code, name, category, normal_balance')
+            .in('code', ['1101', '1102', '1201'])
+            .eq('is_active', true);
 
-      // 1) Recent 10 transactions
-      const { getReadMode } = await import('../config/featureFlags');
-      const readMode = getReadMode();
-      let rows: any[] = [];
-      if (readMode !== 'legacy') {
-        // Use enriched multi-line journals view
-        let recentQ = supabase
-          .from('v_gl2_journals_enriched')
-          .select('journal_id, org_id, number, doc_date, posting_date, status, debit_account_code, credit_account_code, amount')
-          .order('posting_date', { ascending: false, nullsFirst: false })
-          .limit(10);
-        recentQ = applyScope(recentQ);
-        if (postedOnly) recentQ = recentQ.eq('status', 'posted');
-        const { data: txRecent, error: txErr } = await recentQ as any;
-        if (txErr) throw txErr;
-        rows = txRecent || [];
-
-        const recentDerived: RecentRow[] = rows.map(r => ({
-          id: r.journal_id,
-          entry_date: r.doc_date || r.posting_date,
-          description: '',
-          amount: Number(r.amount ?? 0),
-          debit_account_id: r.debit_account_code,
-          credit_account_id: r.credit_account_code,
-          type: 'income',
-          category: null,
-        }));
-        setRecent(recentDerived);
+          if (!accountsError && accountsData) {
+            highlights = accountsData;
+            const { getOfflineDB } = await import('../services/offline/core/OfflineSchema');
+            await getOfflineDB().metadata.put({
+              key: 'dashboard_highlights_accounts',
+              value: accountsData,
+              updatedAt: new Date().toISOString()
+            });
+          }
+        } catch (err) {
+          console.warn('Dashboard accounts fetch failed');
+        }
       } else {
-        // Legacy single-line transactions table (exclude wizard drafts)
-        let recentQ = supabase
-          .from('transactions')
-          .select('id, entry_date, description, amount, debit_account_id, credit_account_id, is_posted')
-          .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
-          .order('entry_date', { ascending: false })
-          .order('created_at', { ascending: false })
-          .limit(10);
-        recentQ = applyScope(recentQ);
-        if (postedOnly) recentQ = recentQ.eq('is_posted', true);
-        const { data: txRecent, error: txErr } = await recentQ;
-        if (txErr) throw txErr;
-        rows = txRecent || [];
-
-        const recentDerived: RecentRow[] = rows.map(r => ({
-          id: r.id,
-          entry_date: r.entry_date,
-          description: r.description,
-          amount: r.amount,
-          debit_account_id: r.debit_account_id,
-          credit_account_id: r.credit_account_id,
-          type: 'income',
-          category: null,
-        }));
-        setRecent(recentDerived);
+        try {
+          const { getOfflineDB } = await import('../services/offline/core/OfflineSchema');
+          const cached = await getOfflineDB().metadata.get('dashboard_highlights_accounts');
+          if (cached && Array.isArray(cached.value)) highlights = cached.value;
+        } catch { }
       }
 
-      // 2) Window for charts: last 6 months
-      const now = new Date();
-      // Date range
-      let startStr = '';
-      if (dateFrom) startStr = dateFrom;
-      else {
+      // 3. Chart Data (Last 6 Months)
+      // For now we still perform the range query but we GUARD it
+      if (isOnline) {
+        const { getReadMode } = await import('../config/featureFlags');
+        const readMode = getReadMode();
+        const now = new Date();
         const start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-        startStr = start.toISOString().slice(0, 10);
-      }
+        const startStr = start.toISOString().slice(0, 10);
 
-      // Range data for charts (last 6 months), switch by read mode
-      let txs: any[] = [];
-      if (readMode !== 'legacy') {
-        let rangeQ = supabase
-          .from('v_gl2_journals_enriched')
-          .select('journal_id, posting_date, doc_date, amount, debit_account_code, credit_account_code, status')
-          .gte('posting_date', startStr)
-          .order('posting_date', { ascending: true });
-        if (dateTo) rangeQ = rangeQ.lte('posting_date', dateTo);
-        rangeQ = applyScope(rangeQ);
-        if (postedOnly) rangeQ = rangeQ.eq('status', 'posted');
-        const { data: txRange, error: rangeErr } = await rangeQ as any;
-        if (rangeErr) throw rangeErr;
-        txs = txRange || [];
-      } else {
-        let rangeQ = supabase
-          .from('transactions')
-          .select('id, entry_date, amount, debit_account_id, credit_account_id, is_posted')
-          .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
-          .gte('entry_date', startStr)
-          .order('entry_date', { ascending: true });
-        if (dateTo) rangeQ = rangeQ.lte('entry_date', dateTo);
-        rangeQ = applyScope(rangeQ);
-        if (postedOnly) rangeQ = rangeQ.eq('is_posted', true);
-        const { data: txRange, error: rangeErr } = await rangeQ;
-        if (rangeErr) throw rangeErr;
-        txs = txRange || [];
-      }
+        let txs: any[] = [];
+        const applyScope = (q: any) => {
+          if (orgId) q = q.eq('org_id', orgId);
+          if (projectId) q = q.eq('project_id', projectId);
+          return q;
+        };
 
-      // Build monthly buckets using consistent formatting
-      const monthKeys: string[] = [];
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const key = d.toLocaleString(numberFormat || (language === 'ar' ? 'ar-SA' : 'en-US'), { month: 'short', year: '2-digit' });
-        monthKeys.push(key);
-      }
-      const revenueByMonth: number[] = Array(6).fill(0);
-      const expensesByMonth: number[] = Array(6).fill(0);
+        if (readMode !== 'legacy') {
+          let rangeQ = supabase
+            .from('v_gl2_journals_enriched')
+            .select('journal_id, posting_date, amount, debit_account_code, credit_account_code, status')
+            .gte('posting_date', startStr);
+          rangeQ = applyScope(rangeQ);
+          if (postedOnly) rangeQ = rangeQ.eq('status', 'posted');
+          const { data } = await rangeQ as any;
+          txs = data || [];
+        } else {
+          let rangeQ = supabase
+            .from('transactions')
+            .select('id, entry_date, amount, debit_account_id, credit_account_id, is_posted')
+            .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
+            .gte('entry_date', startStr);
+          rangeQ = applyScope(rangeQ);
+          if (postedOnly) rangeQ = rangeQ.eq('is_posted', true);
+          const { data } = await rangeQ;
+          txs = data || [];
+        }
 
+        // Process monthly aggregates
+        const monthKeys: string[] = [];
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          monthKeys.push(d.toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US', { month: 'short', year: '2-digit' }));
+        }
 
-      // Build revenue/expenses by month from transactions (informational)
-      for (const r of txs) {
-        const dateVal = (r as any).entry_date || (r as any).doc_date || (r as any).posting_date;
-        const d = new Date(dateVal);
-        const key = d.toLocaleString(numberFormat || (language === 'ar' ? 'ar-SA' : 'en-US'), { month: 'short', year: '2-digit' });
-        const idx = monthKeys.indexOf(key);
-        const creditCat = (r as any).credit_account_id ? (acctById[(r as any).credit_account_id]?.category || null) : ((r as any).credit_account_code ? (acctByCode[(r as any).credit_account_code]?.category || null) : null);
-        const debitCat = (r as any).debit_account_id ? (acctById[(r as any).debit_account_id]?.category || null) : ((r as any).debit_account_code ? (acctByCode[(r as any).debit_account_code]?.category || null) : null);
-        const isPosted = (r as any).is_posted ?? (String((r as any).status || '').toLowerCase() === 'posted');
-        const amt = Number((r as any).amount ?? 0);
-        if (idx >= 0 && (!postedOnly || isPosted)) {
+        const revenueByMonth = Array(6).fill(0);
+        const expensesByMonth = Array(6).fill(0);
+
+        // Map account categories for mapping
+        const { data: accountsData } = await supabase
+          .from('accounts')
+          .select('id, code, category')
+          .in('category', ['revenue', 'expense']);
+
+        const acctMap: Record<string, string> = {};
+        const codeMap: Record<string, string> = {};
+        for (const a of accountsData || []) {
+          acctMap[a.id] = a.category;
+          if (a.code) codeMap[a.code] = a.category;
+        }
+
+        for (const r of txs) {
+          const dateVal = (r as any).entry_date || (r as any).doc_date || (r as any).posting_date;
+          if (!dateVal) continue;
+          const d = new Date(dateVal);
+          const key = d.toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US', { month: 'short', year: '2-digit' });
+          const idx = monthKeys.indexOf(key);
+          if (idx < 0) continue;
+
+          const amt = Number((r as any).amount ?? 0);
+          const debitCat = (r as any).debit_account_id ? acctMap[(r as any).debit_account_id] : ((r as any).debit_account_code ? codeMap[(r as any).debit_account_code] : null);
+          const creditCat = (r as any).credit_account_id ? acctMap[(r as any).credit_account_id] : ((r as any).credit_account_code ? codeMap[(r as any).credit_account_code] : null);
+
           if (creditCat === 'revenue') revenueByMonth[idx] += amt;
           if (debitCat === 'expense') expensesByMonth[idx] += amt;
         }
+
+        setChartData(monthKeys.map((month, i) => ({ month, revenue: revenueByMonth[i], expenses: expensesByMonth[i] })));
+      } else {
+        // Offline chart fallback: static msg or empty
+        setChartData([]);
       }
-      // last updated after chart load
+
       setLastUpdated(new Date());
-
-      // Compose chart data rows
-      setChartData(monthKeys.map((month, i) => ({ month, revenue: revenueByMonth[i], expenses: expensesByMonth[i] })));
-
     } catch (e: any) {
-      setError(e?.message || 'Failed to load dashboard data');
+      if (isOnline) setError(e?.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, demoMode, language, numberFormat, postedOnly, getOrgId, getProjectId]);
+  }, [dateFrom, dateTo, demoMode, language, postedOnly, getOrgId, getProjectId]);
 
   React.useEffect(() => {
     void load();
@@ -534,7 +501,7 @@ const Dashboard: React.FC = () => {
     window.addEventListener('transactions:refresh', handler)
     return () => window.removeEventListener('transactions:refresh', handler)
   }, [qc, load, orgIdForQuery, projectIdForQuery, dateFrom, dateTo, postedOnly])
-  
+
 
   return (
     <Box>
@@ -585,7 +552,7 @@ const Dashboard: React.FC = () => {
               {(language === 'ar' ? 'آخر تحديث: ' : 'Last updated: ') + formatDate(lastUpdated.toISOString().slice(0, 10)) + ' ' + lastUpdated.toLocaleTimeString(numberFormat || (language === 'ar' ? 'ar-SA' : 'en-US'), { hour12: false })}
             </Typography>
           )}
-          <Button variant="outlined" size="small" onClick={async () => { 
+          <Button variant="outlined" size="small" onClick={async () => {
             setRefreshing(true);
             await Promise.allSettled([
               qc.refetchQueries({ queryKey: dashboardQueryKeys.categoryTotals({ orgId: orgIdForQuery, projectId: projectIdForQuery, dateFrom, dateTo, postedOnly }), type: 'active' }),
@@ -616,22 +583,23 @@ const Dashboard: React.FC = () => {
           {/* Filters row */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
             <FormControlLabel
-              control={<Switch size="small" checked={numbersOnlyDashboard} onChange={(e) => { setNumbersOnlyDashboard(e.target.checked); try { localStorage.setItem('dashboard_numbers_only', String(e.target.checked)); } catch {} }} />}
+              control={<Switch size="small" checked={numbersOnlyDashboard} onChange={(e) => { setNumbersOnlyDashboard(e.target.checked); try { localStorage.setItem('dashboard_numbers_only', String(e.target.checked)); } catch { } }} />}
               label={language === 'ar' ? 'أرقام فقط' : 'Numbers only'}
             />
             <FormControlLabel
-              control={<Switch size="small" checked={postedOnly} onChange={(e) => { setPostedOnly(e.target.checked); try { localStorage.setItem('dashboard_posted_only', String(e.target.checked)); } catch {} }} />}
+              control={<Switch size="small" checked={postedOnly} onChange={(e) => { setPostedOnly(e.target.checked); try { localStorage.setItem('dashboard_posted_only', String(e.target.checked)); } catch { } }} />}
               label={language === 'ar' ? 'المرحلة فقط' : 'Posted only'}
             />
             {/* Org/Project selection is now in TopBar via ScopeContext */}
             <ScopeChips showLabels={false} size="small" variant="outlined" />
-            <TextField label={language === 'ar' ? 'من' : 'From'} size="small" type="date" value={dateFrom} onChange={(e)=>{ setDateFrom(e.target.value); try { if (e.target.value) localStorage.setItem('dashboard_date_from', e.target.value); else localStorage.removeItem('dashboard_date_from'); } catch {} }} InputLabelProps={{ shrink: true }} />
-            <TextField label={language === 'ar' ? 'إلى' : 'To'} size="small" type="date" value={dateTo} onChange={(e)=>{ setDateTo(e.target.value); try { if (e.target.value) localStorage.setItem('dashboard_date_to', e.target.value); else localStorage.removeItem('dashboard_date_to'); } catch {} }} InputLabelProps={{ shrink: true }} />
-            <Button variant="text" size="small" onClick={() => { setDateFrom(''); setDateTo(''); try { localStorage.removeItem('dashboard_date_from'); localStorage.removeItem('dashboard_date_to'); } catch {} }}>{language === 'ar' ? 'إعادة التعيين' : 'Reset Dates'}</Button>
+            <TextField label={language === 'ar' ? 'من' : 'From'} size="small" type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); try { if (e.target.value) localStorage.setItem('dashboard_date_from', e.target.value); else localStorage.removeItem('dashboard_date_from'); } catch { } }} InputLabelProps={{ shrink: true }} />
+            <TextField label={language === 'ar' ? 'إلى' : 'To'} size="small" type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); try { if (e.target.value) localStorage.setItem('dashboard_date_to', e.target.value); else localStorage.removeItem('dashboard_date_to'); } catch { } }} InputLabelProps={{ shrink: true }} />
+            <Button variant="text" size="small" onClick={() => { setDateFrom(''); setDateTo(''); try { localStorage.removeItem('dashboard_date_from'); localStorage.removeItem('dashboard_date_to'); } catch { } }}>{language === 'ar' ? 'إعادة التعيين' : 'Reset Dates'}</Button>
           </Box>
         </Box>
       </Collapse>
-      <Box sx={{ display: 'flex', flexWrap: 'nowrap', gap: 1.5, mb: 3, overflowX: 'auto', pb: 1,
+      <Box sx={{
+        display: 'flex', flexWrap: 'nowrap', gap: 1.5, mb: 3, overflowX: 'auto', pb: 1,
         '&::-webkit-scrollbar': { height: 6 },
         '&::-webkit-scrollbar-thumb': { backgroundColor: '#cbd5e1', borderRadius: 3 },
         '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' }
@@ -809,7 +777,7 @@ const Dashboard: React.FC = () => {
               </Button>
             </Box>
           </Box>
-          
+
           <TableContainer component={Paper} variant="outlined">
             <Table>
               <TableHead>
@@ -862,9 +830,9 @@ const Dashboard: React.FC = () => {
                           variant={tx.is_posted ? 'filled' : 'outlined'}
                         />
                       </TableCell>
-                      <TableCell 
+                      <TableCell
                         align="right"
-                        sx={{ 
+                        sx={{
                           color: transaction.type === 'income' ? 'success.main' : 'error.main',
                           fontWeight: 600,
                         }}

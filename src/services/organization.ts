@@ -1,7 +1,5 @@
 import { supabase } from "../utils/supabase";
-import type { Organization } from "../types";
-
-export type { Organization };
+import { getConnectionMonitor } from '../utils/connectionMonitor';
 
 // Network retry helper
 const withRetry = async <T>(
@@ -13,7 +11,7 @@ const withRetry = async <T>(
     try {
       return await fn();
     } catch (error: any) {
-      console.warn(`[withRetry] Attempt ${attempt + 1} failed:`, error?.message || error);
+      if (import.meta.env.DEV && getConnectionMonitor().getHealth().isOnline) console.warn(`[withRetry] Attempt ${attempt + 1} failed:`, error?.message || error);
       
       // Don't retry on client errors (4xx)
       if (error?.status >= 400 && error?.status < 500) {
@@ -34,63 +32,132 @@ const withRetry = async <T>(
   throw new Error('Max retries exceeded');
 };
 
-export async function getOrganizations(): Promise<Organization[]> {
-  const startTime = performance.now();
-  
-  console.log('[getOrganizations] Fetching organizations from API...');
-  
+// Offline-hardened Organization Service
+
+// Helper for offline fallback
+async function getFromCache(key: string) {
   try {
-    // Use retry mechanism for network resilience
+    const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+    const db = getOfflineDB();
+    const cached = await db.metadata.get(key);
+    return cached && Array.isArray(cached.value) ? cached.value : [];
+  } catch {
+    return [];
+  }
+}
+
+
+export interface Organization {
+  id: string;
+  code: string;
+  name: string;
+  name_ar?: string | null;
+  is_active: boolean;
+  logo_url?: string | null;
+  subscription_tier?: string;
+  created_at: string;
+}
+
+export async function getOrganizations(): Promise<Organization[]> {
+  const isOffline = !getConnectionMonitor().getHealth().isOnline;
+
+  if (isOffline) {
+      console.log('[getOrganizations] Offline - yielding cache');
+      return (await getFromCache('organizations_cache')) as Organization[];
+  }
+
+  try {
     const { data, error } = await withRetry<{ data: any; error: any }>(
       async () => {
-        const result = await supabase
+        return await supabase
           .from('organizations')
           .select('id, code, name, name_ar, is_active, created_at')
           .eq('is_active', true)
           .order('code', { ascending: true })
           .limit(50);
-        return result;
       },
-      3,
+      isOffline ? 0 : 3,
       1000
     );
     
-    console.log(`[getOrganizations] REST took ${(performance.now() - startTime).toFixed(0)}ms`, { 
-      error: error?.message,
-      count: data?.length 
-    });
-    
-    if (error) {
-      console.error('[getOrganizations] Error fetching organizations:', error);
-      throw new Error(`Failed to fetch organizations: ${error.message}`);
-    }
+    if (error) throw error;
     
     const organizations = (data as Organization[]) || [];
     
-    // Unified flow uses memory, so no local caching here
+    // 2. Update local cache for offline use
+    if (organizations.length > 0) {
+      try {
+        const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+        const db = getOfflineDB();
+        await db.metadata.put({
+          key: 'organizations_cache',
+          value: organizations,
+          updatedAt: new Date().toISOString()
+        });
+      } catch (cacheUpdateErr) {
+        console.warn('[getOrganizations] Failed to update local metadata cache:', cacheUpdateErr);
+      }
+    }
     
     return organizations;
   } catch (error: any) {
-    console.error('[getOrganizations] All retry attempts failed:', error);
+    if (getConnectionMonitor().getHealth().isOnline) console.error('[getOrganizations] Fetch failed:', error);
     
-    // Return empty array as fallback to prevent app from breaking
-    console.warn('[getOrganizations] Returning empty array as fallback');
+    // 3. Last resort fallback to local cache
+    try {
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+      const db = getOfflineDB();
+      const cached = await db.metadata.get('organizations_cache');
+      if (cached && Array.isArray(cached.value)) {
+        return cached.value;
+      }
+    } catch (finalFallbackErr) {
+      // Ignore
+    }
+    
     return [];
   }
 }
 
 export async function getOrganization(id: string): Promise<Organization | null> {
-  const { data, error } = await supabase
-    .from("organizations")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const isOffline = !getConnectionMonitor().getHealth().isOnline;
 
-  if (error) {
-    if (error.code === "PGRST116") return null; // Not found
+  if (isOffline) {
+    try {
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+      const db = getOfflineDB();
+      const cached = await db.metadata.get('organizations_cache');
+      if (cached && Array.isArray(cached.value)) {
+        return cached.value.find((o: any) => o.id === id) || null;
+      }
+    } catch {}
+    return null;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("organizations")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") return null; // Not found
+      throw error;
+    }
+    return data as Organization;
+  } catch (error) {
+    // If we get a network error while "online", try cache as last resort
+    try {
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+      const db = getOfflineDB();
+      const cached = await db.metadata.get('organizations_cache');
+      if (cached && Array.isArray(cached.value)) {
+        return cached.value.find((o: any) => o.id === id) || null;
+      }
+    } catch {}
     throw error;
   }
-  return data as Organization;
 }
 
 export async function createOrganization(input: Partial<Omit<Organization, "id" | "created_at" | "updated_at">>): Promise<Organization> {
@@ -132,42 +199,84 @@ export async function purgeOrganizationData(id: string): Promise<void> {
 
 
 // Get all users in an organization
+// Get all users in an organization
 export async function getOrganizationUsers(orgId: string): Promise<Array<{ id: string; name?: string; email: string }>> {
+  const isOffline = !getConnectionMonitor().getHealth().isOnline;
+
+  // 1. Offline Fallback
+  if (isOffline) {
+    try {
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+      const db = getOfflineDB();
+      const cached = await db.metadata.get('organization_users_cache');
+      if (cached && Array.isArray(cached.value)) {
+        return cached.value.filter((u: any) => u.org_id === orgId);
+      }
+    } catch (e) {
+      console.error('[getOrganizationUsers] Cache read failed', e);
+    }
+    return [];
+  }
+
   try {
-    // First get org members
+    // 2. Fetch Members
     const { data: members, error: membersError } = await supabase
       .from('org_memberships')
       .select('user_id')
-      .eq('org_id', orgId)
+      .eq('org_id', orgId);
 
-    if (membersError) {
-      console.error('[getOrganizationUsers] Error fetching org members:', membersError)
-      throw membersError
-    }
+    if (membersError) throw membersError;
 
-    if (!members || members.length === 0) {
-      return []
-    }
+    if (!members || members.length === 0) return [];
 
-    // Then get user profiles for those members
-    const userIds = members.map(m => m.user_id)
+    const userIds = members.map(m => m.user_id);
+
+    // 3. Fetch Profiles
     const { data: profiles, error: profilesError } = await supabase
       .from('user_profiles')
       .select('id, first_name, last_name, full_name_ar, email')
-      .in('id', userIds)
+      .in('id', userIds);
 
-    if (profilesError) {
-      console.error('[getOrganizationUsers] Error fetching user profiles:', profilesError)
-      throw profilesError
-    }
+    if (profilesError) throw profilesError;
 
-    return (profiles as any[])?.map(profile => ({
+    const result = (profiles || []).map(profile => ({
       id: profile.id,
       name: profile.full_name_ar || [profile.first_name, profile.last_name].filter(Boolean).join(' ') || profile.email,
       email: profile.email,
-    })) || []
+      org_id: orgId 
+    }));
+
+    // 4. Update Cache
+    try {
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+      const db = getOfflineDB();
+      const cached = await db.metadata.get('organization_users_cache');
+      let all = (cached && Array.isArray(cached.value)) ? cached.value : [];
+      // Remove old entries for this org
+      all = all.filter((u: any) => u.org_id !== orgId);
+      // Add new
+      all = [...all, ...result];
+      
+      await db.metadata.put({ key: 'organization_users_cache', value: all, updatedAt: new Date().toISOString() });
+    } catch (e) {
+      console.warn('Cache update failed', e);
+    }
+
+    return result.map(({ org_id, ...rest }) => rest);
+
   } catch (error) {
-    console.error('[getOrganizationUsers] Error:', error)
-    throw error
+    console.error('[getOrganizationUsers] Error:', error);
+    
+    // Fallback on error
+    try {
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+      const db = getOfflineDB();
+      const cached = await db.metadata.get('organization_users_cache');
+      if (cached && Array.isArray(cached.value)) {
+        return cached.value.filter((u: any) => u.org_id === orgId);
+      }
+    } catch {}
+    
+    return [];
   }
 }

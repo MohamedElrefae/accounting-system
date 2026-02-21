@@ -8,30 +8,39 @@ export interface ConnectionHealth {
   error: string | null;
 }
 
+let monitorInstanceCount = 0;
+
 class ConnectionMonitor {
   private health: ConnectionHealth = {
-    isOnline: navigator.onLine,
+    isOnline: false, // Default to false until verified by first check
     latency: null,
     lastCheck: new Date(),
     error: null
   };
+  
+  private monitorId = ++monitorInstanceCount;
 
   private listeners: Set<(health: ConnectionHealth) => void> = new Set();
   private checkInterval: NodeJS.Timeout | null = null;
   private isChecking = false;
 
   constructor() {
+    if (import.meta.env.DEV) console.log(`[ConnectionMonitor#${this.monitorId}] Initializing...`);
     // Listen for online/offline events
     window.addEventListener('online', this.handleOnline.bind(this));
     window.addEventListener('offline', this.handleOffline.bind(this));
     
     // Start periodic health checks
     this.startPeriodicChecks();
+    
+    // Perform initial check immediately
+    this.checkConnection();
   }
 
   private handleOnline = () => {
-    this.updateHealth({ isOnline: true, error: null });
-    this.checkConnection(); // Immediate check when coming online
+    // DO NOT update health yet. Wait for checkConnection to verify.
+    if (import.meta.env.DEV) console.log('[ConnectionMonitor] Online event detected, verifying...');
+    this.checkConnection(); 
   };
 
   private handleOffline = () => {
@@ -50,6 +59,14 @@ class ConnectionMonitor {
   private async checkConnection(): Promise<void> {
     if (this.isChecking) return;
     
+    // Check navigator.onLine first to avoid ERR_INTERNET_DISCONNECTED in console
+    if (!navigator.onLine) {
+      if (this.health.isOnline) {
+        this.updateHealth({ isOnline: false, error: 'Network offline (navigator)' });
+      }
+      return;
+    }
+
     this.isChecking = true;
     const startTime = performance.now();
     
@@ -79,7 +96,9 @@ class ConnectionMonitor {
       });
       
     } catch (error: any) {
-      console.warn('[ConnectionMonitor] Health check failed:', error);
+      // NEVER log connection failures to the console in production or dev
+      // to keep the console silent during offline boot.
+      
       this.updateHealth({
         isOnline: false,
         latency: null,
@@ -91,11 +110,19 @@ class ConnectionMonitor {
   }
 
   private updateHealth(updates: Partial<ConnectionHealth>) {
+    const wasOnline = this.health.isOnline;
     this.health = {
       ...this.health,
       ...updates,
       lastCheck: new Date()
     };
+    
+    if (!wasOnline && this.health.isOnline) {
+      if (import.meta.env.DEV) console.log(`[ConnectionMonitor#${this.monitorId}] 🌐 Back ONLINE! Transition detected.`);
+    }
+    if (wasOnline && !this.health.isOnline) {
+      if (import.meta.env.DEV) console.log(`[ConnectionMonitor#${this.monitorId}] 🛑 Went OFFLINE! Transition detected.`);
+    }
     
     // Notify all listeners
     this.listeners.forEach(listener => listener({ ...this.health }));

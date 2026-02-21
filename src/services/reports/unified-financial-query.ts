@@ -138,6 +138,20 @@ export interface ProfitLossSummary {
  * All other functions in this service use this data
  */
 export async function fetchGLSummary(filters: UnifiedFilters = {}): Promise<GLSummaryRow[]> {
+  const { getConnectionMonitor } = await import('../../utils/connectionMonitor');
+  const isOffline = !getConnectionMonitor().getHealth().isOnline;
+
+  // 1. If offline, use the local aggregation engine
+  if (isOffline) {
+    try {
+      return await fetchGLSummaryOffline(filters);
+    } catch (offlineErr) {
+      console.error('❌ Unified Financial Query - Offline GL Summary failed:', offlineErr);
+      // Fallback to empty array if both fail
+      return [];
+    }
+  }
+
   // Normalize empty strings to null for date parameters
   const dateFrom = filters.dateFrom && filters.dateFrom.trim() !== '' ? filters.dateFrom : null
   const dateTo = filters.dateTo && filters.dateTo.trim() !== '' ? filters.dateTo : null
@@ -182,6 +196,15 @@ export async function fetchGLSummary(filters: UnifiedFilters = {}): Promise<GLSu
   try {
     data = await callRpc(baseArgs)
   } catch (error: any) {
+    if (error.message?.includes('fetch') || error.message?.includes('Network request failed')) {
+        console.warn('Network error during GL Summary fetch, falling back to offline mode.');
+        try {
+            return await fetchGLSummaryOffline(filters);
+        } catch (offlineErr) {
+            console.error('❌ Offline fallback also failed:', offlineErr);
+            return [];
+        }
+    }
     console.error('❌ Unified Financial Query - GL Summary error:', error)
     throw error
   }
@@ -202,6 +225,110 @@ export async function fetchGLSummary(filters: UnifiedFilters = {}): Promise<GLSu
     closing_credit: Number(row.closing_credit) || 0,
     transaction_count: Number(row.transaction_count) || 0
   }))
+}
+
+/**
+ * Offline implementation of GL Summary aggregation.
+ * Queries Dexie stored transactions and lines directly.
+ */
+async function fetchGLSummaryOffline(filters: UnifiedFilters = {}): Promise<GLSummaryRow[]> {
+  const { getOfflineDB } = await import('../offline/core/OfflineSchema');
+  const db = getOfflineDB();
+
+  console.log('🔍 Unified Financial Query - fetchGLSummaryOffline (Dexie)', filters);
+
+  // 1. Load data from local metadata cache
+  const accountsCache = await db.metadata.get('accounts_cache');
+  if (!accountsCache || !Array.isArray(accountsCache.value)) {
+    console.warn('⚠️ No accounts cache found for offline reporting');
+    return [];
+  }
+  const accounts = accountsCache.value;
+
+  // 2. Query transactions from Dexie
+  let txCollection = db.transactions.toCollection();
+
+  // Apply basic filters directly in Dexie if possible, or filter in memory
+  // For simplicity and correctness with complex filters, we'll filter in memory
+  const allTx = await txCollection.toArray();
+  const txs = allTx.filter(t => {
+    if (filters.orgId && t.org_id !== filters.orgId) return false;
+    if (filters.projectId && t.project_id !== filters.projectId) return false;
+    if (filters.postedOnly && t.approval_status !== 'posted') return false;
+    if (filters.approvalStatus && t.approval_status !== filters.approvalStatus) return false;
+    // Date filtering will be handled during opening/period split
+    return true;
+  });
+
+  const txIds = new Set(txs.map(t => t.id));
+  const activeTxMap = new Map(txs.map(t => [t.id, t]));
+
+  // 3. Load lines for these transactions
+  const allLines = await db.transactionLines.where('transaction_id').anyOf(Array.from(txIds)).toArray();
+
+  // 4. Aggregate by account
+  const dateFrom = filters.dateFrom ? new Date(filters.dateFrom) : null;
+  const dateTo = filters.dateTo ? new Date(filters.dateTo) : null;
+
+  const summaryMap = new Map<string, {
+    opening_net: number;
+    period_debit: number;
+    period_credit: number;
+    tx_count: number;
+  }>();
+
+  for (const line of allLines) {
+    const tx = activeTxMap.get(line.transaction_id);
+    if (!tx) continue;
+
+    const entryDate = new Date(tx.entry_date);
+    const accountId = line.account_id;
+    
+    let stats = summaryMap.get(accountId) || { opening_net: 0, period_debit: 0, period_credit: 0, tx_count: 0 };
+
+    const signedAmount = (line.debit_amount || 0) - (line.credit_amount || 0);
+
+    // Opening vs Period split
+    if (dateFrom && entryDate < dateFrom) {
+      stats.opening_net += signedAmount;
+    } else if ((!dateFrom || entryDate >= dateFrom) && (!dateTo || entryDate <= dateTo)) {
+      stats.period_debit += (line.debit_amount || 0);
+      stats.period_credit += (line.credit_amount || 0);
+      stats.tx_count += 1;
+    }
+
+    summaryMap.set(accountId, stats);
+  }
+
+  // 5. Combine with account metadata
+  const results: GLSummaryRow[] = accounts.map(acc => {
+    const stats = summaryMap.get(acc.id) || { opening_net: 0, period_debit: 0, period_credit: 0, tx_count: 0 };
+    
+    const opening_balance = stats.opening_net;
+    const period_net = stats.period_debit - stats.period_credit;
+    const closing_balance = opening_balance + period_net;
+
+    return {
+      account_id: acc.id,
+      account_code: acc.code,
+      account_name_en: acc.name,
+      account_name_ar: acc.name_ar || acc.name,
+      opening_debit: opening_balance > 0 ? opening_balance : 0,
+      opening_credit: opening_balance < 0 ? Math.abs(opening_balance) : 0,
+      period_debits: stats.period_debit,
+      period_credits: stats.period_credit,
+      closing_debit: closing_balance > 0 ? closing_balance : 0,
+      closing_credit: closing_balance < 0 ? Math.abs(closing_balance) : 0,
+      transaction_count: stats.tx_count
+    };
+  });
+
+  // 6. Final filtering (remove accounts with zero activity and no balance)
+  return results.filter(r => 
+    r.opening_debit !== 0 || r.opening_credit !== 0 || 
+    r.period_debits !== 0 || r.period_credits !== 0 || 
+    r.closing_debit !== 0 || r.closing_credit !== 0
+  ).sort((a, b) => a.account_code.localeCompare(b.account_code));
 }
 
 // ============================================================================

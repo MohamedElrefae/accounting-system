@@ -336,29 +336,74 @@ const AccountsTreePage: React.FC = () => {
   const loadRoots = useCallback(async () => {
     setLoading(true);
     if (!orgId) { setLoading(false); return; }
-    let query = supabase
-      .from('v_accounts_tree_ui')
-      .select('*')
-      .eq('org_id', orgId)
-      .is('parent_id', null)
-      .order('code', { ascending: true });
-    if (selectedProject) {
-      query = query.eq('project_id', selectedProject);
-    }
-    const { data, error } = await query;
-    if (!error) {
-      const rows = (data || []).map(mapRow);
-      setAccounts(rows);
-      setExpanded(new Set());
-      // Hydrate delete flags for visible roots
-      fetchCanDeleteFlags(rows.map(r => r.id)).catch(() => { });
-      // Hydrate rollups for visible roots
-      fetchAccountRollups(rows.map(r => r.id)).catch(() => { });
+
+    const { getConnectionMonitor } = await import('../../utils/connectionMonitor');
+    const isOnline = getConnectionMonitor().getHealth().isOnline;
+
+    if (isOnline) {
+      try {
+        let query = supabase
+          .from('v_accounts_tree_ui')
+          .select('*')
+          .eq('org_id', orgId)
+          .is('parent_id', null)
+          .order('code', { ascending: true });
+        if (selectedProject) {
+          query = query.eq('project_id', selectedProject);
+        }
+        const { data, error } = await query;
+        if (!error && data) {
+          const rows = (data || []).map(mapRow);
+          setAccounts(rows);
+          setExpanded(new Set());
+          // Cache for offline
+          try {
+            const { getOfflineDB } = await import('../../services/offline/core/OfflineSchema');
+            const db = getOfflineDB();
+            await db.metadata.put({
+              key: `accounts_tree_roots:${orgId}:${selectedProject || 'none'}`,
+              value: rows,
+              updatedAt: new Date().toISOString()
+            });
+          } catch { }
+          // Hydrate delete flags for visible roots
+          fetchCanDeleteFlags(rows.map(r => r.id)).catch(() => { });
+          // Hydrate rollups for visible roots
+          fetchAccountRollups(rows.map(r => r.id)).catch(() => { });
+        }
+      } catch (err) {
+        console.warn('Failed to load roots, trying cache');
+      }
+    } else {
+      // Offline: Load from cache
+      try {
+        const { getOfflineDB } = await import('../../services/offline/core/OfflineSchema');
+        const db = getOfflineDB();
+        const cached = await db.metadata.get(`accounts_tree_roots:${orgId}:${selectedProject || 'none'}`);
+        if (cached && Array.isArray(cached.value)) {
+          setAccounts(cached.value);
+          setExpanded(new Set());
+        }
+      } catch { }
     }
     setLoading(false);
   }, [fetchAccountRollups, fetchCanDeleteFlags, orgId, selectedProject]);
 
   const loadChildren = useCallback(async (parentId: string) => {
+    const { getConnectionMonitor } = await import('../../utils/connectionMonitor');
+    const isOnline = getConnectionMonitor().getHealth().isOnline;
+
+    if (!isOnline) {
+      // Try cache
+      try {
+        const { getOfflineDB } = await import('../../services/offline/core/OfflineSchema');
+        const db = getOfflineDB();
+        const cached = await db.metadata.get(`accounts_tree_children:${parentId}`);
+        if (cached && Array.isArray(cached.value)) return cached.value;
+      } catch { }
+      return [] as AccountItem[];
+    }
+
     let query = supabase
       .from('v_accounts_tree_ui')
       .select('*')
@@ -369,12 +414,30 @@ const AccountsTreePage: React.FC = () => {
     const { data, error } = await query;
     if (error) return [] as AccountItem[];
     const mapped = (data || []).map(mapRow);
+
+    // Cache for offline
+    try {
+      const { getOfflineDB } = await import('../../services/offline/core/OfflineSchema');
+      const db = getOfflineDB();
+      await db.metadata.put({
+        key: `accounts_tree_children:${parentId}`,
+        value: mapped,
+        updatedAt: new Date().toISOString()
+      });
+    } catch { }
+
     // fetch rollups for these children
     fetchAccountRollups(mapped.map(r => r.id)).catch(() => { });
     return mapped;
   }, [fetchAccountRollups, orgId, selectedProject]);
 
   const performSearch = useCallback(async () => {
+    const { getConnectionMonitor } = await import('../../utils/connectionMonitor');
+    if (!getConnectionMonitor().getHealth().isOnline) {
+      showToast('البحث غير متاح في وضع غير متصل', { severity: 'warning' });
+      return;
+    }
+
     // Fetch matches by code/name/name_ar and include project filter
     let query = supabase
       .from('v_accounts_tree_ui')
@@ -443,6 +506,13 @@ const AccountsTreePage: React.FC = () => {
   const loadAllAccounts = useCallback(async () => {
     setLoading(true);
     if (!orgId) { setLoading(false); return; }
+
+    const { getConnectionMonitor } = await import('../../utils/connectionMonitor');
+    if (!getConnectionMonitor().getHealth().isOnline) {
+      // Table View is harder offline without full cache, but we try loaded ones
+      setLoading(false);
+      return;
+    }
 
     // Fetch ALL accounts without parent_id filter
     let query = supabase

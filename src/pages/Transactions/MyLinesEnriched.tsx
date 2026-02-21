@@ -94,111 +94,120 @@ const MyLinesEnrichedPage = () => {
 
   // Fetch my lines with transaction header data
   const fetchMyLines = useCallback(async () => {
+    // START HARDENING: Connection Check
+    const { getConnectionMonitor } = await import('../../utils/connectionMonitor');
+    if (!getConnectionMonitor().getHealth().isOnline) {
+      return { rows: [], total: 0 };
+    }
+    // END HARDENING
+
     if (!currentUserId) return { rows: [], total: 0 }
 
-    // Build query for transaction lines created by current user
-    // Use transaction_lines with embedded join to transactions
-    let query = supabase
-      .from('transaction_lines')
-      .select(`
-        id,
-        transaction_id,
-        line_no,
-        account_id,
-        debit_amount,
-        credit_amount,
-        description,
-        project_id,
-        cost_center_id,
-        work_item_id,
-        analysis_work_item_id,
-        classification_id,
-        sub_tree_id,
-        created_at,
-        transactions!inner (
-          id,
-          entry_number,
-          entry_date,
-          description,
-          org_id,
-          project_id,
-          approval_status,
-          is_posted,
-          created_by
-        )
-      `, { count: 'exact' })
-      .eq('transactions.created_by', currentUserId)
+    try {
+      // Build query for transaction lines created by current user
+      // Use transaction_lines with embedded join to transactions
+      let query = supabase
+        .from('transaction_lines')
+        .select(`
+            id,
+            transaction_id,
+            line_no,
+            account_id,
+            debit_amount,
+            credit_amount,
+            description,
+            project_id,
+            cost_center_id,
+            work_item_id,
+            analysis_work_item_id,
+            classification_id,
+            sub_tree_id,
+            created_at,
+            transactions!inner (
+              id,
+              entry_number,
+              entry_date,
+              description,
+              org_id,
+              project_id,
+              approval_status,
+              is_posted,
+              created_by
+            )
+          `, { count: 'exact' })
+        .eq('transactions.created_by', currentUserId)
 
-    // Apply filters using the joined transactions table
-    if (appliedFilters.search) {
-      query = query.or(`description.ilike.%${appliedFilters.search}%,transactions.description.ilike.%${appliedFilters.search}%,transactions.entry_number.ilike.%${appliedFilters.search}%`)
-    }
-    if (appliedFilters.dateFrom) {
-      query = query.gte('transactions.entry_date', appliedFilters.dateFrom)
-    }
-    if (appliedFilters.dateTo) {
-      query = query.lte('transactions.entry_date', appliedFilters.dateTo)
-    }
-    if (appliedFilters.orgId) {
-      query = query.eq('transactions.org_id', appliedFilters.orgId)
-    }
-    if (appliedFilters.projectId) {
-      query = query.eq('project_id', appliedFilters.projectId)
-    }
-    if (appliedFilters.debitAccountId) {
-      query = query.eq('account_id', appliedFilters.debitAccountId).gt('debit_amount', 0)
-    }
-    if (appliedFilters.creditAccountId) {
-      query = query.eq('account_id', appliedFilters.creditAccountId).gt('credit_amount', 0)
-    }
-    if (appliedFilters.approvalStatus) {
-      query = query.eq('transactions.approval_status', appliedFilters.approvalStatus)
-    }
-    if (appliedFilters.classificationId) {
-      query = query.eq('classification_id', appliedFilters.classificationId)
-    }
-    if (appliedFilters.costCenterId) {
-      query = query.eq('cost_center_id', appliedFilters.costCenterId)
-    }
-    if (appliedFilters.workItemId) {
-      query = query.eq('work_item_id', appliedFilters.workItemId)
-    }
-    if (appliedFilters.analysisItemId) {
-      query = query.eq('analysis_work_item_id', appliedFilters.analysisItemId)
-    }
-    if (appliedFilters.expensesCategoryId) {
-      query = query.eq('sub_tree_id', appliedFilters.expensesCategoryId)
-    }
-
-    // Pagination - order by transaction date then line number
-    const from = (page - 1) * pageSize
-    const to = from + pageSize - 1
-    query = query.range(from, to).order('created_at', { ascending: false })
-
-    const { data, error, count } = await query
-
-    if (error) {
-      console.error('Error fetching my lines:', error)
-      throw error
-    }
-
-    // Flatten the joined data - extract transaction fields to top level
-    const rows = (data || []).map((row: any) => {
-      const tx = row.transactions || {}
-      return {
-        ...row,
-        entry_number: tx.entry_number,
-        entry_date: tx.entry_date,
-        header_description: tx.description,
-        header_org_id: tx.org_id,
-        header_project_id: tx.project_id,
-        approval_status: tx.approval_status,
-        is_posted: tx.is_posted,
-        created_by: tx.created_by,
+      // Apply filters using the joined transactions table
+      if (appliedFilters.search) {
+        query = query.or(`description.ilike.%${appliedFilters.search}%,transactions.description.ilike.%${appliedFilters.search}%,transactions.entry_number.ilike.%${appliedFilters.search}%`)
       }
-    })
+      if (appliedFilters.dateFrom) {
+        query = query.gte('transactions.entry_date', appliedFilters.dateFrom)
+      }
+      if (appliedFilters.dateTo) {
+        query = query.lte('transactions.entry_date', appliedFilters.dateTo)
+      }
+      if (appliedFilters.orgId) {
+        query = query.eq('transactions.org_id', appliedFilters.orgId)
+      }
+      if (appliedFilters.projectId) {
+        query = query.eq('project_id', appliedFilters.projectId)
+      }
+      if (appliedFilters.debitAccountId) {
+        query = query.eq('account_id', appliedFilters.debitAccountId).gt('debit_amount', 0)
+      }
+      if (appliedFilters.creditAccountId) {
+        query = query.eq('account_id', appliedFilters.creditAccountId).gt('credit_amount', 0)
+      }
+      if (appliedFilters.approvalStatus) {
+        query = query.eq('transactions.approval_status', appliedFilters.approvalStatus)
+      }
+      if (appliedFilters.classificationId) {
+        query = query.eq('classification_id', appliedFilters.classificationId)
+      }
+      if (appliedFilters.costCenterId) {
+        query = query.eq('cost_center_id', appliedFilters.costCenterId)
+      }
+      if (appliedFilters.workItemId) {
+        query = query.eq('work_item_id', appliedFilters.workItemId)
+      }
+      if (appliedFilters.analysisItemId) {
+        query = query.eq('analysis_work_item_id', appliedFilters.analysisItemId)
+      }
+      if (appliedFilters.expensesCategoryId) {
+        query = query.eq('sub_tree_id', appliedFilters.expensesCategoryId)
+      }
 
-    return { rows, total: count || 0 }
+      // Pagination - order by transaction date then line number
+      const from = (page - 1) * pageSize
+      const to = from + pageSize - 1
+      query = query.range(from, to).order('created_at', { ascending: false })
+
+      const { data, error, count } = await query
+
+      if (error) throw error
+
+      // Flatten the joined data - extract transaction fields to top level
+      const rows = (data || []).map((row: any) => {
+        const tx = row.transactions || {}
+        return {
+          ...row,
+          entry_number: tx.entry_number,
+          entry_date: tx.entry_date,
+          header_description: tx.description,
+          header_org_id: tx.org_id,
+          header_project_id: tx.project_id,
+          approval_status: tx.approval_status,
+          is_posted: tx.is_posted,
+          created_by: tx.created_by,
+        }
+      })
+
+      return { rows, total: count || 0 }
+    } catch (error: any) {
+      console.warn('[fetchMyLines] Network error or offline:', error);
+      return { rows: [], total: 0 };
+    }
   }, [currentUserId, appliedFilters, page, pageSize])
 
   const {

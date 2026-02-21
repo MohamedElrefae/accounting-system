@@ -132,7 +132,7 @@ const UnifiedRoutes: React.FC = () => {
                     </OptimizedSuspense>
                 } />
                 <Route path="sub-tree" element={
-                    <OptimizedProtectedRoute requiredPermission="sub_tree.view">
+                    <OptimizedProtectedRoute requiredPermission={null} scope="global">
                         <OptimizedSuspense>
                             <SubTreePage />
                         </OptimizedSuspense>

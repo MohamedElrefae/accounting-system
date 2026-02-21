@@ -8,8 +8,6 @@ import { ArabicLanguageService } from './services/ArabicLanguageService';
 import DashboardLayout from './components/layout/DashboardLayout';
 import { OptimizedSuspense } from './components/Common/PerformanceOptimizer';
 import DataLoadingErrorBoundary from './components/Common/DataLoadingErrorBoundary';
-import DataLoadingState from './components/Common/DataLoadingState';
-import { Box } from '@mui/material';
 import PerformanceOptimizer from './components/Common/PerformanceOptimizer';
 import DashboardShellSkeleton from './components/layout/DashboardShellSkeleton';
 // Debug components removed for production
@@ -23,6 +21,8 @@ import { RegisterForm } from './components/auth/RegisterForm';
 import { ForgotPassword } from './components/auth/ForgotPassword';
 import { ResetPassword } from './components/auth/ResetPassword';
 import OptimizedProtectedRoute from './components/routing/OptimizedProtectedRoute';
+
+import { OfflineProvider } from './components/OfflineProvider';
 
 const OptimizedApp: React.FC = () => {
   useIdleLogout();
@@ -50,34 +50,36 @@ const OptimizedApp: React.FC = () => {
       }}
     >
       <PerformanceOptimizer>
-        <Routes>
-          {/* Auth Routes */}
-          <Route path="/login" element={<LoginForm />} />
-          <Route path="/register" element={<RegisterForm />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/unauthorized" element={
-            <div style={{ padding: '2rem' }}>
-              <h2>Access denied</h2>
-              <p>You don't have permission to view this page.</p>
-            </div>
-          } />
+        <OfflineProvider>
+          <Routes>
+            {/* Auth Routes */}
+            <Route path="/login" element={<LoginForm />} />
+            <Route path="/register" element={<RegisterForm />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/unauthorized" element={
+              <div style={{ padding: '2rem' }}>
+                <h2>Access denied</h2>
+                <p>You don't have permission to view this page.</p>
+              </div>
+            } />
 
-          {/* Protected App Routes - All handled by UnifiedRoutes */}
-          <Route path="/*" element={
-            <OptimizedProtectedRoute>
-              <DataLoadingErrorBoundary>
-                <Suspense fallback={<DashboardShellSkeleton />}>
-                  <DashboardLayout>
-                    <OptimizedSuspense>
-                      <UnifiedRoutes />
-                    </OptimizedSuspense>
-                  </DashboardLayout>
-                </Suspense>
-              </DataLoadingErrorBoundary>
-            </OptimizedProtectedRoute>
-          } />
-        </Routes>
+            {/* Protected App Routes - All handled by UnifiedRoutes */}
+            <Route path="/*" element={
+              <OptimizedProtectedRoute>
+                <DataLoadingErrorBoundary>
+                  <Suspense fallback={<DashboardShellSkeleton />}>
+                    <DashboardLayout>
+                      <OptimizedSuspense>
+                        <UnifiedRoutes />
+                      </OptimizedSuspense>
+                    </DashboardLayout>
+                  </Suspense>
+                </DataLoadingErrorBoundary>
+              </OptimizedProtectedRoute>
+            } />
+          </Routes>
+        </OfflineProvider>
       </PerformanceOptimizer>
     </Router>
   );

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { supabase } from '@/utils/supabase'
+import { getConnectionMonitor } from '@/utils/connectionMonitor'
 
 type AuditPageInfo = {
   pageName: string
@@ -11,6 +12,9 @@ export function useAuditContext(pageInfo: AuditPageInfo) {
     let cancelled = false
 
     const setContext = async () => {
+      const monitor = getConnectionMonitor()
+      if (!monitor.getHealth().isOnline) return
+
       try {
         let requestId: string | null = null
         try {

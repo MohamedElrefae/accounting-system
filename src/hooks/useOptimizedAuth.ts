@@ -2,8 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../utils/supabase';
 import type { Profile } from '../types/auth';
 import type { Organization, Project } from '../types';
-import featureFlags from '../utils/featureFlags';
-import { ApplicationPerformanceMonitor } from '../services/ApplicationPerformanceMonitor';
 import {
   flattenPermissions,
   hasActionInSnapshot,
@@ -12,7 +10,7 @@ import {
   type ResolvedRole,
   type RoleSlug,
 } from '../lib/permissions';
-import { fetchUserRolesSafely } from '../utils/databaseFix';
+import { getConnectionMonitor } from '../utils/connectionMonitor';
 
 interface OrgRole {
   org_id: string;
@@ -188,6 +186,10 @@ const initializeAuth = async () => {
       initialSessionPromise,
       withTimeout(
         (async () => {
+          // Allow getSession to run even if offline (reads from localStorage)
+          // const monitor = getConnectionMonitor();
+          // if (!monitor.getHealth().isOnline) return null; 
+          
           const sStart = performance.now();
           const sess = await supabase.auth.getSession().then((r) => r.data.session ?? null);
           if (import.meta.env.DEV) console.log(`[Auth] getSession took ${(performance.now() - sStart).toFixed(0)}ms`);
@@ -210,6 +212,30 @@ const initializeAuth = async () => {
       authState.loading = false;
       notifyListeners();
     } else {
+      // Offline Fallback: If no Supabase session, check if we have an "Offline User" enabled
+      const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+      if (!getConnectionMonitor().getHealth().isOnline) {
+          try {
+             // Attempt to recover last active user from Dexie
+             const { getOfflineDB } = await import('../services/offline/core/OfflineSchema');
+             const db = getOfflineDB();
+             const lastUser = await db.metadata.get('last_active_user_id');
+             
+             if (lastUser && typeof lastUser.value === 'string') {
+                 console.log('[Auth] Offline: Recovering session for user:', lastUser.value);
+                 // We don't have a full session, but we can load the profile/roles 
+                 // and let SecurityManager handle the "Unlock" screen if needed.
+                 // For now, we populate state to allow "Offline" access if the app doesn't enforce strict login check on every load
+                 // Or, better: we remain "logged out" but LoginForm detects this state.
+                 
+                 // NOTE: We do NOT set authState.user here because that bypasses authentication. 
+                 // The user must still enter a password/PIN in LoginForm if session is gone.
+             }
+          } catch(e) {
+             console.warn('[Auth] Offline recovery check failed', e);
+          }
+      }
+
       authState.loading = false;
       notifyListeners();
     }
@@ -225,481 +251,136 @@ const initializeAuth = async () => {
 };
 
 // Load user profile and roles - optimized with caching and single RPC call
-const loadAuthData = async (userId: string) => {
-  if (!userId) {
-    console.error('No user ID provided to loadAuthData');
+const loadAuthData = async (userId: string, forceRefresh = false) => {
+  if (!userId) return;
+
+  const monitor = getConnectionMonitor();
+  const isOnline = monitor.getHealth().isOnline;
+
+  // 1. ALWAYS try to get from local Dexie cache immediately for instant UI
+  let cacheFound = false;
+  try {
+    const { getOfflineDB } = await import('../services/offline/core/OfflineSchema');
+    const db = getOfflineDB();
+    const cached = await db.metadata.get(`auth_data_${userId}`);
+    if (cached && cached.value) {
+      const data = cached.value as any; // Cast to any to avoid property access errors
+      authState.profile = data.profile;
+      authState.roles = data.roles as RoleSlug[];
+      authState.resolvedPermissions = flattenPermissions(data.roles as RoleSlug[]);
+      authState.userOrganizations = data.organizations;
+      authState.userProjects = data.projects;
+      authState.defaultOrgId = data.defaultOrgId;
+      authState.orgRoles = data.orgRoles;
+      authState.projectRoles = data.projectRoles;
+      authState.landingPreference = data.landingPreference;
+      clearCaches();
+      notifyListeners();
+      cacheFound = true;
+      if (import.meta.env.DEV) console.log('[Auth] Loaded from offline cache');
+    }
+  } catch (cacheErr) {
+    if (import.meta.env.DEV) console.error('[Auth] Offline cache read failed:', cacheErr);
+  }
+
+  // 2. Only attempt network RPC if verified online and (not found in cache OR forced)
+  if (!isOnline && cacheFound && !forceRefresh) {
+    if (import.meta.env.DEV) console.log('[Auth] Offline: Skipping RPC as cache is present');
     return;
   }
 
-  const startTime = performance.now();
-  performance.mark('auth_rpc_start');
-  const defaultRoles: RoleSlug[] = []; // No default role — keep loading:true until server resolves
-  if (import.meta.env.DEV) {
-    console.log('[Auth] loadAuthData start', { userId, defaultRoles });
-  } 
-  const defaultPermissions = flattenPermissions(defaultRoles);
-  const rpcStart = performance.now();
+  if (!isOnline && !cacheFound) {
+    if (import.meta.env.DEV) console.warn('[Auth] Offline and no cache found for user');
+    return;
+  }
 
   try {
-    // Phase 2: parallel auth queries (RPC + profile) with timeouts
-    if (featureFlags.isEnabled('PARALLEL_AUTH_QUERIES')) {
-      const parallelStart = performance.now();
-
-      const [profileResult, rpcResult] = await Promise.allSettled([
-        (async () => {
-          const result = await supabase.from('user_profiles').select('*').eq('id', userId).single();
-          return result;
-        })(),
-        (async () => {
-          const result = await supabase.rpc('get_user_auth_data', { p_user_id: userId });
-          return result;
-        })()
-      ]);
-
-      const tryUseRpc = async () => {
-        if (rpcResult.status !== 'fulfilled') return false;
-        const rpcValue = rpcResult.value as any;
-        if (!rpcValue || rpcValue.error || !rpcValue.data) return false;
-
-        const authData = rpcValue.data;
-
-        if (authData.profile) {
-          authState.profile = authData.profile as Profile;
-        }
-
-        const roleNames = authData.roles || [];
-        const roleMapping: { [key: string]: RoleSlug } = {
-          super_admin: 'super_admin',
-          admin: 'admin',
-          manager: 'manager',
-          hr: 'hr',
-          team_leader: 'team_leader',
-          accountant: 'accountant',
-          auditor: 'auditor',
-          viewer: 'viewer',
-          // Arabic mappings
-          'محاسب': 'accountant',
-          'مدير': 'manager',
-          'مشرف': 'admin',
-          'مسؤول': 'admin',
-          'مراقب': 'auditor',
-          'مراجع': 'auditor',
-          'قائد فريق': 'team_leader',
-          'موارد بشرية': 'hr',
-          'مشاهد': 'viewer',
-        };
-
-        const extractedRoles: RoleSlug[] = (roleNames as string[])
-          .map((name: string) => {
-            const cleanName = String(name || '').trim().toLowerCase().replace(/\s+/g, '_');
-            
-            // 1. Try Exact Match
-            let mapped = roleMapping[cleanName];
-            
-            // 2. Try Fuzzy Match for Arabic (Common issue with variations)
-            if (!mapped) {
-              if (cleanName.includes('محاسب')) mapped = 'accountant';
-              else if (cleanName.includes('مدير')) mapped = 'manager';
-              else if (cleanName.includes('مشرف') || cleanName.includes('مسؤول')) mapped = 'admin';
-              else if (cleanName.includes('مراقب') || cleanName.includes('مراجع')) mapped = 'auditor';
-              else if (cleanName.includes('قائد فريق')) mapped = 'team_leader';
-              else if (cleanName.includes('موارد')) mapped = 'hr';
-            }
-
-            if (!mapped) {
-               // Log critical error but NOT break execution used to default to viewer
-               console.error(`[Auth] CRITICAL: RPC Role mapping failed for: "${name}" (cleaned: "${cleanName}")`);
-            }
-            return mapped;
-          })
-          .filter((r): r is RoleSlug => r !== undefined);
-
-        if (import.meta.env.DEV) {
-          console.log('[Auth] RPC Processed Roles:', { raw: roleNames, extracted: extractedRoles });
-        }
-
-        const isProfileSuperAdmin = authState.profile?.is_super_admin === true;
-        let finalRoles: RoleSlug[] = extractedRoles;
-
-        // If RPC failed to find roles, try legacy fallback before falling back to defaultRoles
-        if (finalRoles.length === 0) {
-           if (import.meta.env.DEV) console.warn('[Auth] RPC returned no roles, trying legacy fallback...');
-           try {
-             const legacyRoles = await fetchUserRolesSafely(userId, authState.user);
-             if (legacyRoles.length > 0) {
-               if (import.meta.env.DEV) console.log('[Auth] Legacy fallback recovered roles:', legacyRoles);
-               finalRoles = legacyRoles;
-             }
-           } catch (e) {
-             console.error('[Auth] Legacy fallback failed:', e);
-           }
-        }
-
-        const shouldBeSuperAdmin = isProfileSuperAdmin || finalRoles.includes('super_admin');
-        const resolvedRoles: RoleSlug[] = shouldBeSuperAdmin 
-          ? ['super_admin'] 
-          : (finalRoles.length > 0 ? finalRoles : defaultRoles);
-
-        // Process scope data from RPC
-        const organizations = authData.organizations || [];
-        const projects = authData.projects || [];
-        const defaultOrg = authData.default_org || null;
-        
-        authState.roles = resolvedRoles;
-        authState.resolvedPermissions = flattenPermissions(resolvedRoles);
-        authState.userOrganizations = organizations;
-        authState.userProjects = projects;
-        authState.defaultOrgId = defaultOrg;
-        
-        const totalLoadTime = performance.now() - parallelStart;
-        logAuthPerformance({
-          loadTime: totalLoadTime,
-          cacheHit: false,
-          rpcSuccess: true,
-          profileSuccess: false,
-          networkType: 'unknown'
-        });
-
-        clearCaches();
-        notifyListeners();
-        return true;
-      };
-
-      const tryUseProfile = async () => {
-        if (profileResult.status !== 'fulfilled') return false;
-        const profileValue = profileResult.value as any;
-        if (!profileValue || profileValue.error || !profileValue.data) return false;
-
-        authState.profile = profileValue.data as Profile;
-
-        const isProfileSuperAdmin = authState.profile?.is_super_admin === true;
-        let extractedRoles: RoleSlug[] = [];
-        try {
-          extractedRoles = await fetchUserRolesSafely(userId, authState.user);
-        } catch {
-          extractedRoles = [];
-        }
-
-        const finalRoles: RoleSlug[] = isProfileSuperAdmin 
-          ? ['super_admin'] 
-          : (extractedRoles.length > 0 ? extractedRoles : defaultRoles);
-        authState.roles = finalRoles;
-        authState.resolvedPermissions = flattenPermissions(finalRoles);
-        
-        // Scope data not available in profile-only fallback - will be empty
-        authState.userOrganizations = [];
-        authState.userProjects = [];
-        authState.defaultOrgId = null;
-        authState.orgRoles = [];
-        authState.projectRoles = [];
-        
-        const totalLoadTime = performance.now() - parallelStart;
-        logAuthPerformance({
-          loadTime: totalLoadTime,
-          cacheHit: false,
-          rpcSuccess: false,
-          profileSuccess: true,
-          networkType: 'unknown'
-        });
-
-        clearCaches();
-        notifyListeners();
-        return true;
-      };
-
-      // Priority: RPC (faster / more complete) then Profile
-      if (await tryUseRpc()) return;
-      if (await tryUseProfile()) return;
-
-      throw new Error('Parallel auth queries failed');
-    }
+    if (import.meta.env.DEV) console.log('[Auth] Attempting background data refresh...');
     
-    // If we are here, PARALLEL_AUTH_QUERIES is off or we are in UNIFIED_AUTH_DATA mode
-    if (import.meta.env.DEV) console.log('[Auth] Executing Single RPC Handshake (Unified Mode)');
-    const { data: authData, error: rpcError } = await supabase.rpc('get_user_auth_data', { p_user_id: userId });
-    
+    // Explicitly cast the rpc call to avoid Promise generic issues in some environments
+    const { data: authData, error: rpcError } = await withTimeout(
+      (supabase.rpc('get_user_auth_data', { p_user_id: userId }) as any),
+      30000,
+      'Auth RPC timeout'
+    ) as { data: any, error: any };
+
     if (!rpcError && authData) {
-      if (import.meta.env.DEV) {
-        console.log(`[Auth] RPC get_user_auth_data took ${(performance.now() - startTime).toFixed(0)}ms`);
-      }
+      // Process data...
+      const profile = authData.profile as Profile;
       
-      // Process profile
-      if (authData.profile) {
-        authState.profile = authData.profile as Profile;
-      }
-      
-      // Process roles
-      const roleNames = authData.roles || [];
-      const roleMapping: { [key: string]: RoleSlug } = {
-        'super_admin': 'super_admin',
-        'admin': 'admin',
-        'manager': 'manager',
-        'hr': 'hr', // Added missing English HR here too just in case
-        'team_leader': 'team_leader', // Added missing English Team Leader here too
-        'accountant': 'accountant',
-        'auditor': 'auditor',
-        'viewer': 'viewer',
-        // Arabic mappings
-        'محاسب': 'accountant',
-        'مدير': 'manager',
-        'مشرف': 'admin',
-        'مسؤول': 'admin',
-        'مراقب': 'auditor',
-        'مراجع': 'auditor',
-        'قائد فريق': 'team_leader',
-        'موارد بشرية': 'hr',
-        'مشاهد': 'viewer',
+      const roleMapping: any = {
+        'super_admin': 'super_admin', 'admin': 'admin', 'manager': 'manager',
+        'accountant': 'accountant', 'auditor': 'auditor', 'viewer': 'viewer',
+        'محاسب': 'accountant', 'مدير': 'manager', 'مشرف': 'admin', 'مسؤول': 'admin',
+        'مراقب': 'auditor', 'مراجع': 'auditor', 'قائد فريق': 'team_leader', 'موارد بشرية': 'hr'
       };
       
-      let extractedRoles: RoleSlug[] = (roleNames as string[])
-        .map((name: string) => {
-          const cleanName = String(name || '').trim().toLowerCase().replace(/\s+/g, '_');
-          
-          // 1. Try Exact Match
-          let mapped = roleMapping[cleanName];
-          
-          // 2. Try Fuzzy Match for Arabic
-          if (!mapped) {
-            if (cleanName.includes('محاسب')) mapped = 'accountant';
-            else if (cleanName.includes('مدير')) mapped = 'manager';
-            else if (cleanName.includes('مشرف') || cleanName.includes('مسؤول')) mapped = 'admin';
-            else if (cleanName.includes('مراقب') || cleanName.includes('مراجع')) mapped = 'auditor';
-            else if (cleanName.includes('قائد فريق')) mapped = 'team_leader';
-            else if (cleanName.includes('موارد')) mapped = 'hr';
-          }
-
-          if (!mapped) {
-            console.error(`[Auth] CRITICAL: Fallback Role mapping failed for: "${name}" (cleaned: "${cleanName}")`);
-          }
-          return mapped;
-        })
-        .filter((r): r is RoleSlug => r !== undefined);
-      
-      // If RPC failed to find roles, try legacy fallback
-      if (extractedRoles.length === 0) {
-         if (import.meta.env.DEV) console.warn('[Auth] Primary RPC returned no roles, trying legacy fallback...');
-         try {
-           const legacyRoles = await fetchUserRolesSafely(userId, authState.user);
-           if (legacyRoles.length > 0) {
-             if (import.meta.env.DEV) console.log('[Auth] Primary legacy fallback recovered roles:', legacyRoles);
-             extractedRoles = legacyRoles;
-           }
-         } catch (e) {
-           console.error('[Auth] Primary legacy fallback failed:', e);
-         }
-      }
-
-      // Process scope data (organizations, projects, default_org)
-      const organizations = authData.organizations || [];
-      const projects = authData.projects || [];
-      const defaultOrg = authData.default_org || null;
-      
-      // Process org roles (Phase 6)
-      const orgRoles = authData.org_roles || [];
-      const projectRoles = authData.project_roles || [];
-      
-      authState.userOrganizations = organizations;
-      authState.userProjects = projects;
-      authState.defaultOrgId = defaultOrg;
-      authState.projectRoles = projectRoles;
-      authState.landingPreference = authData.landing_preference || 'welcome';
-      
-      if (import.meta.env.DEV) {
-        console.log('[Auth] Loaded scope data:', {
-          orgs: organizations.length,
-          projects: projects.length,
-          defaultOrg,
-          orgRoles: orgRoles.length,
-          projectRoles: projectRoles.length
-        });
-      }
-      
-      // Determine if superadmin
-      const currentEmail = authState.profile?.email || authState.user?.email || '';
-      const isProfileSuperAdmin = authState.profile?.is_super_admin === true;
-      const shouldBeSuperAdmin = isProfileSuperAdmin || extractedRoles.includes('super_admin');
-      
-      // Removed defaultRoles fallback. If extractedRoles is empty, finalRoles is empty.
-      const finalRoles: RoleSlug[] = shouldBeSuperAdmin ? ['super_admin'] : extractedRoles;
-      
-      if (shouldBeSuperAdmin && extractedRoles.length === 0) {
-        // Only log if we are granting superadmin
-
-        if (import.meta.env.DEV) {
-          console.log('🔧 Granting superadmin or fallback roles due to:', {
-            noRoles: extractedRoles.length === 0,
-            isSuperAdmin: shouldBeSuperAdmin,
-            email: currentEmail,
-          });
+      const roles = (authData.roles || []).map((name: string) => {
+        const clean = String(name || '').trim().toLowerCase().replace(/\s+/g, '_');
+        let mapped = roleMapping[clean];
+        if (!mapped) {
+          if (clean.includes('محاسب')) mapped = 'accountant';
+          else if (clean.includes('مدير')) mapped = 'manager';
+          else if (clean.includes('مشرف')) mapped = 'admin';
         }
-      }
-      
+        return mapped;
+      }).filter((r: any) => !!r) as RoleSlug[];
+
+      const isSuper = profile?.is_super_admin || roles.includes('super_admin');
+      const finalRoles = (isSuper ? ['super_admin'] : roles) as RoleSlug[];
+
+      // Update state
+      authState.profile = profile;
       authState.roles = finalRoles;
       authState.resolvedPermissions = flattenPermissions(finalRoles);
-      
-      // Cache the auth data for next time (including scope data and scoped roles)
-      const totalLoadTime = performance.now() - startTime;
-      if (import.meta.env.DEV) {
-        console.log(`[Auth] RPC load completed in ${totalLoadTime.toFixed(0)}ms`);
+      authState.userOrganizations = authData.organizations || [];
+      authState.userProjects = authData.projects || [];
+      authState.defaultOrgId = authData.default_org || null;
+      authState.orgRoles = authData.org_roles || [];
+      authState.projectRoles = authData.project_roles || [];
+      authState.landingPreference = authData.landing_preference || 'welcome';
+
+      // Save to local cache for next time
+      try {
+        const { getOfflineDB } = await import('../services/offline/core/OfflineSchema');
+        const db = getOfflineDB();
+        
+        await db.metadata.bulkPut([
+            {
+               key: `auth_data_${userId}`,
+               value: {
+                 profile: authState.profile,
+                 roles: authState.roles,
+                 organizations: authState.userOrganizations,
+                 projects: authState.userProjects,
+                 defaultOrgId: authState.defaultOrgId,
+                 orgRoles: authState.orgRoles,
+                 projectRoles: authState.projectRoles,
+                 landingPreference: authState.landingPreference
+               },
+               updatedAt: new Date().toISOString()
+            },
+            {
+               key: 'last_active_user_id',
+               value: userId,
+               updatedAt: new Date().toISOString()
+            }
+        ]);
+      } catch (cacheSaveErr) {
+        // Silent
       }
-      
-      // Log performance metrics
-      logAuthPerformance({
-        loadTime: totalLoadTime,
-        cacheHit: false,
-        rpcSuccess: true,
-        profileSuccess: false,
-        networkType: 'unknown'
-      });
-      
-      const totalHandshakeTime = performance.now() - rpcStart;
-      if (import.meta.env.DEV) {
-        console.log(`[Auth] RPC handshake completed in ${totalHandshakeTime.toFixed(0)}ms`);
-      }
-      
+
       clearCaches();
       notifyListeners();
-      return;
     }
-    
-    // Fallback to separate queries if RPC fails
-    console.warn('[Auth] RPC failed, falling back to separate queries:', rpcError?.message);
-    
-    // Query profile
-    let profileData = null;
-    try {
-      const profileResult = await supabase.from('user_profiles').select('*').eq('id', userId).single();
-      profileData = profileResult.data;
-    } catch (profileError) {
-      console.warn('Profile query failed:', profileError);
+  } catch (err) {
+    // Silence network errors to keep console clean
+    if (import.meta.env.DEV && isOnline) {
+      console.warn('[Auth] Background refresh failed:', err);
     }
-
-    if (profileData) {
-      authState.profile = profileData as Profile;
-    }
-
-    // Determine if user should be superadmin
-    const currentEmail = authState.profile?.email || authState.user?.email || '';
-    const isProfileSuperAdmin = authState.profile?.is_super_admin === true;
-    const shouldBeSuperAdmin = isProfileSuperAdmin;
-
-    // Fetch roles using shared safe helper
-    let extractedRoles: RoleSlug[] = [];
-    try {
-      extractedRoles = await fetchUserRolesSafely(userId, authState.user);
-    } catch (rolesFetchError) {
-      console.warn('Roles fetch failed:', rolesFetchError);
-      extractedRoles = [];
-    }
-
-    const finalRoles: RoleSlug[] = shouldBeSuperAdmin 
-      ? ['super_admin'] 
-      : (extractedRoles.length > 0 ? extractedRoles : defaultRoles);
-
-    if (shouldBeSuperAdmin || extractedRoles.length === 0) {
-      if (import.meta.env.DEV) {
-        console.log('🔧 Granting superadmin or fallback roles due to:', {
-          noRoles: extractedRoles.length === 0,
-          isSuperAdmin: shouldBeSuperAdmin,
-          email: currentEmail,
-        });
-      }
-    }
-
-    authState.roles = finalRoles;
-    authState.resolvedPermissions = flattenPermissions(finalRoles);
-    
-    // Scope data not available in fallback path - will be empty
-    authState.userOrganizations = [];
-    authState.userProjects = [];
-    authState.defaultOrgId = null;
-    authState.orgRoles = [];
-    authState.projectRoles = [];
-    
-    // Cache the auth data
-    const fallbackLoadTime = performance.now() - startTime;
-    if (import.meta.env.DEV) {
-      console.log(`[Auth] Fallback queries took ${fallbackLoadTime.toFixed(0)}ms`);
-    }
-    
-    // Log performance metrics for fallback
-    logAuthPerformance({
-      loadTime: fallbackLoadTime,
-      cacheHit: false,
-      rpcSuccess: false,
-      profileSuccess: true,
-      networkType: 'unknown'
-    });
-    
-    clearCaches();
-    notifyListeners();
-
-  } catch (error) {
-    console.error('Failed to load auth data:', error);
-    if (import.meta.env.DEV) {
-      console.log('🔧 Emergency fallback: Granting superadmin access');
-    }
-    // Error fallback: keep roles empty (loading state will persist)
-    // This prevents flashing 'viewer' role when there's a temporary error
-    authState.roles = defaultRoles;
-    authState.resolvedPermissions = defaultPermissions;
-    authState.loading = false; // Signal that auth attempt completed (even in error)
-    clearCaches();
-    notifyListeners();
   }
 };
 
-// Performance logging function for monitoring
-const logAuthPerformance = (data: {
-  loadTime: number;
-  cacheHit: boolean;
-  rpcSuccess: boolean;
-  profileSuccess: boolean;
-  networkType?: string;
-  roleFlicker?: boolean;
-}) => {
-  performance.mark('auth_complete');
-  try {
-    performance.measure('auth_load', 'auth_rpc_start', 'auth_complete');
-  } catch { /* marks may not exist in all paths */ }
-  
-  ApplicationPerformanceMonitor.record('auth_init_duration_ms', data.loadTime);
-
-  // Log to analytics if available
-  const w = window as any;
-  if (w?.analytics?.track) {
-    w.analytics.track('AuthPerformance', {
-      loadTime: data.loadTime,
-      cacheHit: data.cacheHit,
-      rpcSuccess: data.rpcSuccess,
-      profileSuccess: data.profileSuccess,
-      networkType: data.networkType || 'unknown',
-      roleFlicker: data.roleFlicker || false,
-      timestamp: Date.now(),
-    });
-  }
-  if (w?.monitoring?.send) {
-    w.monitoring.send('auth.performance', {
-      auth_init_duration_ms: data.loadTime,
-      rpc_success: data.rpcSuccess,
-      profile_fallback_used: !data.rpcSuccess && data.profileSuccess,
-      cache_hit_ratio: data.cacheHit ? 1 : 0,
-      role_flicker: data.roleFlicker || false,
-      network_type: data.networkType || 'unknown',
-      user_agent: navigator.userAgent,
-      timestamp: Date.now(),
-    });
-  }
-  
-  // Log to console in development
-  if (import.meta.env.DEV) {
-    console.log(`[PERF] Auth: ${data.loadTime.toFixed(0)}ms`, {
-      cacheHit: data.cacheHit,
-      rpcSuccess: data.rpcSuccess,
-      networkType: data.networkType
-    });
-  }
-};
 
 // Notify all listeners of state changes
 // Always send a fresh snapshot object so React hooks see reference changes
@@ -1138,6 +819,33 @@ const getUserRolesInProject = (projectId: string): string[] => {
     .map(r => r.role);
 };
 
+// function to manually set offline user (called by LoginForm after successful PIN/Password unlock)
+export const setOfflineSession = async (userId: string) => {
+    if (import.meta.env.DEV) console.log('[Auth] Setting offline session for:', userId);
+    
+    // Create a mock user object
+    const mockUser = {
+        id: userId,
+        aud: 'authenticated',
+        role: 'authenticated',
+        email: 'offline_user@example.com',
+        app_metadata: { provider: 'email' },
+        user_metadata: {},
+        created_at: new Date().toISOString(),
+    };
+    
+    authState.user = mockUser;
+    authState.loading = true;
+    notifyListeners();
+    
+    // Load cached data
+    await loadAuthData(userId);
+    
+    authState.loading = false;
+    notifyListeners();
+};
+
+
 // Optimized auth hook
 export const useOptimizedAuth = () => {
   const [state, setState] = useState(authState);
@@ -1151,7 +859,7 @@ export const useOptimizedAuth = () => {
         setState(newState);
       }
     };
-
+    
     authListeners.add(listener);
     initializeAuth();
 
@@ -1176,37 +884,44 @@ export const useOptimizedAuth = () => {
     loading: state.loading,
     roles: state.roles,
     resolvedPermissions: state.resolvedPermissions,
-    hasRouteAccess: hasRouteAccessMemo,
-    hasActionAccess: hasActionAccessMemo,
+    
+    // Scope-aware fields
+    userOrganizations: state.userOrganizations,
+    userProjects: state.userProjects,
+    defaultOrgId: state.defaultOrgId,
+    orgRoles: state.orgRoles,
+    projectRoles: state.projectRoles,
+    landingPreference: state.landingPreference,
+
     signIn,
     signOut,
     signUp,
     refreshProfile,
-    
-    // Scope data for org/project access
-    userOrganizations: state.userOrganizations,
-    userProjects: state.userProjects,
-    defaultOrgId: state.defaultOrgId,
-    
-    // NEW: Scoped roles data (Phase 6)
-    orgRoles: state.orgRoles,
-    projectRoles: state.projectRoles,
-    
-    // Scope validation functions
-    belongsToOrg,
-    canAccessProject,
-    getRolesInOrg,
-    hasActionAccessInOrg,
-    
-    // NEW: Scoped roles functions (Phase 5/6)
+
+    // NEW: Offline helper
+    setOfflineSession,
+
+    // Scope helpers
+    belongsToOrg: belongsToOrg,
+    canAccessProject: canAccessProject,
+    getRolesInOrg: getRolesInOrg,
     hasRoleInOrg: hasRoleInOrgMemo,
     hasRoleInProject: hasRoleInProjectMemo,
     canPerformActionInOrg: canPerformActionInOrgMemo,
     canPerformActionInProject: canPerformActionInProjectMemo,
     getUserRolesInOrg: getUserRolesInOrgMemo,
     getUserRolesInProject: getUserRolesInProjectMemo,
-    landingPreference: state.landingPreference,
+
+    // NEW: Action access with context
+    hasActionAccessInOrg,
+    hasActionAccessInProject: canPerformActionInProjectMemo, // Alias for consistency
+
+    // Legacy helper for backward compatibility
+    hasActionAccess: hasActionAccessMemo, 
+    hasPermission: hasActionAccessMemo,
+    hasRouteAccess: hasRouteAccessMemo,
   };
 };
+
 
 export default useOptimizedAuth;

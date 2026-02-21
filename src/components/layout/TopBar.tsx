@@ -13,6 +13,9 @@ import Tooltip from '@mui/material/Tooltip';
 import Divider from '@mui/material/Divider';
 import Button from '@mui/material/Button';
 import Skeleton from '@mui/material/Skeleton';
+import LinearProgress from '@mui/material/LinearProgress';
+import Snackbar from '@mui/material/Snackbar';
+import Alert from '@mui/material/Alert';
 import { alpha, styled } from '@mui/material/styles';
 import {
   MenuIcon,
@@ -41,6 +44,9 @@ import { useNavigate } from 'react-router-dom';
 import GlobalSearch from './GlobalSearch';
 import { useConnectionHealth } from '../../utils/connectionMonitor';
 import { useScope } from '../../contexts/ScopeContext';
+import { SyncQueueViewer } from '../offline/SyncQueueViewer';
+import { syncEngine } from '../../services/offline/sync/SynchronizationEngine';
+import { useOffline } from '../OfflineProvider';
 
 
 // Inline Connection Status Component
@@ -138,12 +144,36 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
 
   const [profileMenuAnchor, setProfileMenuAnchor] = useState<null | HTMLElement>(null);
   const [notificationMenuAnchor, setNotificationMenuAnchor] = useState<null | HTMLElement>(null);
-  // const [themeSettingsOpen, setThemeSettingsOpen] = useState(false); // Temporarily disabled
+  const [syncQueueOpen, setSyncQueueOpen] = useState(false);
+  const { pendingOperations, syncProgress } = useOffline();
+  const [showSyncSuccess, setShowSyncSuccess] = useState(false);
   const isRtl = language === 'ar';
 
   const t = translations[language];
 
 
+
+
+  const [isSyncingMetadata, setIsSyncingMetadata] = useState(false);
+
+  // Manual Metadata Sync Handler
+  const handleMetadataSync = async () => {
+    if (isSyncingMetadata) return;
+    setIsSyncingMetadata(true);
+    try {
+      const { migrationManager } = await import('../../services/offline/core/OfflineMigrations');
+      await migrationManager.seedInitialData();
+      // Simple success feedback leveraging the button state or a quick alert if no toast
+      // For now, we'll just rely on the spinning icon stopping
+      console.log('✅ Metadata sync complete');
+      // Optional: alert(language === 'ar' ? 'تم تحديث البيانات بنجاح' : 'Metadata synced successfully');
+    } catch (error) {
+      console.error('Metadata sync failed:', error);
+      alert(language === 'ar' ? 'فشل تحديث البيانات' : 'Failed to sync metadata');
+    } finally {
+      setIsSyncingMetadata(false);
+    }
+  };
 
   const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setProfileMenuAnchor(event.currentTarget);
@@ -337,25 +367,82 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
             <ConnectionStatusInline />
 
             {/* Sync Button */}
-            <Tooltip title={language === 'ar' ? 'مزامنة البيانات' : 'Sync Data'}>
-              <StyledTopBarButton
-                onClick={() => refreshAll()}
-                disabled={isRefreshing}
-                startIcon={
+            <Tooltip title={
+              syncProgress.isSyncing
+                ? (language === 'ar' ? `جاري المزامنة: ${syncProgress.synced}/${syncProgress.total}` : `Syncing: ${syncProgress.synced}/${syncProgress.total}`)
+                : (language === 'ar' ? 'مزامنة البيانات' : 'Sync Data')
+            }>
+              <span>
+                <StyledTopBarButton
+                  onClick={async () => {
+                    if (pendingOperations > 0) {
+                      setSyncQueueOpen(true); // Open manager which will show progress if needed
+                    }
+                    try {
+                      const result = await syncEngine.startFullSync();
+                      if (result.success && result.syncedOperations > 0) {
+                        setShowSyncSuccess(true);
+                      }
+                    } catch (err) {
+                      console.error('Sync failed:', err);
+                    }
+                  }}
+                  disabled={isRefreshing || syncProgress.isSyncing}
+                  startIcon={
+                    <Badge badgeContent={pendingOperations > 0 ? pendingOperations : undefined} color="error" overlap="circular">
+                      <RefreshIcon
+                        fontSize="small"
+                        sx={{
+                          animation: (isRefreshing || syncProgress.isSyncing) ? 'spin 1s linear infinite' : 'none',
+                          '@keyframes spin': {
+                            '0%': { transform: 'rotate(0deg)' },
+                            '100%': { transform: 'rotate(360deg)' }
+                          }
+                        }}
+                      />
+                    </Badge>
+                  }
+                >
+                  {syncProgress.isSyncing
+                    ? `${syncProgress.synced}/${syncProgress.total}`
+                    : (language === 'ar' ? 'مزامنة' : 'Sync')
+                  }
+                </StyledTopBarButton>
+              </span>
+            </Tooltip>
+
+            {/* Metadata Sync Button (Moved here) */}
+            <Tooltip title={language === 'ar' ? 'تحديث البيانات المرجعية' : 'Update Metadata'}>
+              <span>
+                <ActionIconButton
+                  size="small"
+                  onClick={handleMetadataSync}
+                  disabled={isSyncingMetadata}
+                  sx={{
+                    width: 40, height: 40,
+                    borderColor: isSyncingMetadata ? 'secondary.main' : 'divider',
+                    color: isSyncingMetadata ? 'secondary.main' : 'text.secondary'
+                  }}
+                >
                   <RefreshIcon
                     fontSize="small"
                     sx={{
-                      animation: isRefreshing ? 'spin 1s linear infinite' : 'none',
+                      animation: isSyncingMetadata ? 'spin 1s linear infinite' : 'none',
                       '@keyframes spin': {
                         '0%': { transform: 'rotate(0deg)' },
                         '100%': { transform: 'rotate(360deg)' }
                       }
                     }}
                   />
-                }
-              >
-                {language === 'ar' ? 'مزامنة' : 'Sync'}
-              </StyledTopBarButton>
+                </ActionIconButton>
+              </span>
+            </Tooltip>
+
+            {/* Sync Queue Manager Toggle */}
+            <Tooltip title={language === 'ar' ? 'مدير المزامنة' : 'Sync Manager'}>
+              <ActionIconButton onClick={() => setSyncQueueOpen(true)}>
+                <SettingsIcon fontSize="small" />
+              </ActionIconButton>
             </Tooltip>
 
             {/* Utility Icons Group */}
@@ -418,6 +505,11 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
 
           </Box>
         </Toolbar>
+        {isSyncingMetadata && (
+          <Box sx={{ width: '100%', position: 'absolute', bottom: 0, left: 0 }}>
+            <LinearProgress color="secondary" />
+          </Box>
+        )}
       </AppBar>
 
 
@@ -473,11 +565,28 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
         </MenuItem>
         <Divider />
         <MenuItem onClick={async () => {
+          handleProfileMenuClose();
           try {
-            handleProfileMenuClose();
-            await signOut();
-          } catch (error) {
+            const { getConnectionMonitor } = await import('../../utils/connectionMonitor');
+            if (getConnectionMonitor().getHealth().isOnline) {
+              await signOut();
+            } else {
+              // Offline logout: Just clear local state
+              console.log('Offline logout: Clearing local session...');
+              const { supabase } = await import('../../utils/supabase');
+              await supabase.auth.signOut({ scope: 'local' });
+              // Force reload or redirect
+              window.location.href = '/login';
+            }
+          } catch (error: any) {
             console.error('Logout failed:', error);
+            // Force logout on error
+            if (error?.message?.includes('fetch') || error?.message?.includes('network')) {
+              const { supabase } = await import('../../utils/supabase');
+              await supabase.auth.signOut({ scope: 'local' });
+              window.location.href = '/login';
+              return;
+            }
             alert('فشل تسجيل الخروج');
           }
         }}>
@@ -525,11 +634,21 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
         </MenuItem>
       </Menu>
 
-      {/* Theme Settings Dialog - Temporarily disabled */}
-      {/* <ThemeSettings 
-      open={themeSettingsOpen} 
-      onClose={() => setThemeSettingsOpen(false)} 
-    /> */}
+      <SyncQueueViewer
+        open={syncQueueOpen}
+        onClose={() => setSyncQueueOpen(false)}
+      />
+
+      <Snackbar
+        open={showSyncSuccess}
+        autoHideDuration={4000}
+        onClose={() => setShowSyncSuccess(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="success" sx={{ width: '100%', borderRadius: '12px' }}>
+          {language === 'ar' ? 'تمت المزامنة بنجاح' : 'Synchronization successful'}
+        </Alert>
+      </Snackbar>
     </>
   );
 };

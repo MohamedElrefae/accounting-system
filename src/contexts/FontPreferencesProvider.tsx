@@ -31,6 +31,12 @@ export const FontPreferencesProvider: React.FC<FontPreferencesProviderProps> = (
 
     try {
       setError(null);
+      if (!navigator.onLine) {
+        if (import.meta.env.DEV) console.log('[FontPreferences] Offline: Skipping server fetch');
+        setLoading(false);
+        return;
+      }
+
       // Migrate legacy localStorage key to namespaced per-user key on first login
       try {
         const uid = (user as any)?.id || null;
@@ -42,10 +48,10 @@ export const FontPreferencesProvider: React.FC<FontPreferencesProviderProps> = (
             localStorage.setItem(nsKey, legacy);
             try {
               localStorage.removeItem('font_prefs_v1');
-            } catch {}
+            } catch { }
           }
         }
-      } catch {}
+      } catch { }
       const prefs = await getUserFontPreferences();
       setPreferences(prefs);
       applyFontPreferencesToCSS(prefs);
@@ -64,7 +70,7 @@ export const FontPreferencesProvider: React.FC<FontPreferencesProviderProps> = (
     try {
       const key = `font_prefs_v1/${prefs.user_id || 'local'}`;
       localStorage.setItem(key, JSON.stringify(prefs));
-    } catch {}
+    } catch { }
   }, []);
 
   // Load preferences when user changes

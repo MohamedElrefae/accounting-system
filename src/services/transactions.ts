@@ -345,7 +345,7 @@ export interface ListTransactionsFilters {
   projectId?: string
   orgId?: string
   classificationId?: string
-  expensesCategoryId?: string
+  expensesCategoryId?: string // Note: Only applicable to transaction_lines, not transactions table
   workItemId?: string
   analysisWorkItemId?: string
   costCenterId?: string
@@ -407,7 +407,7 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
   if (f?.projectId) query = query.eq('project_id', f.projectId)
   if (f?.orgId) query = query.eq('org_id', f.orgId)
   if (f?.classificationId) query = query.eq('classification_id', f.classificationId)
-  if (f?.expensesCategoryId) query = query.eq('sub_tree_id', f.expensesCategoryId)
+  // Note: sub_tree_id filter removed - it only exists on transaction_lines table, not transactions table
   if (f?.workItemId) query = query.eq('work_item_id', f.workItemId)
   if (f?.analysisWorkItemId) query = query.eq('analysis_work_item_id', f.analysisWorkItemId)
   if (f?.costCenterId) query = query.eq('cost_center_id', f.costCenterId)
@@ -561,6 +561,54 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
     created_by: uid ?? null,
   }
 
+  // Wired transaction creation
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  const isOffline = !getConnectionMonitor().getHealth().isOnline;
+
+  if (isOffline) {
+    try {
+      console.log('[createTransaction] Offline detected. Enqueuing operation.');
+      // 1. Create local ID
+      const localId = crypto.randomUUID();
+      
+      // 2. Prepare payload for local DB (ensure all required fields)
+      const now = new Date().toISOString();
+      const localTx = {
+        id: localId,
+        ...payload,
+        created_at: now,
+        updated_at: now,
+        is_posted: false,
+        is_synced: false,
+        // Add any other required fields for local DB schema
+      };
+
+      // 3. Save to IndexedDB
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+      const db = getOfflineDB();
+      await db.transactions.add(localTx as any);
+
+      // 4. Enqueue Sync Operation
+      const { enqueueOperation } = await import('./offline/sync/SyncQueueManager');
+      await enqueueOperation({
+        type: 'CREATE',
+        entityType: 'transaction',
+        entityId: localId,
+        data: localTx as any,
+        userId: uid || 'offline-user',
+        timestamp: Date.now(),
+        id: crypto.randomUUID(), // Sync op ID
+        deviceId: 'device-id-placeholder', // TODO: Get actual device ID
+      });
+
+      console.log('[createTransaction] Offline operation enqueued:', localId);
+      return localTx as unknown as TransactionRecord;
+    } catch (offlineErr) {
+      console.error('[createTransaction] Offline save failed:', offlineErr);
+      throw offlineErr;
+    }
+  }
+
   const { data, error } = await supabase
     .from('transactions')
     .insert(payload)
@@ -572,7 +620,7 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
     if (error.code === '23505' && error.message?.includes('entry_number')) {
       // Retry with a new number
       const newEntryNumber = await getNextTransactionNumber()
-      payload.entry_number = newEntryNumber
+      payload.entry_number = String(newEntryNumber)
       const { data: retryData, error: retryError } = await supabase
         .from('transactions')
         .insert(payload)
@@ -582,6 +630,43 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
       if (retryError) throw retryError
       return retryData as TransactionRecord
     }
+    
+    // If network error, fallback to offline
+    if (error.message?.includes('fetch') || error.message?.includes('network')) {
+       console.warn('[createTransaction] Network error detected during create. Falling back to offline queue.');
+       // ... (Reuse offline logic or recursive call with forced offline flag?)
+       // For now, let's keep it simple: throw to let UI handle or duplicate logic. 
+       // Duplicating logic here for robustness:
+       try {
+          // 1. Create local ID
+          const localId = crypto.randomUUID();
+          const now = new Date().toISOString();
+          const localTx = { id: localId, ...payload, created_at: now, updated_at: now, is_posted: false, is_synced: false };
+          
+          // 2. Save
+          const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+          const db = getOfflineDB();
+          await db.transactions.add(localTx as any);
+
+          // 3. Queue
+          const { enqueueOperation } = await import('./offline/sync/SyncQueueManager');
+          await enqueueOperation({
+            type: 'CREATE',
+            entityType: 'transaction',
+            entityId: localId,
+            data: localTx as any,
+            userId: uid || 'offline-user',
+            timestamp: Date.now(),
+            id: crypto.randomUUID(),
+            deviceId: 'device-id-placeholder',
+          });
+          
+          return localTx as unknown as TransactionRecord;
+       } catch (fallbackErr) {
+          throw error; // Throw original error if fallback fails
+       }
+    }
+
     throw error
   }
   return data as TransactionRecord
@@ -670,7 +755,7 @@ export async function createTransactionWithLines(input: CreateTransactionWithLin
     if (headerError.code === '23505' && headerError.message?.includes('entry_number')) {
       // Retry with a new number
       const newEntryNumber = await getNextTransactionNumber()
-      headerPayload.entry_number = newEntryNumber
+      headerPayload.entry_number = String(newEntryNumber)
       const { data: retryData, error: retryError } = await supabase
         .from('transactions')
         .insert(headerPayload)
@@ -781,6 +866,58 @@ export async function updateTransaction(
     payload[key] = value
   }
 
+  // Offline fallback or offline-first handling for updates
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  const isOffline = !getConnectionMonitor().getHealth().isOnline;
+
+  if (isOffline) {
+    try {
+      console.log('[updateTransaction] Offline detected. Enqueuing update.');
+      const now = new Date().toISOString();
+      
+      // 1. Fetch current local state (necessary for delta/consistency)
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+      const db = getOfflineDB();
+      const current = await db.transactions.get(id);
+
+      // If not in local DB, we can't update it offline unless we just queue blindly.
+      // Ideally, we should have it. If not, we might be updating a server-only record that 
+      // hasn't been cached. For now, assume if offline, we might be editing something we just created.
+      // If missing, we queue a blind update.
+      
+      const updatedRecord = {
+        ...(current || { id }), // preserving existing fields if available
+        ...payload,
+        updated_at: now,
+        is_synced: false
+      };
+
+      // 2. Save to local DB (upsert)
+      await db.transactions.put(updatedRecord as any);
+
+      // 3. Queue Sync Operation
+      const { enqueueOperation } = await import('./offline/sync/SyncQueueManager');
+      await enqueueOperation({
+        type: 'UPDATE',
+        entityType: 'transaction',
+        entityId: id,
+        data: payload as any,        // Send only changed fields
+        originalData: current as any,// Send original for potential conflict resolution
+        userId: (await getCurrentUserId()) || 'offline-user',
+        timestamp: Date.now(),
+        id: crypto.randomUUID(),
+        deviceId: 'device-id-placeholder',
+      });
+
+      console.log('[updateTransaction] Offline update enqueued:', id);
+      return updatedRecord as unknown as TransactionRecord;
+
+    } catch (offlineErr) {
+      console.error('[updateTransaction] Offline update failed:', offlineErr);
+      throw offlineErr;
+    }
+  }
+
   const { data, error } = await supabase
     .from('transactions')
     .update(payload)
@@ -788,7 +925,44 @@ export async function updateTransaction(
     .select('*')
     .single()
 
-  if (error) throw error
+  if (error) {
+     if (error.message?.includes('fetch') || error.message?.includes('network')) {
+       console.warn('[updateTransaction] Network error. Falling back to offline queue.');
+       try {
+          const now = new Date().toISOString();
+          const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+          const db = getOfflineDB();
+          const current = await db.transactions.get(id);
+
+          const updatedRecord = {
+            ...(current || { id }),
+            ...payload,
+            updated_at: now,
+            is_synced: false
+          };
+
+          await db.transactions.put(updatedRecord as any);
+
+          const { enqueueOperation } = await import('./offline/sync/SyncQueueManager');
+          await enqueueOperation({
+            type: 'UPDATE',
+            entityType: 'transaction',
+            entityId: id,
+            data: payload as any,
+            originalData: current as any,
+            userId: (await getCurrentUserId()) || 'offline-user',
+            timestamp: Date.now(),
+            id: crypto.randomUUID(),
+            deviceId: 'device-id-placeholder',
+          });
+
+          return updatedRecord as unknown as TransactionRecord;
+       } catch (fallbackErr) {
+          throw error;
+       }
+     }
+     throw error
+  }
   return data as TransactionRecord
 }
 

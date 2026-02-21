@@ -1,4 +1,5 @@
 import { supabase } from '../utils/supabase';
+import { getConnectionMonitor } from '../utils/connectionMonitor';
 
 export interface UserPresenceRow {
   org_id: string;
@@ -17,6 +18,8 @@ export async function presenceHeartbeat(params?: {
   metadata?: Record<string, unknown>;
 }): Promise<void> {
   const { orgId = null, metadata = {} } = params ?? {};
+  const monitor = getConnectionMonitor();
+  if (!monitor.getHealth().isOnline) return;
 
   const { error } = await supabase.rpc('rpc_presence_heartbeat', {
     p_org_id: orgId,
@@ -38,6 +41,9 @@ export async function listUserPresence(params?: {
     onlineWithinSeconds = 120,
     activeWithinSeconds = 900,
   } = params ?? {};
+  
+  const monitor = getConnectionMonitor();
+  if (!monitor.getHealth().isOnline) return [];
 
   const { data, error } = await supabase.rpc('rpc_list_user_presence', {
     p_org_id: orgId,

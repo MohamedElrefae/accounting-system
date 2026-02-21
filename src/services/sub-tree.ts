@@ -64,49 +64,86 @@ export async function getExpensesCategoriesTree(orgId: string, force = false): P
 }
 
 export async function getExpensesCategoriesList(orgId: string, force = false): Promise<SubTreeRow[]> {
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  const isOnline = getConnectionMonitor().getHealth().isOnline;
+
+  if (!isOnline) {
+    // Offline fallback
+    try {
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema')
+      const db = getOfflineDB()
+      const cacheData = await db.metadata.get('sub_tree_cache')
+      if (cacheData && Array.isArray(cacheData.value)) {
+        console.log('📦 Sub Tree loaded from offline cache:', (cacheData.value as any[]).length)
+        const allItems = cacheData.value as any[]
+        return allItems.filter(item => item.org_id === orgId)
+      }
+    } catch (err) {
+      console.error('❌ Sub Tree offline fallback failed:', err)
+    }
+    return [];
+  }
+
   if (!force && cache.list.has(orgId)) return cache.list.get(orgId)!
   
   const viewCandidates = ['sub_tree_full_v2', 'sub_tree_full'] as const
   let data: any[] | null = null
   let lastError: any = null
 
-  for (const viewName of viewCandidates) {
-    const result = await supabase
-      .from(viewName)
-      .select('*')
-      .eq('org_id', orgId)
-      .order('path', { ascending: true })
+  try {
+      for (const viewName of viewCandidates) {
+        const result = await supabase
+          .from(viewName)
+          .select('*')
+          .eq('org_id', orgId)
+          .order('path', { ascending: true })
 
-    if (result.error) {
-      lastError = result.error
-      continue
-    }
+        if (result.error) {
+          lastError = result.error
+          continue
+        }
 
-    if (result.data && result.data.length > 0) {
-      data = result.data
-      lastError = null
-      break
-    }
+        if (result.data && result.data.length > 0) {
+          data = result.data
+          lastError = null
+          break
+        }
 
-    data = result.data
-  }
+        data = result.data
+      }
 
-  if (!data || data.length === 0) {
-    if (lastError) {
-      console.warn('sub_tree_full view failed, trying direct table query:', lastError)
-    }
+      if (!data || data.length === 0) {
+        if (lastError) {
+          console.warn('sub_tree_full view failed, trying direct table query:', lastError)
+        }
 
-    const directResult = await supabase
-      .from('sub_tree')
-      .select(`
-        id, org_id, parent_id, code, description, add_to_cost, is_active, level, path,
-        linked_account_id, created_at, updated_at, created_by, updated_by
-      `)
-      .eq('org_id', orgId)
-      .order('code', { ascending: true })
-    
-    if (directResult.error) throw directResult.error
-    data = directResult.data
+        const directResult = await supabase
+          .from('sub_tree')
+          .select(`
+            id, org_id, parent_id, code, description, add_to_cost, is_active, level, path,
+            linked_account_id, created_at, updated_at, created_by, updated_by
+          `)
+          .eq('org_id', orgId)
+          .order('code', { ascending: true })
+        
+        if (directResult.error) throw directResult.error
+        data = directResult.data
+      }
+  } catch (error: any) {
+      if (!isOnline || error.message?.includes('fetch')) {
+          console.warn('Network error fetching sub_tree, returning empty.');
+          // Try offline cache as last resort
+          try {
+              const { getOfflineDB } = await import('./offline/core/OfflineSchema')
+              const db = getOfflineDB()
+              const cacheData = await db.metadata.get('sub_tree_cache')
+              if (cacheData && Array.isArray(cacheData.value)) {
+                  return cacheData.value.filter((item: any) => item.org_id === orgId)
+              }
+          } catch {}
+          return [];
+      }
+      throw error;
   }
   
   const rows = (data as any[] | null)?.map(r => ({ 
@@ -125,9 +162,27 @@ export async function getExpensesCategoriesList(orgId: string, force = false): P
 }
 
 export async function fetchNextExpensesCategoryCode(orgId: string, parentId: string | null): Promise<string> {
-  // Use local generation - RPC may not be available or have permission issues
-  console.log('📝 Generating next code locally for:', { orgId, parentId })
-  return generateNextCodeLocally(orgId, parentId)
+  console.log('📝 Generating next code via RPC for:', { orgId, parentId })
+  
+  try {
+    // Use RPC function to get next code
+    const { data, error } = await supabase.rpc('rpc_sub_tree_next_code', {
+      p_org_id: orgId,
+      p_parent_id: parentId
+    })
+    
+    if (error) {
+      console.error('❌ RPC call error for next code:', error)
+      throw error
+    }
+    
+    console.log('✅ Next code generated:', data)
+    return data as string
+  } catch (err) {
+    console.error('❌ fetchNextExpensesCategoryCode failed, falling back to local generation:', err)
+    // Fallback to local generation if RPC fails
+    return generateNextCodeLocally(orgId, parentId)
+  }
 }
 
 function generateNextCodeLocally(orgId: string, parentId: string | null): string {
@@ -167,46 +222,26 @@ export async function createExpensesCategory(payload: CreateSubTreePayload): Pro
   try {
     console.log('📝 Creating sub_tree with payload:', payload)
     
-    // Determine level and path
-    let level = 1
-    let path = payload.code
-    
-    if (payload.parent_id) {
-      const parentList = cache.list.get(payload.org_id) || []
-      const parent = parentList.find(r => r.id === payload.parent_id)
-      if (parent) {
-        level = parent.level + 1
-        path = parent.path ? `${parent.path}.${payload.code}` : `${parent.code}.${payload.code}`
-      }
-    }
-    
-    // Insert directly into the table
-    const { data, error } = await supabase
-      .from('sub_tree')
-      .insert({
-        org_id: payload.org_id,
-        code: String(payload.code ?? '').trim(),
-        description: desc,
-        add_to_cost: payload.add_to_cost ?? false,
-        parent_id: payload.parent_id ?? null,
-        linked_account_id: payload.linked_account_id ?? null,
-        level,
-        path,
-        is_active: true,
-      })
-      .select('id')
-      .single()
+    // Use RPC function instead of direct table insert
+    const { data, error } = await supabase.rpc('create_sub_tree', {
+      p_org_id: payload.org_id,
+      p_code: String(payload.code ?? '').trim(),
+      p_description: desc,
+      p_add_to_cost: payload.add_to_cost ?? false,
+      p_parent_id: payload.parent_id ?? null,
+      p_linked_account_id: payload.linked_account_id ?? null
+    })
     
     if (error) {
-      console.error('❌ Insert error:', error)
+      console.error('❌ RPC call error:', error)
       throw error
     }
     
-    console.log('✅ Sub_tree created with ID:', data?.id)
+    console.log('✅ Sub_tree created with ID:', data)
     // Invalidate cache
     cache.tree.delete(payload.org_id)
     cache.list.delete(payload.org_id)
-    return data?.id as string
+    return data as string
   } catch (err) {
     console.error('❌ createExpensesCategory failed:', err)
     throw err
@@ -222,28 +257,30 @@ export async function updateExpensesCategory(payload: UpdateSubTreePayload & { o
   
   try {
     console.log('📝 Updating sub_tree:', payload)
+    console.log('🔗 linked_account_id value:', payload.linked_account_id, 'type:', typeof payload.linked_account_id)
+    console.log('🧹 p_clear_linked_account:', payload.linked_account_id === null)
     
-    const updateData: any = {
-      updated_at: new Date().toISOString(),
-    }
+    // Debug: Track the exact value being sent to RPC
+    const rpcLinkedAccountId = payload.linked_account_id;
+    console.log('🔍 RPC will send linked_account_id:', rpcLinkedAccountId, 'type:', typeof rpcLinkedAccountId)
     
-    if (payload.code !== undefined) updateData.code = String(payload.code).trim()
-    if (desc !== undefined) updateData.description = desc
-    if (payload.add_to_cost !== undefined) updateData.add_to_cost = payload.add_to_cost
-    if (payload.is_active !== undefined) updateData.is_active = payload.is_active
-    if (payload.linked_account_id !== undefined) updateData.linked_account_id = payload.linked_account_id
-    
-    const { error } = await supabase
-      .from('sub_tree')
-      .update(updateData)
-      .eq('id', payload.id)
+    // Use RPC function instead of direct table update
+    const { data, error } = await supabase.rpc('update_sub_tree', {
+      p_id: payload.id,
+      p_code: payload.code !== undefined ? String(payload.code).trim() : undefined,
+      p_description: desc,
+      p_add_to_cost: payload.add_to_cost,
+      p_is_active: payload.is_active,
+      p_linked_account_id: rpcLinkedAccountId,
+      p_clear_linked_account: payload.linked_account_id === null
+    })
     
     if (error) {
-      console.error('❌ Update error:', error)
+      console.error('❌ RPC call error:', error)
       throw error
     }
     
-    console.log('✅ Sub_tree updated')
+    console.log('✅ Sub_tree updated:', data)
     if (payload.org_id) {
       console.log('🗑️ Clearing cache for org:', payload.org_id)
       cache.tree.delete(payload.org_id)
@@ -253,7 +290,7 @@ export async function updateExpensesCategory(payload: UpdateSubTreePayload & { o
       console.log('⚠️ No org_id provided, clearing all caches')
       cache.tree.clear(); cache.list.clear()
     }
-    return true
+    return data as boolean
   } catch (err) {
     console.error('❌ updateExpensesCategory failed:', err)
     throw err
@@ -263,17 +300,18 @@ export async function updateExpensesCategory(payload: UpdateSubTreePayload & { o
 export async function deleteExpensesCategory(id: string, orgId?: string): Promise<boolean> {
   try {
     console.log('🗑️ Deleting sub_tree:', id)
-    const { error } = await supabase
-      .from('sub_tree')
-      .delete()
-      .eq('id', id)
+    
+    // Use RPC function instead of direct table delete
+    const { data, error } = await supabase.rpc('delete_sub_tree', {
+      p_id: id
+    })
     
     if (error) {
-      console.error('❌ Delete error:', error)
+      console.error('❌ RPC call error:', error)
       throw error
     }
     
-    console.log('✅ Sub_tree deleted')
+    console.log('✅ Sub_tree deleted:', data)
     if (orgId) { 
       cache.tree.delete(orgId)
       cache.list.delete(orgId)
@@ -281,7 +319,7 @@ export async function deleteExpensesCategory(id: string, orgId?: string): Promis
       cache.tree.clear()
       cache.list.clear()
     }
-    return true
+    return data as boolean
   } catch (err) {
     console.error('❌ deleteExpensesCategory failed:', err)
     throw err
@@ -299,13 +337,25 @@ export async function listAccountsForOrg(orgId: string): Promise<AccountLite[]> 
   }
   
   if (cache.accounts.has(orgId)) return cache.accounts.get(orgId)!
-  const { data, error } = await supabase
-    .from('accounts')
-    .select('id, org_id, code, name, name_ar, level, is_postable, allow_transactions')
-    .eq('org_id', orgId)
-    .order('code', { ascending: true })
-  if (error) throw error
-  const rows = (data || []) as AccountLite[]
+
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  if (!getConnectionMonitor().getHealth().isOnline) {
+      return []; // Return empty if offline, components should handle empty lists gracefully
+  }
+
+  let rows: AccountLite[] = [];
+  try {
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('id, org_id, code, name, name_ar, level, is_postable, allow_transactions')
+        .eq('org_id', orgId)
+        .order('code', { ascending: true })
+      if (error) throw error
+      rows = (data || []) as AccountLite[]
+  } catch (error: any) {
+      if (error.message?.includes('fetch')) return [];
+      throw error;
+  }
   cache.accounts.set(orgId, rows)
   return rows
 }

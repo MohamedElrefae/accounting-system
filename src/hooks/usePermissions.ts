@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../utils/supabase';
 import { useAuth } from './useAuth';
+import { getConnectionMonitor } from '../utils/connectionMonitor';
 
 
 export function usePermissions() {
@@ -10,6 +11,11 @@ export function usePermissions() {
 
   const loadPermissions = useCallback(async () => {
     try {
+      const monitor = getConnectionMonitor();
+      if (!monitor.getHealth().isOnline) {
+        setLoading(false);
+        return;
+      }
       if (!user?.id) {
         setPermissions([]);
         return;

@@ -48,6 +48,7 @@
     "@types/react-router-dom": "^5.3.3",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.10",
+    "dexie": "^4.3.0",
     "dotenv": "^16.6.1",
     "framer-motion": "^12.23.24",
     "hoist-non-react-statics": "^3.3.2",

@@ -52,6 +52,30 @@ function buildTree(rows: WorkItemRow[]): WorkItemTreeNode[] {
 
 export async function listWorkItemsAll(orgId: string, includeInactive = true): Promise<WorkItemRow[]> {
   if (cache.byOrgAll.has(orgId)) return cache.byOrgAll.get(orgId)!
+
+  // 0. If offline, use local metadata cache
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  if (!getConnectionMonitor().getHealth().isOnline) {
+    try {
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema')
+      const db = getOfflineDB()
+      const cacheData = await db.metadata.get('work_items_cache')
+      if (cacheData && Array.isArray(cacheData.value)) {
+        console.log('📦 Work Items loaded from offline cache:', (cacheData.value as any[]).length)
+        const allItems = cacheData.value as any[]
+        // Filter by org
+        const filtered = allItems.filter(item => 
+          item.org_id === orgId && 
+          (includeInactive ? true : item.is_active)
+        )
+        cache.byOrgAll.set(orgId, filtered)
+        return filtered
+      }
+    } catch (err) {
+      console.error('❌ Work Items offline fallback failed:', err)
+    }
+  }
+
   try {
     let q = supabase.from('work_items_full').select('*').eq('org_id', orgId)
     if (!includeInactive) q = q.eq('is_active', true)
@@ -60,15 +84,24 @@ export async function listWorkItemsAll(orgId: string, includeInactive = true): P
     const rows = (data as WorkItemRow[]) || []
     cache.byOrgAll.set(orgId, rows)
     return rows
-  } catch {
+  } catch (error: any) {
+    if (error.message?.includes('fetch') || !getConnectionMonitor().getHealth().isOnline) {
+         return [];
+    }
+    
     // Fallback if view doesn't exist: query base table
-    let q = supabase.from('work_items').select('*').eq('org_id', orgId)
-    if (!includeInactive) q = q.eq('is_active', true)
-    const { data, error } = await q.order('project_id', { ascending: true }).order('code', { ascending: true })
-    if (error) throw error
-    const rows = (data as WorkItemRow[]) || []
-    cache.byOrgAll.set(orgId, rows)
-    return rows
+    try {
+        let q = supabase.from('work_items').select('*').eq('org_id', orgId)
+        if (!includeInactive) q = q.eq('is_active', true)
+        const { data, error } = await q.order('project_id', { ascending: true }).order('code', { ascending: true })
+        if (error) throw error
+        const rows = (data as WorkItemRow[]) || []
+        cache.byOrgAll.set(orgId, rows)
+        return rows
+    } catch (fbError: any) {
+        if (fbError.message?.includes('fetch')) return [];
+        throw fbError;
+    }
   }
 }
 
@@ -79,6 +112,10 @@ export async function listWorkItemsUnion(orgId: string, projectId?: string | nul
 
 export async function listCatalog(orgId: string, includeInactive = true): Promise<WorkItemRow[]> {
   if (cache.byOrgCatalog.has(orgId)) return cache.byOrgCatalog.get(orgId)!
+  
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  if (!getConnectionMonitor().getHealth().isOnline) return [];
+
   try {
     let q = supabase.from('work_items_full').select('*').eq('org_id', orgId).is('project_id', null)
     if (!includeInactive) q = q.eq('is_active', true)
@@ -87,20 +124,31 @@ export async function listCatalog(orgId: string, includeInactive = true): Promis
     const rows = (data as WorkItemRow[]) || []
     cache.byOrgCatalog.set(orgId, rows)
     return rows
-  } catch {
-    let q = supabase.from('work_items').select('*').eq('org_id', orgId).is('project_id', null)
-    if (!includeInactive) q = q.eq('is_active', true)
-    const { data, error } = await q.order('code', { ascending: true })
-    if (error) throw error
-    const rows = (data as WorkItemRow[]) || []
-    cache.byOrgCatalog.set(orgId, rows)
-    return rows
+  } catch (error: any) {
+    if (error.message?.includes('fetch')) return [];
+
+    try {
+        let q = supabase.from('work_items').select('*').eq('org_id', orgId).is('project_id', null)
+        if (!includeInactive) q = q.eq('is_active', true)
+        const { data, error } = await q.order('code', { ascending: true })
+        if (error) throw error
+        const rows = (data as WorkItemRow[]) || []
+        cache.byOrgCatalog.set(orgId, rows)
+        return rows
+    } catch (fbError: any) {
+        if (fbError.message?.includes('fetch')) return [];
+        throw fbError;
+    }
   }
 }
 
 export async function listProjectOverrides(orgId: string, projectId: string, includeInactive = true): Promise<WorkItemRow[]> {
   const pmap = cache.byOrgProject.get(orgId) || new Map<string, WorkItemRow[]>()
   if (pmap.has(projectId)) return pmap.get(projectId)!
+  
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  if (!getConnectionMonitor().getHealth().isOnline) return [];
+
   try {
     let q = supabase.from('work_items_full').select('*').eq('org_id', orgId).eq('project_id', projectId)
     if (!includeInactive) q = q.eq('is_active', true)
@@ -110,15 +158,22 @@ export async function listProjectOverrides(orgId: string, projectId: string, inc
     pmap.set(projectId, rows)
     cache.byOrgProject.set(orgId, pmap)
     return rows
-  } catch {
-    let q = supabase.from('work_items').select('*').eq('org_id', orgId).eq('project_id', projectId)
-    if (!includeInactive) q = q.eq('is_active', true)
-    const { data, error } = await q.order('code', { ascending: true })
-    if (error) throw error
-    const rows = (data as WorkItemRow[]) || []
-    pmap.set(projectId, rows)
-    cache.byOrgProject.set(orgId, pmap)
-    return rows
+  } catch (error: any) {
+    if (error.message?.includes('fetch')) return [];
+
+    try {
+        let q = supabase.from('work_items').select('*').eq('org_id', orgId).eq('project_id', projectId)
+        if (!includeInactive) q = q.eq('is_active', true)
+        const { data, error } = await q.order('code', { ascending: true })
+        if (error) throw error
+        const rows = (data as WorkItemRow[]) || []
+        pmap.set(projectId, rows)
+        cache.byOrgProject.set(orgId, pmap)
+        return rows
+    } catch (fbError: any) {
+        if (fbError.message?.includes('fetch')) return [];
+        throw fbError;
+    }
   }
 }
 

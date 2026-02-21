@@ -49,6 +49,8 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
         return;
       }
 
+      // Unified check moved inside service calls if needed
+
       setLoading(true);
       setError(null);
 
@@ -98,8 +100,9 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
         localStorage.setItem('is_super_admin', isSuper ? 'true' : 'false');
       } catch { }
     } catch (e: any) {
-      console.error('[UserProfile] Failed to load profile:', e?.message ?? e);
-      setError(e?.message || 'Failed to load user profile');
+      if (import.meta.env.DEV) {
+        console.warn('[UserProfile] Silent load failure (offline or transient):', e?.message ?? e);
+      }
       // Fallback minimal profile
       if (user) {
         setProfile({ id: user.id, email: user.email || '', roles: [] });
@@ -107,7 +110,7 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, authProfile]);
 
   useEffect(() => {
     if (user?.id) {

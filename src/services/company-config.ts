@@ -45,6 +45,7 @@ const DEFAULT_COMPANY_CONFIG: Partial<CompanyConfig> = {
 let configCache: CompanyConfig | null = null
 let configCacheTime = 0
 let configCacheOrgId: string | null = null
+let pendingPromise: Promise<CompanyConfig> | null = null
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
 /**
@@ -59,49 +60,88 @@ export async function getCompanyConfig(orgId?: string | null): Promise<CompanyCo
     return configCache
   }
 
-  try {
-    let query = supabase
-      .from('company_config')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(1)
+  // Promise caching for thundering herd prevention
+  if (pendingPromise) {
+    return pendingPromise
+  }
 
-    if (effectiveOrgId) {
-      query = query.eq('org_id', effectiveOrgId)
-    }
 
-    const { data, error } = await query
-    if (error) throw error
-
-    const row = Array.isArray(data) ? (data[0] as CompanyConfig | undefined) : (data as unknown as CompanyConfig | undefined)
-
-    if (!row) {
-      const fallback = {
+  pendingPromise = (async () => {
+    // Offline fallback: rely on cache or default
+    const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+    if (!getConnectionMonitor().getHealth().isOnline) {
+      if (configCache) return configCache;
+      // If no cache and offline, return default instead of failing
+      return {
         ...DEFAULT_COMPANY_CONFIG,
         id: 'default',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       } as CompanyConfig
-      configCache = fallback
-      configCacheTime = now
-      configCacheOrgId = effectiveOrgId
-      return fallback
     }
 
-    configCache = row
-    configCacheTime = now
-    configCacheOrgId = effectiveOrgId
-    return configCache
-  } catch (error) {
-    console.error('Error fetching company config:', error)
-    // Return default config as fallback
-    return {
-      ...DEFAULT_COMPANY_CONFIG,
-      id: 'default',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    } as CompanyConfig
-  }
+    try {
+      let query = supabase
+        .from('company_config')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      if (effectiveOrgId) {
+        query = query.eq('org_id', effectiveOrgId)
+      }
+
+      const { data, error } = await query
+      if (error) throw error
+
+      const row = Array.isArray(data) ? (data[0] as CompanyConfig | undefined) : (data as unknown as CompanyConfig | undefined)
+
+      if (!row) {
+        const fallback = {
+          ...DEFAULT_COMPANY_CONFIG,
+          id: 'default',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        } as CompanyConfig
+        configCache = fallback
+        configCacheTime = Date.now()
+        configCacheOrgId = effectiveOrgId
+        return fallback
+      }
+
+      configCache = row
+      configCacheTime = Date.now()
+      configCacheOrgId = effectiveOrgId
+      return configCache
+    } catch (error: any) {
+      if (
+        error.name === 'AbortError' || 
+        error.message?.includes('AbortError') ||
+        error.message?.includes('Failed to fetch') ||
+        error.message?.includes('NetworkError')
+      ) {
+        // Ignore abort and network errors
+        return {
+          ...DEFAULT_COMPANY_CONFIG,
+          id: 'default',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        } as CompanyConfig
+      }
+      console.error('Error fetching company config:', error)
+      // Return default config as fallback
+      return {
+        ...DEFAULT_COMPANY_CONFIG,
+        id: 'default',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      } as CompanyConfig
+    } finally {
+      pendingPromise = null
+    }
+  })()
+
+  return pendingPromise
 }
 
 /**

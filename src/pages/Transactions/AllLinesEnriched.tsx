@@ -16,6 +16,7 @@ import { useTransactionsFilters } from '../../hooks/useTransactionsFilters'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useUnifiedSync } from '../../hooks/useUnifiedSync'
 import TransactionsSummaryBar from '../../components/Transactions/TransactionsSummaryBar'
+import { getConnectionMonitor } from '../../utils/connectionMonitor'
 
 const AllLinesEnrichedPage = () => {
   const {
@@ -73,6 +74,9 @@ const AllLinesEnrichedPage = () => {
 
   // Fetch ALL lines with transaction header data (no user filter)
   const fetchAllLines = useCallback(async () => {
+    const monitor = getConnectionMonitor();
+    if (!monitor.getHealth().isOnline) return { rows: [], total: 0 };
+
     // Build query for ALL transaction lines
     let query = supabase
       .from('transaction_lines')
@@ -138,8 +142,8 @@ const AllLinesEnrichedPage = () => {
     if (appliedFilters.workItemId) {
       query = query.eq('work_item_id', appliedFilters.workItemId)
     }
-    if (appliedFilters.analysisItemId) {
-      query = query.eq('analysis_work_item_id', appliedFilters.analysisItemId)
+    if (appliedFilters.analysisWorkItemId) {
+      query = query.eq('analysis_work_item_id', appliedFilters.analysisWorkItemId)
     }
     if (appliedFilters.expensesCategoryId) {
       query = query.eq('sub_tree_id', appliedFilters.expensesCategoryId)
@@ -196,8 +200,8 @@ const AllLinesEnrichedPage = () => {
     if (appliedFilters.workItemId) {
       summaryQuery = summaryQuery.eq('work_item_id', appliedFilters.workItemId)
     }
-    if (appliedFilters.analysisItemId) {
-      summaryQuery = summaryQuery.eq('analysis_work_item_id', appliedFilters.analysisItemId)
+    if (appliedFilters.analysisWorkItemId) {
+      summaryQuery = summaryQuery.eq('analysis_work_item_id', appliedFilters.analysisWorkItemId)
     }
     if (appliedFilters.expensesCategoryId) {
       summaryQuery = summaryQuery.eq('sub_tree_id', appliedFilters.expensesCategoryId)
@@ -250,9 +254,9 @@ const AllLinesEnrichedPage = () => {
     error: queryError,
     refetch
   } = useQuery({
-    queryKey: ['all-lines-enriched', appliedFilters, page, pageSize],
+    queryKey: ['transaction-lines-enriched', appliedFilters, page, pageSize],
     queryFn: fetchAllLines,
-    enabled: !contextLoading,
+    enabled: !contextLoading && getConnectionMonitor().getHealth().isOnline,
     staleTime: 30000,
   })
 

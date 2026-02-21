@@ -244,13 +244,21 @@ class UniversalReportSyncManager {
   }
 
   private async getCurrentUserId(): Promise<string> {
-    const { data: { user } } = await supabase.auth.getUser()
-    return user?.id || `anonymous_${Math.random().toString(36).substr(2, 9)}`
+    try {
+        const { data: { session } } = await supabase.auth.getSession()
+        return session?.user?.id || `anonymous_${Math.random().toString(36).substr(2, 9)}`
+    } catch {
+        return `anonymous_${Math.random().toString(36).substr(2, 9)}`
+    }
   }
 
   private async getCurrentUsername(): Promise<string> {
-    const { data: { user } } = await supabase.auth.getUser()
-    return user?.email || 'مستخدم مجهول'
+    try {
+        const { data: { session } } = await supabase.auth.getSession()
+        return session?.user?.email || 'مستخدم مجهول'
+    } catch {
+        return 'مستخدم مجهول'
+    }
   }
 
   async triggerManualUpdate(reportId: string, metadata?: Record<string, any>) {

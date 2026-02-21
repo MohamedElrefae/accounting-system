@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { getConnectionMonitor } from '../utils/connectionMonitor'
 
 // Column configuration interface - defined inline to avoid import issues
 export interface ColumnConfig {
@@ -119,6 +120,8 @@ export const useColumnPreferences = ({
     // Fire-and-forget server upsert if user is known
     if (userId) {
       ;(async () => {
+        const monitor = getConnectionMonitor()
+        if (!monitor.getHealth().isOnline) return
         try {
           const mod = await import('../services/column-preferences')
           await mod.upsertUserColumnPreferences({ tableKey: serverKey, columnConfig: { columns: updatedColumns }, version: PREFERENCES_VERSION })
@@ -134,6 +137,8 @@ export const useColumnPreferences = ({
     savePreferences(newColumns)
     if (userId) {
       ;(async () => {
+        const monitor = getConnectionMonitor()
+        if (!monitor.getHealth().isOnline) return
         try {
           const mod = await import('../services/column-preferences')
           await mod.upsertUserColumnPreferences({ tableKey: serverKey, columnConfig: { columns: newColumns }, version: PREFERENCES_VERSION })
@@ -154,6 +159,8 @@ export const useColumnPreferences = ({
     let cancelled = false
     async function loadServer() {
       if (!userId) return
+      const monitor = getConnectionMonitor()
+      if (!monitor.getHealth().isOnline) return
       try {
         const mod = await import('../services/column-preferences')
         if (mod.isColumnPreferencesRpcDisabled()) return

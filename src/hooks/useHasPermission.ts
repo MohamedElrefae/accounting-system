@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../utils/supabase'
 import { useAuth } from './useAuth'
+import { getConnectionMonitor } from '../utils/connectionMonitor'
 
 // Aggregates permissions from direct user grants and via roles
 // Tables assumed:
@@ -19,6 +20,11 @@ export function useHasPermission() {
     if (loadingRef.current) return
     loadingRef.current = true
     try {
+      const monitor = getConnectionMonitor();
+      if (!monitor.getHealth().isOnline) {
+        loadingRef.current = false;
+        return;
+      }
       const names = new Set<string>()
 
       // Direct user permissions

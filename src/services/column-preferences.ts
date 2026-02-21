@@ -1,4 +1,5 @@
 import { supabase } from '../utils/supabase'
+import { getConnectionMonitor } from '../utils/connectionMonitor'
 
 export interface UserColumnPreferencesRow {
   id: string
@@ -28,6 +29,8 @@ export function isColumnPreferencesRpcDisabled(): boolean {
 }
 
 export async function getUserColumnPreferences(tableKey: string): Promise<UserColumnPreferencesRow | null> {
+  const monitor = getConnectionMonitor();
+  if (!monitor.getHealth().isOnline) return null;
   if (!COLUMN_PREFS_RPC_DISABLED) {
     const { data, error } = await supabase.rpc('get_user_column_preferences', { p_table_key: tableKey })
     if (!error) return (data as UserColumnPreferencesRow) ?? null
@@ -47,6 +50,8 @@ export async function upsertUserColumnPreferences(params: {
   columnConfig: any
   version?: number
 }): Promise<UserColumnPreferencesRow | null> {
+  const monitor = getConnectionMonitor();
+  if (!monitor.getHealth().isOnline) return null;
   const { tableKey, columnConfig, version = 1 } = params
   if (!COLUMN_PREFS_RPC_DISABLED) {
     const { data, error } = await supabase.rpc('upsert_user_column_preferences', {

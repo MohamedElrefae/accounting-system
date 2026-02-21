@@ -40,6 +40,7 @@ import AttachDocumentsPanel from '../documents/AttachDocumentsPanel'
 import SearchableSelect from '../Common/SearchableSelect'
 import TransactionApprovalStatus from '../Approvals/TransactionApprovalStatus'
 import LineProjectSelector from './LineProjectSelector'
+import TransactionConfirmationDialog from './TransactionConfirmationDialog'
 
 interface TransactionWizardProps {
   open: boolean
@@ -137,6 +138,23 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [draftTransactionId, setDraftTransactionId] = useState<string | null>(null)
   const [draftLineIds, setDraftLineIds] = useState<Record<number, string>>({})
+  
+  // Confirmation dialog state
+  const [confirmationDialog, setConfirmationDialog] = useState<{
+    open: boolean
+    action: 'draft' | 'submit'
+    transactionData?: {
+      description: string
+      entry_date: string
+      totalAmount: number
+      linesCount: number
+      organizationName?: string
+      projectName?: string
+    }
+  }>({
+    open: false,
+    action: 'draft'
+  })
 
   // Header data (transactions table)
   // Get scoped context for org/project synchronization
@@ -693,6 +711,43 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     onClose()
   }
 
+  // Handle confirmation dialog actions
+  const handleConfirmationAction = async (option: 'close' | 'new') => {
+    setConfirmationDialog({ open: false, action: 'draft' })
+    
+    if (option === 'close') {
+      await handleCloseWithCleanup()
+    } else if (option === 'new') {
+      // Reset form for new transaction
+      setTransactionAttachments([])
+      setLineAttachments({})
+      setCompletedSteps(new Set())
+      setDraftTransactionId(null)
+      setDraftLineIds({})
+      setHeaderData({
+        entry_date: new Date().toISOString().split('T')[0],
+        description: '',
+        description_ar: '',
+        org_id: getOrgId() || (organizations[0]?.id || ''),
+        project_id: getProjectId() || '',
+        default_cost_center_id: '',
+        default_work_item_id: '',
+        default_sub_tree_id: '',
+        classification_id: '',
+        reference_number: '',
+        notes: '',
+        notes_ar: ''
+      })
+      setLines([
+        { line_no: 1, account_id: '', debit_amount: 0, credit_amount: 0, description: '' },
+        { line_no: 2, account_id: '', debit_amount: 0, credit_amount: 0, description: '' }
+      ])
+      setCurrentStep('basic')
+      setErrors({})
+      onEditComplete?.()
+    }
+  }
+
   // ========== BUSINESS RULE VALIDATION ==========
   const validateBusinessRules = (): { isValid: boolean; errors: Record<string, string> } => {
     const validationErrors: Record<string, string> = {}
@@ -822,32 +877,23 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       // Finalize wizard draft (remove draft flag) if one was created
       await finalizeWizardDraft()
 
-      setErrors({ success: '✅ تم حفظ المعاملة كمسودة بنجاح!' })
+      // Prepare transaction data for confirmation dialog
+      const organizationName = organizations.find(o => o.id === headerData.org_id)?.name
+      const projectName = projects.find(p => p.id === headerData.project_id)?.name
 
-      setTimeout(() => {
-        setTransactionAttachments([])
-        setLineAttachments({})
-        setCompletedSteps(new Set())
-        setDraftTransactionId(null)
-        setDraftLineIds({})
-        setHeaderData({
-          entry_date: new Date().toISOString().split('T')[0],
-          description: '',
-          description_ar: '',
-          org_id: getOrgId() || (organizations[0]?.id || ''),
-          project_id: getProjectId() || '',
-          default_cost_center_id: '',
-          default_work_item_id: '',
-          default_sub_tree_id: '',
-          classification_id: '',
-          reference_number: '',
-          notes: '',
-          notes_ar: ''
-        })
-        setLines([])
-        onEditComplete?.()
-        onClose()
-      }, 1500)
+      // Show confirmation dialog instead of inline success message
+      setConfirmationDialog({
+        open: true,
+        action: 'draft',
+        transactionData: {
+          description: headerData.description,
+          entry_date: headerData.entry_date,
+          totalAmount: totals.totalDebits,
+          linesCount: lines.length,
+          organizationName,
+          projectName
+        }
+      })
     } catch (error: any) {
       setErrors({ submit: error?.message || 'فشل حفظ المعاملة' })
     } finally {
@@ -911,40 +957,23 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       // Finalize wizard draft (remove draft flag) if one was created
       await finalizeWizardDraft()
 
-      // Show success message
-      setErrors({ success: '✅ تم حفظ المعاملة وإرسالها للاعتماد بنجاح!' })
+      // Prepare transaction data for confirmation dialog
+      const organizationName = organizations.find(o => o.id === headerData.org_id)?.name
+      const projectName = projects.find(p => p.id === headerData.project_id)?.name
 
-      // Wait 2 seconds to show success message, then close
-      setTimeout(() => {
-        // Reset form and close
-        setTransactionAttachments([])
-        setLineAttachments({})
-        setCompletedSteps(new Set())
-        setDraftTransactionId(null)
-        setDraftLineIds({})
-        setHeaderData({
-          entry_date: new Date().toISOString().split('T')[0],
-          description: '',
-          description_ar: '',
-          org_id: getOrgId() || (organizations[0]?.id || ''),
-          project_id: getProjectId() || '',
-          default_cost_center_id: '',
-          default_work_item_id: '',
-          default_sub_tree_id: '',
-          classification_id: '',
-          reference_number: '',
-          notes: '',
-          notes_ar: ''
-        })
-        setLines([
-          { line_no: 1, account_id: '', debit_amount: 0, credit_amount: 0, description: '' },
-          { line_no: 2, account_id: '', debit_amount: 0, credit_amount: 0, description: '' }
-        ])
-        setCurrentStep('basic')
-        setErrors({})
-        onEditComplete?.()
-        onClose()
-      }, 2000)
+      // Show confirmation dialog instead of inline success message
+      setConfirmationDialog({
+        open: true,
+        action: 'submit',
+        transactionData: {
+          description: headerData.description,
+          entry_date: headerData.entry_date,
+          totalAmount: totals.totalDebits,
+          linesCount: lines.length,
+          organizationName,
+          projectName
+        }
+      })
     } catch (err: any) {
       setErrors({ submit: err.message || 'فشل حفظ المعاملة' })
       // Scroll to top to show error
@@ -2122,6 +2151,16 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
           </Box>
         </Box>
       </Dialog>
+
+      {/* Transaction Confirmation Dialog */}
+      <TransactionConfirmationDialog
+        open={confirmationDialog.open}
+        onClose={() => setConfirmationDialog({ open: false, action: 'draft' })}
+        action={confirmationDialog.action}
+        transactionData={confirmationDialog.transactionData}
+        onAction={handleConfirmationAction}
+        isProcessing={isSubmitting}
+      />
     </>
   )
 }

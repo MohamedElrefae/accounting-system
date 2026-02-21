@@ -19,6 +19,7 @@ import { queryKeys } from '../lib/queryKeys'
 import { useUnifiedSync } from '../hooks/useUnifiedSync'
 import { useAuthScopeData } from '../hooks/useAuthScopeData'
 import { useScopeOptional } from './ScopeContext'
+import { getConnectionMonitor } from '../utils/connectionMonitor'
 
 // Cost center type with org_id for filtering
 export interface CostCenterOption {
@@ -100,6 +101,7 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
     queryKey: queryKeys.accounts.all(),
     queryFn: () => getAccounts(null), // Pass null for orgId to get all accounts
     staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled: getConnectionMonitor().getHealth().isOnline,
   })
 
   // Use Unified Auth Data
@@ -114,6 +116,7 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
     queryKey: queryKeys.classifications.all(),
     queryFn: getAllTransactionClassifications,
     staleTime: Infinity,
+    enabled: getConnectionMonitor().getHealth().isOnline,
   })
 
   // Current User
@@ -121,6 +124,7 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
     queryKey: ['current_user_id'],
     queryFn: getCurrentUserId,
     staleTime: Infinity,
+    enabled: getConnectionMonitor().getHealth().isOnline,
   })
 
   // =========================================================================
@@ -165,8 +169,8 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
   const loadDimensionsForOrg = useCallback(async (orgId: string) => {
     if (loadedDimensionsRef.current.has(orgId)) return
 
-    // Check if we already have a promise pending for this org? (Could add optimization)
-    // For now, proceed.
+    const monitor = getConnectionMonitor()
+    if (!monitor.getHealth().isOnline) return
 
     try {
       const [newCats, newCenters, newItems] = await Promise.all([
@@ -204,6 +208,8 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
    */
   const loadAnalysisItems = useCallback(async (orgs: Organization[]) => {
     if (!orgs.length) return
+    const monitor = getConnectionMonitor()
+    if (!monitor.getHealth().isOnline) return
     try {
       const allItems = await Promise.all(
         orgs.map(org =>

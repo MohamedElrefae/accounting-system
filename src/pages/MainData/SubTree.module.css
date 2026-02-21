@@ -103,9 +103,29 @@
   gap: 4px;
   opacity: 0;
   transition: opacity 0.2s ease;
+  justify-content: flex-end;
 }
 .tableRow:hover .actionButtons {
   opacity: 1;
+}
+
+/* Button hover effects */
+.actionButtons :global(.MuiIconButton-root) {
+  transition: all 0.2s ease;
+}
+.actionButtons :global(.MuiIconButton-root:hover) {
+  transform: scale(1.1);
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+/* Linked Account column - constrained width */
+.linkedAccountCell {
+  width: 400px;
+  min-width: 350px;
+  max-width: 450px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* List view styling to match tree view theme/font */

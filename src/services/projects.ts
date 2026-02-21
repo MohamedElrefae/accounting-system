@@ -26,6 +26,41 @@ export interface PagedResult<T> {
 
 // Get all projects with filtering and pagination
 export async function getProjects(options?: ProjectListOptions): Promise<PagedResult<Project>> {
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  if (!getConnectionMonitor().getHealth().isOnline) {
+    // Offline Fallback for List View
+    try {
+        const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+        const db = getOfflineDB();
+        
+        // Try exact match on 'projects_cache' first (fastest)
+        const cached = await db.metadata.get('projects_cache');
+        if (cached && Array.isArray(cached.value) && cached.value.length > 0) {
+             let rows = cached.value;
+             // Apply basic memory filtering
+             const f = options?.filters;
+             if (f?.status && f.status !== 'all') rows = rows.filter((p: any) => p.status === f.status);
+             if (f?.search) {
+                 const s = f.search.toLowerCase();
+                 rows = rows.filter((p: any) => 
+                    p.code?.toLowerCase().includes(s) || 
+                    p.name?.toLowerCase().includes(s) || 
+                    p.description?.toLowerCase().includes(s)
+                 );
+             }
+             // Apply pagination
+             const total = rows.length;
+             const from = (options?.page ?? 1 - 1) * (options?.pageSize ?? 20);
+             const to = from + (options?.pageSize ?? 20);
+             return { rows: rows.slice(from, to), total };
+        }
+        return { rows: [], total: 0 };
+    } catch (err) {
+        console.error('[getProjects] Offline fallback failed:', err);
+        return { rows: [], total: 0 };
+    }
+  }
+  
   const page = options?.page ?? 1
   const pageSize = options?.pageSize ?? 20
   const from = (page - 1) * pageSize
@@ -76,9 +111,27 @@ export async function getProjects(options?: ProjectListOptions): Promise<PagedRe
 
 // Get active projects for dropdown/selection
 export async function getActiveProjects(): Promise<Project[]> {
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  const isOffline = !getConnectionMonitor().getHealth().isOnline;
+
+  if (isOffline) {
+    try {
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+      const db = getOfflineDB();
+      const cached = await db.metadata.get('projects_cache');
+      if (cached && Array.isArray(cached.value)) {
+        return cached.value.filter((p: any) => p.status === 'active');
+      }
+      return [];
+    } catch (e) {
+      console.warn('[getActiveProjects] Offline cache read failed', e);
+      return [];
+    }
+  }
+
   try {
     const { data, error } = await withRetry(
-      () => supabase
+      async () => await supabase
         .from('projects')
         .select('*')
         .eq('status', 'active')
@@ -131,64 +184,86 @@ const withRetry = async <T>(
 };
 
 export async function getActiveProjectsByOrg(orgId: string): Promise<Project[]> {
-  console.log(`[getActiveProjectsByOrg] Loading projects for org: ${orgId}`);
-  
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  const isOffline = !getConnectionMonitor().getHealth().isOnline;
+
   if (!orgId) {
-    console.warn('[getActiveProjectsByOrg] No org ID provided, returning empty array');
     return [];
   }
   
+  // 1. If offline, get from local Dexie cache immediately
+  if (isOffline) {
+    try {
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+      const db = getOfflineDB();
+      const cached = await db.metadata.get('projects_cache');
+      if (cached && Array.isArray(cached.value)) {
+        const orgProjects = cached.value.filter((p: any) => p.org_id === orgId);
+        // Always return what we have when offline, even if empty to avoid RPC
+        console.log('📦 Projects loaded from offline cache:', orgProjects.length);
+        return orgProjects;
+      }
+      return []; // Return empty if cache missing but offline
+    } catch (cacheErr) {
+      console.error('[getActiveProjectsByOrg] Failed to read from local metadata cache:', cacheErr);
+      return []; // Return empty on error
+    }
+  }
+
   try {
-    // Try to use the RPC that respects project_memberships and org_memberships
-    // This is the PRIMARY method that enforces proper access control
-    console.log('[getActiveProjectsByOrg] Attempting RPC call for user-accessible projects');
     const { data, error } = await withRetry(
-      () => supabase.rpc('get_user_accessible_projects', { p_org_id: orgId }),
-      2,
+      async () => await supabase.rpc('get_user_accessible_projects_v2', { p_org_id: orgId }),
+      isOffline ? 0 : 2,
       500
     );
     
     if (!error && data) {
-      const projectCount = Array.isArray(data) ? data.length : 0;
-      console.log(`[getActiveProjectsByOrg] ✅ RPC returned ${projectCount} projects with proper access control`);
+      const projects = (data as Project[]) || [];
       
-      // Log project details for debugging
-      if (projectCount > 0 && import.meta.env.DEV) {
-        console.log('[getActiveProjectsByOrg] Projects:', data.map((p: any) => `${p.code} - ${p.name}`));
+      // 2. Update local cache (merged with existing to handle multiple orgs)
+      if (projects.length > 0) {
+        try {
+          const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+          const db = getOfflineDB();
+          const existing = await db.metadata.get('projects_cache');
+          let allProjects = projects;
+          if (existing && Array.isArray(existing.value)) {
+            // Keep projects from other orgs, replace current org's projects
+            const otherOrgProjects = existing.value.filter((p: any) => p.org_id !== orgId);
+            allProjects = [...otherOrgProjects, ...projects];
+          }
+          await db.metadata.put({
+            key: 'projects_cache',
+            value: allProjects,
+            updatedAt: new Date().toISOString()
+          });
+        } catch (cacheUpdateErr) {
+          console.warn('[getActiveProjectsByOrg] Failed to update local metadata cache:', cacheUpdateErr);
+        }
       }
       
-      return (data as Project[]) || [];
+      return projects;
     } else if (error) {
-      console.error('[getActiveProjectsByOrg] ❌ RPC failed:', error);
-      
-      // Check if it's a function not found error
-      if (error.code === 'PGRST116' || error.message?.includes('function get_user_accessible_projects') || error.message?.includes('does not exist')) {
-        console.error('[getActiveProjectsByOrg] ❌ RPC function does not exist - migration may not be deployed');
-        console.log('[getActiveProjectsByOrg] 💡 Run migration: supabase/migrations/20260126_phase_2_get_user_accessible_projects_v2.sql');
-      } else {
-        console.error('[getActiveProjectsByOrg] ❌ RPC error details:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-      }
+      throw error;
     }
-  } catch (rpcError) {
-    console.error('[getActiveProjectsByOrg] ❌ RPC exception:', rpcError);
+  } catch (rpcError: any) {
+    if (!isOffline && !rpcError.message?.includes('fetch')) {
+        console.error('[getActiveProjectsByOrg] RPC failed:', rpcError);
+    }
   }
   
-  // IMPORTANT: We should NOT fall back to direct query as it bypasses access control
-  // Instead, return empty array and log the issue clearly
-  console.error('[getActiveProjectsByOrg] ⚠️ RPC failed - NOT falling back to direct query for security reasons');
-  console.error('[getActiveProjectsByOrg] ⚠️ This could mean:');
-  console.error('[getActiveProjectsByOrg]   1. RPC migration not deployed');
-  console.error('[getActiveProjectsByOrg]   2. User not authenticated');
-  console.error('[getActiveProjectsByOrg]   3. User lacks organization membership');
-  console.error('[getActiveProjectsByOrg]   4. Database permissions issue');
+  // 3. Last resort fallback to local cache
+  try {
+    const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+    const db = getOfflineDB();
+    const cached = await db.metadata.get('projects_cache');
+    if (cached && Array.isArray(cached.value)) {
+      return cached.value.filter((p: any) => p.org_id === orgId);
+    }
+  } catch (finalFallbackErr) {
+    // Ignore
+  }
   
-  // Return empty array - this is secure and prevents unauthorized access
-  console.warn('[getActiveProjectsByOrg] 🔒 Returning empty array for security');
   return [];
 }
 
@@ -207,6 +282,8 @@ export async function getUserProjectMemberships(): Promise<Array<{
   can_approve: boolean;
   is_default: boolean;
 }>> {
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  if (!getConnectionMonitor().getHealth().isOnline) return [];
   try {
     const { data, error } = await supabase
       .rpc('get_user_project_memberships');
@@ -220,6 +297,8 @@ export async function getUserProjectMemberships(): Promise<Array<{
 
 // Check if user can access a specific project
 export async function canAccessProject(projectId: string): Promise<boolean> {
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  if (!getConnectionMonitor().getHealth().isOnline) return true;
   try {
     const { data, error } = await supabase
       .rpc('can_access_project', { p_project_id: projectId });
@@ -239,6 +318,8 @@ export async function validateProjectAccess(
   projectId: string,
   orgId: string
 ): Promise<boolean> {
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  if (!getConnectionMonitor().getHealth().isOnline) return true; // Default to allow offline if we can't check
   try {
     const { data, error } = await supabase
       .rpc('check_project_access', {
@@ -532,6 +613,18 @@ export interface ProjectStatistics {
 }
 
 export async function getProjectStatistics(): Promise<ProjectStatistics> {
+  if (!navigator.onLine) {
+    return {
+      totalProjects: 0,
+      activeProjects: 0,
+      completedProjects: 0,
+      totalBudget: 0,
+      totalSpent: 0,
+      averageBudgetUtilization: 0,
+      projectsOverBudget: 0,
+    };
+  }
+
   // Get project counts and budgets
   const { data: projects, error: projectsError } = await supabase
     .from('projects')
