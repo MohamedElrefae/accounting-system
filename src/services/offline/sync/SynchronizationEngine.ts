@@ -23,9 +23,13 @@ import {
   getLastCheckpoint
 } from './SyncQueueManager';
 import { markTransactionSynced } from '../core/OfflineStore';
-import { getPlatformSyncConfig, calculateBackoffDelay } from '../core/OfflineConfig';
+import { getPlatformSyncConfig, calculateBackoffDelay, DB_CONSTANTS } from '../core/OfflineConfig';
 import type { SyncResult, SyncQueueEntry } from '../core/OfflineTypes';
 import { migrationManager } from '../core/OfflineMigrations';
+import { getConnectionMonitor } from '../../../utils/connectionMonitor';
+import { offlineCacheManager } from '../core/OfflineCacheManager';
+import { isSessionActive } from '../security/OfflineEncryption';
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -85,9 +89,11 @@ export class SynchronizationEngine {
   private conflictCount: number = 0;
   private errorCount: number = 0;
   private lastStatus: SyncProgress['status'] = 'idle';
+  private reseedIntervalId: any = null;
 
   private constructor() {
     this.setupListeners();
+    this.startReseedPulse();
   }
 
   public addListener(listener: (state: SyncProgress) => void): () => void {
@@ -128,16 +134,67 @@ export class SynchronizationEngine {
 
   private setupListeners(): void {
     if (typeof window !== 'undefined') {
-      window.addEventListener('online', () => {
-        console.info('[SyncEngine] Network online. Attempting resume...');
-        if (!this.isJwtDeferred) {
-          this.startSync();
+      const monitor = getConnectionMonitor();
+      
+      monitor.subscribe((health: any) => {
+        if (health.isOnline) {
+          console.info('[SyncEngine] Network online (verified). Attempting resume...');
+          if (!this.isJwtDeferred) {
+            this.startSync();
+          }
+        } else {
+          console.info('[SyncEngine] Network offline (verified). Pausing sync.');
+          this.pauseSync();
         }
       });
-      window.addEventListener('offline', () => {
-        console.info('[SyncEngine] Network offline. Pausing sync.');
-        this.pauseSync();
+    }
+  }
+
+  /**
+   * Periodic background re-seed pulse.
+   * Ensures metadata (projects, orgs, accounts) stays fresh.
+   */
+  private startReseedPulse(): void {
+    if (this.reseedIntervalId) return;
+    
+    this.reseedIntervalId = setInterval(() => {
+      this.reseedMetadata().catch(err => {
+        console.warn('[SyncEngine] Background re-seed failed:', err);
       });
+    }, DB_CONSTANTS.RESEED_INTERVAL);
+  }
+
+  private async reseedMetadata(): Promise<void> {
+    const monitor = getConnectionMonitor();
+    if (!monitor.getHealth().isOnline) return;
+
+    // Check if re-seed is actually needed for global metadata
+    const projectsStale = await offlineCacheManager.needsReseed('projects_cache');
+    const orgsStale = await offlineCacheManager.needsReseed('organizations_cache');
+
+    if (!projectsStale && !orgsStale) {
+      console.debug('[SyncEngine] Cache still fresh, skipping background re-seed.');
+      return;
+    }
+
+    console.info('[SyncEngine] Starting background metadata re-seed pulse...');
+
+    try {
+      // 1. Refresh Projects
+      if (projectsStale) {
+        const { getActiveProjects } = await import('../../projects');
+        await getActiveProjects(); 
+      }
+
+      // 2. Refresh Organizations
+      if (orgsStale) {
+        const { getOrganizations } = await import('../../organization');
+        await getOrganizations();
+      }
+
+      console.info('[SyncEngine] Background metadata re-seed completed successfully.');
+    } catch (err) {
+      console.warn('[SyncEngine] Metadata re-seed error:', err);
     }
   }
 
@@ -249,6 +306,34 @@ export class SynchronizationEngine {
               };
             }
 
+            if (result.sessionLocked) {
+              // Offline encryption session locked (auto-lock) — stop sync, notify UI
+              console.warn('[SyncEngine] Session locked. Pausing sync until re-authentication.');
+
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('offline-sync-error', {
+                  detail: {
+                    code: 'SESSION_LOCKED',
+                    message: 'Your offline session has been locked. Please re-enter your PIN to continue syncing.',
+                    retryable: true
+                  }
+                }));
+              }
+
+              this.isPaused = true;
+              this.lastStatus = 'failed';
+              historyEntry.status = 'interrupted';
+              historyEntry.syncedOperations = syncedCount;
+              await saveCheckpoint([entry.id], []);
+              return {
+                success: false,
+                syncedOperations: syncedCount,
+                conflicts,
+                errors: [{ operationId: entry.id, code: 'SESSION_LOCKED', message: 'Offline session locked. Re-enter PIN to sync.', retryable: true }],
+                duration: Date.now() - startTime,
+              };
+            }
+
             if (result.success) {
               this.syncedCount++;
               syncedCount = this.syncedCount;
@@ -334,15 +419,26 @@ export class SynchronizationEngine {
 
   /**
    * Processes a single sync queue entry.
-   * Returns structured result including JWT expiry detection.
+   * Returns structured result including JWT expiry and session lock detection.
    */
   private async processEntry(entry: SyncQueueEntry): Promise<{
     success: boolean;
     jwtExpired?: boolean;
+    sessionLocked?: boolean;
     conflict?: any;
   }> {
     const { operation } = entry;
-    
+
+    // ── Session Lock Guard ────────────────────────────────────────────────────
+    // Only block processing if this specific entry was encrypted with a PIN
+    // AND the session is currently locked. Plain-text entries (no PIN configured)
+    // should always be processed normally.
+    const isEntryEncrypted = !!(entry as any)._encryptedOperation;
+    if (isEntryEncrypted && !isSessionActive()) {
+      console.warn('[SyncEngine] Entry is encrypted but session is locked. Deferring until user re-authenticates.');
+      return { success: false, sessionLocked: true };
+    }
+
     try {
       // 1. Check for active session — detect JWT expiry
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -364,6 +460,17 @@ export class SynchronizationEngine {
         }
         if (error.code === 'CONFLICT' || error.code === '409') {
           await markConflict(entry.id, error.message);
+          
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('offline-sync-conflict', {
+              detail: { 
+                entryId: entry.id, 
+                entityType: operation.entityType,
+                message: error.message 
+              }
+            }));
+          }
+
           return { success: false, conflict: { operationId: entry.id, message: error.message } };
         }
         

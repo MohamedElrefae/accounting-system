@@ -28,6 +28,8 @@ import PictureAsPdf from '@mui/icons-material/PictureAsPdf';
 import { PDFGenerator, type PDFOptions, type PDFTableData } from '../../services/pdf-generator';
 import { fetchGLSummary, type UnifiedFilters } from '../../services/reports/unified-financial-query';
 import TransactionsSummaryBar from '../../components/Transactions/TransactionsSummaryBar';
+import { getConnectionMonitor } from '../../utils/connectionMonitor'
+import StalenessIndicator from '../../components/Common/StalenessIndicator'
 
 interface TBRow {
   account_id: string
@@ -54,8 +56,9 @@ function startOfYearISO() {
 
 export default function TrialBalanceOriginal() {
   const { currentOrg, currentProject } = useScope()
-  const lang = useAppStore(s => s.language)
+  const lang = useAppStore(s => (s as any).language)
   const isAr = lang === 'ar'
+  const { isOnline } = getConnectionMonitor().getHealth()
 
   const [dateFrom, setDateFrom] = useState<string>('')
   const [dateTo, setDateTo] = useState<string>('')
@@ -90,19 +93,19 @@ export default function TrialBalanceOriginal() {
     const period_credit = rows.reduce((sum, r) => sum + (r.period_credit || 0), 0)
     const debit = rows.reduce((sum, r) => sum + r.debit, 0)
     const credit = rows.reduce((sum, r) => sum + r.credit, 0)
-    return { 
-      period_debit, 
-      period_credit, 
-      debit, 
-      credit, 
-      diff: +(debit - credit).toFixed(2) 
+    return {
+      period_debit,
+      period_credit,
+      debit,
+      credit,
+      diff: +(debit - credit).toFixed(2)
     }
   }, [rows])
 
   // Generate active filter labels for summary bar
   const getActiveFilterLabels = useCallback((): string[] => {
     const labels: string[] = []
-    
+
     if (dateFrom || dateTo) {
       const from = dateFrom || '...'
       const to = dateTo || '...'
@@ -132,7 +135,7 @@ export default function TrialBalanceOriginal() {
     if (!includeZeros) {
       labels.push(uiLang === 'ar' ? 'بدون أصفار' : 'No Zeros')
     }
-    
+
     return labels
   }, [dateFrom, dateTo, currentOrg, currentProject, approvalStatus, postedOnly, activeGroupsOnly, includeZeros, uiLang])
 
@@ -159,16 +162,16 @@ export default function TrialBalanceOriginal() {
     for (const k of order) {
       // Get all rows for this account type (unfiltered for totals)
       const allRowsForType = rows.filter(x => x.account_type === k)
-      
+
       // Apply includeZeros filter ONLY for display, not for totals
       const displayRows = includeZeros ? allRowsForType : allRowsForType.filter(r => r.debit !== 0 || r.credit !== 0)
-      
+
       // Calculate totals from ALL rows (including zeros) for accuracy
       const period_debit = allRowsForType.reduce((s, x) => s + (x.period_debit || 0), 0)
       const period_credit = allRowsForType.reduce((s, x) => s + (x.period_credit || 0), 0)
       const debit = allRowsForType.reduce((s, x) => s + x.debit, 0)
       const credit = allRowsForType.reduce((s, x) => s + x.credit, 0)
-      
+
       // Only add group if there are rows to display
       if (displayRows.length) groups.push({ key: k, titleAr: title(k).ar, titleEn: title(k).en, rows: displayRows, totals: { period_debit, period_credit, debit, credit } })
     }
@@ -272,7 +275,7 @@ export default function TrialBalanceOriginal() {
     if (Math.abs(totals.debit - totals.credit) > 0.0001) {
       exportRows.push({ code: uiLang === 'ar' ? 'الفرق' : 'Difference', name: '', period_debit: '', period_credit: '', debit: '', credit: Math.abs(totals.debit - totals.credit) })
     }
-    
+
     // Build filter information for metadata
     const filterInfo: string[] = []
     filterInfo.push([uiLang === 'ar' ? 'الشركة' : 'Company', companyName || (uiLang === 'ar' ? 'غير محدد' : 'N/A')])
@@ -282,7 +285,7 @@ export default function TrialBalanceOriginal() {
     filterInfo.push([uiLang === 'ar' ? 'قيود معتمدة فقط' : 'Posted Only', postedOnly ? (uiLang === 'ar' ? 'نعم' : 'Yes') : (uiLang === 'ar' ? 'لا' : 'No')])
     filterInfo.push([uiLang === 'ar' ? 'إظهار الأصفار' : 'Include Zeros', includeZeros ? (uiLang === 'ar' ? 'نعم' : 'Yes') : (uiLang === 'ar' ? 'لا' : 'No')])
     filterInfo.push([uiLang === 'ar' ? 'المجموعات النشطة فقط' : 'Active Groups Only', activeGroupsOnly ? (uiLang === 'ar' ? 'نعم' : 'Yes') : (uiLang === 'ar' ? 'لا' : 'No')])
-    
+
     const data = {
       columns: cols,
       rows: exportRows,
@@ -916,6 +919,12 @@ export default function TrialBalanceOriginal() {
 
   return (
     <div className={styles.container}>
+      {!isOnline && (
+        <StalenessIndicator
+          isStale={true}
+          lastUpdated={new Date().toLocaleDateString(isAr ? 'ar-EG' : 'en-US')}
+        />
+      )}
       {/* Unified one-row filter bar using reusable component */}
       <div className={`${styles.professionalFilterBar} ${styles.noPrint}`}>
         {/* Left Section: Date Filters */}
@@ -947,7 +956,7 @@ export default function TrialBalanceOriginal() {
             aria-label={uiLang === 'ar' ? 'إلى' : 'To'}
             title={uiLang === 'ar' ? 'تاريخ نهاية الفترة' : 'Period end date'}
           />
-          
+
           {/* UPDATED: Approval Status Filter - Synced with transactions.approval_status field */}
           <select
             className={styles.filterInput}

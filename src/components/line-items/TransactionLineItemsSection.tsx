@@ -13,6 +13,7 @@ export interface TransactionLineItemsSectionProps {
   workItems?: Array<{ id: string; code: string; name: string }>
   analysisItems?: Record<string, { code: string; name: string }>
   costCenters?: Array<{ id: string; code: string; name: string }>
+  itemCatalog?: Record<string, { code: string; name: string; description?: string }>
   transactionLineDefaults?: {
     work_item_id?: string | null
     analysis_work_item_id?: string | null
@@ -31,6 +32,7 @@ export const TransactionLineItemsSection: React.FC<TransactionLineItemsSectionPr
   workItems,
   analysisItems,
   costCenters,
+  itemCatalog,
   transactionLineDefaults,
 }) => {
   const [items, setItems] = useState<EditableTxLineItem[]>([])
@@ -113,6 +115,7 @@ export const TransactionLineItemsSection: React.FC<TransactionLineItemsSectionPr
         workItems={workItems}
         analysisItems={analysisItems}
         costCenters={costCenters}
+        itemCatalog={itemCatalog}
         transactionLineDefaults={transactionLineDefaults}
       />
     </section>

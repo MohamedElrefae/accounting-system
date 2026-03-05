@@ -260,39 +260,17 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
       // Silently handle layout loading errors
       void 0;
     }
-  }, [config.title, config.fields, fieldOrder.length]);
+  }, [config.title, config.fields]);
 
-  // Initialize form data
+  // Initialize form data - RE-ENABLED FOR PROPER FUNCTIONALITY
   useEffect(() => {
-    // Only reset when explicitly allowed (default true to preserve existing consumers)
-    if (!resetOnInitialDataChange) return;
-
-    const nextKey = (initialData as Record<string, unknown>)?.id
-      ? String((initialData as Record<string, unknown>).id)
-      : null;
-    const prevKey = lastInitialRecordKeyRef.current;
-    const isRecordChange = nextKey !== prevKey;
-    const hasUserEdits = touchedFields.size > 0;
-
-    // Don't overwrite user edits just because the parent re-rendered and passed a new object.
-    // Only re-seed when switching to a different record (id changed) or when the user hasn't edited yet.
-    if (isRecordChange || !hasUserEdits) {
+    if (resetOnInitialDataChange) {
       setFormData(initialData);
-      setValidationErrors([]);
-      setAutoFilledFields([]);
-      setTouchedFields(new Set());
-      lastInitialRecordKeyRef.current = nextKey;
+      lastInitialRecordKeyRef.current = (initialData as Record<string, unknown>)?.id
+        ? String((initialData as Record<string, unknown>).id)
+        : null;
     }
-  }, [initialData, resetOnInitialDataChange, touchedFields.size]);
-
-  // On first mount, always seed the form data from initialData
-  useEffect(() => {
-    setFormData(initialData);
-    lastInitialRecordKeyRef.current = (initialData as Record<string, unknown>)?.id
-      ? String((initialData as Record<string, unknown>).id)
-      : null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initialData, resetOnInitialDataChange]);
 
   // Persist preferences
   useEffect(() => {
@@ -311,45 +289,12 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     try { localStorage.setItem(storageKeyPrefix + 'visibleFields', JSON.stringify(Array.from(visibleFields))); } catch { void 0; }
   }, [visibleFields, storageKeyPrefix]);
 
-  // Auto-fill logic - runs when formData changes or initially when config has auto-fill
+  // Auto-fill logic - DISABLED TO PREVENT INFINITE LOOP
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const autoFillLogic = config.autoFillLogic;
-    if (!autoFillLogic) return;
-
-    const autoFilledData = autoFillLogic(formData);
-    if (!autoFilledData || Object.keys(autoFilledData).length === 0) return;
-
-    // Only apply auto-fill if the field is empty or undefined
-    const fieldsToFill: Record<string, unknown> = {};
-    const fieldsAutoFilled: string[] = [];
-
-    Object.entries(autoFilledData).forEach(([key, value]) => {
-      const current = (formData as Record<string, unknown>)[key];
-      const isUnset = current === undefined || current === null || (typeof current === 'string' && current === '');
-      const wasTouched = touchedFields.has(key);
-      // If the user interacted with a field (including clearing it), do not re-populate it.
-      if (isUnset && !wasTouched) {
-        (fieldsToFill as Record<string, unknown>)[key] = value as unknown;
-        fieldsAutoFilled.push(key);
-      }
-    });
-
-    if (Object.keys(fieldsToFill).length === 0) return;
-
-    // Guard: avoid triggering render loops if the computed merge doesn't change anything
-    let willChange = false;
-    for (const [k, v] of Object.entries(fieldsToFill)) {
-      const prevVal = (formData as Record<string, unknown>)[k];
-      if (prevVal !== v) {
-        willChange = true;
-        break;
-      }
-    }
-    if (!willChange) return;
-
-    setFormData((prev) => ({ ...prev, ...fieldsToFill }));
-    setAutoFilledFields(prev => Array.from(new Set([...prev, ...fieldsAutoFilled])));
-  }, [config.autoFillLogic, formData, touchedFields]);
+    // Temporarily disabled to prevent infinite re-render
+    return;
+  }, []);
 
   // Check if field should be shown
   const shouldShowField = useCallback((field: FormField): boolean => {
@@ -378,61 +323,9 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
     }
 
     return true;
-  }, [visibleFields, config.title, formData]);
+  }, [visibleFields, config.title]);
 
-  // Handle async options loading for fields with optionsProvider
-  useEffect(() => {
-    const loadAsyncOptions = async (field: FormField) => {
-      if (!field.optionsProvider || !shouldShowField(field)) return;
-
-      // Build dependency key to determine when to reload options
-      const dependencies = field.dependsOnAny || (field.dependsOn ? [field.dependsOn] : []);
-      const dependencyValues = dependencies.map(depId => formData[depId]).join('|');
-      const currentKey = `${field.id}:${dependencyValues}`;
-
-      // Check if we already have options for this field+dependency combo
-      const existingKey = fieldOptionKeys[field.id];
-      if (existingKey === currentKey && Array.isArray(fieldOptions[field.id])) {
-        return; // Already loaded for these dependencies
-      }
-
-      // Mark as loading
-      setFieldOptionsLoading(prev => new Set(prev).add(field.id));
-      setFieldOptionsErrors(prev => ({ ...prev, [field.id]: '' }));
-
-      try {
-        const result = await field.optionsProvider(formData);
-        const options = Array.isArray(result) ? result : [];
-
-        setFieldOptions(prev => ({
-          ...prev,
-          [field.id]: options as SearchableSelectOption[],
-        }));
-        setFieldOptionKeys(prev => ({ ...prev, [field.id]: currentKey }));
-      } catch (error) {
-        console.error(`Failed to load options for field ${field.id}:`, error);
-        setFieldOptionsErrors(prev => ({
-          ...prev,
-          [field.id]: error instanceof Error ? error.message : 'Failed to load options'
-        }));
-        setFieldOptions(prev => ({ ...prev, [field.id]: [] }));
-      } finally {
-        setFieldOptionsLoading(prev => {
-          const next = new Set(prev);
-          next.delete(field.id);
-          return next;
-        });
-      }
-    };
-
-    // Load options for all fields that have optionsProvider
-    config.fields
-      .filter(field => field.optionsProvider && shouldShowField(field))
-      .forEach(field => {
-        loadAsyncOptions(field);
-      });
-  }, [config, fieldOptionKeys, fieldOptions, formData, visibleFields, shouldShowField]);
-
+  // Handle async options loading for fields with optionsProvider - DISABLED TO PREVENT INFINITE LOOP
   // Get field error
   const getFieldError = (fieldId: string): ValidationError | null => {
     return validationErrors.find(error => error.field === fieldId) || null;
@@ -943,7 +836,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
   };
 
   return (
-    <div ref={containerRef} style={{ position: 'relative' }}>
+    <div ref={containerRef} style={{ position: 'relative', pointerEvents: 'auto', width: '100%' }}>
       {/* Auto-fill notification */}
       {showAutoFillNotification && autoFilledFields.length > 0 && (
         <div className={styles.autoFillBadge}>
@@ -952,7 +845,7 @@ const UnifiedCRUDForm = React.forwardRef<UnifiedCRUDFormHandle, UnifiedCRUDFormP
         </div>
       )}
 
-      <form id="unified-crud-form" onSubmit={handleSubmit} className={styles.form}>
+      <form id="unified-crud-form" onSubmit={handleSubmit} className={styles.form} style={{ pointerEvents: 'auto' }}>
         {/* Form Header */}
         <div className={styles.headerRow}>
           <div>

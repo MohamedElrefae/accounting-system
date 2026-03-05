@@ -117,7 +117,16 @@ const baseNavigation: NavigationItem[] = [
         icon: "list-tree",
         path: "/main-data/transaction-line-items",
         requiredPermission: "transaction_line_items.read"
-      }
+      },
+            {
+        id: "addition-deduction-analysis",
+        label: "Manage Addition/Deduction",
+        titleEn: "Manage Addition/Deduction",
+        titleAr: "إدارة الإضافات والخصومات",
+        icon: "calculator",
+        path: "/main-data/addition-deduction-analysis",
+        requiredPermission: "adjustment_types.read"
+      },
     ]
   },
   {
@@ -198,16 +207,6 @@ const baseNavigation: NavigationItem[] = [
         icon: "list",
         path: "/transactions/all",
         requiredPermission: "transactions.view.all"
-      },
-// GL2 menu items removed in unified model
-      {
-        id: "assign-cost-analysis",
-        label: "Assign Cost Analysis",
-        titleEn: "Assign Cost Analysis",
-        titleAr: "تسجيل التكاليف",
-        icon: "calculator",
-        path: "/transactions/assign-cost-analysis",
-        requiredPermission: "transactions.cost_analysis"
       }
     ]
   },

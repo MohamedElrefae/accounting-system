@@ -42,6 +42,17 @@ export const DB_CONSTANTS = {
 
   /** Checkpoint every N operations during sync */
   CHECKPOINT_INTERVAL: 10,
+
+  /** Cache TTLs in milliseconds */
+  CACHE_TTL: {
+    PROJECTS: 60 * 60 * 1000,      // 1 hour
+    ORGANIZATIONS: 60 * 60 * 1000,   // 1 hour
+    ACCOUNTS: 60 * 60 * 1000,        // 1 hour
+    DEFAULTS: 30 * 60 * 1000         // 30 minutes
+  },
+
+  /** Background re-seed interval (30 minutes) */
+  RESEED_INTERVAL: 30 * 60 * 1000,
 } as const;
 
 // ─── Security Constants ───────────────────────────────────────────────────────

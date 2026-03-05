@@ -7,6 +7,7 @@ import ExportButtons from '../../components/Common/ExportButtons'
 import PresetBar from '../../components/Common/PresetBar'
 import { fetchGLAccountSummary, type GLAccountSummaryRow } from '../../services/reports/gl-account-summary'
 import { fetchAccountsMinimal, fetchOrganizations, fetchProjects, type LookupOption } from '../../services/lookups'
+import { getAllTransactionClassifications } from '../../services/transaction-classification'
 import { getCostCentersForSelector } from '../../services/cost-centers'
 import type { UniversalTableData } from '../../utils/UniversalExportManager'
 import { exportToExcel, exportToCSV } from '../../utils/UniversalExportManager'
@@ -18,6 +19,8 @@ import html2canvas from 'html2canvas'
 import { supabase } from '../../utils/supabase'
 import { useScope } from '../../contexts/ScopeContext'
 import './StandardFinancialStatements.css'
+import { getConnectionMonitor } from '../../utils/connectionMonitor'
+import StalenessIndicator from '../../components/Common/StalenessIndicator'
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
 
@@ -59,6 +62,8 @@ const useDebounced = (value: string, delay: number) => {
 const GeneralLedger: React.FC = () => {
   const { currentOrg, currentProject } = useScope()
   const { language: uiLang } = useAppStore()
+  const { isOnline } = getConnectionMonitor().getHealth()
+  const isAr = uiLang === 'ar'
 
   // Filters
   const [filters, setFilters] = useState<GLFilters>({
@@ -1238,11 +1243,8 @@ const GeneralLedger: React.FC = () => {
 
       // Load classifications
       try {
-        const { data: classData } = await supabase
-          .from('transaction_classifications')
-          .select('id, name')
-          .order('name')
-        setClassificationOptions((classData || []).map(c => ({ id: c.id, name: c.name, name_ar: c.name, code: '' })))
+        const classData = await getAllTransactionClassifications()
+        setClassificationOptions((classData || []).map(c => ({ id: c.id, name: c.name, name_ar: c.name, code: String(c.code || '') })))
       } catch { /* noop */ }
 
       // Load expenses categories for the first available org
@@ -1962,6 +1964,12 @@ const GeneralLedger: React.FC = () => {
 
   return (
     <div className={styles.container}>
+      {!isOnline && (
+        <StalenessIndicator
+          isStale={true}
+          lastUpdated={new Date().toLocaleDateString(isAr ? 'ar-EG' : 'en-US')}
+        />
+      )}
       {/* Ultra-compact header with export buttons */}
       <div className={`${styles.noPrint} ${styles.compactHeader}`}>
         <h2 className={styles.compactTitle}>دفتر الأستاذ العام</h2>

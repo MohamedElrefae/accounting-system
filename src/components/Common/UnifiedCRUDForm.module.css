@@ -12,6 +12,7 @@
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  pointer-events: auto;
 }
 
 .headerRow {
@@ -96,6 +97,7 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  pointer-events: auto;
 }
 
 .sectionInfo {
@@ -186,6 +188,7 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  pointer-events: auto;
 }
 
 /* Reduced gap for more compact layout */
@@ -201,6 +204,7 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  pointer-events: auto;
 }
 
 /* More compact spacing for multi-column layouts */
@@ -222,6 +226,7 @@
   display: flex;
   gap: 12px;
   padding-top: 12px;
+  pointer-events: auto;
 }
 
 btnGrow {
@@ -247,6 +252,7 @@ button.ultimate-btn:disabled {
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
   outline: none;
   box-sizing: border-box;
+  pointer-events: auto;
 }
 .inputBase:focus-visible {
   border-color: var(--accent);

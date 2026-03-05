@@ -21,6 +21,10 @@ import { supabase } from '../utils/supabase';
 import { offlineAPI, UnifiedOfflineAPI } from '../services/offline/core/OfflineAPI';
 import { getQueueLength } from '../services/offline/sync/SyncQueueManager';
 import { getConnectionMonitor } from '../utils/connectionMonitor';
+import { BasicConflictModal } from './offline/BasicConflictModal';
+import { ConflictResolutionWizard, type ConflictData } from './offline/ConflictResolutionWizard';
+import { getOfflineDB } from '../services/offline/core/OfflineSchema';
+import { markSynced } from '../services/offline/sync/SyncQueueManager';
 
 interface OfflineContextType {
     isInitialized: boolean;
@@ -39,35 +43,47 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const [isOnline, setIsOnline] = useState(false);
     const [syncProgress, setSyncProgress] = useState<SyncProgress>(syncEngine.getSyncStatus());
     const [pendingCount, setPendingCount] = useState(0);
+    const [activeConflict, setActiveConflict] = useState<ConflictData | null>(null);
+    const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
+    const [isWizardOpen, setIsWizardOpen] = useState(false);
 
     useEffect(() => {
         const monitor = getConnectionMonitor();
 
         const initializeOffline = async () => {
             try {
+                // 1. Core local storage & migrations MUST be ready first
                 await storageMonitor.initialize();
                 await requestPersistentStorage();
                 await migrationManager.migrate();
                 await migrationManager.seedInitialData();
                 await securityManager.syncWithSupabase();
 
-                // Initial count
+                // 2. Refresh initial sync queue state
                 setPendingCount(await getQueueLength());
 
-                // Wait for the first verified connectivity check before starting sync.
-                // ConnectionMonitor pings a known endpoint; this never trusts navigator.onLine.
-                const currentHealth = monitor.getHealth();
-                if (currentHealth.isOnline) {
-                    if (import.meta.env.DEV) console.log('[OfflineProvider] Already verified online — starting sync.');
+                // 3. Wait for the ConnectionMonitor to perform its first verified check.
+                // This prevents "offline" sync attempts on boot if the connection is slow.
+                let health = monitor.getHealth();
+
+                // If the monitor hasn't completed its first check yet (often true right at mount),
+                // we'll use the current health and let the subscriber handle updates.
+                setIsOnline(health.isOnline);
+
+                // 4. If we are verified online, start the engine.
+                if (health.isOnline) {
+                    if (import.meta.env.DEV) console.log('[OfflineProvider] Verified ONLINE on boot — starting initial sync.');
                     await syncEngine.startSync();
                 } else {
-                    if (import.meta.env.DEV) console.log('[OfflineProvider] Offline on boot — sync deferred until connection verified.');
+                    if (import.meta.env.DEV) console.log('[OfflineProvider] Verified OFFLINE on boot — sync deferred.');
                 }
 
                 setIsInitialized(true);
             } catch (error) {
-                console.error('[OfflineProvider] Initialization failed:', error);
-                setIsInitialized(true); // Still mark initialized so UI renders in degraded mode
+                console.error('[OfflineProvider] Critical initialization failed:', error);
+                // Still mark partially initialized so UI doesn't hang, 
+                // but degraded mode will be active.
+                setIsInitialized(true);
             }
         };
 
@@ -108,10 +124,50 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
             }
         });
 
+        const handleConflictEvent = async (e: any) => {
+            const { entryId, entityType, message, conflictData: directConflictData } = e.detail;
+
+            if (directConflictData) {
+                setActiveConflict(directConflictData);
+                setIsConflictModalOpen(true);
+                return;
+            }
+
+            if (!entryId) return;
+
+            // Try to fetch full details from DB for the wizard
+            const db = getOfflineDB();
+            const entry = await db.syncQueue.get(entryId);
+
+            if (entry) {
+                const conflictData: ConflictData = {
+                    id: entryId,
+                    entityType: (entityType as any) || 'transaction',
+                    entityId: entry.operation.entityId,
+                    conflictType: 'edit_conflict',
+                    severity: 'high',
+                    conflictReasons: [message || 'Server version mismatch'],
+                    affectedUsers: [],
+                    fields: [], // Ideally we'd diff here, but for now we let wizard handle it or just show basic
+                    localVersion: entry.operation.data || {},
+                    serverVersion: {}, // Will be fetched by wizard if needed
+                    localModifiedAt: entry.createdAt,
+                    serverModifiedAt: new Date().toISOString(),
+                    localModifiedBy: entry.operation.userId || 'You',
+                    serverModifiedBy: 'Server',
+                };
+                setActiveConflict(conflictData);
+                setIsConflictModalOpen(true);
+            }
+        };
+
+        window.addEventListener('offline-sync-conflict' as any, handleConflictEvent);
+
         return () => {
             unsubscribe();
             unsubscribeMonitor();
             subscription.unsubscribe();
+            window.removeEventListener('offline-sync-conflict' as any, handleConflictEvent);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -129,6 +185,94 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 <>
                     <OfflineBanner />
                     <UnifiedErrorOverlay />
+
+                    <BasicConflictModal
+                        open={isConflictModalOpen}
+                        onClose={() => setIsConflictModalOpen(false)}
+                        onResolve={async (action) => {
+                            if (action === 'advanced') {
+                                setIsConflictModalOpen(false);
+                                setIsWizardOpen(true);
+                            } else if (activeConflict) {
+                                try {
+                                    await supabase.auth.getUser();
+                                    // Use ConflictResolver for consistent resolution logic
+                                    // Strategy mapping: keep_mine -> last-write-wins (or rebase), keep_server -> server-wins
+                                    // const strategy = action === 'keep_mine' ? 'sequence-rebase' : 'server-wins';
+
+                                    // We need to convert from ConflictData (UI) to DataConflict (Service) or similar
+                                    // For now, let's implement the direct resolution logic for common cases
+                                    if (action === 'keep_server') {
+                                        // Discard local: Mark as synced and sync engine will proceed
+                                        await markSynced(activeConflict.id);
+                                    } else {
+                                        // Keep mine: We need to update the sync queue entry data with a higher version
+                                        const db = getOfflineDB();
+                                        const entry = await db.syncQueue.get(activeConflict.id);
+                                        if (entry) {
+                                            // Re-base version to bypass server check
+                                            const updatedData = { ...entry.operation.data, version: (Number(entry.operation.data.version || 0) + 1) };
+                                            await db.syncQueue.update(activeConflict.id, {
+                                                status: 'pending',
+                                                'operation.data': updatedData,
+                                                error: undefined
+                                            });
+                                        }
+                                    }
+
+                                    setIsConflictModalOpen(false);
+                                    setActiveConflict(null);
+                                    // Trigger sync resume
+                                    syncEngine.startSync();
+                                } catch (err) {
+                                    console.error('[OfflineProvider] Quick resolution failed:', err);
+                                }
+                            }
+                        }}
+                        entityName={activeConflict?.entityType}
+                    />
+
+                    <ConflictResolutionWizard
+                        open={isWizardOpen}
+                        conflict={activeConflict}
+                        onClose={() => setIsWizardOpen(false)}
+                        onResolve={async (action) => {
+                            try {
+                                /*
+                                const strategyMap: Record<string, any> = {
+                                    'keep_mine': 'sequence-rebase',
+                                    'keep_server': 'server-wins',
+                                    'keep_both': 'manual',
+                                    'merge': 'manual'
+                                };
+                                */
+
+                                console.info(`[OfflineProvider] Wizard resolution chosen: ${action}`);
+
+                                if (action === 'keep_server' && activeConflict) {
+                                    await markSynced(activeConflict.id);
+                                } else if (activeConflict) {
+                                    // For Keep Mine/Merge/Both, we update the queue entry
+                                    const db = getOfflineDB();
+                                    const entry = await db.syncQueue.get(activeConflict.id);
+                                    if (entry) {
+                                        const updatedData = { ...entry.operation.data, version: (Number(entry.operation.data.version || 0) + 1) };
+                                        await db.syncQueue.update(activeConflict.id, {
+                                            status: 'pending',
+                                            'operation.data': updatedData,
+                                            error: undefined
+                                        });
+                                    }
+                                }
+
+                                setIsWizardOpen(false);
+                                setActiveConflict(null);
+                                syncEngine.startSync();
+                            } catch (err) {
+                                console.error('[OfflineProvider] Wizard resolution failed:', err);
+                            }
+                        }}
+                    />
                 </>
             )}
         </OfflineContext.Provider>

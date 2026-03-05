@@ -10,6 +10,8 @@ import { getCompanyConfig } from '../../services/company-config'
 import { fetchTransactionsDateRange } from '../../services/reports/common'
 import { getBalanceSheet, type UnifiedFilters, type BalanceSheetRow as BSRow } from '../../services/reports/unified-financial-query'
 import { useScope } from '../../contexts/ScopeContext'
+import { getConnectionMonitor } from '../../utils/connectionMonitor'
+import StalenessIndicator from '../../components/Common/StalenessIndicator'
 import Visibility from '@mui/icons-material/Visibility'
 import VisibilityOff from '@mui/icons-material/VisibilityOff'
 import Bolt from '@mui/icons-material/Bolt'
@@ -56,6 +58,7 @@ export default function BalanceSheet() {
   const { currentOrg, currentProject, availableProjects } = useScope()
   const lang = useAppStore((s: { language: string }) => s.language)
   const isAr = lang === 'ar'
+  const { isOnline } = getConnectionMonitor().getHealth()
 
   const [asOfDate, setAsOfDate] = useState<string>(todayISO())
   const [loading, setLoading] = useState<boolean>(false)
@@ -819,6 +822,12 @@ export default function BalanceSheet() {
 
   return (
     <div className={styles.container}>
+      {!isOnline && (
+        <StalenessIndicator
+          isStale={true}
+          lastUpdated={new Date().toLocaleDateString(isAr ? 'ar-EG' : 'en-US')}
+        />
+      )}
       {/* Unified one-row filter bar using advanced implementation - EXACT copy from P&L */}
       <div className={`${styles.professionalFilterBar} ${styles.noPrint}`}>
         {/* Left Section: Date Filters */}

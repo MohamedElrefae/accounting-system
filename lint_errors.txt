@@ -1,0 +1,522 @@
+
+> accounting-system@1.0.0 lint
+> eslint .
+
+
+C:\5\accounting-systemr5\scripts\build-wizard.ts
+  273:13  warning  'buildOutput' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  324:9   warning  'startTime' is assigned a value but never used. Allowed unused vars must match /^_/u    @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\scripts\checkLineItemsMigration.ts
+  33:11  warning  'data' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  47:11  warning  'data' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\scripts\load-test-data.ts
+  26:5   warning  'loaded' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  59:17  warning  'orgs' is never reassigned. Use 'const' instead                                    prefer-const
+
+C:\5\accounting-systemr5\scripts\test-lifecycle-integration.ts
+  60:17  warning  'orgs' is never reassigned. Use 'const' instead  prefer-const
+
+C:\5\accounting-systemr5\src\components\Approvals\EnhancedLineReviewsTable.tsx
+  68:3  warning  'onApprove' is defined but never used. Allowed unused args must match /^_/u      @typescript-eslint/no-unused-vars
+  69:3  warning  'onRequestEdit' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+  70:3  warning  'onFlag' is defined but never used. Allowed unused args must match /^_/u         @typescript-eslint/no-unused-vars
+  71:3  warning  'onAddComment' is defined but never used. Allowed unused args must match /^_/u   @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\components\Approvals\LineReviewStatus.tsx
+  29:3  warning  'loading' is assigned a value but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\components\Approvals\TransactionApprovalStatus.tsx
+  11:3  warning  'transactionId' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\components\AuditLogViewer.tsx
+  85:6  warning  React Hook useEffect has a missing dependency: 'fetchLogs'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\components\Common\TableSkeleton.tsx
+  2:75  warning  'Paper' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\components\OfflineProvider.tsx
+  177:9  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+
+C:\5\accounting-systemr5\src\components\Organizations\OrgSelector.tsx
+   3:15  warning  'Organization' is defined but never used. Allowed unused vars must match /^_/u                                                                                                             @typescript-eslint/no-unused-vars
+  17:9   warning  The 'orgs' logical expression could make the dependencies of useEffect Hook (at line 37) change on every render. To fix this, wrap the initialization of 'orgs' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\components\Organizations\OrganizationManagementTabs.tsx
+  14:9  warning  'canManageOrgs' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\components\Organizations\ProjectSelector.tsx
+  3:15  warning  'Project' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\components\Reports\AccountTreeSidebar.tsx
+  117:8  warning  React Hook useEffect has a missing dependency: 'expandedIds.size'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\components\Reports\ReportResults.tsx
+  218:6  warning  React Hook useMemo has missing dependencies: 'applyFilters', 'applyGrouping', and 'applySort'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\components\Reports\RunningBalanceFilters.tsx
+  81:3  warning  'preferencesKey' is assigned a value but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\components\Reports\RunningBalanceSummary.tsx
+  30:3  warning  'currency' is assigned a value but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\components\Reports\RunningBalanceTable.tsx
+  76:61  warning  'row' is defined but never used. Allowed unused args must match /^_/u       @typescript-eslint/no-unused-vars
+  76:71  warning  'rowIndex' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+  96:9   warning  Unexpected lexical declaration in case block                                no-case-declarations
+
+C:\5\accounting-systemr5\src\components\Transactions\MultiLineEditor.tsx
+  15:92  warning  'orgId' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\components\Transactions\TransactionWizard.tsx
+   244:6  warning  React Hook useEffect has a missing dependency: 'secureProjects'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  1053:9  warning  Unexpected lexical declaration in case block                                                                       no-case-declarations
+
+C:\5\accounting-systemr5\src\components\admin\OrgRoleAssignment.tsx
+  31:6  warning  React Hook useEffect has a missing dependency: 'loadOrgUsers'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\components\admin\OrgRoleAssignment_Enhanced.tsx
+   86:6  warning  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  101:5  error    Unnecessary try/catch wrapper                                                                                no-useless-catch
+  124:5  error    Unnecessary try/catch wrapper                                                                                no-useless-catch
+
+C:\5\accounting-systemr5\src\components\admin\PerformanceMonitoringDashboard.tsx
+  19:11  warning  'MetricDisplay' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\components\admin\ProjectRoleAssignment.tsx
+  30:6  warning  React Hook useEffect has a missing dependency: 'loadProjectUsers'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\components\admin\ProjectRoleAssignment_Enhanced.tsx
+  95:6  warning  React Hook useEffect has a missing dependency: 'loadProjectUsers'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\components\admin\ScopedRoleAssignment.tsx
+  31:11  warning  'canPerformActionInOrg' is assigned a value but never used. Allowed unused vars must match /^_/u                  @typescript-eslint/no-unused-vars
+  43:6   warning  React Hook useEffect has a missing dependency: 'loadUserRoles'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\components\auth\__tests__\AuthProvider.test.tsx
+   53:9   warning  'auth' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  294:18  warning  'error' is defined but never used                                                @typescript-eslint/no-unused-vars
+  314:18  warning  'error' is defined but never used                                                @typescript-eslint/no-unused-vars
+  336:15  warning  'auth' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\components\layout\Sidebar.tsx
+    1:27  warning  'useMemo' is defined but never used. Allowed unused vars must match /^_/u                                            @typescript-eslint/no-unused-vars
+  110:5   warning  'hasRoleInProject' is assigned a value but never used. Allowed unused vars must match /^_/u                          @typescript-eslint/no-unused-vars
+  234:9   warning  Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free  @typescript-eslint/ban-ts-comment
+  236:11  warning  Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free  @typescript-eslint/ban-ts-comment
+  241:9   warning  Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free  @typescript-eslint/ban-ts-comment
+  251:11  warning  Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free  @typescript-eslint/ban-ts-comment
+
+C:\5\accounting-systemr5\src\components\layout\TopBar.tsx
+  138:11  warning  'refreshAll' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\components\offline\ConflictResolutionWizard.tsx
+   15:36  warning  'Divider' is defined but never used. Allowed unused vars must match /^_/u                  @typescript-eslint/no-unused-vars
+   17:47  warning  'Tooltip' is defined but never used. Allowed unused vars must match /^_/u                  @typescript-eslint/no-unused-vars
+   18:5   warning  'IconButton' is defined but never used. Allowed unused vars must match /^_/u               @typescript-eslint/no-unused-vars
+   18:17  warning  'Collapse' is defined but never used. Allowed unused vars must match /^_/u                 @typescript-eslint/no-unused-vars
+   23:25  warning  'MergeIcon' is defined but never used. Allowed unused vars must match /^_/u                @typescript-eslint/no-unused-vars
+   27:26  warning  'ExpandIcon' is defined but never used. Allowed unused vars must match /^_/u               @typescript-eslint/no-unused-vars
+  134:12  warning  'showDetails' is assigned a value but never used. Allowed unused vars must match /^_/u     @typescript-eslint/no-unused-vars
+  134:25  warning  'setShowDetails' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\components\offline\OfflineSettings.tsx
+  17:19  warning  'OnlineIcon' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\components\offline\StorageDashboard.tsx
+  15:19  warning  'Divider' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\components\offline\UnifiedErrorOverlay.tsx
+  13:18  warning  'SyncedIcon' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\components\routing\OptimizedProtectedRoute.tsx
+  19:7  warning  'MinimalLoader' is assigned a value but never used. Allowed unused vars must match /^_/u        @typescript-eslint/no-unused-vars
+  42:5  warning  'hasGlobalPermission' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  51:9  warning  'navigate' is assigned a value but never used. Allowed unused vars must match /^_/u             @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\contexts\AuthContext.tsx
+  9:42  warning  'ReactNode' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\contexts\AuthProvider.tsx
+    9:57  warning  'useEffect' is defined but never used. Allowed unused vars must match /^_/u                                @typescript-eslint/no-unused-vars
+   57:16  warning  'setUser' is assigned a value but never used. Allowed unused vars must match /^_/u                         @typescript-eslint/no-unused-vars
+   59:17  warning  'setRoles' is assigned a value but never used. Allowed unused vars must match /^_/u                        @typescript-eslint/no-unused-vars
+   60:25  warning  'setOrganizations' is assigned a value but never used. Allowed unused vars must match /^_/u                @typescript-eslint/no-unused-vars
+  118:9   warning  'handleReactivePermissionUpdate' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\contexts\ScopeProvider.tsx
+   87:64  warning  'retryCount' is assigned a value but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+  141:11  warning  'isOnline' is assigned a value but never used. Allowed unused vars must match /^_/u    @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\contexts\TransactionsDataContext.tsx
+  305:6  warning  React Hook useCallback has a missing dependency: 'authScopeData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\contexts\UserProfileProvider.tsx
+   42:6  warning  React Hook useEffect has a missing dependency: 'user'. Either include it or remove the dependency array            react-hooks/exhaustive-deps
+  146:6  warning  React Hook useCallback has an unnecessary dependency: 'user.id'. Either exclude it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\hooks\useEnhancedTransactionsFilters.ts
+  109:6  warning  React Hook useMemo has a missing dependency: 'baseFilters'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\hooks\useOptimizedAuth.ts
+  369:16  warning  'cacheSaveErr' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\hooks\usePermissionAuditLogs.ts
+  57:6  warning  React Hook useEffect has a missing dependency: 'fetchLogs'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\hooks\useRefreshPrevention.ts
+  17:5  warning  'preventOnDataUpdate' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\hooks\useReportGrouping.ts
+   90:11  warning  Unexpected lexical declaration in case block  no-case-declarations
+  115:11  warning  Unexpected lexical declaration in case block  no-case-declarations
+
+C:\5\accounting-systemr5\src\hooks\useRoleAssignmentPropagation.ts
+  78:6  warning  React Hook useEffect has a missing dependency: 'options'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\hooks\useUniversalReportSync.ts
+  399:6  warning  React Hook useCallback has a missing dependency: 'config'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  501:6  warning  React Hook useEffect has a missing dependency: 'config'. Either include it or remove the dependency array    react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\pages\Dashboard.tsx
+  385:18  warning  'err' is defined but never used                                                                                                         @typescript-eslint/no-unused-vars
+  392:54  warning  'highlights' is assigned a value but never used. Allowed unused vars must match /^_/u                                                   @typescript-eslint/no-unused-vars
+  484:6   warning  React Hook React.useCallback has unnecessary dependencies: 'dateFrom' and 'dateTo'. Either exclude them or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\pages\Debug\TransactionsTest.tsx
+  90:6  warning  React Hook useEffect has a missing dependency: 'supabase'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\pages\Fiscal\FiscalYearDashboardRefactored.tsx
+  18:0  error  Parsing error: 'from' expected
+
+C:\5\accounting-systemr5\src\pages\Inventory\Locations.tsx
+  24:9  warning  The 'projects' logical expression could make the dependencies of useMemo Hook (at line 38) change on every render. To fix this, wrap the initialization of 'projects' in its own useMemo() Hook   react-hooks/exhaustive-deps
+  24:9  warning  The 'projects' logical expression could make the dependencies of useMemo Hook (at line 267) change on every render. To fix this, wrap the initialization of 'projects' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\pages\MainData\AccountsTree.tsx
+  374:16  warning  'err' is defined but never used                                                                                 @typescript-eslint/no-unused-vars
+  504:6   warning  React Hook useCallback has a missing dependency: 'showToast'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\pages\Reports\AccountExplorer.tsx
+    9:3  warning  'fetchProjects' is defined but never used. Allowed unused vars must match /^_/u                              @typescript-eslint/no-unused-vars
+   10:3  warning  'fetchOrganizations' is defined but never used. Allowed unused vars must match /^_/u                         @typescript-eslint/no-unused-vars
+   11:8  warning  'LookupOption' is defined but never used. Allowed unused vars must match /^_/u                               @typescript-eslint/no-unused-vars
+  286:6  warning  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  297:6  warning  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  355:6  warning  React Hook useMemo has a missing dependency: 'isZero'. Either include it or remove the dependency array      react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\pages\Reports\AnalysisItemUsage.tsx
+   6:50  warning  'InputLabel' is defined but never used. Allowed unused vars must match /^_/u                             @typescript-eslint/no-unused-vars
+  44:6   warning  React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  96:6   warning  React Hook useMemo has a missing dependency: 'isAr'. Either include it or remove the dependency array    react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\pages\Reports\BalanceSheet.tsx
+  1:47  warning  'useCallback' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\pages\Reports\GeneralLedger.tsx
+   316:9   warning  The 'handleFullExport' function makes the dependencies of useCallback Hook (at line 598) change on every render. To fix this, wrap the definition of 'handleFullExport' in its own useCallback() Hook                        react-hooks/exhaustive-deps
+   344:19  warning  'hasChildren' is assigned a value but never used. Allowed unused vars must match /^_/u                                                                                                                                       @typescript-eslint/no-unused-vars
+  1199:13  warning  'qOrgId' is assigned a value but never used. Allowed unused vars must match /^_/u                                                                                                                                            @typescript-eslint/no-unused-vars
+  1200:13  warning  'qProjectId' is assigned a value but never used. Allowed unused vars must match /^_/u                                                                                                                                        @typescript-eslint/no-unused-vars
+  1274:6   warning  React Hook useEffect has a missing dependency: 'currentOrg?.id'. Either include it or remove the dependency array                                                                                                            react-hooks/exhaustive-deps
+  1552:6   warning  React Hook useEffect has a missing dependency: 'pageSize'. Either include it or remove the dependency array                                                                                                                  react-hooks/exhaustive-deps
+  1611:6   warning  React Hook useEffect has a missing dependency: 'classificationId'. Either include it or remove the dependency array                                                                                                          react-hooks/exhaustive-deps
+  1670:6   warning  React Hook useMemo has missing dependencies: 'activityOnly', 'detailColumnOptions', 'hideZeroAccounts', 'includeChildrenInDrilldown', 'numbersOnly', and 'onlyPostable'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  1773:6   warning  React Hook useMemo has a missing dependency: 'accountId'. Either include it or remove the dependency array                                                                                                                   react-hooks/exhaustive-deps
+  1826:6   warning  React Hook useMemo has missing dependencies: 'numbersOnly' and 'overviewColumnOptions'. Either include them or remove the dependency array                                                                                   react-hooks/exhaustive-deps
+  1963:6   warning  React Hook useEffect has a missing dependency: 'expandedAccountId'. Either include it or remove the dependency array                                                                                                         react-hooks/exhaustive-deps
+  2126:31  warning  'hasChildren' is assigned a value but never used. Allowed unused vars must match /^_/u                                                                                                                                       @typescript-eslint/no-unused-vars
+  3006:21  warning  'isPostable' is assigned a value but never used. Allowed unused vars must match /^_/u                                                                                                                                        @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\pages\Reports\ProfitLoss.tsx
+  182:6  warning  React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\pages\Reports\RunningBalanceEnriched.tsx
+  131:6  warning  React Hook useCallback has missing dependencies: 'currentOrg?.id' and 'currentProject?.id'. Either include them or remove the dependency array                                          react-hooks/exhaustive-deps
+  192:6  warning  React Hook useMemo has a missing dependency: 'isAr'. Either include it or remove the dependency array                                                                                   react-hooks/exhaustive-deps
+  426:6  warning  React Hook useMemo has unnecessary dependencies: 'analysisItemsMap', 'classifications', 'costCenters', 'projects', and 'workItems'. Either exclude them or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\pages\Reports\TransactionClassificationReports.tsx
+  161:6   warning  React Hook useEffect has a missing dependency: 'currentOrg?.id'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  182:31  warning  React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array            react-hooks/exhaustive-deps
+  281:6   warning  React Hook useMemo has a missing dependency: 'isAr'. Either include it or remove the dependency array              react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\pages\Reports\TransactionLinesReport.tsx
+   79:11  warning  'queryClient' is assigned a value but never used. Allowed unused vars must match /^_/u                                     @typescript-eslint/no-unused-vars
+  174:8   warning  React Hook useCallback has a missing dependency: 'fetchAllLinesOffline'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  275:8   warning  React Hook useCallback has a missing dependency: 'fetchAllLinesOffline'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\pages\Reports\TrialBalanceAllLevels.tsx
+  202:6  warning  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\pages\Reports\TrialBalanceOriginal.tsx
+    3:10  warning  'supabase' is defined but never used. Allowed unused vars must match /^_/u                               @typescript-eslint/no-unused-vars
+  255:6   warning  React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\pages\Reports\WorkItemUsage.tsx
+  26:6  warning  React Hook useEffect has a missing dependency: 'reload'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\pages\Transactions\AllLinesEnriched.tsx
+  398:6  warning  React Hook useCallback has unnecessary dependencies: 'organizations' and 'projects'. Either exclude them or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\5\accounting-systemr5\src\pages\Transactions\MyLinesEnriched.tsx
+  19:11  warning  'MyLineRow' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\pages\Transactions\TransactionDetails.tsx
+   7:94   warning  'getAccounts' is defined but never used. Allowed unused vars must match /^_/u              @typescript-eslint/no-unused-vars
+   7:107  warning  'getProjects' is defined but never used. Allowed unused vars must match /^_/u              @typescript-eslint/no-unused-vars
+  39:16   warning  'contextLoading' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\pages\Transactions\Transactions.tsx
+  465:10  warning  'autoPostOnApprove' is assigned a value but never used. Allowed unused vars must match /^_/u                                             @typescript-eslint/no-unused-vars
+  484:9   warning  'formatSupabaseError' is assigned a value but never used. Allowed unused vars must match /^_/u                                           @typescript-eslint/no-unused-vars
+  929:6   warning  React Hook useCallback has unnecessary dependencies: 'organizations' and 'projects'. Either exclude them or remove the dependency array  react-hooks/exhaustive-deps
+  956:13  warning  'lineCount' is assigned a value but never used. Allowed unused vars must match /^_/u                                                     @typescript-eslint/no-unused-vars
+  957:13  warning  'total' is assigned a value but never used. Allowed unused vars must match /^_/u                                                         @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\pages\Welcome.tsx
+  124:17  warning  'fiscalYear' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\pages\admin\EnterpriseUserManagement.tsx
+  490:16  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\pages\admin\UserManagementSystem.tsx
+  68:11  warning  'user' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\cache\CacheInvalidationService.ts
+  11:55  warning  'CACHE_TTL' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\filters\SmartDefaultsEngine.ts
+  136:29  warning  'orgId' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\font-preferences.ts
+  145:12  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\integration\AuthOptimizationIntegrationService.ts
+  417:13  warning  'permissionMap' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  422:13  warning  'result' is assigned a value but never used. Allowed unused vars must match /^_/u         @typescript-eslint/no-unused-vars
+  598:14  warning  'error' is defined but never used                                                         @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\offline\core\OfflineAPI.ts
+  12:10  warning  'supabase' is defined but never used. Allowed unused vars must match /^_/u         @typescript-eslint/no-unused-vars
+  15:10  warning  'isSessionActive' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\offline\core\OfflineMigrations.ts
+   81:18  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+  100:18  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+  118:18  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+  133:18  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+  150:18  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+  167:18  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+  184:18  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+  201:18  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+  218:18  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+  273:18  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\offline\core\OfflineStore.ts
+  229:7  warning  'records' is never reassigned. Use 'const' instead  prefer-const
+  230:7  warning  'results' is never reassigned. Use 'const' instead  prefer-const
+
+C:\5\accounting-systemr5\src\services\offline\monitoring\OfflineMetrics.ts
+  14:15  warning  'OfflineMetrics' is defined but never used. Allowed unused vars must match /^_/u    @typescript-eslint/no-unused-vars
+  32:15  warning  'db' is assigned a value but never used. Allowed unused vars must match /^_/u       @typescript-eslint/no-unused-vars
+  35:15  warning  'metrics' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\offline\reports\OfflineExportService.ts
+   2:35  warning  'UniversalTableColumn' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  15:9   warning  'query' is never reassigned. Use 'const' instead                                        prefer-const
+
+C:\5\accounting-systemr5\src\services\offline\sync\SynchronizationEngine.ts
+  131:40  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\5\accounting-systemr5\src\services\offline\testing\OfflineDataGenerator.ts
+  13:28  warning  'TransactionLine' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\offline\testing\acid.property.test.ts
+  12:32  warning  'beforeEach' is defined but never used. Allowed unused vars must match /^_/u          @typescript-eslint/no-unused-vars
+  14:29  warning  'storeTransaction' is defined but never used. Allowed unused vars must match /^_/u    @typescript-eslint/no-unused-vars
+  14:47  warning  'getTransaction' is defined but never used. Allowed unused vars must match /^_/u      @typescript-eslint/no-unused-vars
+  14:63  warning  'deleteTransaction' is defined but never used. Allowed unused vars must match /^_/u   @typescript-eslint/no-unused-vars
+  19:9   warning  'TEST_USER' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  24:71  warning  'tx' is defined but never used. Allowed unused args must match /^_/u                  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\offline\testing\conflict.property.test.ts
+  143:29  warning  'userB' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\offline\testing\performance.property.test.ts
+  66:28  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  74:28  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\5\accounting-systemr5\src\services\offline\testing\security.property.test.ts
+  11:32  warning  'beforeEach' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  11:44  warning  'vi' is defined but never used. Allowed unused vars must match /^_/u          @typescript-eslint/no-unused-vars
+  46:16  warning  'data' is defined but never used. Allowed unused args must match /^_/u        @typescript-eslint/no-unused-vars
+  66:36  error    A `require()` style import is forbidden                                       @typescript-eslint/no-require-imports
+  72:36  error    A `require()` style import is forbidden                                       @typescript-eslint/no-require-imports
+  83:36  error    A `require()` style import is forbidden                                       @typescript-eslint/no-require-imports
+  89:36  error    A `require()` style import is forbidden                                       @typescript-eslint/no-require-imports
+
+C:\5\accounting-systemr5\src\services\offline\testing\sync.property.test.ts
+  133:30  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\5\accounting-systemr5\src\services\organization.ts
+  114:14  warning  'finalFallbackErr' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\permissionSync.test.ts
+  4:10  warning  'permissionAuditService' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\permission\PermissionService.ts
+  601:19  warning  'userId' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\permission\__tests__\batch-processor.test.ts
+  2:70  warning  'BatchProcessingResult' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\projects.ts
+  263:12  warning  'finalFallbackErr' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\reports\runningBalanceService.ts
+  190:9  warning  'runningDebit' is assigned a value but never used. Allowed unused vars must match /^_/u   @typescript-eslint/no-unused-vars
+  191:9  warning  'runningCredit' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\reports\unified-financial-query.ts
+  249:7  warning  'txCollection' is never reassigned. Use 'const' instead  prefer-const
+  293:9  warning  'stats' is never reassigned. Use 'const' instead         prefer-const
+
+C:\5\accounting-systemr5\src\services\roleAssignment\RoleAssignmentPropagationService.ts
+  100:15  warning  'data' is assigned a value but never used. Allowed unused vars must match /^_/u       @typescript-eslint/no-unused-vars
+  170:15  warning  'data' is assigned a value but never used. Allowed unused vars must match /^_/u       @typescript-eslint/no-unused-vars
+  283:15  warning  'data' is assigned a value but never used. Allowed unused vars must match /^_/u       @typescript-eslint/no-unused-vars
+  351:15  warning  'data' is assigned a value but never used. Allowed unused vars must match /^_/u       @typescript-eslint/no-unused-vars
+  745:13  warning  'eventType' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  747:11  warning  'orgId' is assigned a value but never used. Allowed unused vars must match /^_/u      @typescript-eslint/no-unused-vars
+  758:13  warning  'eventType' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  760:11  warning  'projectId' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  771:13  warning  'eventType' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\scopedRoles\ScopedRolesOptimizationService.ts
+   76:11  warning  'dbQuery' is never reassigned. Use 'const' instead      prefer-const
+  497:11  warning  'permissions' is never reassigned. Use 'const' instead  prefer-const
+
+C:\5\accounting-systemr5\src\services\security\SecurityPreservationValidator.ts
+  108:21  warning  'auditTable' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  353:41  warning  'policy' is defined but never used. Allowed unused args must match /^_/u               @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\session\SessionManager.ts
+  11:3  warning  'CompressedOrgData' is defined but never used. Allowed unused vars must match /^_/u           @typescript-eslint/no-unused-vars
+  12:3  warning  'CompressedProjectData' is defined but never used. Allowed unused vars must match /^_/u       @typescript-eslint/no-unused-vars
+  15:3  warning  'SessionComponent' is defined but never used. Allowed unused vars must match /^_/u            @typescript-eslint/no-unused-vars
+  19:3  warning  'MEMORY_OPTIMIZATION_TARGET' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\src\services\transactions.ts
+   667:17  warning  'fallbackErr' is defined but never used  @typescript-eslint/no-unused-vars
+  1192:17  warning  'fallbackErr' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\test-confirmation-dialog.js
+  13:22  error  Parsing error: Unexpected token as
+
+C:\5\accounting-systemr5\tests\integration\auth-optimization-integration.test.ts
+   18:8   warning  'PerformanceValidationResult' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  152:13  warning  'userId' is assigned a value but never used. Allowed unused vars must match /^_/u              @typescript-eslint/no-unused-vars
+  398:13  warning  'userId' is assigned a value but never used. Allowed unused vars must match /^_/u              @typescript-eslint/no-unused-vars
+  437:13  warning  'result' is assigned a value but never used. Allowed unused vars must match /^_/u              @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\performance\performance-validation.test.ts
+  414:13  warning  'benchmarks' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\api-compatibility.test.ts
+  10:37  warning  'APIEndpoint' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\batch-processing-efficiency.test.ts
+  21:10  warning  'cacheKeyStrategy' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\cache-invalidation-consistency.test.ts
+  11:3  warning  'cacheInvalidationPatterns' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\cache-invalidation.test.ts
+  11:3  warning  'cacheInvalidationPatterns' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\database-index-optimization.test.ts
+   73:7   warning  'permissionGenerator' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  203:25  warning  'orgRoles' is assigned a value but never used. Allowed unused vars must match /^_/u             @typescript-eslint/no-unused-vars
+  212:27  warning  'projectRoles' is assigned a value but never used. Allowed unused vars must match /^_/u         @typescript-eslint/no-unused-vars
+  226:25  warning  'systemRoles' is assigned a value but never used. Allowed unused vars must match /^_/u          @typescript-eslint/no-unused-vars
+  303:17  warning  'originalResults' is assigned a value but never used. Allowed unused vars must match /^_/u      @typescript-eslint/no-unused-vars
+  308:25  warning  'optimizedResults' is assigned a value but never used. Allowed unused vars must match /^_/u     @typescript-eslint/no-unused-vars
+  349:7   warning  'orgMemberships' is assigned a value but never used. Allowed unused vars must match /^_/u       @typescript-eslint/no-unused-vars
+  350:7   warning  'projectMemberships' is assigned a value but never used. Allowed unused vars must match /^_/u   @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\feature-flag-control.test.ts
+  14:30  warning  'FeatureFlag' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\graceful-cache-degradation.test.ts
+  13:55  warning  'vi' is defined but never used. Allowed unused vars must match /^_/u                             @typescript-eslint/no-unused-vars
+  22:7   warning  'databaseErrorHandler' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\horizontal-scaling-support.test.ts
+  144:22  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+  349:22  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\migration-data-consistency.test.ts
+   17:3   warning  'DataValidationResult' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+   18:3   warning  'RollbackPlan' is defined but never used. Allowed unused vars must match /^_/u          @typescript-eslint/no-unused-vars
+  305:69  warning  'data' is defined but never used. Allowed unused args must match /^_/u                  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\multi-tenant-performance-isolation.test.ts
+   77:17  warning  'metricsBefore' is assigned a value but never used. Allowed unused vars must match /^_/u         @typescript-eslint/no-unused-vars
+   86:17  warning  'metricsAfter' is assigned a value but never used. Allowed unused vars must match /^_/u          @typescript-eslint/no-unused-vars
+  489:15  warning  'quotaExceededEmitted' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\performance-improvement-validation.test.ts
+   15:10  warning  'performance' is defined but never used. Allowed unused vars must match /^_/u                         @typescript-eslint/no-unused-vars
+   22:7   warning  'CONCURRENT_USERS_BASELINE' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+   23:7   warning  'CONCURRENT_USERS_TARGET' is assigned a value but never used. Allowed unused vars must match /^_/u    @typescript-eslint/no-unused-vars
+  214:53  warning  'userLevel' is defined but never used. Allowed unused args must match /^_/u                           @typescript-eslint/no-unused-vars
+  272:13  warning  'targetMemoryPerSession' is assigned a value but never used. Allowed unused vars must match /^_/u     @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\performance-monitoring.test.ts
+  15:3  warning  'PerformanceMetric' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  16:3  warning  'PerformanceStats' is defined but never used. Allowed unused vars must match /^_/u   @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\performance-regression-alerting.test.ts
+   56:17  warning  'regressionThreshold' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  384:19  warning  'recordEndTime' is assigned a value but never used. Allowed unused vars must match /^_/u        @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\permission-preloading.test.ts
+  12:55  warning  'vi' is defined but never used. Allowed unused vars must match /^_/u                          @typescript-eslint/no-unused-vars
+  19:7   warning  'permissionService' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\reactive-ui-updates.test.ts
+  12:55  warning  'vi' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\resource-prioritization.test.ts
+  301:15  warning  'allocatedCount' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\response-time-performance.test.ts
+  17:10  warning  'propertyTestConfig' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\role-assignment-propagation.test.ts
+  20:18  warning  'table' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\rollback-capability.test.ts
+  11:46  warning  'RollbackStep' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\rpc-function-performance.test.ts
+   22:7   warning  'QUERY_COUNT_REDUCTION_TARGET' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  427:25  warning  'error' is assigned a value but never used. Allowed unused vars must match /^_/u                         @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\scalability-concurrent-users.test.ts
+  17:10  warning  'propertyTestConfig' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  89:26  warning  'error' is defined but never used                                                     @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\scoped-roles-processing-efficiency.test.ts
+  294:17  warning  'hierarchy1' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\5\accounting-systemr5\tests\property\security-preservation.test.ts
+   48:16  warning  'testData' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+   83:16  warning  'testData' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+  114:16  warning  'testData' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+ظ£û 268 problems (12 errors, 256 warnings)
+  0 errors and 10 warnings potentially fixable with the `--fix` option.
+

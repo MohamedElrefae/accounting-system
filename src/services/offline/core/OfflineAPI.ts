@@ -3,16 +3,15 @@
  * Unified entry point for all accounting operations.
  * 
  * Responsibilities:
- * - Detect network status
- * - Fallback to OfflineStore when offline
- * - Use Supabase RPC directly when online (optional, depends on policy)
- * - Handle optimistic updates and queuing
+ * - Detect network status via ConnectionMonitor (never navigator.onLine)
+ * - When ONLINE: write directly to Supabase for zero latency
+ * - When OFFLINE: store locally and enqueue for background sync
+ * - On server error while online: degrade gracefully to offline path
  */
 
 import { supabase } from '../../../utils/supabase';
-import { storeTransaction, updateTransaction, deleteTransaction, queryTransactions } from './OfflineStore';
+import { storeTransaction, updateTransaction, deleteTransaction, queryTransactions, markTransactionSynced } from './OfflineStore';
 import { enqueueOperation } from '../sync/SyncQueueManager';
-import { isSessionActive } from '../security/OfflineEncryption';
 import { performanceMonitor } from '../monitoring/OfflineMetrics';
 import type { Transaction, TransactionQueryOptions } from './OfflineTypes';
 import { getConnectionMonitor } from '../../../utils/connectionMonitor';
@@ -30,7 +29,7 @@ export class UnifiedOfflineAPI {
   }
 
   /**
-   * Helper to determine if we should operate in offline mode.
+   * Determine if we are currently in offline mode.
    * Delegates to ConnectionMonitor — never trusts navigator.onLine directly.
    */
   private isOffline(): boolean {
@@ -39,17 +38,47 @@ export class UnifiedOfflineAPI {
 
   /**
    * Create a new transaction.
-   * If online, tries server first. If offline, stores locally and enqueues.
+   * - ONLINE: writes directly to Supabase, then mirrors to local store as 'verified'.
+   * - OFFLINE: stores locally as 'local_draft' and enqueues for sync.
+   * - SERVER ERROR while online: degrades to offline path (enqueue for later).
    */
   public async createTransaction(
     transaction: Omit<Transaction, 'checksum' | 'syncStatus'>,
     userId: string
   ): Promise<Transaction> {
     return performanceMonitor.measure('api_create_transaction', async () => {
-      // 1. Store locally first (Optimistic UI + Offline Durability)
+      // 1. Always store locally first for optimistic UI
       const localTx = await storeTransaction(transaction, userId);
 
-      // 2. Enqueue for sync
+      if (!this.isOffline()) {
+        try {
+          // 2a. ONLINE PATH: submit directly to Supabase
+          const { amount, ...rest } = transaction;
+          const { data, error } = await supabase
+            .from('transactions')
+            .insert({ 
+              ...rest, 
+              total_debits: amount || 0,
+              total_credits: amount || 0,
+              created_by: userId 
+            })
+            .select()
+            .single();
+
+          if (!error && data) {
+            // Mirror the server-assigned ID back to local store
+            await markTransactionSynced(localTx.localId!, data.id, userId);
+            return { ...localTx, id: data.id, syncStatus: 'verified' };
+          }
+
+          // Server rejected — fall through to offline path below
+          console.warn('[OfflineAPI] Server create failed, degrading to offline path:', error?.message);
+        } catch (err) {
+          console.warn('[OfflineAPI] Network error during create, degrading to offline path:', err);
+        }
+      }
+
+      // 2b. OFFLINE PATH (or server degradation): enqueue for background sync
       await enqueueOperation({
         type: 'CREATE',
         entityType: 'transaction',
@@ -64,6 +93,8 @@ export class UnifiedOfflineAPI {
 
   /**
    * Update an existing transaction.
+   * - ONLINE: updates Supabase directly, mirrors to local store.
+   * - OFFLINE: updates local store and enqueues delta.
    */
   public async updateTransaction(
     id: string,
@@ -74,12 +105,38 @@ export class UnifiedOfflineAPI {
       const updated = await updateTransaction(id, updates, userId);
       if (!updated) return null;
 
+      if (!this.isOffline()) {
+        try {
+          // ONLINE PATH: push directly to Supabase
+          const up: any = { ...updates, updated_by: userId };
+          if (up.amount !== undefined) {
+            up.total_debits = up.amount;
+            up.total_credits = up.amount;
+            delete up.amount;
+          }
+
+          const { error } = await supabase
+            .from('transactions')
+            .update(up)
+            .eq('id', id);
+
+          if (!error) {
+            return { ...updated, syncStatus: 'verified' };
+          }
+
+          console.warn('[OfflineAPI] Server update failed, degrading to offline path:', error?.message);
+        } catch (err) {
+          console.warn('[OfflineAPI] Network error during update, degrading to offline path:', err);
+        }
+      }
+
+      // OFFLINE PATH (or degradation)
       await enqueueOperation({
         type: 'UPDATE',
         entityType: 'transaction',
         entityId: id,
         data: updates as any,
-        originalData: updated as any, // For delta calculations
+        originalData: updated as any,
         userId
       });
 
@@ -89,7 +146,7 @@ export class UnifiedOfflineAPI {
 
   /**
    * Search for transactions.
-   * Prioritizes local store for speed and availability.
+   * Always queries local store first for speed and offline availability.
    */
   public async findTransactions(options: TransactionQueryOptions): Promise<Transaction[]> {
     return performanceMonitor.measure('api_query_transactions', () => queryTransactions(options));
@@ -97,8 +154,29 @@ export class UnifiedOfflineAPI {
 
   /**
    * Delete a transaction.
+   * - ONLINE: deletes from Supabase directly, removes from local store.
+   * - OFFLINE: marks for deletion locally and enqueues.
    */
   public async removeTransaction(id: string, userId: string): Promise<void> {
+    if (!this.isOffline()) {
+      try {
+        const { error } = await supabase
+          .from('transactions')
+          .delete()
+          .eq('id', id);
+
+        if (!error) {
+          await deleteTransaction(id, userId);
+          return;
+        }
+
+        console.warn('[OfflineAPI] Server delete failed, degrading to offline path:', error?.message);
+      } catch (err) {
+        console.warn('[OfflineAPI] Network error during delete, degrading to offline path:', err);
+      }
+    }
+
+    // OFFLINE PATH (or degradation)
     await deleteTransaction(id, userId);
     await enqueueOperation({
       type: 'DELETE',
@@ -111,3 +189,5 @@ export class UnifiedOfflineAPI {
 }
 
 export const offlineAPI = UnifiedOfflineAPI.getInstance();
+
+

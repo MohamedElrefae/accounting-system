@@ -21,6 +21,7 @@ const OPERATION_PRIORITY: Record<string, number> = {
   payment: 100,       // Highest — financial impact
   invoice: 80,
   transaction: 70,
+  transaction_line_items: 70,
   journal_entry: 60,
   attachment: 20,     // Lowest — can be deferred
 };

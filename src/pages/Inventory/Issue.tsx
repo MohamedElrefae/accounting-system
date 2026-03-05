@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { Card, CardContent, Typography, Grid, TextField, MenuItem, Button, Divider } from '@mui/material'
 import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/hooks/useAuth'
@@ -17,6 +17,7 @@ import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import AsyncAutocomplete, { type AsyncOption } from '@/components/Common/AsyncAutocomplete'
+import SearchableSelect, { type SearchableSelectOption } from '@/components/Common/SearchableSelect'
 import DocumentActionsBar from '@/components/Inventory/DocumentActionsBar'
 
 const IssueMaterialsPage: React.FC = () => {
@@ -140,6 +141,23 @@ const IssueMaterialsPage: React.FC = () => {
     const filtered = ql ? src.filter(l => `${l.location_code} ${l.location_name}`.toLowerCase().includes(ql)) : src
     return filtered.slice(0, 100).map(l => ({ id: l.id, label: `${l.location_code} - ${l.location_name}`, raw: l }))
   }
+
+  // Convert data to SearchableSelectOption format
+  const analysisItemOptions: SearchableSelectOption[] = useMemo(() =>
+    analysisItems.map(a => ({
+      value: a.id,
+      label: `${a.code} - ${a.name}`,
+      searchText: `${a.code} ${a.name}`.toLowerCase()
+    }))
+  , [analysisItems])
+
+  const workItemOptions: SearchableSelectOption[] = useMemo(() =>
+    workItems.map(w => ({
+      value: w.id,
+      label: `${w.code} - ${w.name}`,
+      searchText: `${w.code} ${w.name}`.toLowerCase()
+    }))
+  , [workItems])
 
   const addLine = () => {
     if (!materialId || !uomId || !quantity) { showToast('Select material, UOM and quantity', { severity: 'warning' }); return }
@@ -276,16 +294,24 @@ const IssueMaterialsPage: React.FC = () => {
                 </TextField>
               </Grid>
               <Grid item xs={12} md={3}>
-                <TextField select fullWidth label="Analysis Work Item / بند تحليلي" {...register('analysisItemId')} error={!!errors.analysisItemId} helperText={errors.analysisItemId?.message} value={analysisItemId || ''} onChange={() => { }}>
-                  <MenuItem value="">—</MenuItem>
-                  {analysisItems.map(a => (<MenuItem key={a.id} value={a.id}>{a.code} - {a.name}</MenuItem>))}
-                </TextField>
+                <SearchableSelect
+                  value={analysisItemId || ''}
+                  onChange={(value) => { (document.activeElement as HTMLElement)?.blur?.(); (register('analysisItemId').onChange as any)({ target: { value } }) }}
+                  options={analysisItemOptions}
+                  placeholder="ابحث بالكود أو الاسم..."
+                  clearable={true}
+                  error={!!errors.analysisItemId}
+                />
               </Grid>
               <Grid item xs={12} md={3}>
-                <TextField select fullWidth label="Work Item / بند أعمال" {...register('workItemId')} error={!!errors.workItemId} helperText={errors.workItemId?.message} value={workItemId || ''} onChange={() => { }}>
-                  <MenuItem value="">—</MenuItem>
-                  {workItems.map(w => (<MenuItem key={w.id} value={w.id}>{w.code} - {w.name}</MenuItem>))}
-                </TextField>
+                <SearchableSelect
+                  value={workItemId || ''}
+                  onChange={(value) => { (document.activeElement as HTMLElement)?.blur?.(); (register('workItemId').onChange as any)({ target: { value } }) }}
+                  options={workItemOptions}
+                  placeholder="ابحث بالكود أو الاسم..."
+                  clearable={true}
+                  error={!!errors.workItemId}
+                />
               </Grid>
               <Grid item xs={12}>
                 <TextField fullWidth label="Notes / ملاحظات" {...register('notes')} error={!!errors.notes} helperText={errors.notes?.message} value={notes || ''} onChange={() => { }} />

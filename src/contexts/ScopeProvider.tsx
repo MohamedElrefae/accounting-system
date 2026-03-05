@@ -84,7 +84,7 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
   const initializedFromAuthRef = useRef(false);
 
   // Load projects for a specific org with retry mechanism and connectivity awareness
-  const loadProjectsForOrg = useCallback(async (orgId: string, retryCount = 0): Promise<Project[]> => {
+  const loadProjectsForOrg = useCallback(async (orgId: string, _retryCount = 0): Promise<Project[]> => {
     if (useUnifiedAuth && authScopeData.isReady) {
       if (import.meta.env.DEV) console.log('[ScopeProvider] UnifiedAuth: Using projects from auth state for org:', orgId);
       const filteredProjects = authScopeData.projects.filter((p: Project) => p.org_id === orgId);
@@ -103,7 +103,7 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
     }
 
     // Unified check moved inside service calls
-
+    const monitor = getConnectionMonitor();
     setIsLoadingProjects(true);
     try {
       const projects = await getActiveProjectsByOrg(orgId);
@@ -131,14 +131,13 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
         setIsLoadingProjects(false);
       }
     }
-  }, [useUnifiedAuth, authScopeData]);
+  }, [useUnifiedAuth, authScopeData, setAvailableProjects, setCurrentProject]);
 
   // Load organizations with retry mechanism and connection awareness
   const loadOrganizations = useCallback(async (retryCount = 0) => {
     if (!mountedRef.current) return;
 
     const monitor = getConnectionMonitor();
-    const isOnline = monitor.getHealth().isOnline;
 
     setIsLoadingOrgs(true);
 

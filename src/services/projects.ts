@@ -1,5 +1,7 @@
 import { supabase } from '../utils/supabase'
 import { getCurrentUserId, type Project, type ProjectFinancialSummary, getProjectFinancialSummary as getProjectSummaryFromTransactions } from './transactions'
+import { offlineCacheManager } from './offline/core/OfflineCacheManager';
+import { getConnectionMonitor } from '../utils/connectionMonitor';
 
 // Re-export Project type for external use
 export type { Project } from './transactions'
@@ -30,13 +32,9 @@ export async function getProjects(options?: ProjectListOptions): Promise<PagedRe
   if (!getConnectionMonitor().getHealth().isOnline) {
     // Offline Fallback for List View
     try {
-        const { getOfflineDB } = await import('./offline/core/OfflineSchema');
-        const db = getOfflineDB();
-        
-        // Try exact match on 'projects_cache' first (fastest)
-        const cached = await db.metadata.get('projects_cache');
-        if (cached && Array.isArray(cached.value) && cached.value.length > 0) {
-             let rows = cached.value;
+        const cachedRows = await offlineCacheManager.get<Project[]>('projects_cache');
+        if (cachedRows && Array.isArray(cachedRows) && cachedRows.length > 0) {
+             let rows = cachedRows;
              // Apply basic memory filtering
              const f = options?.filters;
              if (f?.status && f.status !== 'all') rows = rows.filter((p: any) => p.status === f.status);
@@ -112,15 +110,14 @@ export async function getProjects(options?: ProjectListOptions): Promise<PagedRe
 // Get active projects for dropdown/selection
 export async function getActiveProjects(): Promise<Project[]> {
   const { getConnectionMonitor } = await import('../utils/connectionMonitor');
-  const isOffline = !getConnectionMonitor().getHealth().isOnline;
+  const monitor = getConnectionMonitor();
+  const isOnline = monitor.getHealth().isOnline;
 
-  if (isOffline) {
+  if (!isOnline) {
     try {
-      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
-      const db = getOfflineDB();
-      const cached = await db.metadata.get('projects_cache');
-      if (cached && Array.isArray(cached.value)) {
-        return cached.value.filter((p: any) => p.status === 'active');
+      const cachedRows = await offlineCacheManager.get<any[]>('projects_cache');
+      if (cachedRows && Array.isArray(cachedRows)) {
+        return cachedRows.filter((p: any) => p.status === 'active');
       }
       return [];
     } catch (e) {
@@ -185,20 +182,19 @@ const withRetry = async <T>(
 
 export async function getActiveProjectsByOrg(orgId: string): Promise<Project[]> {
   const { getConnectionMonitor } = await import('../utils/connectionMonitor');
-  const isOffline = !getConnectionMonitor().getHealth().isOnline;
+  const monitor = getConnectionMonitor();
+  const isOnline = monitor.getHealth().isOnline;
 
   if (!orgId) {
     return [];
   }
   
   // 1. If offline, get from local Dexie cache immediately
-  if (isOffline) {
+  if (!isOnline) {
     try {
-      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
-      const db = getOfflineDB();
-      const cached = await db.metadata.get('projects_cache');
-      if (cached && Array.isArray(cached.value)) {
-        const orgProjects = cached.value.filter((p: any) => p.org_id === orgId);
+      const cachedRows = await offlineCacheManager.get<any[]>('projects_cache');
+      if (cachedRows && Array.isArray(cachedRows)) {
+        const orgProjects = cachedRows.filter((p: any) => p.org_id === orgId);
         // Always return what we have when offline, even if empty to avoid RPC
         console.log('📦 Projects loaded from offline cache:', orgProjects.length);
         return orgProjects;
@@ -213,30 +209,23 @@ export async function getActiveProjectsByOrg(orgId: string): Promise<Project[]> 
   try {
     const { data, error } = await withRetry(
       async () => await supabase.rpc('get_user_accessible_projects_v2', { p_org_id: orgId }),
-      isOffline ? 0 : 2,
+      isOnline ? 2 : 0,
       500
     );
     
     if (!error && data) {
       const projects = (data as Project[]) || [];
       
-      // 2. Update local cache (merged with existing to handle multiple orgs)
       if (projects.length > 0) {
         try {
-          const { getOfflineDB } = await import('./offline/core/OfflineSchema');
-          const db = getOfflineDB();
-          const existing = await db.metadata.get('projects_cache');
+          const existing = await offlineCacheManager.get<any[]>('projects_cache', Infinity); // Get raw even if expired
           let allProjects = projects;
-          if (existing && Array.isArray(existing.value)) {
+          if (existing && Array.isArray(existing)) {
             // Keep projects from other orgs, replace current org's projects
-            const otherOrgProjects = existing.value.filter((p: any) => p.org_id !== orgId);
+            const otherOrgProjects = existing.filter((p: any) => p.org_id !== orgId);
             allProjects = [...otherOrgProjects, ...projects];
           }
-          await db.metadata.put({
-            key: 'projects_cache',
-            value: allProjects,
-            updatedAt: new Date().toISOString()
-          });
+          await offlineCacheManager.set('projects_cache', allProjects);
         } catch (cacheUpdateErr) {
           console.warn('[getActiveProjectsByOrg] Failed to update local metadata cache:', cacheUpdateErr);
         }
@@ -247,18 +236,16 @@ export async function getActiveProjectsByOrg(orgId: string): Promise<Project[]> 
       throw error;
     }
   } catch (rpcError: any) {
-    if (!isOffline && !rpcError.message?.includes('fetch')) {
+    if (isOnline && !rpcError.message?.includes('fetch')) {
         console.error('[getActiveProjectsByOrg] RPC failed:', rpcError);
     }
   }
   
   // 3. Last resort fallback to local cache
   try {
-    const { getOfflineDB } = await import('./offline/core/OfflineSchema');
-    const db = getOfflineDB();
-    const cached = await db.metadata.get('projects_cache');
-    if (cached && Array.isArray(cached.value)) {
-      return cached.value.filter((p: any) => p.org_id === orgId);
+    const cachedRows = await offlineCacheManager.get<any[]>('projects_cache', Infinity);
+    if (cachedRows && Array.isArray(cachedRows)) {
+      return cachedRows.filter((p: any) => p.org_id === orgId);
     }
   } catch (finalFallbackErr) {
     // Ignore
@@ -341,32 +328,78 @@ export async function validateProjectAccess(
 
 // Get project by ID
 export async function getProject(id: string): Promise<Project | null> {
-  const { data, error } = await supabase
-    .from('projects')
-    .select('*')
-    .eq('id', id)
-    .single()
-
-  if (error) {
-    if (error.code === 'PGRST116') return null // Not found
-    throw error
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  const monitor = getConnectionMonitor();
+  if (!monitor.getHealth().isOnline) {
+    const cachedRows = await offlineCacheManager.get<any[]>('projects_cache');
+    if (cachedRows && Array.isArray(cachedRows)) {
+      return cachedRows.find((p: any) => p.id === id) || null;
+    }
+    return null;
   }
-  return data as Project
+
+  try {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') return null // Not found
+      throw error
+    }
+    return data as Project
+  } catch (error) {
+    // Fallback on error
+    try {
+      const cachedRows = await offlineCacheManager.get<any[]>('projects_cache', Infinity);
+      if (cachedRows && Array.isArray(cachedRows)) {
+        return cachedRows.find((p: any) => p.id === id) || null;
+      }
+    } catch {}
+    throw error;
+  }
 }
 
 // Get project by code
 export async function getProjectByCode(code: string): Promise<Project | null> {
-  const { data, error } = await supabase
-    .from('projects')
-    .select('*')
-    .eq('code', code)
-    .single()
-
-  if (error) {
-    if (error.code === 'PGRST116') return null // Not found
-    throw error
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  const monitor = getConnectionMonitor();
+  const isOnline = monitor.getHealth().isOnline;
+  
+  if (!isOnline) {
+    try {
+      const cachedRows = await offlineCacheManager.get<any[]>('projects_cache');
+      if (cachedRows && Array.isArray(cachedRows)) {
+        return cachedRows.find((p: any) => p.code === code) || null;
+      }
+    } catch {}
+    return null;
   }
-  return data as Project
+
+  try {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('code', code)
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') return null // Not found
+      throw error
+    }
+    return data as Project
+  } catch (error) {
+    // Fallback on error
+    try {
+      const cachedRows = await offlineCacheManager.get<any[]>('projects_cache', Infinity);
+      if (cachedRows && Array.isArray(cachedRows)) {
+        return cachedRows.find((p: any) => p.code === code) || null;
+      }
+    } catch {}
+    throw error;
+  }
 }
 
 // Create a new project
@@ -613,7 +646,8 @@ export interface ProjectStatistics {
 }
 
 export async function getProjectStatistics(): Promise<ProjectStatistics> {
-  if (!navigator.onLine) {
+  const monitor = getConnectionMonitor();
+  if (!monitor.getHealth().isOnline) {
     return {
       totalProjects: 0,
       activeProjects: 0,

@@ -128,6 +128,10 @@ export async function createTransactionClassification(
   orgId: string,
   input: { code: number; name: string; post_to_costs: boolean }
 ): Promise<TransactionClassification> {
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  if (!getConnectionMonitor().getHealth().isOnline) {
+    throw new Error('OFFLINE: Cannot create transaction classifications while offline.');
+  }
   const { data, error } = await supabase.rpc('transaction_classification_insert', {
     p_org_id: orgId,
     p_code: input.code,
@@ -152,6 +156,10 @@ export async function updateTransactionClassification(
   orgId: string,
   updates: { code: number; name: string; post_to_costs: boolean }
 ): Promise<TransactionClassification> {
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  if (!getConnectionMonitor().getHealth().isOnline) {
+    throw new Error('OFFLINE: Cannot update transaction classifications while offline.');
+  }
   const { data, error } = await supabase.rpc('transaction_classification_update', {
     p_org_id: orgId,
     p_id: id,

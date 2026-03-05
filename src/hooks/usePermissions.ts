@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../utils/supabase';
 import { useAuth } from './useAuth';
-import { getConnectionMonitor } from '../utils/connectionMonitor';
+import { getConnectionMonitor, useConnectionHealth } from '../utils/connectionMonitor';
 
 
 export function usePermissions() {
@@ -109,14 +109,17 @@ export function usePermissions() {
     }
   }, [user?.id]);
 
+  const { isOnline } = useConnectionHealth()
+
   useEffect(() => {
-    if (user) {
+    if (user && isOnline) {
       loadPermissions();
-    } else {
+    } else if (!user) {
       setPermissions([]);
       setLoading(false);
     }
-  }, [user, loadPermissions]);
+    // Note: if user is logged in but offline, loading will be set to false by loadPermissions' interior check
+  }, [user, loadPermissions, isOnline]);
 
   const hasPermission = (permission: string): boolean => {
     return permissions.includes('*') || permissions.includes(permission);

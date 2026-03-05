@@ -6,6 +6,8 @@
 import { supabase } from '@/utils/supabase'
 import type { FiscalYear, CreateFiscalYearInput, UpdateFiscalYearInput } from './types'
 import { fiscalLogger } from './logger'
+import { getConnectionMonitor } from '@/utils/connectionMonitor'
+import { offlineCacheManager } from '@/services/offline/core/OfflineCacheManager'
 
 export class FiscalYearService {
   // ============================================
@@ -17,6 +19,12 @@ export class FiscalYearService {
    * Uses fn_can_manage_fiscal_v2 (NOT v1!)
    */
   static async canManage(orgId: string): Promise<boolean> {
+    const isOffline = !getConnectionMonitor().getHealth().isOnline;
+    if (isOffline) {
+      fiscalLogger.debug('canManage [Offline] - Defaulting to false');
+      return false;
+    }
+
     try {
       const { data: userData } = await supabase.auth.getUser()
       if (!userData?.user?.id) {
@@ -56,6 +64,17 @@ export class FiscalYearService {
     if (!orgId || typeof orgId !== 'string') {
       throw new Error('Invalid organization ID provided')
     }
+    
+    const isOffline = !getConnectionMonitor().getHealth().isOnline;
+    if (isOffline) {
+      fiscalLogger.debug('getAll [Offline] - Yielding cache', { orgId });
+      try {
+        const cached = await offlineCacheManager.get<any[]>('fiscal_years_cache_' + orgId, Infinity);
+        return cached && Array.isArray(cached) ? cached : [];
+      } catch {
+        return [];
+      }
+    }
 
     try {
       // Use optimized query with specific column selection to avoid RLS complexity
@@ -90,9 +109,26 @@ export class FiscalYearService {
       }
 
       fiscalLogger.debug('getAll success', { count: data?.length })
-      return (data || []).map(this.mapFromDb)
+      const results = (data || []).map((row: any) => this.mapFromDb(row));
+      
+      if (results.length > 0) {
+        try {
+          await offlineCacheManager.set('fiscal_years_cache_' + orgId, results);
+        } catch (e) {
+          fiscalLogger.warn('Cache update failed', e);
+        }
+      }
+      return results;
     } catch (error: any) {
       fiscalLogger.error('getAll exception', error)
+      
+      // Fallback on network error
+      try {
+        const cached = await offlineCacheManager.get<any[]>('fiscal_years_cache_' + orgId, Infinity);
+        if (cached && Array.isArray(cached)) {
+          return cached;
+        }
+      } catch {}
       
       // Re-throw with context for proper error handling upstream
       if (error.message?.includes('Database error:')) {
@@ -109,20 +145,27 @@ export class FiscalYearService {
   static async getById(id: string): Promise<FiscalYear | null> {
     fiscalLogger.debug('getById', { id })
 
-    // Use maybeSingle() to avoid 406 errors when no rows found
-    const { data, error } = await supabase
-      .from('fiscal_years')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle()
+    const isOffline = !getConnectionMonitor().getHealth().isOnline;
+    if (isOffline) return null; // Cannot look up by ID efficiently offline without exposing org_id in cache keys
 
-    if (error?.code === 'PGRST116') return null // Not found
-    if (error) {
-      fiscalLogger.error('getById failed', error)
-      throw new Error(`Failed to fetch fiscal year: ${error.message}`)
+    try {
+      // Use maybeSingle() to avoid 406 errors when no rows found
+      const { data, error } = await supabase
+        .from('fiscal_years')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle()
+
+      if (error?.code === 'PGRST116') return null // Not found
+      if (error) {
+        fiscalLogger.error('getById failed', error)
+        throw new Error(`Failed to fetch fiscal year: ${error.message}`)
+      }
+
+      return data ? this.mapFromDb(data) : null
+    } catch (e) {
+      return null; // Gracefully degrade when offline/failing
     }
-
-    return data ? this.mapFromDb(data) : null
   }
 
   /**
@@ -131,22 +174,61 @@ export class FiscalYearService {
   static async getCurrent(orgId: string): Promise<FiscalYear | null> {
     fiscalLogger.debug('getCurrent', { orgId })
 
-    // Use maybeSingle() instead of single() to avoid 406 errors when no rows found
-    const { data, error } = await supabase
-      .from('fiscal_years')
-      .select('*')
-      .eq('org_id', orgId)
-      .eq('is_current', true)
-      .maybeSingle()
-
-    // PGRST116 = no rows found (shouldn't happen with maybeSingle but handle anyway)
-    if (error?.code === 'PGRST116') return null
-    if (error) {
-      fiscalLogger.error('getCurrent failed', error)
-      throw new Error(`Failed to fetch current fiscal year: ${error.message}`)
+    const isOffline = !getConnectionMonitor().getHealth().isOnline;
+    if (isOffline) {
+        fiscalLogger.debug('getCurrent [Offline] - Yielding cache', { orgId });
+        try {
+            const cached = await offlineCacheManager.get<any[]>('fiscal_years_cache_' + orgId, Infinity);
+            if (cached && Array.isArray(cached)) {
+                return cached.find((fy: any) => fy.isCurrent === true) || null;
+            }
+        } catch (e) {}
+        return null; // Gracefully return null offline
     }
 
-    return data ? this.mapFromDb(data) : null
+    try {
+      // Use maybeSingle() instead of single() to avoid 406 errors when no rows found
+      const { data, error } = await supabase
+        .from('fiscal_years')
+        .select('*')
+        .eq('org_id', orgId)
+        .eq('is_current', true)
+        .maybeSingle()
+
+      // PGRST116 = no rows found (shouldn't happen with maybeSingle but handle anyway)
+      if (error?.code === 'PGRST116') return null
+      if (error) {
+        fiscalLogger.error('getCurrent failed', error)
+        throw new Error(`Failed to fetch current fiscal year: ${error.message}`)
+      }
+
+      const result = data ? this.mapFromDb(data) : null;
+      
+      // Update the cache for offline fallback
+      if (result) {
+         try {
+             const cached = await offlineCacheManager.get<any[]>('fiscal_years_cache_' + orgId, Infinity) || [];
+             let updated = Array.isArray(cached) ? cached : [];
+             updated = updated.filter((fy: any) => fy.id !== result.id);
+             // Ensure only this one is marked current in cache
+             updated.forEach((fy: any) => fy.isCurrent = false);
+             updated.push(result);
+             await offlineCacheManager.set('fiscal_years_cache_' + orgId, updated);
+         } catch (e) {}
+      }
+      
+      return result;
+    } catch (error: any) {
+        // Fallback on network error
+        try {
+            const cached = await offlineCacheManager.get<any[]>('fiscal_years_cache_' + orgId, Infinity);
+            if (cached && Array.isArray(cached)) {
+                return cached.find((fy: any) => fy.isCurrent === true) || null;
+            }
+        } catch (e) {}
+        fiscalLogger.error('getCurrent exception', error);
+        throw error;
+    }
   }
 
   // ============================================
@@ -165,6 +247,11 @@ export class FiscalYearService {
     const endDate = new Date(input.endDate)
     if (startDate >= endDate) {
       throw new Error('Start date must be before end date')
+    }
+
+    const isOffline = !getConnectionMonitor().getHealth().isOnline;
+    if (isOffline) {
+      throw new Error('Cannot create fiscal year while offline. Connectivity required for RPC validation.');
     }
 
     const { data: userData } = await supabase.auth.getUser()
@@ -198,6 +285,11 @@ export class FiscalYearService {
   static async update(id: string, input: UpdateFiscalYearInput): Promise<FiscalYear> {
     fiscalLogger.debug('update', { id, input })
 
+    const isOffline = !getConnectionMonitor().getHealth().isOnline;
+    if (isOffline) {
+      throw new Error('Cannot update fiscal year while offline. Connectivity required.');
+    }
+
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
 
     if (input.nameEn !== undefined) updateData.name_en = input.nameEn
@@ -229,6 +321,11 @@ export class FiscalYearService {
   static async delete(id: string): Promise<void> {
     fiscalLogger.debug('delete', { id })
 
+    const isOffline = !getConnectionMonitor().getHealth().isOnline;
+    if (isOffline) {
+      throw new Error('Cannot delete fiscal year while offline. Connectivity required.');
+    }
+
     const { error } = await supabase
       .from('fiscal_years')
       .delete()
@@ -252,6 +349,11 @@ export class FiscalYearService {
    */
   static async setCurrent(orgId: string, fiscalYearId: string): Promise<void> {
     fiscalLogger.debug('setCurrent', { orgId, fiscalYearId })
+
+    const isOffline = !getConnectionMonitor().getHealth().isOnline;
+    if (isOffline) {
+      throw new Error('Cannot change current fiscal year while offline. Connectivity required.');
+    }
 
     // First, unset all current flags
     await supabase
@@ -286,6 +388,11 @@ export class FiscalYearService {
    */
   static async close(id: string): Promise<FiscalYear> {
     fiscalLogger.debug('close', { id })
+
+    const isOffline = !getConnectionMonitor().getHealth().isOnline;
+    if (isOffline) {
+      throw new Error('Cannot close fiscal year while offline. Connectivity required.');
+    }
 
     const { data: userData } = await supabase.auth.getUser()
 

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { TransactionLineItemsSection } from '../../components/line-items/TransactionLineItemsSection'
 import { useScopeOptional } from '../../contexts/ScopeContext'
 import ScopeChips from '../../components/Scope/ScopeChips'
+import { getItemCatalog } from '../../services/item-catalog'
 
 // Utility: read query param from window.location
 function useQueryParam(name: string): string | null {
@@ -29,6 +30,12 @@ export const TransactionLineItemsPage: React.FC = () => {
   const [header, setHeader] = useState<null | { entry_number: string; description: string }>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // Cost analysis data
+  const [workItems, setWorkItems] = useState<Array<{ id: string; code: string; name: string }>>([])
+  const [analysisItems, setAnalysisItems] = useState<Record<string, { code: string; name: string }>>({})
+  const [costCenters, setCostCenters] = useState<Array<{ id: string; code: string; name: string }>>([])
+  const [itemCatalog, setItemCatalog] = useState<Record<string, { code: string; name: string; description?: string }>>({})
 
   const scope = useScopeOptional()
   const orgId = scope?.currentOrg?.id || ''
@@ -57,6 +64,52 @@ export const TransactionLineItemsPage: React.FC = () => {
     loadHeader()
     return () => { mounted = false }
   }, [transactionId, orgId])
+
+  // Load cost analysis data
+  useEffect(() => {
+    let mounted = true
+    const loadCostData = async () => {
+      if (!orgId) return
+      try {
+        const { supabase } = await import('../../utils/supabase')
+        
+        // Load work items
+        const { data: wiData } = await supabase
+          .from('work_items')
+          .select('id, code, name')
+          .eq('org_id', orgId)
+        if (mounted && wiData) setWorkItems(wiData)
+        
+        // Load analysis items
+        const { data: aiData } = await supabase
+          .from('analysis_items')
+          .select('id, code, name')
+          .eq('org_id', orgId)
+        if (mounted && aiData) {
+          const aiMap = aiData.reduce((acc, item) => {
+            acc[item.id] = { code: item.code, name: item.name }
+            return acc
+          }, {} as Record<string, { code: string; name: string }>)
+          setAnalysisItems(aiMap)
+        }
+        
+        // Load cost centers (sub_tree)
+        const { data: ccData } = await supabase
+          .from('sub_tree')
+          .select('id, code, name')
+          .eq('org_id', orgId)
+        if (mounted && ccData) setCostCenters(ccData)
+        
+        // Load item catalog
+        const catalog = await getItemCatalog(orgId)
+        if (mounted) setItemCatalog(catalog)
+      } catch (e: any) {
+        console.error('Failed to load cost analysis data:', e)
+      }
+    }
+    loadCostData()
+    return () => { mounted = false }
+  }, [orgId])
 
   if (!orgId) {
     return (
@@ -129,6 +182,10 @@ export const TransactionLineItemsPage: React.FC = () => {
       <TransactionLineItemsSection
         transactionId={transactionId}
         orgId={orgId}
+        workItems={workItems}
+        analysisItems={analysisItems}
+        costCenters={costCenters}
+        itemCatalog={itemCatalog}
       />
     </div>
   )

@@ -8,6 +8,8 @@ import {
   postTransaction,
   submitTransaction,
   getUserDisplayMap,
+  createTransactionWithLines,
+  updateTransactionWithLines,
   type TransactionRecord,
   type TransactionAudit,
 } from '../../services/transactions'
@@ -22,12 +24,12 @@ import PermissionBadge from '../../components/Common/PermissionBadge'
 import { WithPermission } from '../../components/Common/withPermission'
 import { logClientError } from '../../services/telemetry'
 import ColumnConfiguration from '../../components/Common/ColumnConfiguration'
+import DraggablePanelContainer from '../../components/Common/DraggablePanelContainer'
 import type { ColumnConfig } from '../../components/Common/ColumnConfiguration'
 import useColumnPreferences from '../../hooks/useColumnPreferences'
 import { supabase } from '../../utils/supabase'
 import { transactionValidationAPI } from '../../services/transaction-validation-api'
 import { getCompanyConfig } from '../../services/company-config'
-import TransactionAnalysisModal from '../../components/Transactions/TransactionAnalysisModal'
 import TransactionWizard from '../../components/Transactions/TransactionWizard'
 const TransactionsHeaderTable = React.lazy(() => import('./TransactionsHeaderTable'))
 const TransactionLinesTable = React.lazy(() => import('./TransactionLinesTable'))
@@ -106,12 +108,6 @@ const TransactionsPage: React.FC = () => {
   // Keep create-mode title even after header insert until user saves draft/post
   const [_keepCreateTitle, _setKeepCreateTitle] = useState<boolean>(false)
 
-  // Cost Analysis Modal state
-  const [analysisModalOpen, setAnalysisModalOpen] = useState(false)
-  const [analysisTransactionId, setAnalysisTransactionId] = useState<string | null>(null)
-  const [analysisTransactionLineId, setAnalysisTransactionLineId] = useState<string | null>(null)
-  const [analysisTransaction, setAnalysisTransaction] = useState<TransactionRecord | null>(null)
-
   // Documents panel state
   const [documentsOpen, setDocumentsOpen] = useState(false)
   const [documentsFor, setDocumentsFor] = useState<TransactionRecord | null>(null)
@@ -143,21 +139,6 @@ const TransactionsPage: React.FC = () => {
 
   const formRef = React.useRef<UnifiedCRUDFormHandle>(null)
 
-  // Cost analysis functions
-  const openCostAnalysisModal = (transaction: TransactionRecord, lineId?: string) => {
-    setAnalysisTransaction(transaction)
-    setAnalysisTransactionId(transaction.id)
-    setAnalysisTransactionLineId(lineId || null)
-    setAnalysisModalOpen(true)
-  }
-
-  const closeCostAnalysisModal = () => {
-    setAnalysisModalOpen(false)
-    setAnalysisTransactionId(null)
-    setAnalysisTransactionLineId(null)
-    setAnalysisTransaction(null)
-  }
-
   const {
     headerFilters,
     headerAppliedFilters,
@@ -167,7 +148,7 @@ const TransactionsPage: React.FC = () => {
     resetHeaderFilters,
     lineFilters,
     updateLineFilter,
-    // _resetLineFilters, // Available for future filter reset functionality
+    resetLineFilters,
   } = useTransactionsFilters()
 
   const recordPerformanceEvent = useCallback((name: string, duration: number) => {
@@ -648,9 +629,9 @@ const TransactionsPage: React.FC = () => {
       ...line,
       line_id: line.id || line.line_id, // ensure we have both
       org_name: line.org_name || (line.org_id ? organizations.find(o => o.id === line.org_id)?.name : undefined),
-      org_name_ar: line.org_name_ar || (line.org_id ? organizations.find(o => o.id === line.org_id)?.name_ar : undefined),
+      org_name_ar: line.org_name_ar || (line.org_id ? (organizations.find(o => o.id === line.org_id) as any)?.name_ar : undefined),
       project_name: line.project_name || (line.project_id ? projects.find(p => p.id === line.project_id)?.name : undefined),
-      project_name_ar: line.project_name_ar || (line.project_id ? projects.find(p => p.id === line.project_id)?.name_ar : undefined),
+      project_name_ar: line.project_name_ar || (line.project_id ? (projects.find(p => p.id === line.project_id) as any)?.name_ar : undefined),
     }
     setSelectedLineForReview(enrichedLine)
     setLineReviewOpen(true)
@@ -896,19 +877,19 @@ const TransactionsPage: React.FC = () => {
     }
     if (filters.classificationId) {
       const classification = classifications.find(c => c.id === filters.classificationId)
-      if (classification) labels.push(`تصنيف: ${classification.name_ar || classification.name}`)
+      if (classification) labels.push(`تصنيف: ${(classification as any).name_ar || (classification as any).name}`)
     }
     if (filters.expensesCategoryId) {
       const category = categories.find(c => c.id === filters.expensesCategoryId)
-      if (category) labels.push(`فئة مصروفات: ${category.name_ar || category.name}`)
+      if (category) labels.push(`فئة مصروفات: ${(category as any).name_ar || (category as any).name}`)
     }
     if (filters.workItemId) {
       const workItem = workItems.find(w => w.id === filters.workItemId)
-      if (workItem) labels.push(`عنصر عمل: ${workItem.name_ar || workItem.name}`)
+      if (workItem) labels.push(`عنصر عمل: ${(workItem as any).name_ar || (workItem as any).name}`)
     }
     if (filters.costCenterId) {
       const costCenter = costCenters.find(c => c.id === filters.costCenterId)
-      if (costCenter) labels.push(`مركز تكلفة: ${costCenter.name_ar || costCenter.name}`)
+      if (costCenter) labels.push(`مركز تكلفة: ${(costCenter as any).name_ar || (costCenter as any).name}`)
     }
     if (filters.approvalStatus) {
       const statusLabels: Record<string, string> = {
@@ -1750,6 +1731,7 @@ const TransactionsPage: React.FC = () => {
             filteredLines={filteredTransactionLines.length}
             filters={lineFilters}
             onFilterChange={updateLineFilter}
+            onResetFilters={resetLineFilters}
           />
         )}
 
@@ -1857,12 +1839,6 @@ const TransactionsPage: React.FC = () => {
                   setDocumentsForLine(line)
                   setDocumentsOpen(true)
                 }}
-                onOpenCostAnalysis={(line) => {
-                  const transaction = transactions.find(t => t.id === selectedTransactionId) || detailsFor;
-                  if (transaction) {
-                    openCostAnalysisModal(transaction, line.id);
-                  }
-                }}
                 onOpenLineReview={handleOpenLineReview}
                 onClose={() => _setDetailsOpen(false)}
                 onUpdate={async (updatedTransaction) => {
@@ -1892,10 +1868,10 @@ const TransactionsPage: React.FC = () => {
                     throw new Error(e?.message || 'فشل في تحديث المعاملة')
                   }
                 }}
-                onDelete={async (transactionId) => {
+                onDelete={async (transactionId: string) => {
                   await handleDelete(transactionId)
                 }}
-                onPost={async (transactionId) => {
+                onPost={async (transactionId: string) => {
                   await measurePerformance('transactions.post.inline', async () => {
                     await withRetry(() => postTransaction(transactionId))
                     showToast('تم ترحيل المعاملة', { severity: 'success' })
@@ -1905,7 +1881,7 @@ const TransactionsPage: React.FC = () => {
                 columns={lineColumns}
                 wrapMode={lineWrapMode}
                 loading={loading}
-                selectedLineId={_selectedLineId}
+                selectedLineId={_selectedLineId || undefined}
                 onColumnResize={handleLineColumnResize}
               />
             </OptimizedSuspense>
@@ -2159,30 +2135,17 @@ const TransactionsPage: React.FC = () => {
           </div>
         )}
 
-
-        {/* Transaction Analysis Modal */}
-        <TransactionAnalysisModal
-          open={analysisModalOpen}
-          transactionId={analysisTransactionId}
-          transactionLineId={analysisTransactionLineId}
-          onClose={closeCostAnalysisModal}
-          entryNumber={analysisTransaction?.entry_number}
-          description={analysisTransaction?.description}
-          effectiveTolerance={1.0}
-          transactionAmount={analysisTransaction?.amount ?? undefined}
-          orgId={analysisTransaction?.org_id || ''}
-          workItems={workItems}
-        />
-
         {/* Column Configuration Modal - Headers Table */}
-        <ColumnConfiguration
-          columns={columns}
-          onConfigChange={handleColumnConfigChange}
-          isOpen={headersColumnConfigOpen}
-          onClose={() => setHeadersColumnConfigOpen(false)}
-          onReset={resetToDefaults}
-          sampleData={tableData as any}
-        />
+        <DraggablePanelContainer>
+          <ColumnConfiguration
+            columns={columns}
+            onConfigChange={handleColumnConfigChange}
+            isOpen={headersColumnConfigOpen}
+            onClose={() => setHeadersColumnConfigOpen(false)}
+            onReset={resetToDefaults}
+            sampleData={tableData as any}
+          />
+        </DraggablePanelContainer>
 
         {/* Column Configuration Modal - Lines Table */}
         <ColumnConfiguration
@@ -2215,16 +2178,11 @@ const TransactionsPage: React.FC = () => {
           }}
           onSubmit={async (data) => {
             try {
-              console.log('Saving transaction:', data)
+              let transaction: any
 
-              // Get current user ID
-              const authService = await import('../../services/authService')
-              const userId = await authService.AuthService.getCurrentUserId()
-
-              // Save transaction header to Supabase
-              const { data: transaction, error: txError } = await supabase
-                .from('transactions')
-                .insert({
+              if (editingTx) {
+                console.log('📦 Updating transaction via hardened service:', data)
+                transaction = await updateTransactionWithLines(editingTx.id, {
                   entry_date: data.entry_date,
                   description: data.description,
                   description_ar: data.description_ar,
@@ -2233,127 +2191,98 @@ const TransactionsPage: React.FC = () => {
                   reference_number: data.reference_number,
                   notes: data.notes,
                   notes_ar: data.notes_ar,
-                  created_by: userId
+                  classification_id: data.classification_id,
+                  lines: data.lines,
+                  version: data.version
                 })
-                .select()
-                .single()
-
-              if (txError) {
-                console.error('Error saving transaction:', txError)
-                throw new Error(txError.message || 'فشل حفظ المعاملة')
+              } else {
+                console.log('📦 Creating transaction via hardened service:', data)
+                // Use the hardened service which handles offline enqueuing automatically
+                transaction = await createTransactionWithLines({
+                  entry_date: data.entry_date,
+                  description: data.description,
+                  description_ar: data.description_ar,
+                  org_id: data.org_id,
+                  project_id: data.project_id,
+                  reference_number: data.reference_number,
+                  notes: data.notes,
+                  notes_ar: data.notes_ar,
+                  classification_id: data.classification_id,
+                  lines: data.lines
+                })
+                setCreatedTxId(transaction.id)
               }
 
-              console.log('Transaction saved:', transaction)
+              console.log('✅ Transaction processed:', transaction.id)
 
-              // Save transaction lines
-              if (data.lines && data.lines.length > 0) {
-                const linesData = data.lines.map((line: any) => ({
-                  transaction_id: transaction.id,
-                  line_no: line.line_no,
-                  account_id: line.account_id,
-                  debit_amount: line.debit_amount || 0,
-                  credit_amount: line.credit_amount || 0,
-                  description: line.description,
-                  org_id: line.org_id || data.org_id,
-                  project_id: line.project_id || data.project_id,
-                  cost_center_id: line.cost_center_id,
-                  work_item_id: line.work_item_id,
-                  analysis_work_item_id: line.analysis_work_item_id,
-                  classification_id: line.classification_id,
-                  sub_tree_id: line.sub_tree_id
-                }))
+              // Upload and link staged documents (Background task, does not block UI success)
+              if (data.attachments) {
+                const { uploadDocument } = await import('../../services/documents')
 
-                const { data: savedLines, error: linesError } = await supabase
-                  .from('transaction_lines')
-                  .insert(linesData)
-                  .select()
-
-                if (linesError) {
-                  console.error('Error saving transaction lines:', linesError)
-                  throw new Error(linesError.message || 'فشل حفظ بنود المعاملة')
-                }
-
-                console.log('Transaction lines saved successfully')
-
-                // Upload and link staged documents
-                if (data.attachments) {
-                  const { uploadDocument, linkDocumentToTransactionLine } = await import('../../services/documents')
-
-                  // Upload and link line-level documents
-                  if (data.attachments.lines && Object.keys(data.attachments.lines).length > 0) {
-                    for (const [lineIdx, files] of Object.entries(data.attachments.lines)) {
-                      const lineIndex = Number(lineIdx)
-                      const savedLine = savedLines?.[lineIndex]
-
-                      if (savedLine && Array.isArray(files) && files.length > 0) {
-                        for (const file of files) {
-                          try {
-                            // Upload document
-                            const uploadResult = await uploadDocument({
-                              orgId: data.org_id,
-                              title: file.name,
-                              file: file,
-                              projectId: data.project_id || undefined
-                            })
-
-                            // Link to transaction line
-                            await linkDocumentToTransactionLine(uploadResult.document.id, savedLine.id)
-                            console.log(`Document ${file.name} uploaded and linked to line ${savedLine.line_no}`)
-                          } catch (docError) {
-                            console.error(`Failed to upload/link document ${file.name}:`, docError)
-                            // Continue with other documents even if one fails
-                          }
-                        }
-                      }
-                    }
-                  }
-
-                  // Upload and link transaction-level documents
-                  if (data.attachments.transaction && Array.isArray(data.attachments.transaction) && data.attachments.transaction.length > 0) {
-                    const { linkDocument } = await import('../../services/documents')
-                    for (const file of data.attachments.transaction) {
-                      try {
-                        // Upload document
-                        const uploadResult = await uploadDocument({
-                          orgId: data.org_id,
-                          title: file.name,
-                          file: file,
-                          projectId: data.project_id || undefined
-                        })
-
-                        // Link to transaction
-                        await linkDocument(uploadResult.document.id, 'transactions', transaction.id)
-                        console.log(`Document ${file.name} uploaded and linked to transaction`)
-                      } catch (docError) {
-                        console.error(`Failed to upload/link document ${file.name}:`, docError)
-                        // Continue with other documents even if one fails
+                // Process line attachments
+                if (data.attachments.lines) {
+                  for (const [_lineIdx, files] of Object.entries(data.attachments.lines)) {
+                    if (Array.isArray(files) && files.length > 0) {
+                      for (const file of files) {
+                        try {
+                          await uploadDocument({
+                            orgId: data.org_id,
+                            title: (file as File).name,
+                            file: file as File,
+                            projectId: data.project_id || undefined
+                          })
+                        } catch (e) { console.warn('Document upload skipped or failed:', e) }
                       }
                     }
                   }
                 }
+
+                // Process transaction attachments
+                if (data.attachments.transaction && data.attachments.transaction.length > 0) {
+                  for (const file of data.attachments.transaction) {
+                    try {
+                      await uploadDocument({
+                        orgId: data.org_id,
+                        title: (file as File).name,
+                        file: file as File,
+                        projectId: data.project_id || undefined
+                      })
+                    } catch (e) { console.warn('Transaction document upload failed:', e) }
+                  }
+                }
               }
 
-              // Reload transactions
-              await reload()
-
-              // Handle approval submission if needed
+              // Handle approval submission if requested
               if (data.submitForApproval) {
                 try {
                   await submitTransaction(transaction.id)
-                  console.log('Transaction submitted for approval successfully!')
+                  showToast('تم حفظ المعاملة وإرسالها للاعتماد', { severity: 'success' })
                 } catch (submitError: any) {
-                  console.error('Failed to submit transaction for approval:', submitError)
-                  throw new Error(submitError?.message || 'فشل إرسال المعاملة للاعتماد')
+                  console.warn('Submission for approval failed (might be offline):', submitError)
+                  showToast('تم حفظ المعاملة محلياً (سيتم إرسالها للاعتماد عند الاتصال)', { severity: 'info' })
                 }
               } else {
-                console.log('Transaction saved as draft successfully!')
+                showToast('تم حفظ المعاملة بنجاح', { severity: 'success' })
               }
 
-              // Success - wizard will show success message
-              console.log('Transaction processed successfully!')
+              // Reload transactions list
+              await reload()
+
             } catch (error: any) {
-              console.error('Transaction creation failed:', error)
-              throw error // Re-throw to let the wizard handle the error
+              if (error.message === 'VERSION_MISMATCH') {
+                showToast('حدث تعارض: قام مستخدم آخر بتعديل هذه المعاملة. يرجى مراجعة التغييرات.', { severity: 'warning' })
+                // Trigger conflict resolution flow
+                window.dispatchEvent(new CustomEvent('offline-sync-conflict', {
+                  detail: {
+                    entityType: 'transaction',
+                    message: 'تم تعديل المعاملة من قبل مستخدم آخر (تعديل مباشر)'
+                  }
+                }))
+                return
+              }
+              console.error('❌ Transaction operation failed:', error)
+              showToast('فشل حفظ المعاملة: ' + (error.message || 'خطأ غير معروف'), { severity: 'error' })
+              throw error
             }
           }}
           // All data from TransactionsDataContext - single source of truth
@@ -2371,6 +2300,7 @@ const TransactionsPage: React.FC = () => {
           transactionId={editingTx?.id}
           initialData={editingTx ? {
             header: {
+              ...editingTx, // Include version and all fields
               entry_date: editingTx.entry_date,
               description: editingTx.description,
               description_ar: (editingTx as any).description_ar || '',

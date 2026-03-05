@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../utils/supabase'
 import { useAuth } from './useAuth'
-import { getConnectionMonitor } from '../utils/connectionMonitor'
+import { getConnectionMonitor, useConnectionHealth } from '../utils/connectionMonitor'
 
 // Aggregates permissions from direct user grants and via roles
 // Tables assumed:
@@ -75,14 +75,16 @@ export function useHasPermission() {
     }
   }, [])
 
+  const { isOnline } = useConnectionHealth()
+
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && isOnline) {
       load(user.id)
-    } else {
+    } else if (!user?.id) {
       setPerms(new Set())
       setIsSuperAdmin(false)
     }
-  }, [user?.id, load])
+  }, [user?.id, load, isOnline])
 
   const hasPermission = useCallback((name?: string): boolean => {
     if (isSuperAdmin) return true

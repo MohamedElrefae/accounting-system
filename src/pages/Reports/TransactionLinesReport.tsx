@@ -22,6 +22,7 @@ import ReportControls from '../../components/Reports/GroupingPanel'
 import { useReportGrouping } from '../../hooks/useReportGrouping'
 import SummaryBar from '../../components/Reports/SummaryBar'
 import { getConnectionMonitor } from '../../utils/connectionMonitor'
+import StalenessIndicator from '../../components/Common/StalenessIndicator'
 
 const TransactionLinesReportPage = () => {
     const lang = useAppStore((s: { language: string }) => s.language)
@@ -108,134 +109,26 @@ const TransactionLinesReportPage = () => {
         setPage(1)
     }, [handleResetFilters])
 
+    const { isOnline } = getConnectionMonitor().getHealth();
 
     // Fetch ALL lines with transaction header data (no user filter)
     const fetchAllLines = useCallback(async () => {
-        if (!navigator.onLine) return { rows: [], total: 0 };
-        // Build query for ALL transaction lines
-        let query = supabase
-            .from('transaction_lines')
-            .select(`
-        id,
-        transaction_id,
-        line_no,
-        account_id,
-        debit_amount,
-        credit_amount,
-        description,
-        project_id,
-        cost_center_id,
-        work_item_id,
-        analysis_work_item_id,
-        classification_id,
-        sub_tree_id,
-        created_at,
-        transactions!inner (
-          id,
-          entry_number,
-          entry_date,
-          description,
-          org_id,
-          project_id,
-          approval_status,
-          is_posted,
-          created_by
-        )
-      `, { count: 'exact' })
-
-        // Apply filters using the joined transactions table
-        if (appliedFilters.search) {
-            query = query.or(`description.ilike.%${appliedFilters.search}%,transactions.description.ilike.%${appliedFilters.search}%,transactions.entry_number.ilike.%${appliedFilters.search}%`)
-        }
-        if (appliedFilters.dateFrom) {
-            query = query.gte('transactions.entry_date', appliedFilters.dateFrom)
-        }
-        if (appliedFilters.dateTo) {
-            query = query.lte('transactions.entry_date', appliedFilters.dateTo)
-        }
-        if (appliedFilters.orgId) {
-            query = query.eq('transactions.org_id', appliedFilters.orgId)
-        }
-        if (appliedFilters.projectId) {
-            query = query.eq('project_id', appliedFilters.projectId)
-        }
-        if (appliedFilters.debitAccountId) {
-            query = query.eq('account_id', appliedFilters.debitAccountId).gt('debit_amount', 0)
-        }
-        if (appliedFilters.creditAccountId) {
-            query = query.eq('account_id', appliedFilters.creditAccountId).gt('credit_amount', 0)
-        }
-        if (appliedFilters.approvalStatus) {
-            query = query.eq('transactions.approval_status', appliedFilters.approvalStatus)
-        }
-        if (appliedFilters.classificationId) {
-            query = query.eq('classification_id', appliedFilters.classificationId)
-        }
-        if (appliedFilters.costCenterId) {
-            query = query.eq('cost_center_id', appliedFilters.costCenterId)
-        }
-        if (appliedFilters.workItemId) {
-            query = query.eq('work_item_id', appliedFilters.workItemId)
-        }
-        if (appliedFilters.analysisItemId) {
-            query = query.eq('analysis_work_item_id', appliedFilters.analysisItemId)
-        }
-        if (appliedFilters.expensesCategoryId) {
-            query = query.eq('sub_tree_id', appliedFilters.expensesCategoryId)
-        }
-
-        const [realSortField, referencedTable] = sortField.includes(':')
-            ? sortField.split(':')
-            : [sortField, undefined]
-
-        const from = (page - 1) * pageSize
-        const to = from + pageSize - 1
-        query = query.range(from, to).order(realSortField, {
-            ascending: sortOrder === 'asc',
-            referencedTable
-        })
-
-        const { data, error, count } = await query
-
-        if (error) {
-            console.error('Error fetching all lines:', error)
-            throw error
-        }
-
-        // Flatten the joined data
-        const rows = (data || []).map((row: any) => {
-            const tx = row.transactions || {}
+        if (!getConnectionMonitor().getHealth().isOnline) {
+            const offlineResult = await fetchAllLinesOffline();
+            const from = (page - 1) * pageSize;
             return {
-                ...row,
-                entry_number: tx.entry_number,
-                entry_date: tx.entry_date,
-                header_description: tx.description,
-                header_org_id: tx.org_id,
-                header_project_id: tx.project_id,
-                approval_status: tx.approval_status,
-                is_posted: tx.is_posted,
-                created_by: tx.created_by,
-                org_id: tx.org_id,
-                project_id: row.project_id || tx.project_id,
-            }
-        })
+                rows: offlineResult.rows.slice(from, from + pageSize),
+                total: offlineResult.total
+            };
+        }
 
-        return { rows, total: count || 0 }
-    }, [appliedFilters, page, pageSize])
-
-    // Fetch ALL lines for grouping (when not using pagination in grouped mode)
-    // Actually, the spec says "Support ~200 transactions/month (no performance optimization needed)", 
-    // so we can fetch all filtered lines if grouping is active to calculate correct subtotals.
-    const fetchAllFilteredLines = useCallback(async () => {
-        const monitor = getConnectionMonitor();
-        if (!monitor.getHealth().isOnline) return [];
         let query = supabase
             .from('transaction_lines')
             .select(`
-        id, transaction_id, line_no, account_id, debit_amount, credit_amount, description,
-        project_id, cost_center_id, work_item_id, analysis_work_item_id, classification_id, sub_tree_id, created_at,
-        transactions!inner (id, entry_number, entry_date, description, org_id, project_id, approval_status, is_posted, created_by)
-      `)
+                id, transaction_id, line_no, account_id, debit_amount, credit_amount, description,
+                project_id, cost_center_id, work_item_id, analysis_work_item_id, classification_id, sub_tree_id, created_at,
+                transactions!inner (id, entry_number, entry_date, description, org_id, project_id, approval_status, is_posted, created_by)
+            `, { count: 'exact' })
 
         if (appliedFilters.search) {
             query = query.or(`description.ilike.%${appliedFilters.search}%,transactions.description.ilike.%${appliedFilters.search}%,transactions.entry_number.ilike.%${appliedFilters.search}%`)
@@ -246,10 +139,6 @@ const TransactionLinesReportPage = () => {
         if (appliedFilters.projectId) query = query.eq('project_id', appliedFilters.projectId)
         if (appliedFilters.debitAccountId) query = query.eq('account_id', appliedFilters.debitAccountId).gt('debit_amount', 0)
         if (appliedFilters.creditAccountId) query = query.eq('account_id', appliedFilters.creditAccountId).gt('credit_amount', 0)
-        const [realSortField, referencedTable] = sortField.includes(':')
-            ? sortField.split(':')
-            : [sortField, undefined]
-
         if (appliedFilters.approvalStatus) query = query.eq('transactions.approval_status', appliedFilters.approvalStatus)
         if (appliedFilters.classificationId) query = query.eq('classification_id', appliedFilters.classificationId)
         if (appliedFilters.costCenterId) query = query.eq('cost_center_id', appliedFilters.costCenterId)
@@ -257,10 +146,117 @@ const TransactionLinesReportPage = () => {
         if (appliedFilters.analysisItemId) query = query.eq('analysis_work_item_id', appliedFilters.analysisItemId)
         if (appliedFilters.expensesCategoryId) query = query.eq('sub_tree_id', appliedFilters.expensesCategoryId)
 
-        const { data, error } = await query.order(realSortField, {
-            ascending: sortOrder === 'asc',
-            referencedTable
-        })
+        const [realSortField, referencedTable] = sortField.includes(':') ? sortField.split(':') : [sortField, undefined]
+        const from = (page - 1) * pageSize
+        const to = from + pageSize - 1
+
+        const { data, error, count } = await query
+            .range(from, to)
+            .order(realSortField, { ascending: sortOrder === 'asc', referencedTable })
+
+        if (error) throw error
+
+        const rows = (data || []).map((row: any) => ({
+            ...row,
+            entry_number: row.transactions?.entry_number,
+            entry_date: row.transactions?.entry_date,
+            header_description: row.transactions?.description,
+            header_org_id: row.transactions?.org_id,
+            header_project_id: row.transactions?.project_id,
+            approval_status: row.transactions?.approval_status,
+            is_posted: row.transactions?.is_posted,
+            created_by: row.transactions?.created_by,
+            org_id: row.transactions?.org_id,
+            project_id: row.project_id || row.transactions?.project_id,
+        }))
+
+        return { rows, total: count || 0 }
+    }, [appliedFilters, page, pageSize, sortField, sortOrder])
+
+    async function fetchAllLinesOffline() {
+        const { getOfflineDB } = await import('../../services/offline/core/OfflineSchema');
+        const db = getOfflineDB();
+
+        const allTx = await db.transactions.toArray();
+        const filteredTx = allTx.filter(t => {
+            if (appliedFilters.orgId && t.org_id !== appliedFilters.orgId) return false;
+            if (appliedFilters.approvalStatus && t.approval_status !== appliedFilters.approvalStatus) return false;
+            if (appliedFilters.dateFrom && t.entry_date < appliedFilters.dateFrom) return false;
+            if (appliedFilters.dateTo && t.entry_date > appliedFilters.dateTo) return false;
+            return true;
+        });
+
+        const txIds = new Set(filteredTx.map(t => t.id));
+        const txMap = new Map(filteredTx.map(t => [t.id, t]));
+
+        const allLines = await db.transactionLines.where('transaction_id').anyOf(Array.from(txIds)).toArray();
+        const filteredLines = allLines.filter(line => {
+            const tx = txMap.get(line.transaction_id);
+            if (!tx) return false;
+            if (appliedFilters.projectId && line.project_id !== appliedFilters.projectId && tx.project_id !== appliedFilters.projectId) return false;
+            if (appliedFilters.costCenterId && line.cost_center_id !== appliedFilters.costCenterId) return false;
+            if (appliedFilters.workItemId && line.work_item_id !== appliedFilters.workItemId) return false;
+            if (appliedFilters.analysisItemId && line.analysis_work_item_id !== appliedFilters.analysisItemId) return false;
+            if (appliedFilters.expensesCategoryId && line.sub_tree_id !== appliedFilters.expensesCategoryId) return false;
+            if (appliedFilters.classificationId && line.classification_id !== appliedFilters.classificationId) return false;
+            if (appliedFilters.debitAccountId && (line.account_id !== appliedFilters.debitAccountId || (line.debit_amount || 0) <= 0)) return false;
+            if (appliedFilters.creditAccountId && (line.account_id !== appliedFilters.creditAccountId || (line.credit_amount || 0) <= 0)) return false;
+            return true;
+        });
+
+        const rows = filteredLines.map(row => {
+            const tx = txMap.get(row.transaction_id)!;
+            return {
+                ...row,
+                entry_number: tx.entry_number,
+                entry_date: tx.entry_date,
+                header_description: tx.description,
+                header_org_id: tx.org_id,
+                header_project_id: tx.project_id,
+                approval_status: tx.approval_status,
+                is_posted: tx.approval_status === 'posted',
+                created_by: tx.created_by,
+                org_id: tx.org_id,
+                project_id: row.project_id || tx.project_id,
+            };
+        });
+
+        return { rows, total: rows.length };
+    }
+
+    const fetchAllFilteredLines = useCallback(async () => {
+        if (!navigator.onLine) {
+            const result = await fetchAllLinesOffline();
+            return result.rows;
+        }
+
+        let query = supabase
+            .from('transaction_lines')
+            .select(`
+                id, transaction_id, line_no, account_id, debit_amount, credit_amount, description,
+                project_id, cost_center_id, work_item_id, analysis_work_item_id, classification_id, sub_tree_id, created_at,
+                transactions!inner (id, entry_number, entry_date, description, org_id, project_id, approval_status, is_posted, created_by)
+            `)
+
+        if (appliedFilters.search) {
+            query = query.or(`description.ilike.%${appliedFilters.search}%,transactions.description.ilike.%${appliedFilters.search}%,transactions.entry_number.ilike.%${appliedFilters.search}%`)
+        }
+        if (appliedFilters.dateFrom) query = query.gte('transactions.entry_date', appliedFilters.dateFrom)
+        if (appliedFilters.dateTo) query = query.lte('transactions.entry_date', appliedFilters.dateTo)
+        if (appliedFilters.orgId) query = query.eq('transactions.org_id', appliedFilters.orgId)
+        if (appliedFilters.projectId) query = query.eq('project_id', appliedFilters.projectId)
+        if (appliedFilters.debitAccountId) query = query.eq('account_id', appliedFilters.debitAccountId).gt('debit_amount', 0)
+        if (appliedFilters.creditAccountId) query = query.eq('account_id', appliedFilters.creditAccountId).gt('credit_amount', 0)
+        if (appliedFilters.approvalStatus) query = query.eq('transactions.approval_status', appliedFilters.approvalStatus)
+        if (appliedFilters.classificationId) query = query.eq('classification_id', appliedFilters.classificationId)
+        if (appliedFilters.costCenterId) query = query.eq('cost_center_id', appliedFilters.costCenterId)
+        if (appliedFilters.workItemId) query = query.eq('work_item_id', appliedFilters.workItemId)
+        if (appliedFilters.analysisItemId) query = query.eq('analysis_work_item_id', appliedFilters.analysisItemId)
+        if (appliedFilters.expensesCategoryId) query = query.eq('sub_tree_id', appliedFilters.expensesCategoryId)
+
+        const [realSortField, referencedTable] = sortField.includes(':') ? sortField.split(':') : [sortField, undefined]
+
+        const { data, error } = await query.order(realSortField, { ascending: sortOrder === 'asc', referencedTable })
         if (error) throw error
 
         return (data || []).map((row: any) => ({
@@ -276,12 +272,13 @@ const TransactionLinesReportPage = () => {
             org_id: row.transactions?.org_id,
             project_id: row.project_id || row.transactions?.project_id,
         }))
-    }, [appliedFilters])
+    }, [appliedFilters, sortField, sortOrder])
 
+    // ... existing useQuery hooks ...
     const { data: allData, isLoading: allLoading } = useQuery({
         queryKey: ['transaction-lines-report-all', appliedFilters],
         queryFn: fetchAllFilteredLines,
-        enabled: grouping !== 'none' && !contextLoading && getConnectionMonitor().getHealth().isOnline,
+        enabled: grouping !== 'none' && !contextLoading, // Removed isOnline requirement
     })
 
     const {
@@ -292,18 +289,13 @@ const TransactionLinesReportPage = () => {
     } = useQuery({
         queryKey: ['transaction-lines-report', appliedFilters, page, pageSize],
         queryFn: fetchAllLines,
-        enabled: !contextLoading && grouping === 'none' && getConnectionMonitor().getHealth().isOnline, // Only fetch paginated data if not grouped
+        enabled: !contextLoading && grouping === 'none', // Removed isOnline requirement
         staleTime: 30000,
     })
 
-    // Real-time sync
+    // ... existing sync ...
     useUnifiedSync({
-        channelId: 'transaction-lines-report-sync',
-        tables: ['transactions', 'transaction_lines'],
-        onDataChange: () => {
-            queryClient.invalidateQueries({ queryKey: ['transaction-lines-report'] })
-            queryClient.invalidateQueries({ queryKey: ['transaction-lines-report-all'] })
-        },
+        // ...
     })
 
     const rows = useMemo(() => queryData?.rows ?? [], [queryData?.rows])
@@ -569,7 +561,17 @@ const TransactionLinesReportPage = () => {
     return (
         <div className={`transactions-container ${isAr ? 'rtl' : 'ltr'}`} dir={isAr ? 'rtl' : 'ltr'}>
             <div className="transactions-header">
-                <h1 className="transactions-title">{isAr ? 'تقرير سطور المعاملات' : 'Transaction Lines Report'}</h1>
+                <div style={{ flex: 1 }}>
+                    <h1 className="transactions-title" style={{ marginBottom: isOnline ? 0 : '0.5rem' }}>
+                        {isAr ? 'تقرير سطور المعاملات' : 'Transaction Lines Report'}
+                    </h1>
+                    {!isOnline && (
+                        <StalenessIndicator
+                            isStale={true}
+                            lastUpdated={new Date().toLocaleDateString(isAr ? 'ar-EG' : 'en-US')}
+                        />
+                    )}
+                </div>
                 <div className="transactions-actions">
                     <button className="ultimate-btn ultimate-btn-edit" onClick={() => setColumnsConfigOpen(true)}>
                         <div className="btn-content"><span className="btn-text">{isAr ? '⚙️ إعدادات الأعمدة' : '⚙️ Column Settings'}</span></div>

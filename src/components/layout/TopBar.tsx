@@ -146,6 +146,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
   const [notificationMenuAnchor, setNotificationMenuAnchor] = useState<null | HTMLElement>(null);
   const [syncQueueOpen, setSyncQueueOpen] = useState(false);
   const { pendingOperations, syncProgress } = useOffline();
+  const connectionHealth = useConnectionHealth();
   const [showSyncSuccess, setShowSyncSuccess] = useState(false);
   const isRtl = language === 'ar';
 
@@ -366,7 +367,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
             {/* Connection Status Indicator */}
             <ConnectionStatusInline />
 
-            {/* Sync Button */}
+            {/* Data Sync Button (online queue sync) */}
             <Tooltip title={
               syncProgress.isSyncing
                 ? (language === 'ar' ? `جاري المزامنة: ${syncProgress.synced}/${syncProgress.total}` : `Syncing: ${syncProgress.synced}/${syncProgress.total}`)
@@ -376,10 +377,11 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
                 <StyledTopBarButton
                   onClick={async () => {
                     if (pendingOperations > 0) {
-                      setSyncQueueOpen(true); // Open manager which will show progress if needed
+                      setSyncQueueOpen(true);
                     }
                     try {
-                      const result = await syncEngine.startFullSync();
+                      // startSync() only processes the offline queue — no metadata seeding
+                      const result = await syncEngine.startSync();
                       if (result.success && result.syncedOperations > 0) {
                         setShowSyncSuccess(true);
                       }
@@ -387,7 +389,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
                       console.error('Sync failed:', err);
                     }
                   }}
-                  disabled={isRefreshing || syncProgress.isSyncing}
+                  disabled={isRefreshing || syncProgress.isSyncing || !connectionHealth.isOnline}
                   startIcon={
                     <Badge badgeContent={pendingOperations > 0 ? pendingOperations : undefined} color="error" overlap="circular">
                       <RefreshIcon
@@ -411,18 +413,14 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
               </span>
             </Tooltip>
 
-            {/* Metadata Sync Button (Moved here) */}
-            <Tooltip title={language === 'ar' ? 'تحديث البيانات المرجعية' : 'Update Metadata'}>
+            {/* Reference Data Sync (offline seeding) */}
+            <Tooltip title={language === 'ar' ? 'مزامنة البيانات المرجعية' : 'Sync Reference Data'}>
               <span>
                 <ActionIconButton
                   size="small"
                   onClick={handleMetadataSync}
                   disabled={isSyncingMetadata}
-                  sx={{
-                    width: 40, height: 40,
-                    borderColor: isSyncingMetadata ? 'secondary.main' : 'divider',
-                    color: isSyncingMetadata ? 'secondary.main' : 'text.secondary'
-                  }}
+                  sx={{ width: 40, height: 40 }}
                 >
                   <RefreshIcon
                     fontSize="small"
@@ -431,7 +429,8 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
                       '@keyframes spin': {
                         '0%': { transform: 'rotate(0deg)' },
                         '100%': { transform: 'rotate(360deg)' }
-                      }
+                      },
+                      color: 'secondary.main'
                     }}
                   />
                 </ActionIconButton>
@@ -493,8 +492,18 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
                   '&:hover': { transform: 'scale(1.05)' }
                 }}
               >
-                {(profile?.avatar_url) ? (
-                  <Avatar src={profile.avatar_url} sx={{ width: 36, height: 36 }} />
+                {(profile?.avatar_url && connectionHealth.isOnline) ? (
+                  <Avatar
+                    src={profile.avatar_url}
+                    sx={{ width: 36, height: 36 }}
+                    imgProps={{
+                      onError: (e) => {
+                        (e.target as any).parentNode.style.display = 'none';
+                      }
+                    }}
+                  >
+                    {getAvatarInitials()}
+                  </Avatar>
                 ) : (
                   <Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.main', fontSize: '0.9rem', fontWeight: 700 }}>
                     {getAvatarInitials()}
@@ -524,7 +533,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
       >
         <MenuItem onClick={handleProfileMenuClose}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1 }}>
-            {profile?.avatar_url ? (
+            {(profile?.avatar_url && connectionHealth.isOnline) ? (
               <Avatar src={profile.avatar_url} sx={{ width: 40, height: 40 }} />
             ) : (
               <Avatar sx={{ width: 40, height: 40, bgcolor: 'primary.main' }}>

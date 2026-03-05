@@ -19,6 +19,8 @@ export default defineConfig({
       'src/components/__tests__/opening-balance.*.test.*',
       'src/components/__tests__/navigation.*.test.*',
       'src/components/auth/__tests__/**/*.test.*',
+      'src/components/Transactions/__tests__/**/*.test.*',
+      'src/components/Transactions/CostAnalysis/__tests__/**/*.test.*',
       'src/hooks/__tests__/**/*.test.*',
       'src/services/__tests__/*.test.*',
       'src/utils/__tests__/*.test.*',

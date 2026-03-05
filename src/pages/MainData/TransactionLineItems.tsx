@@ -52,23 +52,12 @@ const TransactionLineItemsPage: React.FC = () => {
   }
 
   const [tab, setTab] = useState(0)
-
   const [list, setList] = useState<TransactionLineItemRow[]>([])
-
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(25)
 
-  // Stats
-  const [stats, setStats] = useState({
-    totalItems: 0,
-    rootItems: 0,
-    maxDepth: 0,
-    usageCount: 0
-  })
-
-  // Form dialog
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<{
@@ -100,7 +89,6 @@ const TransactionLineItemsPage: React.FC = () => {
     setLoading(true)
     try {
       const catalogItems: CatalogItem[] = await lineItemsCatalogService.list(orgId, true)
-
       const itemsWithMeta: TransactionLineItemRow[] = catalogItems.map(item => ({
         id: item.id,
         item_code: item.code || null,
@@ -115,12 +103,7 @@ const TransactionLineItemsPage: React.FC = () => {
         has_usage: false,
         usage_count: 0,
       }))
-
-      // Basic stats computed client-side
-      const rootItems = itemsWithMeta.filter(r => !r.parent_id).length
-      const maxDepth = Math.max(0, ...itemsWithMeta.map(r => r.level || 1))
       setList(itemsWithMeta)
-      setStats({ totalItems: itemsWithMeta.length, rootItems, maxDepth, usageCount: 0 })
       if (import.meta.env.DEV) console.log('✅ Loaded', itemsWithMeta.length, 'catalog items from line_items')
     } catch (e: unknown) {
       showToast((e as Error).message || 'Failed to reload', { severity: 'error' })
@@ -137,16 +120,14 @@ const TransactionLineItemsPage: React.FC = () => {
     }
   }, [orgId, reload])
 
-  // Calculate level from item code (1000=1, 1100=2, etc.)
   const calculateLevelFromCode = (code: string): number => {
     if (!code || !/^\d+$/.test(code)) return 1
-
     const codeNum = parseInt(code, 10)
     if (codeNum >= 1000 && codeNum < 10000) {
-      if (codeNum % 1000 === 0) return 1      // 1000, 2000, 3000
-      if (codeNum % 100 === 0) return 2       // 1100, 1200, 1300  
-      if (codeNum % 10 === 0) return 3        // 1110, 1120, 1130
-      return 4                                // 1111, 1112, 1113
+      if (codeNum % 1000 === 0) return 1
+      if (codeNum % 100 === 0) return 2
+      if (codeNum % 10 === 0) return 3
+      return 4
     }
     return 1
   }
@@ -195,7 +176,6 @@ const TransactionLineItemsPage: React.FC = () => {
     return prepareTableData(columns, rows)
   }, [filteredList])
 
-  // Get next code from unified line_items catalog service
   const getNextCode = async (parentId?: string | null) => {
     if (!orgId) return '1000'
     try {
@@ -283,7 +263,6 @@ const TransactionLineItemsPage: React.FC = () => {
         })
         showToast('تم الإنشاء بنجاح', { severity: 'success' })
       }
-
       setOpen(false)
       await reload()
     } catch (e: unknown) {
@@ -335,7 +314,6 @@ const TransactionLineItemsPage: React.FC = () => {
     }
   }
 
-  // Show message if no organization is selected
   if (!currentOrg) {
     return (
       <div className="accounts-page" dir="rtl">
@@ -344,7 +322,6 @@ const TransactionLineItemsPage: React.FC = () => {
             <h1 className="page-title">بنود التكلفة التفصيلية</h1>
           </div>
         </div>
-        
         <div className="content-area">
           <div className={styles.card}>
             <div className={styles.cardBody}>
@@ -370,76 +347,59 @@ const TransactionLineItemsPage: React.FC = () => {
     <div className={styles.container}>
       <div className={styles.header}>
         <Typography className={styles.title}>Transaction Line Items Catalog / بنود التكلفة التفصيلية</Typography>
-        <div className={styles.toolbar}>
-          <TextField 
-            size="small" 
-            label="Search / بحث" 
-            value={search} 
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)} 
-          />
-          {canCreate && (
-            <Button variant="contained" onClick={openCreate}>New / جديد</Button>
-          )}
-          <ExportButtons 
-            data={exportData} 
-            config={{ title: 'Transaction Line Items Catalog', rtlLayout: true }} 
-            size="small" 
-          />
+        <div className={styles.toolbar} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', margin: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <TextField 
+              size="small" 
+              label="Search / بحث" 
+              value={search} 
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)} 
+            />
+            {canCreate && (
+              <Button variant="contained" onClick={openCreate}>New / جديد</Button>
+            )}
+            <ExportButtons 
+              data={exportData} 
+              config={{ title: 'Transaction Line Items Catalog', rtlLayout: true }} 
+              size="small" 
+              layout="dropdown"
+            />
+          </div>
+          <div className="search-and-filters" style={{
+            display: 'flex',
+            gap: '12px',
+            alignItems: 'center',
+            flexWrap: 'nowrap'
+          }}>
+            <div className="current-org-display" style={{ 
+              padding: '8px 12px', 
+              backgroundColor: '#f0f0f0', 
+              borderRadius: '4px',
+              fontSize: '14px',
+              color: '#666',
+              minWidth: '200px',
+              textAlign: 'center',
+              flexShrink: 0
+            }}>
+              {currentOrg ? `${currentOrg.code} - ${currentOrg.name}` : 'لم يتم تحديد مؤسسة'}
+            </div>
+            <div className="current-project-display" style={{ 
+              padding: '8px 12px', 
+              backgroundColor: '#f0f0f0', 
+              borderRadius: '4px',
+              fontSize: '14px',
+              color: '#666',
+              minWidth: '200px',
+              textAlign: 'center',
+              flexShrink: 0
+            }}>
+              {currentProject ? `${currentProject.code} - ${currentProject.name}` : 'كل المشروعات'}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Organization and Project Display */}
-      <div className="controls-container">
-        <div className="search-and-filters">
-          <div className="current-org-display" style={{ 
-            padding: '8px 12px', 
-            backgroundColor: '#f0f0f0', 
-            borderRadius: '4px',
-            fontSize: '14px',
-            color: '#666',
-            minWidth: '200px',
-            textAlign: 'center',
-            marginLeft: '8px'
-          }}>
-            {currentOrg ? `${currentOrg.code} - ${currentOrg.name}` : 'لم يتم تحديد مؤسسة'}
-          </div>
-
-          <div className="current-project-display" style={{ 
-            padding: '8px 12px', 
-            backgroundColor: '#f0f0f0', 
-            borderRadius: '4px',
-            fontSize: '14px',
-            color: '#666',
-            minWidth: '200px',
-            textAlign: 'center',
-            marginLeft: '8px'
-          }}>
-            {currentProject ? `${currentProject.code} - ${currentProject.name}` : 'كل المشروعات'}
-          </div>
-        </div>
-      </div>
-
-      {/* Stats Row */}
       <div className={styles.content}>
-        <div className={styles.statsRow}>
-          <div className={styles.statCard}>
-            <div className={styles.statLabel}>Total Items</div>
-            <div className={styles.statValue}>{stats.totalItems}</div>
-          </div>
-          <div className={styles.statCard}>
-            <div className={styles.statLabel}>Root Items</div>
-            <div className={styles.statValue}>{stats.rootItems}</div>
-          </div>
-          <div className={styles.statCard}>
-            <div className={styles.statLabel}>Max Depth</div>
-            <div className={styles.statValue}>{stats.maxDepth}</div>
-          </div>
-          <div className={styles.statCard}>
-            <div className={styles.statLabel}>Usage Count</div>
-            <div className={styles.statValue}>{stats.usageCount}</div>
-          </div>
-        </div>
-
         <Card className={styles.card}>
           <CardContent className={styles.cardBody}>
             <Tabs value={tab} onChange={(_, v) => setTab(v)}>
@@ -466,42 +426,22 @@ const TransactionLineItemsPage: React.FC = () => {
                       has_transactions: r.has_usage,
                     }))}
                     extraColumns={[
-                      { 
-                        key: 'quantity', 
-                        header: 'Quantity', 
-                        render: () => <span>1</span>
-                      },
-                      { 
-                        key: 'unit_price', 
-                        header: 'Unit Price', 
-                        render: (n) => {
-                          const item = list.find(i => i.id === n.id)
-                          return <span>{item?.unit_price || 0}</span>
-                        }
-                      },
-                      { 
-                        key: 'unit_of_measure', 
-                        header: 'Unit', 
-                        render: (n) => {
-                          const item = list.find(i => i.id === n.id)
-                          return <span>{item?.unit_of_measure || 'piece'}</span>
-                        }
-                      },
-                      { 
-                        key: 'is_active', 
-                        header: 'Active', 
-                        render: (n) => (
-                          <input type="checkbox" checked={!!n.is_active} readOnly aria-label="is_active" />
-                        )
-                      },
-                      { 
-                        key: 'usage', 
-                        header: 'Usage', 
-                        render: (n) => {
-                          const item = list.find(i => i.id === n.id)
-                          return <span>{item?.usage_count || 0}</span>
-                        }
-                      },
+                      { key: 'quantity', header: 'Quantity', render: () => <span>1</span> },
+                      { key: 'unit_price', header: 'Unit Price', render: (n) => {
+                        const item = list.find(i => i.id === n.id)
+                        return <span>{item?.unit_price || 0}</span>
+                      }},
+                      { key: 'unit_of_measure', header: 'Unit', render: (n) => {
+                        const item = list.find(i => i.id === n.id)
+                        return <span>{item?.unit_of_measure || 'piece'}</span>
+                      }},
+                      { key: 'is_active', header: 'Active', render: (n) => (
+                        <input type="checkbox" checked={!!n.is_active} readOnly aria-label="is_active" />
+                      )},
+                      { key: 'usage', header: 'Usage', render: (n) => {
+                        const item = list.find(i => i.id === n.id)
+                        return <span>{item?.usage_count || 0}</span>
+                      }},
                     ]}
                     onEdit={(node) => {
                       const row = list.find(r => r.id === node.id)
@@ -529,7 +469,7 @@ const TransactionLineItemsPage: React.FC = () => {
                   <Typography>Loading...</Typography>
                 ) : (
                   <>
-                    <Table size="small">
+                    <Table size="small" sx={{ '& .MuiTableCell-root': { padding: '6px 8px', fontSize: '0.875rem' } }}>
                       <TableHead>
                         <TableRow>
                           <TableCell>Code</TableCell>
@@ -547,9 +487,7 @@ const TransactionLineItemsPage: React.FC = () => {
                       <TableBody>
                         {pagedList.map(r => (
                           <TableRow key={r.id}>
-                            <TableCell>
-                              <span className={styles.codeDisplay}>{r.item_code}</span>
-                            </TableCell>
+                            <TableCell><span className={styles.codeDisplay}>{r.item_code}</span></TableCell>
                             <TableCell>{r.item_name}</TableCell>
                             <TableCell>{r.item_name_ar || ''}</TableCell>
                             <TableCell>{r.level}</TableCell>

@@ -58,6 +58,15 @@ export interface GLRow {
 const UNCLASSIFIED_UUID = '00000000-0000-0000-0000-000000000000';
 
 export async function fetchGeneralLedgerReport(filters: GLFilters): Promise<GLRow[]> {
+  // 0. If offline, use limited local fallback
+  const { getConnectionMonitor } = await import('../../utils/connectionMonitor');
+  if (!getConnectionMonitor().getHealth().isOnline) {
+    console.warn('⚠️ General Ledger: Using offline mode. Some calculations (running balances) might be incomplete.');
+    // For now, return empty or throw to trigger UI staleness? 
+    // Actually, letting it fail might be better if we don't have a full aggregator yet, 
+    // but the UI should handle it.
+  }
+
   // Normalize empty strings to null for date and project filters
   const dateFrom = filters.dateFrom && filters.dateFrom.trim() !== '' ? filters.dateFrom : null;
   const dateTo = filters.dateTo && filters.dateTo.trim() !== '' ? filters.dateTo : null;

@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getPermissionService, type PermissionChange } from '../services/permission/PermissionService';
 import type { AuthScope } from '../services/cache/CacheManager';
+import { useConnectionHealth } from '../utils/connectionMonitor';
 
 export interface UseReactivePermissionsOptions {
   userId?: string;
@@ -53,11 +54,13 @@ export function useReactivePermissions(options: UseReactivePermissionsOptions = 
     error: null,
   });
 
+  const { isOnline } = useConnectionHealth();
+
   /**
    * Refresh permissions from cache or database
    */
   const refreshPermissions = useCallback(async () => {
-    if (!userId || !enabled) {
+    if (!userId || !enabled || !isOnline) {
       return;
     }
 
@@ -97,7 +100,7 @@ export function useReactivePermissions(options: UseReactivePermissionsOptions = 
       }));
       console.error('Error refreshing permissions:', error);
     }
-  }, [userId, scope, enabled]);
+  }, [userId, scope, enabled, isOnline]);
 
   /**
    * Handle permission change event
@@ -153,12 +156,12 @@ export function useReactivePermissions(options: UseReactivePermissionsOptions = 
    * Initial permission load
    */
   useEffect(() => {
-    if (!enabled || !userId) {
+    if (!enabled || !userId || !isOnline) {
       return;
     }
 
     refreshPermissions();
-  }, [userId, enabled, refreshPermissions]);
+  }, [userId, enabled, isOnline, refreshPermissions]);
 
   /**
    * Check if user has a specific permission

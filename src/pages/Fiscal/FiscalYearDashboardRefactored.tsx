@@ -1,19 +1,21 @@
 import { useState } from 'react'
-import { 
-  IconButton, 
-  Menu, 
-  MenuItem, 
-  Dialog, 
-  DialogTitle, 
-  DialogContent, 
-  DialogActions, 
-  Button, 
+import {
+  IconButton,
+  Menu,
+  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
   Typography,
   Chip,
   Alert
 } from '@mui/material'
-import { MoreVert, Edit, Delete, Pla
-}
+import { MoreVert, Edit, Delete, PlayArrow } from '@mui/icons-material'
+import { useEffect } from 'react'
+import { useArabicLanguage } from '@/hooks/useArabicLanguage'
+import { type FiscalYear } from '@/types/fiscal'
 
 export default function FiscalYearDashboardRefactored() {
   const { isRTL, formatCurrency, formatDate } = useArabicLanguage()

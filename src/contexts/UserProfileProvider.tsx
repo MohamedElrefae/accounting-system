@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../hooks/useAuth';
 import featureFlags from '../utils/featureFlags';
+import { getConnectionMonitor } from '../utils/connectionMonitor';
 import {
   UserProfileContext,
   type AppUserProfile,
@@ -49,7 +50,16 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
         return;
       }
 
-      // Unified check moved inside service calls if needed
+      // Check connection status before network calls
+      const monitor = getConnectionMonitor();
+      if (!monitor.getHealth().isOnline) {
+        if (import.meta.env.DEV) console.log('[UserProfile] Offline: Skipping network profile fetch');
+        // Fallback minimal profile if not already set via authProfile
+        if (!profile && user) {
+          setProfile({ id: user.id, email: user.email || '', roles: [] });
+        }
+        return;
+      }
 
       setLoading(true);
       setError(null);

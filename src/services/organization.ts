@@ -1,5 +1,6 @@
 import { supabase } from "../utils/supabase";
 import { getConnectionMonitor } from '../utils/connectionMonitor';
+import { offlineCacheManager } from "./offline/core/OfflineCacheManager";
 
 // Network retry helper
 const withRetry = async <T>(
@@ -37,10 +38,8 @@ const withRetry = async <T>(
 // Helper for offline fallback
 async function getFromCache(key: string) {
   try {
-    const { getOfflineDB } = await import('./offline/core/OfflineSchema');
-    const db = getOfflineDB();
-    const cached = await db.metadata.get(key);
-    return cached && Array.isArray(cached.value) ? cached.value : [];
+    const cached = await offlineCacheManager.get<any[]>(key);
+    return cached && Array.isArray(cached) ? cached : [];
   } catch {
     return [];
   }
@@ -63,7 +62,8 @@ export async function getOrganizations(): Promise<Organization[]> {
 
   if (isOffline) {
       console.log('[getOrganizations] Offline - yielding cache');
-      return (await getFromCache('organizations_cache')) as Organization[];
+      const cached = await offlineCacheManager.get<Organization[]>('organizations_cache', Infinity);
+      return cached || [];
   }
 
   try {
@@ -87,13 +87,7 @@ export async function getOrganizations(): Promise<Organization[]> {
     // 2. Update local cache for offline use
     if (organizations.length > 0) {
       try {
-        const { getOfflineDB } = await import('./offline/core/OfflineSchema');
-        const db = getOfflineDB();
-        await db.metadata.put({
-          key: 'organizations_cache',
-          value: organizations,
-          updatedAt: new Date().toISOString()
-        });
+        await offlineCacheManager.set('organizations_cache', organizations);
       } catch (cacheUpdateErr) {
         console.warn('[getOrganizations] Failed to update local metadata cache:', cacheUpdateErr);
       }
@@ -105,11 +99,9 @@ export async function getOrganizations(): Promise<Organization[]> {
     
     // 3. Last resort fallback to local cache
     try {
-      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
-      const db = getOfflineDB();
-      const cached = await db.metadata.get('organizations_cache');
-      if (cached && Array.isArray(cached.value)) {
-        return cached.value;
+      const cached = await offlineCacheManager.get<any[]>('organizations_cache', Infinity);
+      if (cached && Array.isArray(cached)) {
+        return cached;
       }
     } catch (finalFallbackErr) {
       // Ignore
@@ -124,11 +116,9 @@ export async function getOrganization(id: string): Promise<Organization | null> 
 
   if (isOffline) {
     try {
-      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
-      const db = getOfflineDB();
-      const cached = await db.metadata.get('organizations_cache');
-      if (cached && Array.isArray(cached.value)) {
-        return cached.value.find((o: any) => o.id === id) || null;
+      const cached = await offlineCacheManager.get<any[]>('organizations_cache', Infinity);
+      if (cached && Array.isArray(cached)) {
+        return cached.find((o: any) => o.id === id) || null;
       }
     } catch {}
     return null;
@@ -149,11 +139,9 @@ export async function getOrganization(id: string): Promise<Organization | null> 
   } catch (error) {
     // If we get a network error while "online", try cache as last resort
     try {
-      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
-      const db = getOfflineDB();
-      const cached = await db.metadata.get('organizations_cache');
-      if (cached && Array.isArray(cached.value)) {
-        return cached.value.find((o: any) => o.id === id) || null;
+      const cached = await offlineCacheManager.get<any[]>('organizations_cache', Infinity);
+      if (cached && Array.isArray(cached)) {
+        return cached.find((o: any) => o.id === id) || null;
       }
     } catch {}
     throw error;
@@ -206,11 +194,9 @@ export async function getOrganizationUsers(orgId: string): Promise<Array<{ id: s
   // 1. Offline Fallback
   if (isOffline) {
     try {
-      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
-      const db = getOfflineDB();
-      const cached = await db.metadata.get('organization_users_cache');
-      if (cached && Array.isArray(cached.value)) {
-        return cached.value.filter((u: any) => u.org_id === orgId);
+      const cached = await offlineCacheManager.get<any[]>('organization_users_cache');
+      if (cached && Array.isArray(cached)) {
+        return cached.filter((u: any) => u.org_id === orgId);
       }
     } catch (e) {
       console.error('[getOrganizationUsers] Cache read failed', e);
@@ -248,16 +234,14 @@ export async function getOrganizationUsers(orgId: string): Promise<Array<{ id: s
 
     // 4. Update Cache
     try {
-      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
-      const db = getOfflineDB();
-      const cached = await db.metadata.get('organization_users_cache');
-      let all = (cached && Array.isArray(cached.value)) ? cached.value : [];
+      const cached = await offlineCacheManager.get<any[]>('organization_users_cache', Infinity);
+      let all = (cached && Array.isArray(cached)) ? cached : [];
       // Remove old entries for this org
       all = all.filter((u: any) => u.org_id !== orgId);
       // Add new
       all = [...all, ...result];
       
-      await db.metadata.put({ key: 'organization_users_cache', value: all, updatedAt: new Date().toISOString() });
+      await offlineCacheManager.set('organization_users_cache', all);
     } catch (e) {
       console.warn('Cache update failed', e);
     }
@@ -269,11 +253,9 @@ export async function getOrganizationUsers(orgId: string): Promise<Array<{ id: s
     
     // Fallback on error
     try {
-      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
-      const db = getOfflineDB();
-      const cached = await db.metadata.get('organization_users_cache');
-      if (cached && Array.isArray(cached.value)) {
-        return cached.value.filter((u: any) => u.org_id === orgId);
+      const cached = await offlineCacheManager.get<any[]>('organization_users_cache', Infinity);
+      if (cached && Array.isArray(cached)) {
+        return cached.filter((u: any) => u.org_id === orgId);
       }
     } catch {}
     

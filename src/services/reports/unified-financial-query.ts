@@ -283,6 +283,12 @@ async function fetchGLSummaryOffline(filters: UnifiedFilters = {}): Promise<GLSu
 
     const entryDate = new Date(tx.entry_date);
     const accountId = line.account_id;
+
+    // Apply additional filters from UnifiedFilters
+    if (filters.costCenterId && line.cost_center_id !== filters.costCenterId) continue;
+    if (filters.workItemId && line.work_item_id !== filters.workItemId) continue;
+    if (filters.analysisWorkItemId && line.analysis_work_item_id !== filters.analysisWorkItemId) continue;
+    if (filters.subTreeId && line.sub_tree_id !== filters.subTreeId) continue;
     
     let stats = summaryMap.get(accountId) || { opening_net: 0, period_debit: 0, period_credit: 0, tx_count: 0 };
 

@@ -42,6 +42,7 @@ import {
 } from '../data/mockData';
 import { supabase } from '../utils/supabase';
 import { getCompanyConfig } from '../services/company-config';
+import { getConnectionMonitor } from '../utils/connectionMonitor';
 import { useScope } from '../contexts/ScopeContext';
 import { ScopeChips } from '../components/Scope/ScopeChips';
 import type { StatCard as StatCardType } from '../types';

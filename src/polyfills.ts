@@ -97,4 +97,7 @@ declare global {
   });
 })();
 
-export {};
+export {};window.addEventListener('unhandledrejection', function(event) {
+  console.error('[Global] Unhandled promise rejection:', event.promise);
+  console.error('[Global] Reason:', event.reason);
+});

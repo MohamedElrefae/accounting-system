@@ -5,7 +5,9 @@ import type { Organization } from '../../types'
 import type { TransactionClassification } from '../../services/transaction-classification'
 import type { ExpensesCategoryRow } from '../../types/sub-tree'
 import type { WorkItemRow } from '../../types/work-items'
-// Data now comes from TransactionsDataContext via props - no independent fetching
+import {
+  getTransactionLineItemCounts
+} from '../../services/transaction-line-items'
 import { useScope } from '../../contexts/ScopeContext'
 import { getActiveProjectsByOrg } from '../../services/projects'
 import {
@@ -41,6 +43,8 @@ import SearchableSelect from '../Common/SearchableSelect'
 import TransactionApprovalStatus from '../Approvals/TransactionApprovalStatus'
 import LineProjectSelector from './LineProjectSelector'
 import TransactionConfirmationDialog from './TransactionConfirmationDialog'
+import CostAnalysisModal from './CostAnalysisModal'
+import { Calculate } from '@mui/icons-material'
 
 interface TransactionWizardProps {
   open: boolean
@@ -138,7 +142,10 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [draftTransactionId, setDraftTransactionId] = useState<string | null>(null)
   const [draftLineIds, setDraftLineIds] = useState<Record<number, string>>({})
-  
+  const [lineItemCounts, setLineItemCounts] = useState<Record<string, number>>({})
+  const [costAnalysisModalOpen, setCostAnalysisModalOpen] = useState(false)
+  const [selectedLineForCostAnalysis, setSelectedLineForCostAnalysis] = useState<{ index: number; id: string | null } | null>(null)
+
   // Confirmation dialog state
   const [confirmationDialog, setConfirmationDialog] = useState<{
     open: boolean
@@ -399,7 +406,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       setSecureProjects(userProjects)
       projectsReadyRef.current = true // Set flag when projects are loaded
       if (import.meta.env.DEV) {
-        console.log(`[TransactionWizard] Loaded ${userProjects.length} user-accessible projects for org ${headerData.org_id}`)
+        console.log(`[TransactionWizard] Loaded ${userProjects.length} user - accessible projects for org ${headerData.org_id}`)
       }
 
       // Validate existing lines - clear only truly inaccessible projects
@@ -410,7 +417,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         const needsValidation = !line.org_id || line.org_id === headerData.org_id
 
         if (needsValidation && line.project_id && !userProjects.some(p => p.id === line.project_id)) {
-          console.warn(`[TransactionWizard] Clearing inaccessible project ${line.project_id} from line (not accessible in org ${headerData.org_id})`)
+          console.warn(`[TransactionWizard] Clearing inaccessible project ${line.project_id} from line(not accessible in org ${headerData.org_id})`)
           return { ...line, project_id: undefined }
         }
         return line
@@ -431,7 +438,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
 
   // Prepare options for SearchableSelect
   const organizationOptions = useMemo(() =>
-    organizations.map(org => ({ value: org.id, label: `${org.code} - ${org.name}` })),
+    organizations.map(org => ({ value: org.id, label: `${org.code} - ${org.name} ` })),
     [organizations]
   )
 
@@ -439,34 +446,34 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     if (loadingProjects) {
       return [{ value: '', label: 'Loading projects...' }]
     }
-    return secureProjects.map(proj => ({ value: proj.id, label: `${proj.code} - ${proj.name}` }))
+    return secureProjects.map(proj => ({ value: proj.id, label: `${proj.code} - ${proj.name} ` }))
   }, [secureProjects, loadingProjects])
 
   const costCenterOptions = useMemo(() =>
-    effectiveCostCenters.map(cc => ({ value: cc.id, label: `${cc.code} - ${cc.name}` })),
+    effectiveCostCenters.map(cc => ({ value: cc.id, label: `${cc.code} - ${cc.name} ` })),
     [effectiveCostCenters]
   )
 
   const workItemOptions = useMemo(() =>
-    effectiveWorkItems.map(wi => ({ value: wi.id, label: `${wi.code} - ${wi.name}` })),
+    effectiveWorkItems.map(wi => ({ value: wi.id, label: `${wi.code} - ${wi.name} ` })),
     [effectiveWorkItems]
   )
 
   const classificationOptions = useMemo(() =>
-    effectiveClassifications.map(cls => ({ value: cls.id, label: `${cls.code} - ${cls.name}` })),
+    effectiveClassifications.map(cls => ({ value: cls.id, label: `${cls.code} - ${cls.name} ` })),
     [effectiveClassifications]
   )
 
   const analysisItemOptions = useMemo(() =>
     Object.entries(effectiveAnalysisItems).map(([id, item]) => ({
       value: id,
-      label: `${item.code} - ${item.name}`
+      label: `${item.code} - ${item.name} `
     })),
     [effectiveAnalysisItems]
   )
 
   const accountOptions = useMemo(() =>
-    postableAccounts.map(acc => ({ value: acc.id, label: `${acc.code} - ${acc.name_ar || acc.name}` })),
+    postableAccounts.map(acc => ({ value: acc.id, label: `${acc.code} - ${acc.name_ar || acc.name} ` })),
     [postableAccounts]
   )
 
@@ -558,6 +565,16 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     if (draftTransactionId) return draftTransactionId // Already created
 
     try {
+      const { getConnectionMonitor } = await import('../../utils/connectionMonitor')
+      const isOffline = !getConnectionMonitor().getHealth().isOnline
+
+      if (isOffline) {
+        console.warn('Draft transaction: Offline mode. Generating temporary ID.')
+        const tempId = `temp_tx_${crypto.randomUUID()}`
+        setDraftTransactionId(tempId)
+        return tempId
+      }
+
       const { supabase } = await import('../../utils/supabase')
       const authService = await import('../../services/authService')
       const userId = await authService.AuthService.getCurrentUserId()
@@ -588,8 +605,10 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       console.log('Draft transaction created:', transaction.id)
       return transaction.id
     } catch (error) {
-      console.error('Failed to create draft transaction:', error)
-      return null
+      console.error('Failed to create draft transaction, using temp ID:', error)
+      const tempId = `temp_tx_${crypto.randomUUID()}`
+      setDraftTransactionId(tempId)
+      return tempId
     }
   }
 
@@ -600,17 +619,22 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     const line = lines[lineIndex]
     if (!line.account_id) return null // Can't create without account
 
-    // Check constraint: at least one side must be positive
-    const debit = Number(line.debit_amount) || 0
-    const credit = Number(line.credit_amount) || 0
-    if (debit <= 0 && credit <= 0) return null // Can't create without amount
-
     try {
-      const { supabase } = await import('../../utils/supabase')
-
-      // Ensure transaction exists
       const txId = draftTransactionId || await createDraftTransaction()
       if (!txId) return null
+
+      const { getConnectionMonitor } = await import('../../utils/connectionMonitor')
+      const isOffline = !getConnectionMonitor().getHealth().isOnline
+
+      // If we are offline OR the transaction is temporary, we must use a temp line ID
+      if (isOffline || txId.startsWith('temp_tx_')) {
+        console.warn('Draft line: Offline mode or temp txId. Generating temporary ID.')
+        const tempLineId = `temp_line_${crypto.randomUUID()}`
+        setDraftLineIds(prev => ({ ...prev, [lineIndex]: tempLineId }))
+        return tempLineId
+      }
+
+      const { supabase } = await import('../../utils/supabase')
 
       // Create draft line
       const { data: savedLine, error: lineError } = await supabase
@@ -637,11 +661,13 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
 
       // Store line ID
       setDraftLineIds(prev => ({ ...prev, [lineIndex]: savedLine.id }))
-      console.log(`Draft line ${lineIndex} created:`, savedLine.id)
+      console.log(`Draft line ${lineIndex} created: `, savedLine.id)
       return savedLine.id
     } catch (error) {
-      console.error(`Failed to create draft line ${lineIndex}:`, error)
-      return null
+      console.error(`Failed to create draft line ${lineIndex}, using temp ID: `, error)
+      const tempLineId = `temp_line_${crypto.randomUUID()}`
+      setDraftLineIds(prev => ({ ...prev, [lineIndex]: tempLineId }))
+      return tempLineId
     }
   }
 
@@ -671,6 +697,46 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       console.error('Failed to cleanup wizard draft:', error)
     }
   }
+
+  const handleOpenCostAnalysis = async (index: number) => {
+    const line = lines[index]
+    if (!line.account_id) {
+      setErrors(prev => ({ ...prev, [`line_${index} _account`]: 'يجب اختيار الحساب أولاً' }))
+      return
+    }
+
+    let lineId = line.id || draftLineIds[index]
+
+    if (!lineId) {
+      // Create draft line if it doesn't exist
+      lineId = await createDraftLine(index)
+    }
+
+    if (lineId) {
+      setSelectedLineForCostAnalysis({ index, id: lineId })
+      setCostAnalysisModalOpen(true)
+    } else {
+      console.error('Failed to get or create line ID for cost analysis')
+    }
+  }
+
+  const handleCostAnalysisModalClose = () => {
+    setCostAnalysisModalOpen(false)
+    setSelectedLineForCostAnalysis(null)
+    // Re-fetch counts after modal closes, in case items were added/removed
+    const ids = Object.values(draftLineIds).concat(lines.map(l => l.id).filter(id => !!id) as string[])
+    if (ids.length > 0) {
+      getTransactionLineItemCounts(ids).then(setLineItemCounts)
+    }
+  }
+
+  // Load line item counts when lines have IDs
+  useEffect(() => {
+    const ids = Object.values(draftLineIds).concat(lines.map(l => l.id).filter(id => !!id) as string[])
+    if (ids.length > 0) {
+      getTransactionLineItemCounts(ids).then(setLineItemCounts)
+    }
+  }, [draftLineIds, lines, open])
 
   // Convert wizard draft to real transaction (remove draft flag)
   const finalizeWizardDraft = async () => {
@@ -714,7 +780,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   // Handle confirmation dialog actions
   const handleConfirmationAction = async (option: 'close' | 'new') => {
     setConfirmationDialog({ open: false, action: 'draft' })
-    
+
     if (option === 'close') {
       await handleCloseWithCleanup()
     } else if (option === 'new') {
@@ -789,18 +855,18 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
 
     lines.forEach((line, idx) => {
       if (!line.account_id) {
-        validationErrors[`line_${idx}_account`] = `السطر ${idx + 1}: الحساب مطلوب`
+        validationErrors[`line_${idx} _account`] = `السطر ${idx + 1}: الحساب مطلوب`
       }
 
       const debit = Number(line.debit_amount) || 0
       const credit = Number(line.credit_amount) || 0
 
       if (debit <= 0 && credit <= 0) {
-        validationErrors[`line_${idx}_amount`] = `السطر ${idx + 1}: يجب إدخال مبلغ مدين أو دائن`
+        validationErrors[`line_${idx} _amount`] = `السطر ${idx + 1}: يجب إدخال مبلغ مدين أو دائن`
       }
 
       if (debit > 0 && credit > 0) {
-        validationErrors[`line_${idx}_xor`] = `السطر ${idx + 1}: لا يمكن إدخال مدين ودائن معاً في نفس السطر`
+        validationErrors[`line_${idx} _xor`] = `السطر ${idx + 1}: لا يمكن إدخال مدين ودائن معاً في نفس السطر`
       }
 
       if (debit > 0) hasDebitLine = true
@@ -851,6 +917,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         reference_number: headerData.reference_number || null,
         notes: headerData.notes || null,
         notes_ar: headerData.notes_ar || null,
+        version: headerData.version,
         lines: lines.map(line => ({
           line_no: line.line_no,
           account_id: line.account_id,
@@ -927,6 +994,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         reference_number: headerData.reference_number || null,
         notes: headerData.notes || null,
         notes_ar: headerData.notes_ar || null,
+        version: headerData.version,
         // Lines (transaction_lines table)
         lines: lines.map(line => ({
           line_no: line.line_no,
@@ -1016,7 +1084,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     // if (updates.project_id && updates.project_id !== '') {
     //   const isAccessible = secureProjects.some(p => p.id === updates.project_id)
     //   if (!isAccessible) {
-    //     console.warn(`[TransactionWizard] Line ${idx}: Cannot select inaccessible project: ${updates.project_id}`)
+    //     console.warn(`[TransactionWizard] Line ${ idx }: Cannot select inaccessible project: ${ updates.project_id } `)
     //     return
     //   }
     // }
@@ -1091,7 +1159,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
             if (!line.account_id) return true;
             return c.linked_account_id === line.account_id;
           })
-          .map(c => ({ value: c.id, label: `${c.code} - ${c.description}` }))
+          .map(c => ({ value: c.id, label: `${c.code} - ${c.description} ` }))
 
         return (
           <SearchableSelect
@@ -1116,8 +1184,8 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         storageKey="txWizard"
         isOpen={open}
         onClose={handleCloseWithCleanup}
-        title={mode === 'edit' ? `تعديل المعاملة${transactionId ? ` - ${transactionId.substring(0, 8)}` : ''}` : "معاملة جديدة - خطوة بخطوة"}
-        subtitle={`الخطوة ${currentStepIndex + 1} من ${steps.length}: ${steps[currentStepIndex].label}`}
+        title={mode === 'edit' ? `تعديل المعاملة${transactionId ? ` - ${transactionId.substring(0, 8)}` : ''} ` : "معاملة جديدة - خطوة بخطوة"}
+        subtitle={`الخطوة ${currentStepIndex + 1} من ${steps.length}: ${steps[currentStepIndex].label} `}
         defaults={{
           position: () => ({ x: 60, y: 40 }),
           size: () => ({ width: 1000, height: 700 }),
@@ -1217,7 +1285,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                             width: '100%',
                             padding: '12px',
                             borderRadius: '8px',
-                            border: `2px solid ${errors.entry_date ? '#ef4444' : '#475569'}`,
+                            border: `2px solid ${errors.entry_date ? '#ef4444' : '#475569'} `,
                             fontSize: '14px',
                             backgroundColor: '#334155',
                             color: '#f1f5f9',
@@ -1272,7 +1340,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                             width: '100%',
                             padding: '12px',
                             borderRadius: '8px',
-                            border: `2px solid ${errors.description ? '#ef4444' : '#475569'}`,
+                            border: `2px solid ${errors.description ? '#ef4444' : '#475569'} `,
                             fontSize: '14px',
                             backgroundColor: '#334155',
                             color: '#f1f5f9',
@@ -1402,6 +1470,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                         <th style={{ padding: '12px 8px', textAlign: 'right', width: '110px', color: '#f1f5f9', fontWeight: 600 }}>مدين</th>
                         <th style={{ padding: '12px 8px', textAlign: 'right', width: '110px', color: '#f1f5f9', fontWeight: 600 }}>دائن</th>
                         <th style={{ padding: '12px 8px', textAlign: 'right', minWidth: '300px', color: '#f1f5f9', fontWeight: 600 }}>البيان</th>
+                        <th style={{ padding: '12px 8px', textAlign: 'center', width: '60px', color: '#f1f5f9', fontWeight: 600 }}>التحليل</th>
                         <th style={{ padding: '12px 8px', textAlign: 'center', width: '100px', color: '#f1f5f9', fontWeight: 600 }}>إجراءات</th>
                       </tr>
                     </thead>
@@ -1428,11 +1497,11 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                                     updateLine(idx, updates)
                                   }}
                                   placeholder="اختر الحساب..."
-                                  error={!!errors[`line_${idx}_account`]}
+                                  error={!!errors[`line_${idx} _account`]}
                                 />
-                                {errors[`line_${idx}_account`] && (
+                                {errors[`line_${idx} _account`] && (
                                   <div style={{ color: 'var(--danger)', fontSize: '11px', marginTop: '4px' }}>
-                                    {errors[`line_${idx}_account`]}
+                                    {errors[`line_${idx} _account`]}
                                   </div>
                                 )}
                               </td>
@@ -1506,6 +1575,34 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                 <IconButton
                                   size="small"
+                                  onClick={() => handleOpenCostAnalysis(idx)}
+                                  color="primary"
+                                  title="تحليل التكلفة"
+                                >
+                                  <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+                                    <Calculate />
+                                    {(lineItemCounts[line.id || ''] || lineItemCounts[draftLineIds[idx] || '']) > 0 && (
+                                      <Chip
+                                        label={lineItemCounts[line.id || ''] || lineItemCounts[draftLineIds[idx] || '']}
+                                        size="small"
+                                        color="primary"
+                                        sx={{
+                                          position: 'absolute',
+                                          top: -8,
+                                          right: -8,
+                                          height: 16,
+                                          minWidth: 16,
+                                          fontSize: 10,
+                                          p: 0
+                                        }}
+                                      />
+                                    )}
+                                  </Box>
+                                </IconButton>
+                              </td>
+                              <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                <IconButton
+                                  size="small"
                                   onClick={() => {
                                     const newExpanded = new Set(expandedLines)
                                     if (isExpanded) {
@@ -1532,7 +1629,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                             {/* Expanded row with additional fields */}
                             {isExpanded && (
                               <tr style={{ background: '#1e293b' }}>
-                                <td colSpan={5} style={{ padding: '16px' }}>
+                                <td colSpan={7} style={{ padding: '16px' }}>
                                   <Grid container spacing={2}>
                                     {columnConfig.org_id?.visible && (
                                       <Grid xs={12} md={3}>
@@ -1592,9 +1689,9 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                                     )}
                                   </Grid>
 
-                                  {(errors[`line_${idx}_amount`] || errors[`line_${idx}_xor`]) && (
+                                  {(errors[`line_${idx} _amount`] || errors[`line_${idx} _xor`]) && (
                                     <div style={{ color: 'var(--danger)', fontSize: '12px', marginTop: '6px' }}>
-                                      {errors[`line_${idx}_amount`] || errors[`line_${idx}_xor`]}
+                                      {errors[`line_${idx} _amount`] || errors[`line_${idx} _xor`]}
                                     </div>
                                   )}
 
@@ -1653,7 +1750,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                                           {/* Option 1: Quick file upload (staged) */}
                                           <input
                                             type="file"
-                                            id={`line-file-${idx}`}
+                                            id={`line - file - ${idx} `}
                                             multiple
                                             style={{ display: 'none' }}
                                             onChange={(e) => {
@@ -1667,7 +1764,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                                               e.target.value = '' // Reset for re-selection
                                             }}
                                           />
-                                          <label htmlFor={`line-file-${idx}`}>
+                                          <label htmlFor={`line - file - ${idx} `}>
                                             <Button
                                               variant="outlined"
                                               component="span"
@@ -1739,7 +1836,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                   background: totals.totalDebits !== totals.totalCredits ? '#7f1d1d' : '#065f46',
                   padding: '16px',
                   borderRadius: '8px',
-                  border: `2px solid ${totals.totalDebits !== totals.totalCredits ? '#dc2626' : '#10b981'}`
+                  border: `2px solid ${totals.totalDebits !== totals.totalCredits ? '#dc2626' : '#10b981'} `
                 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', textAlign: 'center' }}>
                     <div>
@@ -1869,7 +1966,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                             <tr key={idx} style={{ borderBottom: '1px solid var(--divider)' }}>
                               <td style={{ padding: '12px', textAlign: 'center' }}>{line.line_no}</td>
                               <td style={{ padding: '12px' }}>
-                                {account ? `${account.code} - ${account.name}` : '—'}
+                                {account ? `${account.code} - ${account.name} ` : '—'}
                               </td>
                               <td style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: line.debit_amount > 0 ? 'var(--success)' : 'inherit' }}>
                                 {line.debit_amount > 0 ? Number(line.debit_amount).toLocaleString('ar-EG') : '—'}
@@ -2155,11 +2252,47 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       {/* Transaction Confirmation Dialog */}
       <TransactionConfirmationDialog
         open={confirmationDialog.open}
-        onClose={() => setConfirmationDialog({ open: false, action: 'draft' })}
+        onClose={() => setConfirmationDialog(prev => ({ ...prev, open: false }))}
+        onConfirm={handleConfirmationAction}
         action={confirmationDialog.action}
         transactionData={confirmationDialog.transactionData}
-        onAction={handleConfirmationAction}
         isProcessing={isSubmitting}
+      />
+
+      {/* Cost Analysis Modal */}
+      <CostAnalysisModal
+        open={costAnalysisModalOpen}
+        orgId={headerData.org_id || ''}
+        transactionLineId={selectedLineForCostAnalysis?.id || ''}
+        onClose={() => {
+          setCostAnalysisModalOpen(false)
+          setSelectedLineForCostAnalysis(null)
+          // Refresh counts when modal closes (might have changed)
+          const ids = Object.values(draftLineIds).concat(lines.map(l => l.id).filter(id => !!id) as string[])
+          if (ids.length > 0) {
+            getTransactionLineItemCounts(ids).then(setLineItemCounts)
+          }
+        }}
+        onSaveSuccess={async (side) => {
+          if (!selectedLineForCostAnalysis) return;
+          const { index, id } = selectedLineForCostAnalysis;
+          try {
+            const { calculateTransactionLineTotals } = await import('../../services/transaction-line-items');
+            if (!id) return;
+            const totals = await calculateTransactionLineTotals(id);
+            if (totals) {
+              const isCredit = side === 'credit';
+
+              updateLine(index, {
+                debit_amount: isCredit ? 0 : totals.total_net,
+                credit_amount: isCredit ? totals.total_net : 0
+              });
+            }
+          } catch (err) {
+            console.error('Failed to sync cost analysis total:', err);
+          }
+        }}
+        isLocked={headerData.approval_status === 'approved' || headerData.approval_status === 'submitted'}
       />
     </>
   )

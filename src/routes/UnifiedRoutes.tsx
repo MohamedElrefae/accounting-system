@@ -26,6 +26,7 @@ const SubTreePage = React.lazy(() => import('../pages/MainData/SubTree'));
 const WorkItemsPage = React.lazy(() => import('../pages/MainData/WorkItems'));
 const CostCentersPage = React.lazy(() => import('../pages/MainData/CostCenters'));
 const TransactionLineItemsCatalogPage = React.lazy(() => import('../pages/MainData/TransactionLineItems'));
+const AdditionDeductionAnalysisPage = React.lazy(() => import('../pages/MainData/AdditionDeductionAnalysis'));
 const AnalysisWorkItemsPage = React.lazy(() => import('../pages/MainData/AnalysisWorkItems'));
 const TransactionClassificationPage = React.lazy(() => import('../pages/MainData/TransactionClassification'));
 const OrgManagementTabs = React.lazy(() => import('../components/Organizations/OrganizationManagementTabs'));
@@ -41,7 +42,6 @@ const MyLinesEnrichedPage = React.lazy(() => import('../pages/Transactions/MyLin
 const AllLinesEnrichedPage = React.lazy(() => import('../pages/Transactions/AllLinesEnriched'));
 const TxLineItemsPage = React.lazy(() => import('../pages/Transactions/TransactionLineItems'));
 const TransactionDetailsPage = React.lazy(() => import('../pages/Transactions/TransactionDetails'));
-const AssignCostAnalysisPage = React.lazy(() => import('../pages/Transactions/AssignCostAnalysis'));
 
 // Reports
 const GeneralLedgerPage = React.lazy(() => import('../pages/Reports/GeneralLedger'));
@@ -84,6 +84,9 @@ const ApprovalsWorkflowsPage = React.lazy(() => import('../pages/Approvals/Workf
 
 // Project Attachments
 const ProjectAttachmentsPage = React.lazy(() => import('../pages/Projects/ProjectAttachments'));
+
+// Documents
+const DocumentsPage = React.lazy(() => import('../pages/Documents/Documents'));
 
 
 /**
@@ -132,7 +135,7 @@ const UnifiedRoutes: React.FC = () => {
                     </OptimizedSuspense>
                 } />
                 <Route path="sub-tree" element={
-                    <OptimizedProtectedRoute requiredPermission={null} scope="global">
+                    <OptimizedProtectedRoute requiredPermission={undefined} scope="global">
                         <OptimizedSuspense>
                             <SubTreePage />
                         </OptimizedSuspense>
@@ -206,6 +209,13 @@ const UnifiedRoutes: React.FC = () => {
                     <OptimizedSuspense>
                         <TransactionClassificationPage />
                     </OptimizedSuspense>
+                } />
+                <Route path="addition-deduction-analysis" element={
+                    <OptimizedProtectedRoute requiredPermission="adjustment_types.read">
+                        <OptimizedSuspense>
+                            <AdditionDeductionAnalysisPage />
+                        </OptimizedSuspense>
+                    </OptimizedProtectedRoute>
                 } />
             </Route>
 
@@ -301,14 +311,6 @@ const UnifiedRoutes: React.FC = () => {
                                 <OptimizedSuspense>
                                     <TxLineItemsPage />
                                 </OptimizedSuspense>
-                            } />
-
-                            <Route path="assign-cost-analysis" element={
-                                <OptimizedProtectedRoute requiredPermission="transactions.cost_analysis">
-                                    <OptimizedSuspense>
-                                        <AssignCostAnalysisPage />
-                                    </OptimizedSuspense>
-                                </OptimizedProtectedRoute>
                             } />
                         </Routes>
                     </TransactionsErrorBoundary>
@@ -584,6 +586,15 @@ const UnifiedRoutes: React.FC = () => {
                 <OptimizedProtectedRoute requiredPermission="documents.view">
                     <OptimizedSuspense>
                         <ProjectAttachmentsPage />
+                    </OptimizedSuspense>
+                </OptimizedProtectedRoute>
+            } />
+
+            {/* Documents */}
+            <Route path="documents" element={
+                <OptimizedProtectedRoute requiredPermission="documents.view">
+                    <OptimizedSuspense>
+                        <DocumentsPage />
                     </OptimizedSuspense>
                 </OptimizedProtectedRoute>
             } />

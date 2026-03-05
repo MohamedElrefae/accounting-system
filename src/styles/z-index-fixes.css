@@ -21,6 +21,11 @@
 
 .MuiModal-root {
   z-index: 10002 !important;
+  pointer-events: auto !important;
+}
+
+.MuiModal-root > * {
+  pointer-events: auto !important;
 }
 
 .MuiTooltip-popper {
@@ -29,6 +34,7 @@
 
 .MuiBackdrop-root {
   z-index: 10000 !important;
+  pointer-events: auto !important;
 }
 
 /* Ensure context menus appear above panels */

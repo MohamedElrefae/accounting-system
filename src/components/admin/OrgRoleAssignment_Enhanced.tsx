@@ -98,40 +98,32 @@ export const OrgRoleAssignmentEnhanced: React.FC<OrgRoleAssignmentEnhancedProps>
   };
 
   const loadOrgUsers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('org_roles')
-        .select('*, user_profiles(id, email, name)')
-        .eq('org_id', orgId);
+    const { data, error } = await supabase
+      .from('org_roles')
+      .select('*, user_profiles(id, email, name)')
+      .eq('org_id', orgId);
 
-      if (error) throw error;
+    if (error) throw error;
 
-      setUsers(
-        data?.map((r: any) => ({
-          user_id: r.user_id,
-          email: r.user_profiles?.email || 'Unknown',
-          name: r.user_profiles?.name || 'Unknown',
-          role: r.role,
-          can_access_all_projects: r.can_access_all_projects,
-        })) || []
-      );
-    } catch (err) {
-      throw err;
-    }
+    setUsers(
+      data?.map((r: any) => ({
+        user_id: r.user_id,
+        email: r.user_profiles?.email || 'Unknown',
+        name: r.user_profiles?.name || 'Unknown',
+        role: r.role,
+        can_access_all_projects: r.can_access_all_projects,
+      })) || []
+    );
   };
 
   const loadAvailableUsers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('id, email, name')
-        .order('name');
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('id, email, name')
+      .order('name');
 
-      if (error) throw error;
-      setAvailableUsers(data || []);
-    } catch (err) {
-      throw err;
-    }
+    if (error) throw error;
+    setAvailableUsers(data || []);
   };
 
   const handleAddUser = async () => {

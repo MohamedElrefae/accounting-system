@@ -193,3 +193,20 @@ export async function getTransactionLinesWithCosts(transactionId: string) {
 
   return lines
 }
+
+export async function deleteTransactionLine(id: string) {
+  if (!id) throw new Error('Line ID is required')
+  const { error } = await supabase
+    .from('transaction_lines')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    let errorMsg = 'Failed to delete transaction line'
+    try {
+      errorMsg = error.code || error.hint || error.details || errorMsg
+    } catch {}
+    console.error('❌ Delete transaction line failed')
+    throw new Error(errorMsg)
+  }
+}

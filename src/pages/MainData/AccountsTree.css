@@ -269,8 +269,14 @@ html[data-theme='light'] .table-code-cell {
 }
 
 .accounts-table thead th {
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover));
-  color: var(--on-accent);
+  background: var(--primary, #1976d2);
+  color: var(--on-primary, #ffffff);
+}
+
+/* Dark mode support */
+html[data-theme='dark'] .accounts-table thead th {
+  background: var(--primary-dark, #1976d2);
+  color: var(--on-primary-dark, #ffffff);
 }
 
 /* فئات التباين الأقصى لعرض الجدول */

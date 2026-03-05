@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 import { DataGenerator } from './OfflineDataGenerator';
 import { AccountingValidator } from '../core/AccountingValidator';
+import { syncEngine } from '../sync/SynchronizationEngine';
 
 // ─── Property 17: Operation Overhead Limits (Task 10.2, Req 6.1) ──────────────
 
@@ -63,7 +64,6 @@ describe('Property 19: Background Sync Non-Blocking (Req 6.4)', () => {
 
   it('P19a: Background sync uses Promise-based async (non-blocking)', () => {
     // Verify that sync operations return Promises (non-blocking contract)
-    const { syncEngine } = require('../sync/SynchronizationEngine');
     const syncResult = syncEngine.startSync();
 
     // Must return a Promise (non-blocking)
@@ -71,7 +71,6 @@ describe('Property 19: Background Sync Non-Blocking (Req 6.4)', () => {
   });
 
   it('P19b: Sync status can be queried while sync is running', () => {
-    const { syncEngine } = require('../sync/SynchronizationEngine');
 
     // Start sync (non-blocking)
     syncEngine.startSync().catch(() => {}); // Ignore errors in test

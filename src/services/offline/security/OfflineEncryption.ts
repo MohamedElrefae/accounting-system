@@ -16,6 +16,12 @@
 import { SECURITY_CONSTANTS } from '../core/OfflineConfig';
 import type { EncryptedData, DataClassification } from '../core/OfflineTypes';
 
+// ─── Key Verification Canary ─────────────────────────────────────────────────
+
+const CANARY_KEY = 'offline_key_canary';
+/** Known plaintext to encrypt and store on first PIN setup */
+const CANARY_VALUE = 'OFFLINE_KEY_VERIFIED_v1';
+
 // ─── Key Management ───────────────────────────────────────────────────────────
 
 /** In-memory session key — never persisted to disk */
@@ -85,6 +91,38 @@ export async function initEncryptionSession(
   _sessionKey = await deriveKey(pin, salt);
   _lockCallback = onLock ?? null;
   resetAutoLockTimer();
+}
+
+// ─── Canary Write / Verify ────────────────────────────────────────────────────
+
+/**
+ * Store an encrypted canary on first PIN setup.
+ * Must be called once immediately after a new PIN is established.
+ */
+export async function writeKeyCanary(): Promise<void> {
+  const canary = await encryptData(CANARY_VALUE, 'confidential');
+  localStorage.setItem(CANARY_KEY, JSON.stringify(canary));
+}
+
+/**
+ * Verify the current session key against the stored canary.
+ * Returns true if they match, false if the PIN is wrong.
+ * If no canary exists yet (first boot), returns true and writes one.
+ */
+export async function verifyKeyCanary(): Promise<boolean> {
+  const stored = localStorage.getItem(CANARY_KEY);
+  if (!stored) {
+    // First-time setup — write canary and accept
+    await writeKeyCanary();
+    return true;
+  }
+  try {
+    const canary = JSON.parse(stored) as EncryptedData;
+    const decrypted = await decryptData<string>(canary);
+    return decrypted === CANARY_VALUE;
+  } catch {
+    return false; // Wrong key — decryption failed
+  }
 }
 
 /**
@@ -219,8 +257,9 @@ export async function secureWipe(): Promise<void> {
   // 1. Clear in-memory key
   lockSession();
 
-  // 2. Remove salt (makes old encrypted data permanently unreadable)
+  // 2. Remove salt AND canary (makes old encrypted data permanently unreadable)
   localStorage.removeItem('offline_encryption_salt');
+  localStorage.removeItem(CANARY_KEY);
 
   // 3. Remove canary values
   localStorage.removeItem('lastSyncTimestamp');
@@ -253,21 +292,34 @@ export async function validateSecret(
     return 'locked';
   }
 
-  if (secret.length < 4) { // PINS are 4+, Passwords usually 8+. 4 is safe minimum for validation check.
+  if (secret.length < 4) {
     return 'wrong_pin';
   }
 
   try {
-    // Attempt to initialize session — if secret is wrong, decryption will fail later
-    // We use a test encrypt/decrypt cycle to validate the secret immediately
+    // Step 1: Derive key from PIN
     await initEncryptionSession(secret, onLock);
 
-    // Test the key by encrypting and decrypting a known value
-    const testValue = { test: 'auth_validation', ts: Date.now() };
-    const encrypted = await encryptData(testValue);
-    await decryptData(encrypted);
+    // Step 2: Verify against stored canary.
+    // This is the critical check — it validates the PIN against the SAME key
+    // that was used to encrypt previous data, not just any internally consistent key.
+    const canaryOk = await verifyKeyCanary();
 
-    // Secret is correct
+    if (!canaryOk) {
+      // Wrong PIN — clear the bad session key immediately so no data is accessible
+      lockSession();
+      _failedPinAttempts++;
+
+      if (_failedPinAttempts >= SECURITY_CONSTANTS.MAX_PIN_ATTEMPTS) {
+        _lockedUntil = new Date(Date.now() + SECURITY_CONSTANTS.LOCKOUT_DURATION_MS);
+        _failedPinAttempts = 0;
+        console.warn('[OfflineEncryption] Too many failed attempts. Locked out.');
+      }
+
+      return 'wrong_pin';
+    }
+
+    // PIN is correct
     _failedPinAttempts = 0;
     _lockedUntil = null;
     return 'success';

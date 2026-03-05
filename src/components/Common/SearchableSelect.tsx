@@ -143,7 +143,20 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
     }
     return undefined;
   };
-  const selectedOption = value ? findOptionDeep(options, value) : undefined;
+  const selectedOption = useMemo(() => {
+    if (!value) return undefined;
+
+    // 1. Search in primary flat options
+    let found = findOptionDeep(options, value);
+    if (found) return found;
+
+    // 2. Fallback: search in tree options (for drilldown modal persistence)
+    if (treeOptions && treeOptions.length > 0) {
+      found = findOptionDeep(treeOptions, value);
+    }
+
+    return found;
+  }, [value, options, treeOptions]);
 
   // Calculate dropdown position when opening
   useEffect(() => {

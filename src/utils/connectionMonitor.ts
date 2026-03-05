@@ -1,5 +1,4 @@
 import React from 'react';
-import { supabase } from './supabase';
 
 export interface ConnectionHealth {
   isOnline: boolean;
@@ -33,8 +32,12 @@ class ConnectionMonitor {
     // Start periodic health checks
     this.startPeriodicChecks();
     
-    // Perform initial check immediately
-    this.checkConnection();
+    // Perform initial check immediately if potentially online
+    if (navigator.onLine) {
+      this.checkConnection();
+    } else {
+      this.updateHealth({ isOnline: false, error: 'Network offline (initial)' });
+    }
   }
 
   private handleOnline = () => {
@@ -64,6 +67,7 @@ class ConnectionMonitor {
       if (this.health.isOnline) {
         this.updateHealth({ isOnline: false, error: 'Network offline (navigator)' });
       }
+      this.isChecking = false; // MUST reset flag if exiting early
       return;
     }
 
@@ -71,22 +75,36 @@ class ConnectionMonitor {
     const startTime = performance.now();
     
     try {
-      // Simple ping to Supabase with manual timeout
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+      if (!supabaseUrl) {
+         if (import.meta.env.DEV) console.warn('[ConnectionMonitor] SUPABASE_URL is missing!');
+         throw new Error('Supabase URL missing');
+      }
+
+      // Lightweight health-check endpoint (unauthenticated)
+      const pingUrl = `${supabaseUrl}/auth/v1/health`;
+      
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Connection timeout')), 5000)
+        setTimeout(() => reject(new Error('Connection timeout (5s)')), 5000)
       );
       
-      const queryPromise = supabase
-        .from('organizations')
-        .select('id')
-        .limit(1);
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+      const queryPromise = fetch(pingUrl, {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            ...(anonKey ? { 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` } : {})
+        },
+        cache: 'no-store'
+      });
       
-      const { error } = await Promise.race([queryPromise, timeoutPromise]) as any;
-      
+      const response = await Promise.race([queryPromise, timeoutPromise]) as Response;
       const latency = performance.now() - startTime;
       
-      if (error) {
-        throw error;
+      // If we got a status (even if not 200/OK), we are connected to the server.
+      // Status 0 usually indicates CORS error or complete network failure.
+      if (response.status === 0) {
+          throw new Error('Network error (CORS or server unreachable)');
       }
       
       this.updateHealth({
@@ -96,8 +114,9 @@ class ConnectionMonitor {
       });
       
     } catch (error: any) {
-      // NEVER log connection failures to the console in production or dev
-      // to keep the console silent during offline boot.
+      if (import.meta.env.DEV) {
+          console.warn(`[ConnectionMonitor] Verification failed: ${error?.message || 'Unknown error'}`);
+      }
       
       this.updateHealth({
         isOnline: false,
@@ -117,11 +136,8 @@ class ConnectionMonitor {
       lastCheck: new Date()
     };
     
-    if (!wasOnline && this.health.isOnline) {
-      if (import.meta.env.DEV) console.log(`[ConnectionMonitor#${this.monitorId}] 🌐 Back ONLINE! Transition detected.`);
-    }
-    if (wasOnline && !this.health.isOnline) {
-      if (import.meta.env.DEV) console.log(`[ConnectionMonitor#${this.monitorId}] 🛑 Went OFFLINE! Transition detected.`);
+    if (import.meta.env.DEV && wasOnline !== this.health.isOnline) {
+      console.log(`🌐 [ConnectionMonitor#${this.monitorId}] Health state transition: ${wasOnline ? 'ONLINE' : 'OFFLINE'} -> ${this.health.isOnline ? 'ONLINE' : 'OFFLINE'} (Latency: ${this.health.latency}ms)`);
     }
     
     // Notify all listeners

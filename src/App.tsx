@@ -23,6 +23,8 @@ import { ResetPassword } from './components/auth/ResetPassword';
 import OptimizedProtectedRoute from './components/routing/OptimizedProtectedRoute';
 
 import { OfflineProvider } from './components/OfflineProvider';
+import { CacheProvider } from '@emotion/react';
+import { cacheRtl, cacheLtr } from './theme/rtl';
 
 const OptimizedApp: React.FC = () => {
   useIdleLogout();
@@ -35,7 +37,6 @@ const OptimizedApp: React.FC = () => {
   });
   const { language } = useAppStore();
 
-  // Set document direction and language
   useEffect(() => {
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = language;
@@ -43,45 +44,47 @@ const OptimizedApp: React.FC = () => {
   }, [language]);
 
   return (
-    <Router
-      future={{
-        v7_startTransition: true,
-        v7_relativeSplatPath: true,
-      }}
-    >
-      <PerformanceOptimizer>
-        <OfflineProvider>
-          <Routes>
-            {/* Auth Routes */}
-            <Route path="/login" element={<LoginForm />} />
-            <Route path="/register" element={<RegisterForm />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/unauthorized" element={
-              <div style={{ padding: '2rem' }}>
-                <h2>Access denied</h2>
-                <p>You don't have permission to view this page.</p>
-              </div>
-            } />
+    <CacheProvider value={language === 'ar' ? cacheRtl : cacheLtr}>
+      <Router
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
+        <PerformanceOptimizer>
+          <OfflineProvider>
+            <Routes>
+              {/* Auth Routes */}
+              <Route path="/login" element={<LoginForm />} />
+              <Route path="/register" element={<RegisterForm />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/unauthorized" element={
+                <div style={{ padding: '2rem' }}>
+                  <h2>Access denied</h2>
+                  <p>You don't have permission to view this page.</p>
+                </div>
+              } />
 
-            {/* Protected App Routes - All handled by UnifiedRoutes */}
-            <Route path="/*" element={
-              <OptimizedProtectedRoute>
-                <DataLoadingErrorBoundary>
-                  <Suspense fallback={<DashboardShellSkeleton />}>
-                    <DashboardLayout>
-                      <OptimizedSuspense>
-                        <UnifiedRoutes />
-                      </OptimizedSuspense>
-                    </DashboardLayout>
-                  </Suspense>
-                </DataLoadingErrorBoundary>
-              </OptimizedProtectedRoute>
-            } />
-          </Routes>
-        </OfflineProvider>
-      </PerformanceOptimizer>
-    </Router>
+              {/* Protected App Routes - All handled by UnifiedRoutes */}
+              <Route path="/*" element={
+                <OptimizedProtectedRoute>
+                  <DataLoadingErrorBoundary>
+                    <Suspense fallback={<DashboardShellSkeleton />}>
+                      <DashboardLayout>
+                        <OptimizedSuspense>
+                          <UnifiedRoutes />
+                        </OptimizedSuspense>
+                      </DashboardLayout>
+                    </Suspense>
+                  </DataLoadingErrorBoundary>
+                </OptimizedProtectedRoute>
+              } />
+            </Routes>
+          </OfflineProvider>
+        </PerformanceOptimizer>
+      </Router>
+    </CacheProvider>
   );
 };
 

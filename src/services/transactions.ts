@@ -144,6 +144,8 @@ export interface TransactionRecord {
   lines_approved_count?: number
   created_at: string
   updated_at: string
+  version?: number
+  lines?: any[]
 }
 
 /** Cancel a pending submission before any reviewer action. */
@@ -436,23 +438,65 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
       const ids = rows.map(r => r.id)
 
       // Fetch page-level aggregates in parallel to reduce RTT cost.
+      // Batch queries to avoid URL length limits (max ~100 IDs per batch)
       const pendingIds = rows.filter(r => !r.is_posted).map(r => r.id)
-
-      const [aggsResult, approvalStatsResult] = await Promise.all([
-        supabase
-          .from('v_tx_line_items_agg')
-          .select('transaction_id, line_items_count, line_items_total')
-          .in('transaction_id', ids),
-        pendingIds.length > 0
-          ? supabase
+      
+      const BATCH_SIZE = 100
+      
+      const fetchAggregatesBatches = async (transactionIds: string[]) => {
+        const batches = []
+        for (let i = 0; i < transactionIds.length; i += BATCH_SIZE) {
+          batches.push(transactionIds.slice(i, i + BATCH_SIZE))
+        }
+        
+        const batchResults = await Promise.all(
+          batches.map(batch =>
+            supabase
+              .from('v_tx_line_items_agg')
+              .select('transaction_id, line_items_count, line_items_total')
+              .in('transaction_id', batch)
+          )
+        )
+        
+        // Combine results from all batches
+        return batchResults.reduce((combined, result) => {
+          if (result.data && !result.error) {
+            combined.push(...result.data)
+          }
+          return combined
+        }, [] as any[])
+      }
+      
+      const fetchApprovalStatsBatches = async (transactionIds: string[]) => {
+        if (transactionIds.length === 0) return []
+        
+        const batches = []
+        for (let i = 0; i < transactionIds.length; i += BATCH_SIZE) {
+          batches.push(transactionIds.slice(i, i + BATCH_SIZE))
+        }
+        
+        const batchResults = await Promise.all(
+          batches.map(batch =>
+            supabase
               .from('transaction_lines')
               .select('transaction_id, line_status')
-              .in('transaction_id', pendingIds)
-          : Promise.resolve({ data: null as any, error: null as any }),
-      ])
+              .in('transaction_id', batch)
+          )
+        )
+        
+        // Combine results from all batches
+        return batchResults.reduce((combined, result) => {
+          if (result.data && !result.error) {
+            combined.push(...result.data)
+          }
+          return combined
+        }, [] as any[])
+      }
 
-      const { data: aggs, error: aggErr } = aggsResult as any
-      const { data: approvalStats } = approvalStatsResult as any
+      const [aggs, approvalStats] = await Promise.all([
+        fetchAggregatesBatches(ids),
+        fetchApprovalStatsBatches(pendingIds)
+      ])
 
       const approvalStatsMap = new Map<string, { total: number; approved: number }>()
       if (approvalStats) {
@@ -464,7 +508,7 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
         }
       }
 
-      if (!aggErr && Array.isArray(aggs)) {
+      if (Array.isArray(aggs)) {
         const map = new Map<string, { c: number; t: number }>()
         for (const a of aggs as any[]) map.set(a.transaction_id, { c: Number(a.line_items_count || 0), t: Number(a.line_items_total || 0) })
         for (const r of rows) {
@@ -685,6 +729,7 @@ export interface CreateTransactionWithLinesInput {
   notes_ar?: string | null
   project_id?: string | null
   org_id?: string | null
+  classification_id?: string | null
   // Lines (transaction_lines table)
   lines: TxLineInput[]
 }
@@ -719,6 +764,89 @@ export async function createTransactionWithLines(input: CreateTransactionWithLin
   }
 
   const uid = await getCurrentUserId()
+  
+  // ─── Offline Guard ───────────────────────────────────────────────────────────
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  const isOffline = !getConnectionMonitor().getHealth().isOnline;
+
+  if (isOffline) {
+    try {
+      console.log('[createTransactionWithLines] Offline detected. Enqueuing multiline operation.');
+      const localTxId = crypto.randomUUID();
+      const now = new Date().toISOString();
+      
+      // 1. Generate local entry number
+      const entryNumber = `OFF-${Date.now().toString().slice(-6)}`;
+
+      // 2. Prepare header
+      const header = {
+        id: localTxId,
+        entry_number: entryNumber,
+        entry_date: formatDateForSupabase(input.entry_date),
+        description: input.description.trim(),
+        description_ar: input.description_ar?.trim() || null,
+        reference_number: input.reference_number?.trim() || null,
+        notes: input.notes?.trim() || null,
+        notes_ar: input.notes_ar?.trim() || null,
+        org_id: input.org_id,
+        project_id: input.project_id || null,
+        created_by: uid ?? 'offline-user',
+        created_at: now,
+        updated_at: now,
+        is_posted: false,
+        is_synced: false,
+      };
+
+      // 3. Prepare lines
+      const processedLines = input.lines.map((l, idx) => ({
+        id: crypto.randomUUID(),
+        transaction_id: localTxId,
+        line_no: l.line_no || (idx + 1),
+        account_id: l.account_id,
+        debit_amount: Number(l.debit_amount || 0),
+        credit_amount: Number(l.credit_amount || 0),
+        description: l.description || null,
+        org_id: l.org_id || input.org_id,
+        project_id: l.project_id || input.project_id || null,
+        cost_center_id: l.cost_center_id || null,
+        work_item_id: l.work_item_id || null,
+        analysis_work_item_id: l.analysis_work_item_id || null,
+        classification_id: l.classification_id || null,
+        sub_tree_id: l.sub_tree_id || null,
+        created_at: now,
+        updated_at: now,
+      }));
+
+      // 4. Save to IndexedDB
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+      const db = getOfflineDB();
+      await db.transactions.add(header as any);
+      if (db.transactionLines) {
+        await (db as any).transactionLines.bulkAdd(processedLines);
+      }
+
+      // 5. Enqueue Sync Operation
+      const { enqueueOperation } = await import('./offline/sync/SyncQueueManager');
+      await enqueueOperation({
+        type: 'CREATE',
+        entityType: 'transaction_with_lines',
+        entityId: localTxId,
+        data: { header, lines: processedLines },
+        userId: uid || 'offline-user',
+        timestamp: Date.now(),
+        id: crypto.randomUUID(),
+        deviceId: 'device-id-placeholder',
+      });
+
+      console.log('[createTransactionWithLines] Offline operation enqueued:', localTxId);
+      return header as unknown as TransactionRecord;
+    } catch (offlineErr) {
+      console.error('[createTransactionWithLines] Offline save failed:', offlineErr);
+      throw offlineErr;
+    }
+  }
+
+  // ─── Online Execution ────────────────────────────────────────────────────────
   
   // Generate entry number
   const entryNumber = await getNextTransactionNumber()
@@ -781,6 +909,136 @@ export async function createTransactionWithLines(input: CreateTransactionWithLin
   }
 
   return header as TransactionRecord
+}
+
+export async function updateTransactionWithLines(
+  id: string,
+  input: CreateTransactionWithLinesInput & { version?: number }
+): Promise<TransactionRecord> {
+  // Validate input
+  if (!input.description || input.description.trim().length < 3) {
+    throw new Error('وصف المعاملة مطلوب (3 أحرف على الأقل)')
+  }
+  if (!input.org_id) {
+    throw new Error('المؤسسة مطلوبة')
+  }
+  if (!Array.isArray(input.lines) || input.lines.length < 1) {
+    throw new Error('يجب إضافة سطر واحد على الأقل')
+  }
+
+  // Validate lines balance
+  let totalDebits = 0
+  let totalCredits = 0
+  for (const line of input.lines) {
+    const d = Number(line.debit_amount || 0)
+    const c = Number(line.credit_amount || 0)
+    if (d < 0 || c < 0) throw new Error('المبالغ لا يمكن أن تكون سالبة')
+    if ((d > 0 && c > 0) || (d === 0 && c === 0)) {
+      throw new Error(`السطر ${line.line_no}: يجب إدخال مبلغ مدين أو دائن (ليس كلاهما)`)
+    }
+    totalDebits += d
+    totalCredits += c
+  }
+  if (Math.abs(totalDebits - totalCredits) >= 0.01) {
+    throw new Error(`القيود غير متوازنة - إجمالي المدين: ${totalDebits.toFixed(2)} مقابل إجمالي الدائن: ${totalCredits.toFixed(2)}`)
+  }
+
+  // ─── Offline Guard ───────────────────────────────────────────────────────────
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  const isOffline = !getConnectionMonitor().getHealth().isOnline;
+
+  if (isOffline) {
+    console.log('[updateTransactionWithLines] Offline detected. Enqueuing multiline update.');
+    // Reuse existing updateTransaction which handles offline queuing for headers
+    // But we need to handle lines too.
+    // For now, we'll implement a dedicated offline path for multiline updates.
+    try {
+      const now = new Date().toISOString();
+      const uid = (await getCurrentUserId()) || 'offline-user';
+      
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+      const db = getOfflineDB();
+      const current = await db.transactions.get(id);
+
+      const header = {
+        ...(current || { id }),
+        entry_date: formatDateForSupabase(input.entry_date),
+        description: input.description.trim(),
+        description_ar: input.description_ar?.trim() || null,
+        reference_number: input.reference_number?.trim() || null,
+        notes: input.notes?.trim() || null,
+        notes_ar: input.notes_ar?.trim() || null,
+        org_id: input.org_id,
+        project_id: input.project_id || null,
+        updated_at: now,
+        is_synced: false,
+      };
+
+      const processedLines = input.lines.map((l, idx) => ({
+        id: (l as any).id || crypto.randomUUID(),
+        transaction_id: id,
+        line_no: l.line_no || (idx + 1),
+        account_id: l.account_id,
+        debit_amount: Number(l.debit_amount || 0),
+        credit_amount: Number(l.credit_amount || 0),
+        description: l.description || null,
+        org_id: l.org_id || input.org_id,
+        project_id: l.project_id || input.project_id || null,
+        cost_center_id: l.cost_center_id || null,
+        work_item_id: l.work_item_id || null,
+        analysis_work_item_id: l.analysis_work_item_id || null,
+        classification_id: l.classification_id || null,
+        sub_tree_id: l.sub_tree_id || null,
+        updated_at: now,
+      }));
+
+      // Update Local DB
+      await db.transactions.put(header as any);
+      if (db.transactionLines) {
+        // Clear old lines for this tx and add new ones
+        await (db as any).transactionLines.where('transaction_id').equals(id).delete();
+        await (db as any).transactionLines.bulkAdd(processedLines);
+      }
+
+      // Enqueue Sync Operation
+      const { enqueueOperation } = await import('./offline/sync/SyncQueueManager');
+      await enqueueOperation({
+        type: 'UPDATE',
+        entityType: 'transaction_with_lines',
+        entityId: id,
+        data: { header, lines: processedLines },
+        userId: uid,
+        timestamp: Date.now(),
+        id: crypto.randomUUID(),
+        deviceId: 'device-id-placeholder',
+      });
+
+      return header as unknown as TransactionRecord;
+    } catch (offlineErr) {
+      console.error('[updateTransactionWithLines] Offline update failed:', offlineErr);
+      throw offlineErr;
+    }
+  }
+
+  // ─── Online Execution ────────────────────────────────────────────────────────
+  
+  // 1. Update header (this handles the version check organically)
+  const header = await updateTransaction(id, {
+    entry_date: input.entry_date,
+    description: input.description,
+    description_ar: input.description_ar,
+    reference_number: input.reference_number,
+    notes: input.notes,
+    notes_ar: input.notes_ar,
+    project_id: input.project_id,
+    org_id: input.org_id,
+    version: input.version
+  } as any)
+
+  // 2. Replace lines
+  await replaceTransactionLines(id, input.lines)
+
+  return header
 }
 
 export async function getTransactionById(id: string): Promise<TransactionRecord | null> {
@@ -918,12 +1176,28 @@ export async function updateTransaction(
     }
   }
 
-  const { data, error } = await supabase
+  const query = supabase
     .from('transactions')
     .update(payload)
     .eq('id', id)
+
+  // Use optimistic versioning if provided
+  if (payload.version !== undefined) {
+    query.eq('version', payload.version);
+    // Remove version from payload to prevent it being updated manually (trigger handles it)
+    delete payload.version;
+  }
+
+  const { data, error, status } = await query
     .select('*')
     .single()
+
+  if (status === 406 || (error && error.code === 'PGRST116')) {
+     // No rows returned could mean version mismatch if version was provided
+     if (payload.version !== undefined) {
+        throw new Error('VERSION_MISMATCH');
+     }
+  }
 
   if (error) {
      if (error.message?.includes('fetch') || error.message?.includes('network')) {

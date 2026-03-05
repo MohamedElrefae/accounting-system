@@ -102,6 +102,29 @@ export interface LanguageTexts {
     closingNotes: { en: string; ar: string }
     approvalRequired: { en: string; ar: string }
   }
+  
+  // Cost Analysis Modal Terms
+  costAnalysis: {
+    modalTitle: { en: string; ar: string }
+    addItem: { en: string; ar: string }
+    searchCatalog: { en: string; ar: string }
+    quantity: { en: string; ar: string }
+    percentage: { en: string; ar: string }
+    unitPrice: { en: string; ar: string }
+    totalAmount: { en: string; ar: string }
+    deductions: { en: string; ar: string }
+    additions: { en: string; ar: string }
+    netAmount: { en: string; ar: string }
+    item: { en: string; ar: string }
+    noItems: { en: string; ar: string }
+    saveSuccess: { en: string; ar: string }
+    saveError: { en: string; ar: string }
+    unsavedChanges: { en: string; ar: string }
+    unsavedWarning: { en: string; ar: string }
+    leave: { en: string; ar: string }
+    stay: { en: string; ar: string }
+    lockedWarning: { en: string; ar: string }
+  }
 }
 
 export const ARABIC_TEXTS: LanguageTexts = {
@@ -199,6 +222,28 @@ export const ARABIC_TEXTS: LanguageTexts = {
     unlockPeriod: { en: 'Unlock Period', ar: 'إلغاء قفل الفترة' },
     closingNotes: { en: 'Closing Notes', ar: 'ملاحظات الإغلاق' },
     approvalRequired: { en: 'Approval Required', ar: 'يتطلب الموافقة' }
+  },
+  
+  costAnalysis: {
+    modalTitle: { en: 'Cost Analysis', ar: 'تحليل التكاليف' },
+    addItem: { en: 'Add Item', ar: 'إضافة عنصر' },
+    searchCatalog: { en: 'Search catalog...', ar: 'البحث في الفهرس...' },
+    quantity: { en: 'Qty', ar: 'الكمية' },
+    percentage: { en: 'Share %', ar: 'نسبة التوزيع %' },
+    unitPrice: { en: 'Unit Price', ar: 'سعر الوحدة' },
+    totalAmount: { en: 'Gross Total', ar: 'الإجمالي' },
+    deductions: { en: 'Deductions', ar: 'الاستقطاعات' },
+    additions: { en: 'Additions', ar: 'الإضافات' },
+    netAmount: { en: 'Net Amount', ar: 'الصافي' },
+    item: { en: 'Item', ar: 'العنصر' },
+    noItems: { en: 'No items added. Click "Add Item" to start.', ar: 'لم يتم إضافة عناصر. انقر على "إضافة عنصر" للبدء.' },
+    saveSuccess: { en: 'Cost analysis saved successfully', ar: 'تم حفظ تحليل التكاليف بنجاح' },
+    saveError: { en: 'Failed to save cost analysis', ar: 'فشل حفظ تحليل التكاليف' },
+    unsavedChanges: { en: 'Unsaved Changes', ar: 'تغييرات غير محفوظة' },
+    unsavedWarning: { en: 'You have unsaved changes. Are you sure you want to close without saving?', ar: 'لديك تغييرات غير محفوظة. هل أنت متأكد أنك تريد الإغلاق دون الحفظ؟' },
+    leave: { en: 'Close Without Saving', ar: 'إغلاق بدون حفظ' },
+    stay: { en: 'Keep Editing', ar: 'متابعة التعديل' },
+    lockedWarning: { en: 'This transaction line is approved and cannot be edited.', ar: 'خط المعاملة هذا معتمد ولا يمكن تعديله.' }
   }
 }
 

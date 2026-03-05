@@ -1,5 +1,7 @@
 import { useSyncedQuery } from './useSyncedQuery'
 import { supabase } from '../utils/supabase'
+import { offlineCacheManager } from '../services/offline/core/OfflineCacheManager';
+import { useConnectionHealth } from '../utils/connectionMonitor';
 
 export interface ExplorerAccount {
   id: string
@@ -16,6 +18,17 @@ export interface ExplorerAccount {
 async function fetchExplorerAccounts(orgId: string | null): Promise<ExplorerAccount[]> {
   if (!orgId) return []
   
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  const isOffline = !getConnectionMonitor().getHealth().isOnline;
+
+  if (isOffline) {
+    try {
+      const cached = await offlineCacheManager.get<ExplorerAccount[]>(`accounts_cache:${orgId}`);
+      if (cached && Array.isArray(cached)) return cached;
+    } catch {}
+    return [];
+  }
+  
   // Debug: Log the orgId to see what type it is
   console.log('fetchExplorerAccounts called with orgId:', orgId, typeof orgId)
   
@@ -25,19 +38,38 @@ async function fetchExplorerAccounts(orgId: string | null): Promise<ExplorerAcco
     return []
   }
   
-  const { data, error } = await supabase
-    .from('accounts')
-    .select('id, code, name, name_ar, level, parent_id, status, category, org_id')
-    .eq('org_id', orgId)
-    .order('code', { ascending: true })
-    
-  if (error) throw error
-  return (data || []) as ExplorerAccount[]
+  try {
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('id, code, name, name_ar, level, parent_id, status, category, org_id')
+      .eq('org_id', orgId)
+      .order('code', { ascending: true })
+      
+    if (error) throw error
+    const result = (data || []) as ExplorerAccount[]
+
+    // Cache for offline
+    try {
+      await offlineCacheManager.set(`accounts_cache:${orgId}`, result);
+    } catch {}
+
+    return result
+  } catch (error) {
+    console.error('fetchExplorerAccounts failed:', error);
+    // Fallback on error
+    try {
+      const cached = await offlineCacheManager.get<ExplorerAccount[]>(`accounts_cache:${orgId}`, Infinity);
+      if (cached && Array.isArray(cached)) return cached;
+    } catch {}
+    throw error;
+  }
 }
 
 export function useExplorerAccounts(orgId: string | null) {
+  const { isOnline } = useConnectionHealth();
+
   return useSyncedQuery({
-    queryKey: ['explorer-accounts', orgId],
+    queryKey: ['explorer-accounts', orgId, isOnline], // Add isOnline to key for reactivity
     queryFn: () => fetchExplorerAccounts(orgId),
     sync: {
       channelId: 'explorer-accounts',

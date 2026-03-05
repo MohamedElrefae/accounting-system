@@ -1,5 +1,7 @@
 import { supabase } from '../utils/supabase'
 
+import { getConnectionMonitor } from '../utils/connectionMonitor';
+
 export type LandingPreference = 'welcome' | 'dashboard'
 
 // Reads the user's landing preference, scoped to active org if available.
@@ -7,7 +9,6 @@ export type LandingPreference = 'welcome' | 'dashboard'
 export async function getLandingPreference(orgId?: string): Promise<LandingPreference> {
 
   try {
-    const { getConnectionMonitor } = await import('../utils/connectionMonitor');
     const isOnline = getConnectionMonitor().getHealth().isOnline;
 
     let user;
@@ -22,9 +23,9 @@ export async function getLandingPreference(orgId?: string): Promise<LandingPrefe
 
     if (!user) return 'welcome' // Default to welcome for new users
 
-    // If offline, we can't fetch prefs from DB. Return 'dashboard' as safe default for existing users
+    // If offline, we can't fetch prefs from DB. Return 'welcome' as safe default
     if (!isOnline) {
-        return 'dashboard'; 
+        return 'welcome'; 
     }
 
     const effectiveOrgId = orgId ?? null

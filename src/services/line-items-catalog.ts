@@ -32,6 +32,27 @@ export interface CatalogSelectorItem {
 
 class LineItemsCatalogService {
   async list(orgId: string, includeInactive = false): Promise<CatalogItem[]> {
+    let isOffline = false;
+    try {
+      const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+      isOffline = !getConnectionMonitor().getHealth().isOnline;
+    } catch (e) {
+      // ignore
+    }
+
+    if (isOffline) {
+      try {
+        const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+        const db = getOfflineDB();
+        const cached = await db.metadata.get(`line_items_catalog_cache_${orgId}`);
+        if (cached && Array.isArray(cached.value)) {
+          return (cached.value as CatalogItem[]).filter(item => includeInactive || item.is_active !== false);
+        }
+      } catch (e) {
+        console.warn('Cache read failed', e);
+      }
+    }
+
     // Use the safe view exclusively to avoid PostgREST recursion on the table/RPC
     const selectCols = [
       'id', 'org_id', 'code', 'name', 'name_ar', 'parent_id', 'level', 'path',
@@ -51,7 +72,23 @@ class LineItemsCatalogService {
 
     const { data, error } = await q
     if (error) throw error
-    return (data || []) as CatalogItem[]
+
+    // Sync to cache for offline use
+    if (data) {
+      try {
+        const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+        const db = getOfflineDB();
+        await db.metadata.put({ 
+          key: `line_items_catalog_cache_${orgId}`, 
+          value: data, 
+          updatedAt: new Date().toISOString() 
+        });
+      } catch (e) {
+        console.warn('Cache update failed', e);
+      }
+    }
+
+    return (data as unknown as CatalogItem[]) || []
   }
 
   async tree(orgId: string, includeInactive = false): Promise<CatalogItem[]> {
@@ -197,3 +234,30 @@ class LineItemsCatalogService {
 }
 
 export const lineItemsCatalogService = new LineItemsCatalogService()
+
+/**
+ * Perform a simple text search in the catalog for the Cost Analysis Modal
+ */
+export async function searchLineItemsCatalog(orgId: string, query: string): Promise<CatalogItem[]> {
+  const trimmed = query.trim()
+  if (!trimmed) return []
+  
+  const selectCols = [
+    'id', 'org_id', 'code', 'name', 'name_ar', 'parent_id', 'level', 'path',
+    'is_selectable', 'item_type', 'specifications', 'base_unit_of_measure',
+    'standard_cost', 'is_active', 'created_at', 'updated_at'
+  ].join(', ')
+  
+  const { data, error } = await supabase
+    .from('v_line_items_browse')
+    .select(selectCols)
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .eq('is_selectable', true)
+    .or(`code.ilike.%${trimmed}%,name.ilike.%${trimmed}%,name_ar.ilike.%${trimmed}%`)
+    .order('path', { ascending: true })
+    .limit(50)
+    
+  if (error) throw error
+  return (data as unknown as CatalogItem[]) || []
+}

@@ -123,6 +123,10 @@ export async function createAnalysisWorkItem(payload: {
   is_active?: boolean,
   position?: number,
 }): Promise<AnalysisWorkItemRow> {
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  if (!getConnectionMonitor().getHealth().isOnline) {
+    throw new Error('OFFLINE: Cannot create analysis work items while offline.');
+  }
   const { data, error } = await supabase
     .from('analysis_work_items')
     .insert({
@@ -155,6 +159,10 @@ export async function createAnalysisWorkItem(payload: {
 }
 
 export async function updateAnalysisWorkItem(id: string, updates: Partial<Omit<AnalysisWorkItemRow, 'id' | 'created_at' | 'updated_at'>>): Promise<AnalysisWorkItemRow> {
+  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+  if (!getConnectionMonitor().getHealth().isOnline) {
+    throw new Error('OFFLINE: Cannot update analysis work items while offline.');
+  }
   const { data, error } = await supabase
     .from('analysis_work_items')
     .update(updates)

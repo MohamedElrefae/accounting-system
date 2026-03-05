@@ -2,6 +2,8 @@ import { QueryClient } from '@tanstack/react-query'
 import { supabase } from '../utils/supabase'
 import { getCategoryTotalsLegacyFormat } from './reports/unified-financial-query'
 import useAppStore from '../store/useAppStore'
+import { getConnectionMonitor } from '../utils/connectionMonitor'
+import { getOfflineDB } from './offline/core/OfflineSchema'
 
 export interface RecentRow {
   id: string
@@ -43,9 +45,16 @@ export const dashboardQueryKeys = {
 export async function fetchCategoryTotals(f: { orgId?: string; projectId?: string; dateFrom?: string; dateTo?: string; postedOnly?: boolean }) {
   console.log('🎯 Dashboard fetchCategoryTotals called with:', f)
   
-  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
-  if (!getConnectionMonitor().getHealth().isOnline) {
-      // Return safe defaults when offline to prevent crashes
+  const isOnline = getConnectionMonitor().getHealth().isOnline;
+
+  if (!isOnline) {
+      try {
+        const db = getOfflineDB();
+        const cached = await db.metadata.get(`dashboard_totals_cache:${f.orgId || 'none'}:${f.projectId || 'none'}:${f.dateFrom || 'none'}:${f.dateTo || 'none'}:${f.postedOnly}`);
+        if (cached && typeof cached.value === 'object') return cached.value;
+      } catch {}
+
+      // Safe defaults if no cache
       return {
         asset: 0,
         liability: 0,
@@ -74,10 +83,29 @@ export async function fetchCategoryTotals(f: { orgId?: string; projectId?: strin
       postedOnly: !!f.postedOnly,
     })
     console.log('✅ Dashboard fetchCategoryTotals result:', result)
+
+    // Cache for offline
+    try {
+      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+      const db = getOfflineDB();
+      await db.metadata.put({
+        key: `dashboard_totals_cache:${f.orgId || 'none'}:${f.projectId || 'none'}:${f.dateFrom || 'none'}:${f.dateTo || 'none'}:${f.postedOnly}`,
+        value: result,
+        updatedAt: new Date().toISOString()
+      });
+    } catch {}
+
     return result
   } catch (error) {
     console.error('❌ Dashboard fetchCategoryTotals error:', error)
-    // Return empty defaults on error instead of throwing
+    
+    // Attempt offline fallback from cache as last resort
+    try {
+      const db = getOfflineDB();
+      const cached = await db.metadata.get(`dashboard_totals_cache:${f.orgId || 'none'}:${f.projectId || 'none'}:${f.dateFrom || 'none'}:${f.dateTo || 'none'}:${f.postedOnly}`);
+      if (cached && typeof cached.value === 'object') return cached.value;
+    } catch {}
+
     return {
         asset: 0,
         liability: 0,
@@ -89,12 +117,10 @@ export async function fetchCategoryTotals(f: { orgId?: string; projectId?: strin
 }
 
 export async function fetchRecentActivity(f: { orgId?: string; projectId?: string; postedOnly?: boolean }): Promise<RecentRow[]> {
-  const { getConnectionMonitor } = await import('../utils/connectionMonitor');
   const isOnline = getConnectionMonitor().getHealth().isOnline;
 
   if (!isOnline) {
     try {
-      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
       const db = getOfflineDB();
       const cached = await db.metadata.get(`recent_activity_cache:${f.orgId || 'none'}:${f.projectId || 'none'}`);
       if (cached && Array.isArray(cached.value)) return cached.value;
@@ -127,18 +153,34 @@ export async function fetchRecentActivity(f: { orgId?: string; projectId?: strin
     if (error) throw error;
     if (!rows || rows.length === 0) return [];
 
-    // Fetch the lines for these transactions to get accurate totals and account names
+    // Fetch lines for these transactions to get accurate totals and account names
+    // Batch queries to avoid URL length limits
     const ids = rows.map(r => r.id);
     let lines: any[] = [];
     try {
-      const { data: linesData, error: linesErr } = await supabase
-        .from('v_transaction_lines_enriched')
-        .select('transaction_id, account_name, account_name_ar, account_category, debit_amount, credit_amount, line_no')
-        .in('transaction_id', ids)
-        .order('line_no', { ascending: true });
-
-      if (linesErr) throw linesErr;
-      lines = linesData || [];
+      const BATCH_SIZE = 100
+      const batches = []
+      for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+        batches.push(ids.slice(i, i + BATCH_SIZE))
+      }
+      
+      const batchResults = await Promise.all(
+        batches.map(batch =>
+          supabase
+            .from('v_transaction_lines_enriched')
+            .select('transaction_id, account_name, account_name_ar, account_category, debit_amount, credit_amount, line_no')
+            .in('transaction_id', batch)
+            .order('line_no', { ascending: true })
+        )
+      )
+      
+      // Combine results from all batches
+      lines = batchResults.reduce((combined, result) => {
+        if (result.data && !result.error) {
+          combined.push(...result.data)
+        }
+        return combined
+      }, [] as any[])
     } catch (err) {
       console.error('❌ Error fetching recent transaction lines:', err);
       lines = [];
@@ -189,7 +231,6 @@ export async function fetchRecentActivity(f: { orgId?: string; projectId?: strin
 
     // Cache for offline
     try {
-      const { getOfflineDB } = await import('./offline/core/OfflineSchema');
       const db = getOfflineDB();
       await db.metadata.put({
         key: `recent_activity_cache:${f.orgId || 'none'}:${f.projectId || 'none'}`,

@@ -13,6 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 import { DataGenerator } from './OfflineDataGenerator';
+import { DB_CONSTANTS } from '../core/OfflineConfig';
 
 // ─── Property 18: Queue Performance Scalability (Task 5.3, Req 6.2) ───────────
 
@@ -130,7 +131,6 @@ describe('Property 29: Sync Failure Recovery (Req 12.5, 12.6)', () => {
   });
 
   it('P29b: Retry count never exceeds maximum', () => {
-    const { DB_CONSTANTS } = require('../core/OfflineConfig');
     const maxRetries = DB_CONSTANTS.MAX_SYNC_RETRIES;
 
     fc.assert(

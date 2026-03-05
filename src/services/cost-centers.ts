@@ -65,7 +65,8 @@ export type CostCenterUpdate = {
 // API Functions
 export async function getCostCentersTree(orgId: string, includeInactive = false): Promise<CostCenterTreeNode[]> {
   try {
-    if (!navigator.onLine) return [];
+    const monitor = getConnectionMonitor();
+    if (!monitor.getHealth().isOnline) return [];
 
     const { data, error } = await supabase.rpc('get_cost_centers_tree', {
       p_org_id: orgId,
@@ -144,7 +145,8 @@ export async function getCostCentersList(orgId: string, includeInactive = false)
 }
 
 export async function getCostCenter(id: string): Promise<CostCenter | null> {
-  if (!navigator.onLine) return null;
+  const monitor = getConnectionMonitor();
+  if (!monitor.getHealth().isOnline) return null;
   const { data, error } = await supabase.rpc('get_cost_center', { p_id: id }) // Note: Usually CC is cached, but this is direct fetch
   
   if (error) {
@@ -155,7 +157,8 @@ export async function getCostCenter(id: string): Promise<CostCenter | null> {
 }
 
 export async function createCostCenter(input: CostCenterCreate): Promise<CostCenter> {
-  if (!navigator.onLine) throw new Error('Offline: Cannot create cost center');
+  const monitor = getConnectionMonitor();
+  if (!monitor.getHealth().isOnline) throw new Error('Offline: Cannot create cost center');
   const { data, error } = await supabase
     .from('cost_centers')
     .insert([{
@@ -172,7 +175,8 @@ export async function createCostCenter(input: CostCenterCreate): Promise<CostCen
 }
 
 export async function updateCostCenter(input: CostCenterUpdate): Promise<CostCenter> {
-  if (!navigator.onLine) throw new Error('Offline: Cannot update cost center');
+  const monitor = getConnectionMonitor();
+  if (!monitor.getHealth().isOnline) throw new Error('Offline: Cannot update cost center');
   const { id, org_id, ...updates } = input
   
   const { data, error } = await supabase
@@ -191,7 +195,8 @@ export async function updateCostCenter(input: CostCenterUpdate): Promise<CostCen
 }
 
 export async function deleteCostCenter(id: string, orgId: string): Promise<void> {
-  if (!navigator.onLine) throw new Error('Offline: Cannot delete cost center');
+  const monitor = getConnectionMonitor();
+  if (!monitor.getHealth().isOnline) throw new Error('Offline: Cannot delete cost center');
   const { error } = await supabase
     .from('cost_centers')
     .delete()
@@ -202,7 +207,8 @@ export async function deleteCostCenter(id: string, orgId: string): Promise<void>
 }
 
 export async function fetchNextCostCenterCode(orgId: string, parentId?: string | null): Promise<string> {
-  if (!navigator.onLine) return '1';
+  const monitor = getConnectionMonitor();
+  if (!monitor.getHealth().isOnline) return '1';
   const { data, error } = await supabase.rpc('get_next_cost_center_code', {
     p_org_id: orgId,
     p_parent_id: parentId

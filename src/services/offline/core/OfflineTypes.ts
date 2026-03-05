@@ -86,7 +86,7 @@ export interface Transaction {
 export interface SyncOperation {
   id: string;
   type: SyncOperationType;
-  entityType: 'transaction' | 'transaction_line' | 'attachment' | 'payment';
+  entityType: 'transaction' | 'transaction_line' | 'attachment' | 'payment' | 'transaction_line_items';
   entityId: string;
   localId?: string;
   data: Record<string, unknown>;

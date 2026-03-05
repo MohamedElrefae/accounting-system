@@ -1157,6 +1157,27 @@ class TransactionLineItemsCatalogService {
    * Get catalog items (templates) - items with transaction_id = NULL
    */
   async getCatalogItems(orgId: string, includeInactive = false): Promise<DbTxLineItem[]> {
+    let isOffline = false;
+    try {
+      const { getConnectionMonitor } = await import('../utils/connectionMonitor');
+      isOffline = !getConnectionMonitor().getHealth().isOnline;
+    } catch (e) {
+      // ignore
+    }
+
+    if (isOffline) {
+      try {
+        const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+        const db = getOfflineDB();
+        const cached = await db.metadata.get(`tx_line_items_catalog_cache_${orgId}`);
+        if (cached && Array.isArray(cached.value)) {
+          return (cached.value as DbTxLineItem[]).filter(item => includeInactive || item.is_active !== false);
+        }
+      } catch (e) {
+        console.warn('Cache read failed', e);
+      }
+    }
+
     try {
       const { data, error } = await supabase
         .from('transaction_line_items')
@@ -1166,6 +1187,21 @@ class TransactionLineItemsCatalogService {
         .order('item_code', { ascending: true })
       
       if (error) throw error
+
+      if (data) {
+        try {
+          const { getOfflineDB } = await import('./offline/core/OfflineSchema');
+          const db = getOfflineDB();
+          await db.metadata.put({ 
+            key: `tx_line_items_catalog_cache_${orgId}`, 
+            value: data, 
+            updatedAt: new Date().toISOString() 
+          });
+        } catch (e) {
+          console.warn('Cache update failed', e);
+        }
+      }
+
       return ((data || []) as DbTxLineItem[])
         .filter(item => includeInactive || item.is_active !== false)
     } catch (error) {

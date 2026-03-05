@@ -42,12 +42,27 @@ const LandingDecider: React.FC = () => {
     }
   }, [demoMode, qc])
 
-  // Show loading state briefly
-  if (!demoMode && isLoading) return <DashboardShellSkeleton />
+  const [timedOut, setTimedOut] = React.useState(false)
 
-  // If there's an error or no preference, default to welcome (not dashboard)
+  // Timeout for offline/slow startup
+  React.useEffect(() => {
+    if (isLoading) {
+      const timer = setTimeout(() => {
+        if (isLoading) {
+          console.warn('[LandingDecider] Query timed out, falling back to welcome');
+          setTimedOut(true)
+        }
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [isLoading])
+
+  // Show loading state briefly
+  if (!demoMode && isLoading && !timedOut) return <DashboardShellSkeleton />
+
+  // If there's an error, timeout, or no preference, default to welcome (not dashboard)
   // Dashboard requires specific permissions, so welcome is safer default
-  const effectivePref = demoMode ? 'dashboard' : (error ? 'welcome' : (pref || 'welcome'))
+  const effectivePref = (error || timedOut) ? 'welcome' : (pref || 'welcome')
 
   return (
     <React.Suspense fallback={<DashboardShellSkeleton />}>

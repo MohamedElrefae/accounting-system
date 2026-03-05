@@ -581,6 +581,18 @@ export const ArrowDownwardIcon: React.FC<SvgIconProps> = (props) => (
   </SvgIcon>
 );
 
+export const CalculateIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2zm5 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z" /></SvgIcon>
+);
+
+export const KeyboardArrowUpIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z" /></SvgIcon>
+);
+
+export const KeyboardArrowDownIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z" /></SvgIcon>
+);
+
 export const CheckIcon: React.FC<SvgIconProps> = (props) => (
   <SvgIcon {...props}>
     <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
@@ -777,6 +789,18 @@ export const CloudDoneIcon: React.FC<SvgIconProps> = (props) => (
   </SvgIcon>
 );
 
+export const CompareRoundedIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}><path d="M19 3h-5v2h5v13l-5-5v9h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 15v5H5c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2h5v2H5v13l5-5z" /></SvgIcon>
+);
+
+export const CloudDownloadRoundedIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z" /></SvgIcon>
+);
+
+export const SaveRoundedIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" /></SvgIcon>
+);
+
 // Export all icons with their MUI names for compatibility
 export {
   MenuIcon as Menu,
@@ -909,6 +933,10 @@ export {
   DeselectOutlinedIcon as DeselectOutlined,
   BugReportIcon as BugReport,
   WarningAmberRoundedIcon as WarningAmberRounded,
+  WarningAmberRoundedIcon as WarningAmber,
+  KeyboardArrowUpIcon as KeyboardArrowUp,
+  KeyboardArrowDownIcon as KeyboardArrowDown,
+  CalculateIcon as Calculate,
   MergeTypeRoundedIcon as MergeTypeRounded,
   PersonIcon as PersonRounded,
   CheckCircleIcon as CheckCircleRounded,
@@ -918,11 +946,13 @@ export {
   SyncRoundedIcon as SyncRounded,
   CloudOffIcon as CloudOff,
   ErrorIcon as ErrorRounded,
+  ErrorIcon as ErrorOutlineRounded,
   WarningIcon as WarningRounded,
   MinimizeRoundedIcon as MinimizeRounded,
   CloseIcon as CloseRounded,
   History as HistoryRounded,
   StorageRoundedIcon as StorageRounded,
+  StorageRoundedIcon as Storage,
   RefreshIcon as RefreshRounded,
   PlayArrowIcon as PlayArrowRounded,
   SettingsIcon as SettingsRounded,
@@ -935,7 +965,21 @@ export {
   DescriptionOutlinedIcon as DescriptionOutlined,
   SignalWifiOffIcon as SignalWifiOff,
   SyncProblemIcon as SyncProblem,
-  CloudDoneIcon as CloudDone
+  CloudDoneIcon as CloudDone,
+  CompareRoundedIcon as CompareRounded,
+  CloudDownloadRoundedIcon as CloudDownloadRounded,
+  SaveRoundedIcon as SaveRounded,
+  DescriptionIcon as Book,
+  DescriptionIcon as Summarize,
+  AccountBalanceIcon as Balance,
+  EditIcon as EditNote,
+  InventoryIcon as ShoppingCart,
+  ReceiptIcon as RequestQuote,
+  GroupIcon as PersonOutline,
+  TrendingUpIcon as MonetizationOn,
+  TrendingUpIcon as SwapHoriz,
+  TableChartIcon as BarChart,
+  CloudUploadIcon as Backup
 };
 
 // Default export for compatibility with default imports
@@ -1012,6 +1056,7 @@ const icons = {
   InfoOutlined: InfoOutlinedIcon,
   CheckCircle: CheckCircleIcon,
   Error: ErrorIcon,
+  ErrorOutlineRounded: ErrorIcon,
   Warning: WarningIcon,
   Info: InfoIcon,
   RestartAlt: RestartAltIcon,
@@ -1069,11 +1114,38 @@ const icons = {
   DeselectOutlined: DeselectOutlinedIcon,
   BugReport: BugReportIcon,
   WarningAmberRounded: WarningAmberRoundedIcon,
+  WarningAmber: WarningAmberRoundedIcon,
+  KeyboardArrowUp: KeyboardArrowUpIcon,
+  KeyboardArrowDown: KeyboardArrowDownIcon,
   MergeTypeRounded: MergeTypeRoundedIcon,
   PersonRounded: PersonIcon,
   CheckCircleRounded: CheckCircleIcon,
   InfoRounded: InfoIcon,
-  ExpandMoreRounded: ExpandMoreIcon
+  ExpandMoreRounded: ExpandMoreIcon,
+  CompareRounded: CompareRoundedIcon,
+  CloudDownloadRounded: CloudDownloadRoundedIcon,
+  Storage: StorageRoundedIcon,
+  SaveRounded: SaveRoundedIcon,
+  Book: DescriptionIcon,
+  Summarize: DescriptionIcon,
+  Balance: AccountBalanceIcon,
+  EditNote: EditIcon,
+  ShoppingCart: InventoryIcon,
+  RequestQuote: ReceiptIcon,
+  PersonOutline: GroupIcon,
+  MonetizationOn: TrendingUpIcon,
+  SwapHoriz: TrendingUpIcon,
+  BarChart: TableChartIcon,
+  Backup: CloudUploadIcon,
+  Calculate: CalculateIcon,
+  Settings: SettingsIcon,
+  Send: SendIcon,
+  ArrowBack: ArrowBackIcon,
+  ArrowForward: ArrowForwardIcon,
+  ExpandLess: ExpandLessIcon,
+  Add: AddIcon,
+  Delete: DeleteIcon,
+  Close: CloseIcon
 };
 
 export default icons;

@@ -12,6 +12,7 @@ export interface TransactionLineItemsEditorProps {
   workItems?: Array<{ id: string; code: string; name: string }>
   analysisItems?: Record<string, { code: string; name: string }>
   costCenters?: Array<{ id: string; code: string; name: string }>
+  itemCatalog?: Record<string, { code: string; name: string; description?: string }>
   transactionLineDefaults?: {
     work_item_id?: string | null
     analysis_work_item_id?: string | null
@@ -39,6 +40,7 @@ export const TransactionLineItemsEditor: React.FC<TransactionLineItemsEditorProp
   workItems,
   analysisItems,
   costCenters,
+  itemCatalog,
   transactionLineDefaults,
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -161,6 +163,7 @@ export const TransactionLineItemsEditor: React.FC<TransactionLineItemsEditorProp
                 {showAdvanced && (
                   <th className="p-3 text-right text-sm font-semibold text-gray-700">وحدة القياس</th>
                 )}
+                <th className="p-3 text-right text-sm font-semibold text-gray-700">التحليل</th>
                 <th className="p-3 text-right text-sm font-semibold text-gray-700">الإجمالي</th>
                 <th className="p-3 text-center text-sm font-semibold text-gray-700">العمليات</th>
               </tr>
@@ -168,6 +171,14 @@ export const TransactionLineItemsEditor: React.FC<TransactionLineItemsEditorProp
             <tbody>
               {items.map((item, index) => {
                 const lineTotal = calculateLineTotal(item)
+                
+                // Get cost analysis labels
+                const workItem = workItems?.find(w => w.id === item.work_item_id)
+                const analysisItem = analysisItems?.[item.analysis_work_item_id || '']
+                const costCenter = costCenters?.find(c => c.id === item.sub_tree_id)
+                
+                const hasCostAnalysis = workItem || analysisItem || costCenter
+                
                 return (
                   <tr key={index} className="border-b hover:bg-gray-50">
                     <td className="p-3 text-sm text-gray-600">{item.line_number}</td>
@@ -256,6 +267,31 @@ export const TransactionLineItemsEditor: React.FC<TransactionLineItemsEditorProp
                         </select>
                       </td>
                     )}
+                    
+                    {/* Cost Analysis Display */}
+                    <td className="p-3">
+                      {hasCostAnalysis ? (
+                        <div className="flex flex-col gap-1 text-xs">
+                          {workItem && (
+                            <div className="px-2 py-1 bg-blue-100 text-blue-800 rounded">
+                              📌 {workItem.code}
+                            </div>
+                          )}
+                          {analysisItem && (
+                            <div className="px-2 py-1 bg-purple-100 text-purple-800 rounded">
+                              🔍 {analysisItem.code}
+                            </div>
+                          )}
+                          {costCenter && (
+                            <div className="px-2 py-1 bg-green-100 text-green-800 rounded">
+                              🏢 {costCenter.code}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-gray-400">—</div>
+                      )}
+                    </td>
                     
                     {/* Total */}
                     <td className="p-3">
@@ -360,6 +396,7 @@ export const TransactionLineItemsEditor: React.FC<TransactionLineItemsEditorProp
         workItems={workItems || []}
         analysisItems={analysisItems || {}}
         costCenters={costCenters || []}
+        itemCatalog={itemCatalog}
         transactionLineDefaults={transactionLineDefaults}
       />
     </div>
