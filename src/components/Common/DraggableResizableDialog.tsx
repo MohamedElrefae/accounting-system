@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Dialog, DialogTitle, DialogContent, useTheme } from '@mui/material'
+import { Dialog, DialogTitle, DialogContent, useTheme, IconButton, Box } from '@mui/material'
+import { CloseIcon, FullscreenIcon, FullscreenExitIcon } from '../icons/SimpleIcons'
 
 interface DraggableResizableDialogProps {
   open: boolean
@@ -13,6 +14,9 @@ interface DraggableResizableDialogProps {
   showLayoutButtons?: boolean
   enableDockTopBottom?: boolean
   rememberLayoutKey?: string
+  // New props for modern design
+  showHeaderActions?: boolean
+  headerGradient?: string
 }
 
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
@@ -25,6 +29,8 @@ const DraggableResizableDialog: React.FC<DraggableResizableDialogProps> = ({
   storageKey,
   initialWidth = 900,
   initialHeight = 600,
+  showHeaderActions = true,
+  headerGradient = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
 }) => {
   const theme = useTheme()
   const isRtl = theme.direction === 'rtl'
@@ -62,11 +68,45 @@ const DraggableResizableDialog: React.FC<DraggableResizableDialogProps> = ({
   const resizing = useRef(false)
   const resizeStart = useRef<{ x: number; y: number; w: number; h: number }>({ x: 0, y: 0, w: 0, h: 0 })
 
+  const [isMaximized, setIsMaximized] = useState(false)
+  const [_maximizedSize, setMaximizedSize] = useState({ width: 0, height: 0 })
+  const [normalSize, setNormalSize] = useState({ width: 0, height: 0 })
+  const [normalPos, setNormalPos] = useState({ x: 0, y: 0 })
+
+  // Store normal state before maximizing
+  const handleMaximizeToggle = useCallback(() => {
+    try {
+      if (isMaximized) {
+        // Restore normal size and position
+        setSize(normalSize)
+        setPos(normalPos)
+        setIsMaximized(false)
+      } else {
+        // Store current state and maximize
+        setNormalSize(size)
+        setNormalPos(pos)
+        const maximizedW = window.innerWidth - 40
+        const maximizedH = window.innerHeight - 40
+        setMaximizedSize({ width: maximizedW, height: maximizedH })
+        setSize({ width: maximizedW, height: maximizedH })
+        setPos({ x: 20, y: 20 })
+        setIsMaximized(true)
+      }
+    } catch (error) {
+      console.error('Maximize toggle error:', error)
+    }
+  }, [isMaximized, size, pos, setSize, setPos, setNormalSize, setNormalPos, setMaximizedSize, normalSize, normalPos])
+
   const onTitleMouseDown: React.MouseEventHandler = (e) => {
-    dragging.current = true
-    dragStart.current = { x: e.clientX, y: e.clientY, px: pos.x, py: pos.y }
-    document.addEventListener('mousemove', onDrag)
-    document.addEventListener('mouseup', onDragEnd)
+    try {
+      dragging.current = true
+      dragStart.current = { x: e.clientX, y: e.clientY, px: pos.x, py: pos.y }
+      document.addEventListener('mousemove', onDrag)
+      document.addEventListener('mouseup', onDragEnd)
+    } catch (error) {
+      console.error('Title mouse down error:', error)
+      dragging.current = false
+    }
   }
 
   const onDrag = useCallback((e: MouseEvent) => {
@@ -74,7 +114,10 @@ const DraggableResizableDialog: React.FC<DraggableResizableDialogProps> = ({
     const dx = e.clientX - dragStart.current.x
     const dy = e.clientY - dragStart.current.y
 
-    const nx = dragStart.current.px + dx
+    // In RTL mode, invert the horizontal movement
+    const adjustedDx = isRtl ? -dx : dx
+
+    const nx = dragStart.current.px + adjustedDx
     const ny = dragStart.current.py + dy
 
     // Safety margin: keep at least 50px of header visible
@@ -82,7 +125,7 @@ const DraggableResizableDialog: React.FC<DraggableResizableDialogProps> = ({
     const safeY = clamp(ny, 0, window.innerHeight - 50)
 
     setPos({ x: safeX, y: safeY })
-  }, [size.width])
+  }, [size.width, isRtl])
 
   const onDragEnd = useCallback(() => {
     dragging.current = false
@@ -91,57 +134,56 @@ const DraggableResizableDialog: React.FC<DraggableResizableDialogProps> = ({
   }, [onDrag])
 
   const onResizeHandleMouseDown: React.MouseEventHandler<HTMLDivElement> = (e) => {
-    resizing.current = true
-    resizeStart.current = { x: e.clientX, y: e.clientY, w: size.width, h: size.height }
-    document.addEventListener('mousemove', onResize)
-    document.addEventListener('mouseup', onResizeEnd)
-    e.preventDefault()
-    e.stopPropagation()
+    try {
+      e.preventDefault()
+      e.stopPropagation()
+
+      resizing.current = true
+      resizeStart.current = { x: e.clientX, y: e.clientY, w: size.width, h: size.height }
+
+      const handleMouseMove = (e: MouseEvent) => {
+        if (!resizing.current) return
+
+        let dw = e.clientX - resizeStart.current.x
+        const dh = e.clientY - resizeStart.current.y
+
+        // In RTL mode, invert the horizontal movement for resize
+        if (isRtl) {
+          dw = -dw
+        }
+
+        setSize({ width: w, height: h })
+      }
+
+      const handleMouseUp = () => {
+        resizing.current = false
+        document.removeEventListener('mousemove', handleMouseMove)
+        document.removeEventListener('mouseup', handleMouseUp)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = isRtl ? 'nesw-resize' : 'nwse-resize'
+      document.body.style.userSelect = 'none'
+
+    } catch (error) {
+      console.error('Resize handle mouse down error:', error)
+      resizing.current = false
+    }
   }
-
-  const onResize = useCallback((e: MouseEvent) => {
-    if (!resizing.current) return
-    const dw = e.clientX - resizeStart.current.x
-    const dh = e.clientY - resizeStart.current.y
-
-    const w = clamp(resizeStart.current.w + dw, 200, 4000)
-    const h = clamp(resizeStart.current.h + dh, 150, 4000)
-    setSize({ width: w, height: h })
-  }, [])
-
-  const onResizeEnd = useCallback(() => {
-    resizing.current = false
-    document.removeEventListener('mousemove', onResize)
-    document.removeEventListener('mouseup', onResizeEnd)
-  }, [onResize])
 
   useEffect(() => () => {
     document.removeEventListener('mousemove', onDrag)
     document.removeEventListener('mouseup', onDragEnd)
-    document.removeEventListener('mousemove', onResize)
-    document.removeEventListener('mouseup', onResizeEnd)
-  }, [onDrag, onDragEnd, onResize, onResizeEnd])
+  }, [onDrag, onDragEnd])
 
   return (
     <Dialog
       open={open}
       onClose={onClose}
       maxWidth={false}
-      // Override the container and backdrop to allow clicking/dragging "outside"
-      sx={{
-        '& .MuiDialog-container': {
-          display: 'block',
-          overflow: 'visible',
-          pointerEvents: 'none'
-        },
-        '& .MuiDialog-paper': {
-          pointerEvents: 'auto'
-        },
-        '& .MuiBackdrop-root': {
-          // Keep backdrop but don't let it block clicks if we want to drag far
-          // Or just keep it as is if modal is truly modal
-        }
-      }}
       PaperProps={{
         sx: {
           width: size.width,
@@ -155,35 +197,139 @@ const DraggableResizableDialog: React.FC<DraggableResizableDialogProps> = ({
           maxHeight: 'none !important',
           overflow: 'hidden',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          border: '2px solid #667eea',
+          borderRadius: '8px',
+          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
+          pointerEvents: 'auto'
         }
       }}
     >
       {title && (
-        <DialogTitle onMouseDown={onTitleMouseDown} sx={{ cursor: 'move', userSelect: 'none' }}>{title}</DialogTitle>
+        <DialogTitle
+          onMouseDown={onTitleMouseDown}
+          sx={{
+            cursor: 'move',
+            userSelect: 'none',
+            background: headerGradient,
+            color: 'white',
+            borderBottom: '2px solid rgba(255, 255, 255, 0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 16px',
+            fontSize: '16px',
+            fontWeight: 600
+          }}
+        >
+          <Box>{title}</Box>
+          {showHeaderActions && (
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <IconButton
+                size="small"
+                onClick={handleMaximizeToggle}
+                sx={{
+                  color: 'white',
+                  '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.1)' }
+                }}
+              >
+                {isMaximized ? <FullscreenExitIcon /> : <FullscreenIcon />}
+              </IconButton>
+              <IconButton
+                size="small"
+                onClick={onClose}
+                sx={{
+                  color: 'white',
+                  '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.1)' }
+                }}
+              >
+                <CloseIcon />
+              </IconButton>
+            </Box>
+          )}
+        </DialogTitle>
       )}
-      <DialogContent dividers sx={{ p: 2, position: 'relative', flexGrow: 1 }}>
+      <DialogContent dividers sx={{
+        p: 2,
+        position: 'relative',
+        flexGrow: 1,
+        overflow: 'auto',
+        minWidth: 200,
+        minHeight: 150
+      }}>
         {children}
       </DialogContent>
-      {/* Resize handle moved to Paper level (sibling of content) */}
+      {/* Modern Resize Handle */}
       <div
         onMouseDown={onResizeHandleMouseDown}
         style={{
           position: 'absolute',
-          right: 0,
+          [isRtl ? 'left' : 'right']: 0,
           bottom: 0,
-          width: 24,
-          height: 24,
-          cursor: 'nwse-resize',
+          width: 30,
+          height: 30,
+          cursor: isRtl ? 'nesw-resize' : 'nwse-resize',
           zIndex: 10000,
           display: 'flex',
-          alignItems: 'flex-end',
-          justifyContent: 'flex-end',
-          padding: '0 4px 4px 0'
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(102, 126, 234, 0.25)',
+          borderRadius: isRtl ? '8px 0 0 0' : '0 0 8px 0',
+          border: `2px solid #667eea`,
+          borderTop: isRtl ? '2px solid #667eea' : 'none',
+          borderLeft: isRtl ? 'none' : '2px solid #667eea',
+          userSelect: 'none',
+          boxShadow: '0 4px 16px rgba(102, 126, 234, 0.5)',
+          transform: 'scale(1.1)'
         }}
-        title="Resize"
+        title="Resize - Click and drag to resize freely like Transaction Wizard"
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'rgba(102, 126, 234, 0.4)'
+          e.currentTarget.style.transform = 'scale(1.2)'
+          e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.7)'
+        }}
+        onMouseLeave={(e) => {
+          if (!resizing.current) {
+            e.currentTarget.style.backgroundColor = 'rgba(102, 126, 234, 0.25)'
+            e.currentTarget.style.transform = 'scale(1.1)'
+            e.currentTarget.style.boxShadow = '0 4px 16px rgba(102, 126, 234, 0.5)'
+          }
+        }}
       >
-        <div style={{ width: 10, height: 10, borderRight: '2px solid #999', borderBottom: '2px solid #999' }} />
+        <div style={{
+          width: 16,
+          height: 16,
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'flex-end'
+        }}>
+          <div style={{
+            position: 'absolute',
+            width: '100%',
+            height: '2px',
+            backgroundColor: '#667eea',
+            bottom: 0,
+            right: 0
+          }} />
+          <div style={{
+            position: 'absolute',
+            width: '2px',
+            height: '100%',
+            backgroundColor: '#667eea',
+            bottom: 0,
+            right: 0
+          }} />
+          <div style={{
+            position: 'absolute',
+            width: '6px',
+            height: '6px',
+            borderRight: '2px solid #667eea',
+            borderBottom: '2px solid #667eea',
+            bottom: 0,
+            right: 0
+          }} />
+        </div>
       </div>
     </Dialog>
   )

@@ -12,6 +12,7 @@ export interface FilterOptionsResult {
   workItemOptions: SearchableSelectOption[]
   analysisOptions: SearchableSelectOption[]
   costCenterOptions: SearchableSelectOption[]
+  itemOptions: SearchableSelectOption[]
 }
 
 export const useFilterOptions = (): FilterOptionsResult => {
@@ -24,6 +25,7 @@ export const useFilterOptions = (): FilterOptionsResult => {
     categories,
     classifications,
     analysisItemsMap,
+    items,
   } = useTransactionsData()
 
   const accountOptions = useMemo(() => (
@@ -111,6 +113,15 @@ export const useFilterOptions = (): FilterOptionsResult => {
       })),
   ]), [costCenters])
 
+  const itemOptions = useMemo(() => ([
+    { value: '', label: 'جميع الأصناف', searchText: '' },
+    ...items.map(item => ({
+      value: item.id,
+      label: `${item.item_code} - ${item.item_name}`,
+      searchText: `${item.item_code} ${item.item_name} ${item.item_name_ar || ''}`,
+    })),
+  ]), [items])
+
   return {
     accountOptions,
     orgOptions,
@@ -120,6 +131,7 @@ export const useFilterOptions = (): FilterOptionsResult => {
     workItemOptions,
     analysisOptions,
     costCenterOptions,
+    itemOptions,
   }
 }
 

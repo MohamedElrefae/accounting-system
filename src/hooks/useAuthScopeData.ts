@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import useOptimizedAuth from './useOptimizedAuth';
 
 /**
@@ -10,7 +11,7 @@ import useOptimizedAuth from './useOptimizedAuth';
 export function useAuthScopeData() {
   const auth = useOptimizedAuth();
   
-  return {
+  return useMemo(() => ({
     organizations: auth.userOrganizations,
     projects: auth.userProjects,
     defaultOrgId: auth.defaultOrgId,
@@ -18,7 +19,16 @@ export function useAuthScopeData() {
     projectRoles: auth.projectRoles,
     isReady: !auth.loading && auth.user !== null,
     refresh: auth.refreshProfile,
-  };
+  }), [
+    auth.userOrganizations, 
+    auth.userProjects, 
+    auth.defaultOrgId, 
+    auth.orgRoles, 
+    auth.projectRoles, 
+    auth.loading, 
+    auth.user, 
+    auth.refreshProfile
+  ]);
 }
 
 export default useAuthScopeData;

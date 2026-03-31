@@ -107,9 +107,13 @@ export interface TransactionRecord {
   description_ar?: string | null
   reference_number: string | null
   // Legacy single-line fields (removed in multiline schema) kept optional for compatibility
+  // These are now in transaction_lines, not the transactions header table
   debit_account_id?: string | null
   credit_account_id?: string | null
-  amount?: number | null
+  // amount field is deprecated and removed from DB, use total_debits instead
+  // These are now aggregates in the header table
+  total_debits?: number | null
+  total_credits?: number | null
   // Header-level fields
   notes: string | null
   notes_ar?: string | null
@@ -123,8 +127,8 @@ export interface TransactionRecord {
   has_line_items?: boolean
   line_items_total?: number | null
   line_items_count?: number | null
-  total_debits?: number | null
-  total_credits?: number | null
+  line_items_total?: number | null
+  line_items_count?: number | null
   // Line-level dimension placeholders (optional in headers)
   classification_id?: string | null
   sub_tree_id?: string | null
@@ -400,11 +404,12 @@ export async function getTransactions(options?: ListTransactionsOptions): Promis
 
   if (f?.dateFrom) query = query.gte('entry_date', f.dateFrom)
   if (f?.dateTo) query = query.lte('entry_date', f.dateTo)
-  if (f?.amountFrom) query = query.gte('amount', f.amountFrom)
-  if (f?.amountTo) query = query.lte('amount', f.amountTo)
+  if (f?.amountFrom) query = query.gte('total_debits', f.amountFrom)
+  if (f?.amountTo) query = query.lte('total_debits', f.amountTo)
   
-  if (f?.debitAccountId) query = query.eq('debit_account_id', f.debitAccountId)
-  if (f?.creditAccountId) query = query.eq('credit_account_id', f.creditAccountId)
+  // Note: debit_account_id and credit_account_id filters removed from header query 
+  // as they no longer exist in the transactions table. Filtering should be done 
+  // via transaction_lines or an enriched view.
   
   if (f?.projectId) query = query.eq('project_id', f.projectId)
   if (f?.orgId) query = query.eq('org_id', f.orgId)
@@ -590,9 +595,8 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
     description: input.description,
     description_ar: (input as any).description_ar || null,
     reference_number: input.reference_number || null,
-    debit_account_id: input.debit_account_id,
-    credit_account_id: input.credit_account_id,
-    amount: input.amount,
+    total_debits: input.amount,
+    total_credits: input.amount,
     notes: input.notes || null,
     notes_ar: (input as any).notes_ar || null,
     classification_id: input.classification_id || null,
@@ -618,13 +622,16 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
       // 2. Prepare payload for local DB (ensure all required fields)
       const now = new Date().toISOString();
       const localTx = {
+        _pk: localId, // IndexedDB Primary Key
         id: localId,
         ...payload,
         created_at: now,
         updated_at: now,
+        _storedAt: now,
         is_posted: false,
         is_synced: false,
-        // Add any other required fields for local DB schema
+        syncStatus: 'local_draft',
+        vectorClock: { [uid || 'offline-user']: 1 },
       };
 
       // 3. Save to IndexedDB
@@ -780,6 +787,7 @@ export async function createTransactionWithLines(input: CreateTransactionWithLin
 
       // 2. Prepare header
       const header = {
+        _pk: localTxId, // IndexedDB Primary Key
         id: localTxId,
         entry_number: entryNumber,
         entry_date: formatDateForSupabase(input.entry_date),
@@ -793,29 +801,39 @@ export async function createTransactionWithLines(input: CreateTransactionWithLin
         created_by: uid ?? 'offline-user',
         created_at: now,
         updated_at: now,
+        _storedAt: now,
         is_posted: false,
         is_synced: false,
+        syncStatus: 'local_draft',
+        vectorClock: { [uid || 'offline-user']: 1 },
       };
 
       // 3. Prepare lines
-      const processedLines = input.lines.map((l, idx) => ({
-        id: crypto.randomUUID(),
-        transaction_id: localTxId,
-        line_no: l.line_no || (idx + 1),
-        account_id: l.account_id,
-        debit_amount: Number(l.debit_amount || 0),
-        credit_amount: Number(l.credit_amount || 0),
-        description: l.description || null,
-        org_id: l.org_id || input.org_id,
-        project_id: l.project_id || input.project_id || null,
-        cost_center_id: l.cost_center_id || null,
-        work_item_id: l.work_item_id || null,
-        analysis_work_item_id: l.analysis_work_item_id || null,
-        classification_id: l.classification_id || null,
-        sub_tree_id: l.sub_tree_id || null,
-        created_at: now,
-        updated_at: now,
-      }));
+      const processedLines = input.lines.map((l, idx) => {
+        const lineId = crypto.randomUUID();
+        return {
+          _pk: lineId, // IndexedDB Primary Key
+          id: lineId,
+          transaction_id: localTxId,
+          line_no: l.line_no || (idx + 1),
+          account_id: l.account_id,
+          debit_amount: Number(l.debit_amount || 0),
+          credit_amount: Number(l.credit_amount || 0),
+          description: l.description || null,
+          org_id: l.org_id || input.org_id,
+          project_id: l.project_id || input.project_id || null,
+          cost_center_id: l.cost_center_id || null,
+          work_item_id: l.work_item_id || null,
+          analysis_work_item_id: l.analysis_work_item_id || null,
+          classification_id: l.classification_id || null,
+          sub_tree_id: l.sub_tree_id || null,
+          created_at: now,
+          updated_at: now,
+          _storedAt: now,
+          syncStatus: 'local_draft',
+          vectorClock: { [uid || 'offline-user']: 1 },
+        };
+      });
 
       // 4. Save to IndexedDB
       const { getOfflineDB } = await import('./offline/core/OfflineSchema');
@@ -866,10 +884,7 @@ export async function createTransactionWithLines(input: CreateTransactionWithLin
     project_id: input.project_id || null,
     org_id: input.org_id,
     created_by: uid ?? null,
-    // Legacy fields set to null (not used in multi-line model)
-    debit_account_id: null,
-    credit_account_id: null,
-    amount: null,
+    // Legacy fields (debit_account_id, credit_account_id, amount) removed from header table
   }
 
   const { data: header, error: headerError } = await supabase
@@ -962,6 +977,7 @@ export async function updateTransactionWithLines(
 
       const header = {
         ...(current || { id }),
+        _pk: id, // Ensure primary key is present
         entry_date: formatDateForSupabase(input.entry_date),
         description: input.description.trim(),
         description_ar: input.description_ar?.trim() || null,
@@ -971,26 +987,36 @@ export async function updateTransactionWithLines(
         org_id: input.org_id,
         project_id: input.project_id || null,
         updated_at: now,
+        _storedAt: now,
         is_synced: false,
+        syncStatus: 'local_draft', // Force re-verification on sync
+        vectorClock: { ...(current?.vectorClock || {}), [uid || 'offline-user']: (current?.vectorClock?.[uid || 'offline-user'] || 0) + 1 },
       };
 
-      const processedLines = input.lines.map((l, idx) => ({
-        id: (l as any).id || crypto.randomUUID(),
-        transaction_id: id,
-        line_no: l.line_no || (idx + 1),
-        account_id: l.account_id,
-        debit_amount: Number(l.debit_amount || 0),
-        credit_amount: Number(l.credit_amount || 0),
-        description: l.description || null,
-        org_id: l.org_id || input.org_id,
-        project_id: l.project_id || input.project_id || null,
-        cost_center_id: l.cost_center_id || null,
-        work_item_id: l.work_item_id || null,
-        analysis_work_item_id: l.analysis_work_item_id || null,
-        classification_id: l.classification_id || null,
-        sub_tree_id: l.sub_tree_id || null,
-        updated_at: now,
-      }));
+      const processedLines = input.lines.map((l, idx) => {
+        const lineId = (l as any).id || crypto.randomUUID();
+        return {
+          _pk: lineId,
+          id: lineId,
+          transaction_id: id,
+          line_no: l.line_no || (idx + 1),
+          account_id: l.account_id,
+          debit_amount: Number(l.debit_amount || 0),
+          credit_amount: Number(l.credit_amount || 0),
+          description: l.description || null,
+          org_id: l.org_id || input.org_id,
+          project_id: l.project_id || input.project_id || null,
+          cost_center_id: l.cost_center_id || null,
+          work_item_id: l.work_item_id || null,
+          analysis_work_item_id: l.analysis_work_item_id || null,
+          classification_id: l.classification_id || null,
+          sub_tree_id: l.sub_tree_id || null,
+          updated_at: now,
+          _storedAt: now,
+          syncStatus: 'local_draft',
+          vectorClock: { [uid || 'offline-user']: 1 },
+        };
+      });
 
       // Update Local DB
       await db.transactions.put(header as any);
@@ -1075,9 +1101,9 @@ export async function updateTransaction(
     'description',
     'description_ar',
     'reference_number',
-    'debit_account_id',
-    'credit_account_id',
-    'amount',
+    'total_debits',
+    'total_credits',
+    'amount', // Supported for legacy mapping
     'notes',
     'notes_ar',
     'classification_id',
@@ -1115,10 +1141,14 @@ export async function updateTransaction(
       }
     }
 
-    // Numeric normalization
+    // Numeric normalization and legacy mapping
     if (key === 'amount' && value != null) {
       const n = typeof value === 'number' ? value : parseFloat(String(value))
-      if (!isNaN(n)) value = n
+      if (!isNaN(n)) {
+        payload['total_debits'] = n
+        payload['total_credits'] = n
+      }
+      continue // Prevent adding the literal 'amount' key to payload
     }
 
     payload[key] = value
@@ -1145,9 +1175,13 @@ export async function updateTransaction(
       
       const updatedRecord = {
         ...(current || { id }), // preserving existing fields if available
+        _pk: id, // Ensure primary key is present
         ...payload,
         updated_at: now,
-        is_synced: false
+        _storedAt: now,
+        is_synced: false,
+        syncStatus: (current?.syncStatus === 'posted' || current?.syncStatus === 'verified') ? 'conflict' : 'local_draft',
+        vectorClock: { ...(current?.vectorClock || {}), [(await getCurrentUserId()) || 'offline-user']: (current?.vectorClock?.[(await getCurrentUserId()) || 'offline-user'] || 0) + 1 },
       };
 
       // 2. Save to local DB (upsert)

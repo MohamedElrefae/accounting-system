@@ -93,9 +93,7 @@ export const ScopedProjectSelector: React.FC<Props> = ({
           // Loading projects
           if (isLoadingProjects) {
             return (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                <Skeleton variant="text" width="80%" height={24} />
-              </Box>
+              <span style={{ color: '#999' }}>{loadingText}</span>
             );
           }
           // No projects available

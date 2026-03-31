@@ -13,6 +13,7 @@ const createHeaderDefaults = (): FilterState => ({
   amountTo: '',
   orgId: '',
   projectId: '', // Always start with empty (All Projects)
+  accountId: '',
   debitAccountId: '',
   creditAccountId: '',
   classificationId: '',
@@ -21,12 +22,16 @@ const createHeaderDefaults = (): FilterState => ({
   analysisWorkItemId: '',
   costCenterId: '',
   approvalStatus: '',
+  itemId: '',
+  hasCostAnalysisItems: undefined,
+  isCompliant: '',
 })
 
 const createLineDefaults = (): FilterState => ({
   search: '',
   amountFrom: '',
   amountTo: '',
+  accountId: '',
   debitAccountId: '',
   creditAccountId: '',
   projectId: '',
@@ -35,6 +40,9 @@ const createLineDefaults = (): FilterState => ({
   analysisWorkItemId: '',
   classificationId: '',
   expensesCategoryId: '',
+  itemId: '',
+  hasCostAnalysisItems: undefined,
+  isCompliant: '',
 })
 
 export const useTransactionsFilters = () => {

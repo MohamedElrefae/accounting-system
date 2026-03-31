@@ -166,7 +166,7 @@ export class PeriodClosingService {
         .eq('fiscal_year_id', fiscalYearId),
       supabase
         .from('transactions')
-        .select('amount, entry_date')
+        .select('total_debits, entry_date')
         .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
         .eq('org_id', orgId)
         .gte('entry_date', p.start_date)
@@ -174,7 +174,7 @@ export class PeriodClosingService {
     ])
 
     const openingTotal = (obSum || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0)
-    const glTotal = (txSum || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0)
+    const glTotal = (txSum || []).reduce((s: number, r: any) => s + Number(r.total_debits || 0), 0)
     const difference = glTotal - openingTotal
     return { glTotal, openingTotal, difference }
   }

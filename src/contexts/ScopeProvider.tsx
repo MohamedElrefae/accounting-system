@@ -154,6 +154,11 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
         setCurrentOrg(orgToSet);
         setStoredOrgId(orgToSet.id);
         await loadProjectsForOrg(orgToSet.id);
+      } else {
+        // Clear selection if no orgs found or stored ID doesn't match and no default
+        setCurrentOrg(null);
+        setAvailableProjects([]);
+        setCurrentProject(null);
       }
 
       initializedFromAuthRef.current = true;
@@ -180,6 +185,10 @@ export const ScopeProvider: React.FC<ScopeProviderProps> = ({ children }) => {
         setCurrentOrg(orgToSet);
         setStoredOrgId(orgToSet.id);
         await loadProjectsForOrg(orgToSet.id);
+      } else {
+        setCurrentOrg(null);
+        setAvailableProjects([]);
+        setCurrentProject(null);
       }
 
       setLastUpdated(new Date());

@@ -62,13 +62,13 @@ const SubTreePage: React.FC = () => {
   const [list, setList] = useState<ExpensesCategoryRow[]>([])
   const [accounts, setAccounts] = useState<AccountLite[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(25)
 
   // Filter state
   const [filterValues, setFilterValues] = useState({
-    code: '',
+    search: '', // Combined code and description search
     accountType: '',
     linkedAccount: '',
     active: ''
@@ -176,25 +176,17 @@ const SubTreePage: React.FC = () => {
   const filteredList = useMemo(() => {
     console.log('🔍 Filtering data - original list length:', list.length, 'filters:', filterValues)
     let filtered = list
-    
-    // Apply search filter
-    if (search) {
-      const q = search.toLowerCase()
-      filtered = filtered.filter(r => 
-        r.code.toLowerCase().includes(q) || 
-        r.description.toLowerCase().includes(q)
+
+    // Apply unified search filter (code and description)
+    if (filterValues.search) {
+      const q = filterValues.search.toLowerCase()
+      filtered = filtered.filter(r =>
+        (r.code && r.code.toLowerCase().includes(q)) ||
+        (r.description && r.description.toLowerCase().includes(q))
       )
+      console.log('🔍 Search filter applied:', q, 'results:', filtered.length)
     }
-    
-    // Apply unified filters
-    if (filterValues.code) {
-      const codeFilter = filterValues.code.toLowerCase()
-      filtered = filtered.filter(r => 
-        r.code.toLowerCase().includes(codeFilter)
-      )
-      console.log('🔍 Code filter applied:', codeFilter, 'results:', filtered.length)
-    }
-    
+
     if (filterValues.accountType) {
       if (filterValues.accountType === 'linked') {
         filtered = filtered.filter(r => r.linked_account_code)
@@ -204,14 +196,14 @@ const SubTreePage: React.FC = () => {
         console.log('🔍 Account type filter (none) applied, results:', filtered.length)
       }
     }
-    
+
     if (filterValues.linkedAccount) {
-      filtered = filtered.filter(r => 
+      filtered = filtered.filter(r =>
         r.linked_account_code === filterValues.linkedAccount
       )
       console.log('🔍 Linked account filter applied:', filterValues.linkedAccount, 'results:', filtered.length)
     }
-    
+
     if (filterValues.active) {
       const activeFilter = filterValues.active
       if (activeFilter === 'active') {
@@ -223,12 +215,12 @@ const SubTreePage: React.FC = () => {
       }
       // 'all' shows all items, no filtering needed
     }
-    
+
     console.log('✅ Final filtered list length:', filtered.length)
     return filtered
-  }, [list, search, filterValues])
+  }, [list, filterValues])
 
-  useEffect(() => { setPage(0) }, [search])
+  useEffect(() => { setPage(0) }, [filterValues.search])
 
   const pagedList = useMemo(() => {
     const start = page * rowsPerPage
@@ -395,18 +387,35 @@ const SubTreePage: React.FC = () => {
           }}>
             {currentOrg ? `${currentOrg.code} - ${currentOrg.name}` : 'لم يتم تحديد مؤسسة'}
           </div>
-          <TextField size="small" label="Search / بحث" value={search} onChange={(e) => setSearch(e.target.value)} />
           {canCreate && (
-            <Button variant="contained" onClick={openCreate}>New / جديد</Button>
+            <Button variant="contained" onClick={openCreate} startIcon={<AddIcon />}>New / جديد</Button>
           )}
           {/* Unified Filter Component */}
           <Box sx={{ ml: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2" sx={{ fontSize: '0.875rem', color: 'text.secondary' }}>Filter:</Typography>
-            <TextField 
-              size="small" 
-              placeholder="Code, Name, Account Type..."
-              value={filterValues.code || ''}
-              onChange={(e) => setFilterValues(prev => ({ ...prev, code: e.target.value }))}
+            <Typography variant="body2" sx={{ fontSize: '0.875rem', color: 'text.secondary' }}>Search / بحث:</Typography>
+            <SearchableSelect
+              placeholder="Instant Search (Code/Name)..."
+              value="" // We don't need a persistent value for the search picker itself
+              onChange={(value) => {
+                // If value is selected from the dropdown, we find its code/description
+                const selected = list.find(r => r.id === value);
+                if (selected) {
+                  setFilterValues(prev => ({ ...prev, search: selected.code }));
+                  showToast(`Selected: ${selected.description}`, { severity: 'info' });
+                }
+              }}
+              options={list.map(r => ({
+                value: r.id,
+                label: `${r.code} - ${r.description}`,
+                searchText: `${r.code} ${r.description}`.toLowerCase()
+              }))}
+              clearable={true}
+            />
+            <TextField
+              size="small"
+              placeholder="Fuzzy Search / بحث حر..."
+              value={filterValues.search || ''}
+              onChange={(e) => setFilterValues(prev => ({ ...prev, search: e.target.value }))}
               sx={{ width: 200 }}
             />
             <SearchableSelect
@@ -428,16 +437,15 @@ const SubTreePage: React.FC = () => {
               onChange={(value) => setFilterValues(prev => ({ ...prev, active: value }))}
               options={activeStatusOptions}
             />
-            {(filterValues.code || filterValues.accountType || filterValues.linkedAccount || filterValues.active) && (
+            {(filterValues.search || filterValues.accountType || filterValues.linkedAccount || filterValues.active) && (
               <>
-                <Button 
-                  size="small" 
+                <Button
+                  size="small"
                   variant="outlined"
                   color="secondary"
                   onClick={() => {
                     // Clear all filters
-                    setFilterValues({ code: '', accountType: '', linkedAccount: '', active: '' })
-                    setSearch('')
+                    setFilterValues({ search: '', accountType: '', linkedAccount: '', active: '' })
                     console.log('🧹 Filters cleared')
                     showToast('Filters cleared', { severity: 'info' })
                   }}
@@ -445,27 +453,13 @@ const SubTreePage: React.FC = () => {
                 >
                   Clear
                 </Button>
-                <Button 
-                  size="small" 
-                  variant="contained"
-                  color="primary"
-                  onClick={() => {
-                    // Force re-render to apply filters (filters are already reactive)
-                    console.log('🔍 Current filters active:', filterValues)
-                    console.log('🔍 Filtered results:', filteredList.length, 'of', list.length)
-                    showToast(`Filters applied: ${filteredList.length} of ${list.length} records`, { severity: 'success' })
-                  }}
-                  sx={{ ml: 0.5, minWidth: 70, height: 32 }}
-                >
-                  Apply
-                </Button>
               </>
             )}
           </Box>
           {/* Expandable Export Button */}
           <Box sx={{ ml: 'auto' }}>
-            <Button 
-              size="small" 
+            <Button
+              size="small"
               variant="outlined"
               onClick={handleExportMenuOpen}
               startIcon={<span>📊</span>}
@@ -473,7 +467,7 @@ const SubTreePage: React.FC = () => {
             >
               Export
             </Button>
-            <Menu 
+            <Menu
               anchorEl={exportMenuAnchor}
               open={Boolean(exportMenuAnchor)}
               onClose={handleExportMenuClose}
@@ -506,13 +500,9 @@ const SubTreePage: React.FC = () => {
               <div className={styles.tableContainer}>
                 {loading ? (
                   <Typography>Loading...</Typography>
-                ) : (filterValues.code || filterValues.accountType || filterValues.linkedAccount || filterValues.active) ? (
-                  <Typography sx={{ p: 2, color: 'warning.main' }}>
-                    ⚠️ Tree view is disabled when filters are active. Use the List tab to see filtered results.
-                  </Typography>
                 ) : (
                   <TreeView
-                    data={list.map(r => ({
+                    data={filteredList.map(r => ({
                       id: r.id,
                       code: r.code,
                       name_ar: r.description,
@@ -606,7 +596,7 @@ const SubTreePage: React.FC = () => {
                             <TableCell className={styles.tableCell}>Level</TableCell>
                             <TableCell className={styles.tableCell}>Add to Cost</TableCell>
                             <TableCell className={styles.tableCell}>Active</TableCell>
-                            <TableCell className={styles.tableCell} sx={{ 
+                            <TableCell className={styles.tableCell} sx={{
                               width: 400,
                               minWidth: 400,
                               maxWidth: 500,
@@ -634,79 +624,79 @@ const SubTreePage: React.FC = () => {
                               <TableCell className={styles.tableCell}>{r.level}</TableCell>
                               <TableCell className={styles.tableCell}><Checkbox checked={r.add_to_cost} disabled /></TableCell>
                               <TableCell className={styles.tableCell}><Checkbox checked={r.is_active} disabled /></TableCell>
-                            <TableCell 
-                              className={styles.tableCell} 
-                              sx={{ 
-                                width: 400,
-                                minWidth: 400,
-                                maxWidth: 500,
-                                overflow: 'hidden', 
-                                textOverflow: 'ellipsis', 
-                                whiteSpace: 'nowrap',
-                                fontSize: '0.9rem',
-                                padding: '12px 16px',
-                                boxSizing: 'border-box',
-                                fontFamily: 'inherit',
-                                backgroundColor: 'inherit',
-                                border: 'none',
-                                position: 'relative',
-                                '&:hover': {
-                                  overflow: 'visible'
-                                }
-                              }}
-                            >
-                              <Tooltip 
-                                title={r.linked_account_code ? `${r.linked_account_code} - ${r.linked_account_name || ''}` : ''} 
-                                arrow
-                                placement="top"
-                                enterDelay={300}
-                                leaveDelay={100}
-                                PopperProps={{
-                                  sx: {
-                                    '& .MuiTooltip-tooltip': {
-                                      fontSize: '0.85rem',
-                                      padding: '8px 12px'
-                                    }
+                              <TableCell
+                                className={styles.tableCell}
+                                sx={{
+                                  width: 400,
+                                  minWidth: 400,
+                                  maxWidth: 500,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  fontSize: '0.9rem',
+                                  padding: '12px 16px',
+                                  boxSizing: 'border-box',
+                                  fontFamily: 'inherit',
+                                  backgroundColor: 'inherit',
+                                  border: 'none',
+                                  position: 'relative',
+                                  '&:hover': {
+                                    overflow: 'visible'
                                   }
                                 }}
                               >
-                                <Box sx={{ 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  gap: '8px',
-                                  minWidth: 0,
-                                  maxWidth: '100%'
-                                }}>
-                                  <Typography 
-                                    variant="body2" 
-                                    sx={{ 
-                                      fontWeight: 700, 
-                                      color: 'primary.main',
-                                      fontSize: '0.95rem',
-                                      minWidth: 'fit-content',
-                                      flexShrink: 0
-                                    }}
-                                  >
-                                    {r.linked_account_code}
-                                  </Typography>
-                                  {r.linked_account_name && (
-                                    <Typography 
-                                      variant="body2" 
-                                      sx={{ 
-                                        color: 'text.secondary', 
+                                <Tooltip
+                                  title={r.linked_account_code ? `${r.linked_account_code} - ${r.linked_account_name || ''}` : ''}
+                                  arrow
+                                  placement="top"
+                                  enterDelay={300}
+                                  leaveDelay={100}
+                                  PopperProps={{
+                                    sx: {
+                                      '& .MuiTooltip-tooltip': {
                                         fontSize: '0.85rem',
-                                        opacity: 0.95,
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap'
+                                        padding: '8px 12px'
+                                      }
+                                    }
+                                  }}
+                                >
+                                  <Box sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    minWidth: 0,
+                                    maxWidth: '100%'
+                                  }}>
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        fontWeight: 700,
+                                        color: 'primary.main',
+                                        fontSize: '0.95rem',
+                                        minWidth: 'fit-content',
+                                        flexShrink: 0
                                       }}
                                     >
-                                      - {r.linked_account_name}
+                                      {r.linked_account_code}
                                     </Typography>
-                                  )}
-                                </Box>
-                              </Tooltip>
-                            </TableCell>
+                                    {r.linked_account_name && (
+                                      <Typography
+                                        variant="body2"
+                                        sx={{
+                                          color: 'text.secondary',
+                                          fontSize: '0.85rem',
+                                          opacity: 0.95,
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
+                                          whiteSpace: 'nowrap'
+                                        }}
+                                      >
+                                        - {r.linked_account_name}
+                                      </Typography>
+                                    )}
+                                  </Box>
+                                </Tooltip>
+                              </TableCell>
                               <TableCell className={styles.tableCell}>{r.child_count ?? 0}</TableCell>
                               <TableCell className={styles.tableCell}><Checkbox checked={!!r.has_transactions} disabled /></TableCell>
                               <TableCell align="right" className={styles.tableCell}>
@@ -845,8 +835,8 @@ const SubTreePage: React.FC = () => {
               // Note: Form validation already passed in UnifiedCRUDForm, so we just need to prepare the payload
               // Extract linked_account_id value (handle both string and null)
               const linkedAccountId = data.linked_account_id;
-              const finalLinkedAccountId = linkedAccountId && typeof linkedAccountId === 'object' 
-                ? (linkedAccountId as any).value || (linkedAccountId as any).id 
+              const finalLinkedAccountId = linkedAccountId && typeof linkedAccountId === 'object'
+                ? (linkedAccountId as any).value || (linkedAccountId as any).id
                 : linkedAccountId;
 
               console.log('🔍 Form linked_account_id:', linkedAccountId, 'type:', typeof linkedAccountId)

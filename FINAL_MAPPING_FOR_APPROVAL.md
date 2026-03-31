@@ -86,13 +86,13 @@ The Excel file contains only transaction LINES. We must create transaction HEADE
 
 | Excel Column | Supabase Table | Supabase Column | Data Type | Required | Mapping Logic |
 |--------------|----------------|-----------------|-----------|----------|----------------|
-| entry no | transactions | reference_number | string | YES | Direct copy |
+| entry no | transactions | reference_number | string | YES | Direct copy | 
 | entry date | transactions | transaction_date | date | YES | Direct copy |
 | (calculated) | transactions | fiscal_year | integer | YES | Extract year from entry_date |
 | (calculated) | transactions | month | integer | YES | Extract month from entry_date |
 | (calculated) | transactions | total_debit | decimal | YES | SUM(debit) for all lines in transaction |
 | (calculated) | transactions | total_credit | decimal | YES | SUM(credit) for all lines in transaction |
-| (calculated) | transactions | org_id | UUID | YES | d5789445-11e3-4ad6-9297-b56521675114 |
+| (calculated) | transactions | org_id | UUID | YES | d5789445-11e3-4ad6-9297-b56521675114 | 
 
 ### Transaction Line Mapping (transaction_lines table)
 
@@ -104,13 +104,13 @@ The Excel file contains only transaction LINES. We must create transaction HEADE
 | project code | project_id | UUID (FK) | YES | Map to projects table |
 | project name | (stored separately) | string | NO | Derived from project_id |
 | work analysis code | work_analysis_id | UUID (FK) | YES | Map to work_analysis table |
-| work analysis name | (stored separately) | string | NO | Derived from work_analysis_id |
+| work analysis name | (stored separately) | string | NO | Derived from work_analysis_id | 
 | sub_tree code | sub_tree_id | UUID (FK) | YES | Map to sub_tree table |
 | sub_tree name | (stored separately) | string | NO | Derived from sub_tree_id |
 | debit | debit_amount | decimal | YES | Direct copy (convert from string to decimal) |
 | credit | credit_amount | decimal | YES | Direct copy (convert from string to decimal) |
 | description | description | string | NO | Direct copy |
-| notes | notes | string | NO | Direct copy |
+| notes | notes | string | NO | Direct copy |  
 | (calculated) | transaction_id | UUID (FK) | YES | Reference to parent transaction |
 | (calculated) | org_id | UUID | YES | d5789445-11e3-4ad6-9297-b56521675114 |
 

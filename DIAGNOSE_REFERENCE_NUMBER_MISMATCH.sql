@@ -15,18 +15,7 @@ FROM transactions
 WHERE org_id = 'd5789445-11e3-4ad6-9297-b56521675114';
 
 -- Step 2: Show sample reference_numbers from transactions
-SELECT 
-    'Sample References' as info,
-    reference_number,
-    entry_number,
-    entry_date,
-    total_debits,
-    total_credits
-FROM transactions
-WHERE org_id = 'd5789445-11e3-4ad6-9297-b56521675114'
-ORDER BY reference_number::INTEGER
-LIMIT 20;
-
+ 
 -- Step 3: Check if reference_numbers are padded with zeros
 SELECT 
     'Reference Format Check' as info,

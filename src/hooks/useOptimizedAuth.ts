@@ -111,11 +111,14 @@ const initializeAuth = async () => {
     currentLoadPromise = (async () => {
       try {
         await withTimeout(loadAuthData(userId), 30000, 'Auth data load timeout');
+        authState.loading = false;
+        notifyListeners();
       } catch (loadError) {
         console.warn('Auth data load failed, using fallback:', loadError);
         const fallbackRoles: RoleSlug[] = ['super_admin'];
         authState.roles = fallbackRoles;
         authState.resolvedPermissions = flattenPermissions(fallbackRoles);
+        authState.loading = false;
         clearCaches();
         notifyListeners();
       } finally {
@@ -148,9 +151,6 @@ const initializeAuth = async () => {
              authState.loading = false;
              notifyListeners();
         });
-
-        authState.loading = false;
-        notifyListeners();
       } else {
         authState = {
           user: null,
@@ -209,8 +209,6 @@ const initializeAuth = async () => {
       authState.loading = true;
       notifyListeners();
       await applyAuthenticatedUser(session.user.id);
-      authState.loading = false;
-      notifyListeners();
     } else {
       // Offline Fallback: If no Supabase session, check if we have an "Offline User" enabled
       const { getConnectionMonitor } = await import('../utils/connectionMonitor');

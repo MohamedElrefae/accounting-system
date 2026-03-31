@@ -27,6 +27,7 @@ export interface FilterState {
   projectId?: string
   
   // Accounts
+  accountId?: string
   debitAccountId?: string
   creditAccountId?: string
   
@@ -36,6 +37,11 @@ export interface FilterState {
   workItemId?: string
   analysisWorkItemId?: string
   costCenterId?: string
+  itemId?: string
+  
+  // Cost Analysis Specific
+  hasCostAnalysisItems?: boolean
+  isCompliant?: string // 'true', 'false', or undefined
   
   // Approval Status (enhanced - supports line-level approval)
   approvalStatus?: 'draft' | 'submitted' | 'pending' | 'approved' | 'posted' | 'revision_requested' | 'requires_revision' | 'rejected' | 'cancelled' | string

@@ -94,7 +94,7 @@ export class TransactionValidationAPI {
       // Get transaction data first
       const { data: transactionData, error: fetchError } = await supabase
         .from('transactions')
-        .select('debit_account_id, credit_account_id, amount, description, entry_date')
+        .select('total_debits, description, entry_date')
         .eq('id', transactionId)
         .single()
 
@@ -114,9 +114,9 @@ export class TransactionValidationAPI {
       const { transactionValidator } = await import('./transaction-validation')
       
       const clientResult = await transactionValidator.validateTransaction({
-        debit_account_id: transactionData.debit_account_id,
-        credit_account_id: transactionData.credit_account_id,
-        amount: transactionData.amount,
+        debit_account_id: (transactionData as any).debit_account_id || '',
+        credit_account_id: (transactionData as any).credit_account_id || '',
+        amount: transactionData.total_debits || 0,
         description: transactionData.description,
         entry_date: transactionData.entry_date
       })

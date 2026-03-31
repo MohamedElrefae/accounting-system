@@ -56,6 +56,7 @@ const TrialBalanceOriginalPage = React.lazy(() => import('../pages/Reports/Trial
 const TransactionClassificationReportsPage = React.lazy(() => import('../pages/Reports/TransactionClassificationReports'));
 const RunningBalanceEnrichedPage = React.lazy(() => import('../pages/Reports/RunningBalanceEnriched'));
 const TransactionLinesReportPage = React.lazy(() => import('../pages/Reports/TransactionLinesReport'));
+const CostAnalysisReportPage = React.lazy(() => import('../pages/Reports/CostAnalysisReport'));
 
 // Inventory
 const InventoryModule = React.lazy(() => import('../pages/Inventory/InventoryModule'));
@@ -398,6 +399,15 @@ const UnifiedRoutes: React.FC = () => {
                         <TransactionsDataProvider>
                             <OptimizedSuspense>
                                 <TransactionLinesReportPage />
+                            </OptimizedSuspense>
+                        </TransactionsDataProvider>
+                    </OptimizedProtectedRoute>
+                } />
+                <Route path="cost-analysis-report" element={
+                    <OptimizedProtectedRoute>
+                        <TransactionsDataProvider>
+                            <OptimizedSuspense>
+                                <CostAnalysisReportPage />
                             </OptimizedSuspense>
                         </TransactionsDataProvider>
                     </OptimizedProtectedRoute>

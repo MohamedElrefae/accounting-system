@@ -50,13 +50,19 @@ const DocumentDetailsPage: React.FC = () => {
         // GL transactions linked by source
         const { data: tx, error: txErr } = await supabase
           .from('transactions')
-          .select('id, entry_number, entry_date, posted_at, amount, debit_account_id, credit_account_id')
+          .select('id, entry_number, entry_date, posted_at, total_debits')
           .eq('org_id', hdr.org_id)
           .eq('source_module', 'inventory')
           .eq('source_reference_id', docId)
           .order('posted_at', { ascending: false })
         if (txErr) throw txErr
-        setTransactions(tx || [])
+
+        // Map total_debits to amount for compatibility with TxRow interface
+        const mappedTx = (tx || []).map(t => ({
+          ...t,
+          amount: (t as any).total_debits || 0
+        }))
+        setTransactions(mappedTx as any)
         // postings linkage
         const { data: ip, error: ipErr } = await supabase
           .from('inventory_postings')
@@ -73,7 +79,7 @@ const DocumentDetailsPage: React.FC = () => {
 
   const docTitle = useMemo(() => {
     if (!header) return 'Inventory Document'
-    const dn = header.doc_number ? `#${header.doc_number}` : header.id?.slice(0,8)
+    const dn = header.doc_number ? `#${header.doc_number}` : header.id?.slice(0, 8)
     return `${header.doc_type?.toUpperCase?.()} ${dn}`
   }, [header])
 
@@ -85,7 +91,7 @@ const DocumentDetailsPage: React.FC = () => {
           <Typography variant="caption" color="text.secondary">Linked Transactions:</Typography>{' '}
           {transactions.map(t => (
             <Button key={t.id} size="small" sx={{ mr: 1, mb: 1 }} onClick={() => navigate(`/transactions/${t.id}`)}>
-              {t.entry_number ?? t.id.slice(0,8)}
+              {t.entry_number ?? t.id.slice(0, 8)}
             </Button>
           ))}
         </div>
@@ -127,12 +133,12 @@ const DocumentDetailsPage: React.FC = () => {
             {movements.length > 0 && (
               <Button size="small" variant="outlined" onClick={() => {
                 try {
-                  const headers = ['movement_id','movement_date','movement_type','material_id','location_id','uom_id','quantity','unit_cost','total_cost']
+                  const headers = ['movement_id', 'movement_date', 'movement_type', 'material_id', 'location_id', 'uom_id', 'quantity', 'unit_cost', 'total_cost']
                   const csvRows = [headers.join(',')]
                   for (const r of movements) {
                     const vals = [
                       r.id,
-                      String(r.movement_date ?? '').replace('T',' ').split('.')[0],
+                      String(r.movement_date ?? '').replace('T', ' ').split('.')[0],
                       r.movement_type,
                       r.material_id,
                       r.location_id,
@@ -144,19 +150,19 @@ const DocumentDetailsPage: React.FC = () => {
                     csvRows.push(vals.map(v => {
                       const s = String(v ?? '')
                       const needs = s.includes(',') || s.includes('"') || s.includes('\n')
-                      return needs ? '"' + s.replaceAll('"','""') + '"' : s
+                      return needs ? '"' + s.replaceAll('"', '""') + '"' : s
                     }).join(','))
                   }
                   const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' })
                   const url = URL.createObjectURL(blob)
                   const a = document.createElement('a')
                   a.href = url
-                  a.download = `document_${(header?.doc_number || header?.id || 'document').toString().replaceAll(' ','_')}_movements.csv`
+                  a.download = `document_${(header?.doc_number || header?.id || 'document').toString().replaceAll(' ', '_')}_movements.csv`
                   document.body.appendChild(a)
                   a.click()
                   document.body.removeChild(a)
                   URL.revokeObjectURL(url)
-                } catch {}
+                } catch { }
               }}>Export CSV</Button>
             )}
           </div>
@@ -180,7 +186,7 @@ const DocumentDetailsPage: React.FC = () => {
         <CardContent>
           {transactions.length ? transactions.map((t) => (
             <div key={t.id} style={{ display: 'flex', gap: 16, fontSize: 14, padding: '4px 0', alignItems: 'center' }}>
-              <span>{t.entry_number ?? t.id.slice(0,8)}</span>
+              <span>{t.entry_number ?? t.id.slice(0, 8)}</span>
               <span>Amount: {t.amount}</span>
               <span>Posted: {t.posted_at ?? '-'}</span>
               <Button size="small" variant="outlined" onClick={() => navigate(`/transactions/${t.id}`)}>View</Button>

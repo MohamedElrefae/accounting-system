@@ -161,9 +161,9 @@ The Excel file contains only transaction LINES. We must create transaction HEADE
 **BEFORE PROCEEDING, PLEASE CONFIRM:**
 
 ### Column Mapping (CORRECTED)
-- [ ] Excel column "entry no" → Supabase "reference_number" ✓
+- [ ] Excel column "entry no" → Supabase "reference_number" ✓   
 - [ ] Excel column "entry date" → Supabase "transaction_date" ✓
-- [ ] Excel column "description" → Supabase "description" (in transactions table) ✓
+- [ ] Excel column "description" → Supabase "description" (in transactions table) ✓  
 - [ ] Excel column "account id legacy" → Supabase "account_id" (via legacy_code lookup) ✓
 - [ ] Excel column "transaction classification code" → Supabase "classification_id" ✓
 - [ ] Excel column "project code" → Supabase "project_id" ✓

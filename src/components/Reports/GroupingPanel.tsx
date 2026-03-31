@@ -25,14 +25,26 @@ const groupingOptions = [
     { value: 'date_monthly', label: 'التاريخ (شهري)', labelEn: 'Date - Monthly' },
     { value: 'date_weekly', label: 'التاريخ (أسبوعي)', labelEn: 'Date - Weekly' },
     { value: 'date_daily', label: 'التاريخ (يومي)', labelEn: 'Date - Daily' },
+    // Transaction Line Items specific grouping options
+    { value: 'item_code', label: 'رمز البند', labelEn: 'Item Code' },
+    { value: 'line_item_id', label: 'بند الصنف', labelEn: 'Line Item' },
+    { value: 'has_cost_analysis_items', label: 'لديه تحليل تكلفة', labelEn: 'Has Cost Analysis' },
+    { value: 'is_two_line_transaction', label: 'معاملة من سطرين', labelEn: 'Two Line Transaction' },
+    { value: 'dimensions_match', label: 'مطابقة الأبعاد', labelEn: 'Dimensions Match' },
 ]
 
 const sortOptions = [
     { value: 'created_at', label: 'تاريخ الإنشاء', labelEn: 'Creation Date' },
-    { value: 'entry_date:transactions', label: 'التاريخ', labelEn: 'Date' },
-    { value: 'entry_number:transactions', label: 'رقم القيد', labelEn: 'Entry Number' },
+    { value: 'entry_date', label: 'التاريخ', labelEn: 'Date' },
+    { value: 'entry_number', label: 'رقم القيد', labelEn: 'Entry Number' },
     { value: 'debit_amount', label: 'المبلغ المدين', labelEn: 'Debit Amount' },
     { value: 'credit_amount', label: 'المبلغ الدائن', labelEn: 'Credit Amount' },
+    // Transaction Line Items specific sort options
+    { value: 'item_code', label: 'رمز البند', labelEn: 'Item Code' },
+    { value: 'quantity', label: 'الكمية', labelEn: 'Quantity' },
+    { value: 'unit_price', label: 'سعر الوحدة', labelEn: 'Unit Price' },
+    { value: 'total_amount', label: 'الإجمالي', labelEn: 'Total Amount' },
+    { value: 'net_amount', label: 'الصافي', labelEn: 'Net Amount' },
 ]
 
 export function ReportControls({

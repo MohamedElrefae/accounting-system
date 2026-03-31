@@ -15,11 +15,14 @@ const LandingDecider: React.FC = () => {
   const orgId = scope?.currentOrg?.id
 
   // Fetch server-backed landing preference (scoped by active org via service)
-  const { data: pref, isLoading, error } = useQuery({
+  // keepPreviousData: true ensures we never flash the DashboardShellSkeleton when
+  // the org changes — we hold the previous result visible while the new one loads.
+  const { data: pref, isInitialLoading, error } = useQuery({
     queryKey: ['landingPreference', orgId ?? null],
     queryFn: () => getLandingPreference(orgId ?? undefined),
     enabled: !demoMode,
     staleTime: 5 * 60 * 1000,
+    keepPreviousData: true,
     retry: 1, // Only retry once
     retryDelay: 500,
   })
@@ -46,19 +49,19 @@ const LandingDecider: React.FC = () => {
 
   // Timeout for offline/slow startup
   React.useEffect(() => {
-    if (isLoading) {
+    if (isInitialLoading) {
       const timer = setTimeout(() => {
-        if (isLoading) {
+        if (isInitialLoading) {
           console.warn('[LandingDecider] Query timed out, falling back to welcome');
           setTimedOut(true)
         }
       }, 3000)
       return () => clearTimeout(timer)
     }
-  }, [isLoading])
+  }, [isInitialLoading])
 
-  // Show loading state briefly
-  if (!demoMode && isLoading && !timedOut) return <DashboardShellSkeleton />
+  // Show loading state only on very first mount (not on org changes)
+  if (!demoMode && isInitialLoading && !timedOut) return <DashboardShellSkeleton />
 
   // If there's an error, timeout, or no preference, default to welcome (not dashboard)
   // Dashboard requires specific permissions, so welcome is safer default

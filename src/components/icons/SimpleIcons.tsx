@@ -440,6 +440,18 @@ export const CloseIcon: React.FC<SvgIconProps> = (props) => (
   </SvgIcon>
 );
 
+export const FullscreenIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
+  </SvgIcon>
+);
+
+export const FullscreenExitIcon: React.FC<SvgIconProps> = (props) => (
+  <SvgIcon {...props}>
+    <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" />
+  </SvgIcon>
+);
+
 export const InfoOutlinedIcon: React.FC<SvgIconProps> = (props) => (
   <SvgIcon {...props}>
     <path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
@@ -1137,15 +1149,7 @@ const icons = {
   SwapHoriz: TrendingUpIcon,
   BarChart: TableChartIcon,
   Backup: CloudUploadIcon,
-  Calculate: CalculateIcon,
-  Settings: SettingsIcon,
-  Send: SendIcon,
-  ArrowBack: ArrowBackIcon,
-  ArrowForward: ArrowForwardIcon,
-  ExpandLess: ExpandLessIcon,
-  Add: AddIcon,
-  Delete: DeleteIcon,
-  Close: CloseIcon
+  Calculate: CalculateIcon
 };
 
 export default icons;

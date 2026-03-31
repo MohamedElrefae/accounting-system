@@ -82,7 +82,7 @@ SELECT
     'SUB_TREE' as type,
     id,
     code,
-    name,
+    description,
     created_at
 FROM sub_tree 
 WHERE org_id = 'd5789445-11e3-4ad6-9297-b56521675114'

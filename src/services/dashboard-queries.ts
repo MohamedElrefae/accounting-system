@@ -11,8 +11,8 @@ export interface RecentRow {
   description: string
   description_ar?: string | null
   amount: number
-  debit_account_id: string | null
-  credit_account_id: string | null
+  debit_account_id?: string | null
+  credit_account_id?: string | null
   type: 'income' | 'expense'
   category?: string | null
   category_ar?: string | null

@@ -153,6 +153,9 @@ const MyLinesEnrichedPage = () => {
       if (appliedFilters.projectId) {
         query = query.eq('project_id', appliedFilters.projectId)
       }
+      if (appliedFilters.accountId) {
+        query = query.eq('account_id', appliedFilters.accountId)
+      }
       if (appliedFilters.debitAccountId) {
         query = query.eq('account_id', appliedFilters.debitAccountId).gt('debit_amount', 0)
       }
@@ -171,8 +174,8 @@ const MyLinesEnrichedPage = () => {
       if (appliedFilters.workItemId) {
         query = query.eq('work_item_id', appliedFilters.workItemId)
       }
-      if (appliedFilters.analysisItemId) {
-        query = query.eq('analysis_work_item_id', appliedFilters.analysisItemId)
+      if (appliedFilters.analysisWorkItemId) {
+        query = query.eq('analysis_work_item_id', appliedFilters.analysisWorkItemId)
       }
       if (appliedFilters.expensesCategoryId) {
         query = query.eq('sub_tree_id', appliedFilters.expensesCategoryId)
@@ -396,6 +399,7 @@ const MyLinesEnrichedPage = () => {
         preferencesKey="my_lines_enriched_filterbar"
         config={{
           showAmountRange: false,
+          showAccount: true,
         }}
       />
 

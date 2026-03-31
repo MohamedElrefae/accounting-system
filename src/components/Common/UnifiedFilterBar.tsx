@@ -23,7 +23,7 @@ import { ScopeChips } from '../Scope/ScopeChips'
 
 export type { FilterState }
 
-type FilterVisibilityKey = 'search' | 'dateFrom' | 'dateTo' | 'amountFrom' | 'amountTo' | 'org' | 'project' | 'debitAccount' | 'creditAccount' | 'classification' | 'expensesCategory' | 'workItem' | 'analysisWorkItem' | 'costCenter' | 'approvalStatus'
+type FilterVisibilityKey = 'search' | 'dateFrom' | 'dateTo' | 'amountFrom' | 'amountTo' | 'org' | 'project' | 'account' | 'debitAccount' | 'creditAccount' | 'classification' | 'expensesCategory' | 'workItem' | 'analysisWorkItem' | 'costCenter' | 'approvalStatus' | 'item'
 
 type FilterVisibilityState = Partial<Record<FilterVisibilityKey, boolean>>
 
@@ -46,6 +46,7 @@ export interface FilterConfig {
   showAmountRange?: boolean
   showOrg?: boolean
   showProject?: boolean
+  showAccount?: boolean
   showDebitAccount?: boolean
   showCreditAccount?: boolean
   showClassification?: boolean
@@ -54,6 +55,7 @@ export interface FilterConfig {
   showAnalysisWorkItem?: boolean
   showCostCenter?: boolean
   showApprovalStatus?: boolean
+  showItem?: boolean
 }
 
 export interface FilterWidths {
@@ -64,6 +66,7 @@ export interface FilterWidths {
   amountTo?: number
   org?: number
   project?: number
+  account?: number
   debitAccount?: number
   creditAccount?: number
   classification?: number
@@ -72,6 +75,7 @@ export interface FilterWidths {
   analysisWorkItem?: number
   costCenter?: number
   approvalStatus?: number
+  item?: number
 }
 
 interface UnifiedFilterBarProps {
@@ -94,6 +98,7 @@ const defaultConfig: FilterConfig = {
   showAmountRange: false,
   showOrg: false, // Now managed by TopBar ScopeContext
   showProject: false, // Now managed by TopBar ScopeContext
+  showAccount: false,
   showDebitAccount: true,
   showCreditAccount: true,
   showClassification: true,
@@ -102,6 +107,7 @@ const defaultConfig: FilterConfig = {
   showAnalysisWorkItem: true,
   showCostCenter: true,
   showApprovalStatus: true,
+  showItem: true,
 }
 
 const defaultWidths: FilterWidths = {
@@ -112,6 +118,7 @@ const defaultWidths: FilterWidths = {
   amountTo: 100,
   org: 180,
   project: 180,
+  account: 220,
   debitAccount: 220,
   creditAccount: 220,
   classification: 180,
@@ -120,6 +127,7 @@ const defaultWidths: FilterWidths = {
   analysisWorkItem: 180,
   costCenter: 180,
   approvalStatus: 140,
+  item: 200,
 }
 
 export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
@@ -146,6 +154,7 @@ export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
     workItemOptions,
     analysisOptions,
     costCenterOptions,
+    itemOptions,
   } = useFilterOptions()
 
   const cfg = useMemo(() => ({ ...defaultConfig, ...config }), [config])
@@ -236,6 +245,7 @@ export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
     if (values.amountTo) count++
     if (values.orgId) count++
     if (values.projectId) count++
+    if (values.accountId) count++
     if (values.debitAccountId) count++
     if (values.creditAccountId) count++
     if (values.classificationId) count++
@@ -244,6 +254,7 @@ export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
     if (values.analysisWorkItemId) count++
     if (values.costCenterId) count++
     if (values.approvalStatus) count++
+    if (values.itemId) count++
     return count
   }, [values])
 
@@ -265,6 +276,7 @@ export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
       { key: 'approvalStatus', label: 'حالة الاعتماد', min: 120, max: 260, enabled: cfg.showApprovalStatus !== false },
       { key: 'org', label: 'المؤسسة', min: 120, max: 260, enabled: cfg.showOrg !== false },
       { key: 'project', label: 'المشروع', min: 120, max: 260, enabled: cfg.showProject !== false },
+      { key: 'account', label: 'الحساب', min: 140, max: 320, enabled: cfg.showAccount !== false },
       { key: 'debitAccount', label: 'الحساب المدين', min: 140, max: 320, enabled: cfg.showDebitAccount !== false },
       { key: 'creditAccount', label: 'الحساب الدائن', min: 140, max: 320, enabled: cfg.showCreditAccount !== false },
       { key: 'classification', label: 'التصنيف', min: 140, max: 280, enabled: cfg.showClassification !== false },
@@ -272,6 +284,7 @@ export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
       { key: 'workItem', label: 'عنصر العمل', min: 140, max: 280, enabled: cfg.showWorkItem !== false },
       { key: 'analysisWorkItem', label: 'بند التحليل', min: 140, max: 280, enabled: cfg.showAnalysisWorkItem !== false },
       { key: 'costCenter', label: 'مركز التكلفة', min: 140, max: 260, enabled: cfg.showCostCenter !== false },
+      { key: 'item', label: 'الصنف', min: 140, max: 280, enabled: cfg.showItem !== false },
       { key: 'amountFrom', label: 'من المبلغ', min: 80, max: 200, enabled: cfg.showAmountRange !== false },
       { key: 'amountTo', label: 'إلى المبلغ', min: 80, max: 200, enabled: cfg.showAmountRange !== false },
     ]
@@ -513,6 +526,23 @@ export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
         </div>
       )}
 
+      {/* Account (Any) */}
+      {cfg.showAccount && isFilterVisible('account') && (
+        <div style={{ width: resolvedWidths.account, flexShrink: 0 }}>
+          <SearchableSelect
+            id="unified.filter.account"
+            value={values.accountId || ''}
+            options={[
+              { value: '', label: 'جميع الحسابات', searchText: '' },
+              ...accountOptions
+            ]}
+            onChange={v => onChange('accountId', v)}
+            placeholder="جميع الحسابات"
+            clearable
+          />
+        </div>
+      )}
+
       {/* Debit Account */}
       {cfg.showDebitAccount && isFilterVisible('debitAccount') && (
         <div style={{ width: resolvedWidths.debitAccount, flexShrink: 0 }}>
@@ -612,6 +642,20 @@ export const UnifiedFilterBar: React.FC<UnifiedFilterBarProps> = ({
             options={costCenterOptions}
             onChange={v => onChange('costCenterId', v)}
             placeholder="جميع مراكز التكلفة"
+            clearable
+          />
+        </div>
+      )}
+
+      {/* Item */}
+      {cfg.showItem && isFilterVisible('item') && (
+        <div style={{ width: resolvedWidths.item, flexShrink: 0 }}>
+          <SearchableSelect
+            id="unified.filter.item"
+            value={values.itemId || ''}
+            options={itemOptions}
+            onChange={v => onChange('itemId', v)}
+            placeholder="جميع الأصناف"
             clearable
           />
         </div>

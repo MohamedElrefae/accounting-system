@@ -236,6 +236,55 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     }
   }, [open, getOrgId, getProjectId, currentStep])
 
+  // Filter projects by org AND user permissions (secure approach)
+  const [secureProjects, setSecureProjects] = useState<Project[]>([])
+  const [loadingProjects, setLoadingProjects] = useState(false)
+  const projectsReadyRef = useRef(false) // Use useRef to track initialization state
+
+  // Load user-accessible projects when org changes
+  const loadSecureProjects = useCallback(async () => {
+    if (!headerData.org_id) {
+      setSecureProjects([])
+      projectsReadyRef.current = false // Reset initialization flag
+      return
+    }
+
+    setLoadingProjects(true)
+    try {
+      const userProjects = await getActiveProjectsByOrg(headerData.org_id)
+      setSecureProjects(userProjects)
+      projectsReadyRef.current = true // Set flag when projects are loaded
+      if (import.meta.env.DEV) {
+        console.log(`[TransactionWizard] Loaded ${userProjects.length} user - accessible projects for org ${headerData.org_id}`)
+      }
+
+      // Validate existing lines - clear only truly inaccessible projects
+      // Allow different projects per line, just clear ones not accessible for current org
+      setLines(prev => prev.map(line => {
+        // Only validate lines that use the header org (or no org set, implying header org override)
+        // If line has a different explicit org_id, don't validate against header org projects
+        const needsValidation = !line.org_id || line.org_id === headerData.org_id
+
+        if (needsValidation && line.project_id && !userProjects.some(p => p.id === line.project_id)) {
+          console.warn(`[TransactionWizard] Clearing inaccessible project ${line.project_id} from line(not accessible in org ${headerData.org_id})`)
+          return { ...line, project_id: undefined }
+        }
+        return line
+      }))
+
+    } catch (error) {
+      console.error('[TransactionWizard] Failed to load user-accessible projects:', error)
+      setSecureProjects([]) // Secure fallback - no projects if permissions check fails
+      projectsReadyRef.current = false // Reset flag on error
+    } finally {
+      setLoadingProjects(false)
+    }
+  }, [headerData.org_id])
+
+  useEffect(() => {
+    loadSecureProjects()
+  }, [loadSecureProjects])
+
   // Separate effect for project validation when secureProjects is initialized
   useEffect(() => {
     // Only run validation when projects are properly initialized
@@ -248,7 +297,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
         setHeaderData(prev => ({ ...prev, project_id: undefined }))
       }
     }
-  }, [open, currentStep, headerData.org_id, headerData.project_id]) // Remove secureProjects from deps
+  }, [open, currentStep, headerData.org_id, headerData.project_id, secureProjects])
 
   // Lines data (transaction_lines table)
   const [lines, setLines] = useState<TxLine[]>([
@@ -387,54 +436,6 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
     [accounts]
   )
 
-  // Filter projects by org AND user permissions (secure approach)
-  const [secureProjects, setSecureProjects] = useState<Project[]>([])
-  const [loadingProjects, setLoadingProjects] = useState(false)
-  const projectsReadyRef = useRef(false) // Use useRef to track initialization state
-
-  // Load user-accessible projects when org changes
-  const loadSecureProjects = useCallback(async () => {
-    if (!headerData.org_id) {
-      setSecureProjects([])
-      projectsReadyRef.current = false // Reset initialization flag
-      return
-    }
-
-    setLoadingProjects(true)
-    try {
-      const userProjects = await getActiveProjectsByOrg(headerData.org_id)
-      setSecureProjects(userProjects)
-      projectsReadyRef.current = true // Set flag when projects are loaded
-      if (import.meta.env.DEV) {
-        console.log(`[TransactionWizard] Loaded ${userProjects.length} user - accessible projects for org ${headerData.org_id}`)
-      }
-
-      // Validate existing lines - clear only truly inaccessible projects
-      // Allow different projects per line, just clear ones not accessible for current org
-      setLines(prev => prev.map(line => {
-        // Only validate lines that use the header org (or no org set, implying header org override)
-        // If line has a different explicit org_id, don't validate against header org projects
-        const needsValidation = !line.org_id || line.org_id === headerData.org_id
-
-        if (needsValidation && line.project_id && !userProjects.some(p => p.id === line.project_id)) {
-          console.warn(`[TransactionWizard] Clearing inaccessible project ${line.project_id} from line(not accessible in org ${headerData.org_id})`)
-          return { ...line, project_id: undefined }
-        }
-        return line
-      }))
-
-    } catch (error) {
-      console.error('[TransactionWizard] Failed to load user-accessible projects:', error)
-      setSecureProjects([]) // Secure fallback - no projects if permissions check fails
-      projectsReadyRef.current = false // Reset flag on error
-    } finally {
-      setLoadingProjects(false)
-    }
-  }, [headerData.org_id])
-
-  useEffect(() => {
-    loadSecureProjects()
-  }, [loadSecureProjects])
 
   // Prepare options for SearchableSelect
   const organizationOptions = useMemo(() =>
@@ -705,6 +706,47 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       return
     }
 
+    // Cost Analysis Validation - Check if this would violate restrictions
+    const currentHasCostAnalysis = hasCostAnalysisItems()
+
+    // If we're adding cost analysis to a transaction without existing cost analysis
+    if (!currentHasCostAnalysis) {
+      // Check if transaction has more than 2 lines
+      if (lines.length > 2) {
+        setErrors(prev => ({ ...prev, cost_analysis_lines: 'Cannot add cost analysis: transaction already has multiple lines' }))
+        return
+      }
+
+      // If transaction has exactly 2 lines, validate dimension consistency
+      if (lines.length === 2) {
+        const otherLine = lines.find((_, i) => i !== index)
+        if (otherLine) {
+          // Check for dimension conflicts
+          const checkDimensionConflict = (dimName: string, val1: string | undefined, val2: string | undefined) => {
+            if (val1 && val2 && val1 !== val2) {
+              return `${dimName} dimensions conflict between lines`
+            }
+            return null
+          }
+
+          const projectConflict = checkDimensionConflict('Project', line.project_id, otherLine.project_id)
+          const costCenterConflict = checkDimensionConflict('Cost Center', line.cost_center_id, otherLine.cost_center_id)
+          const workItemConflict = checkDimensionConflict('Work Item', line.work_item_id, otherLine.work_item_id)
+          const analysisConflict = checkDimensionConflict('Analysis Work Item', line.analysis_work_item_id, otherLine.analysis_work_item_id)
+          const classificationConflict = checkDimensionConflict('Classification', line.classification_id, otherLine.classification_id)
+          const subTreeConflict = checkDimensionConflict('Sub-tree', line.sub_tree_id, otherLine.sub_tree_id)
+
+          const conflicts = [projectConflict, costCenterConflict, workItemConflict, analysisConflict, classificationConflict, subTreeConflict]
+            .filter(Boolean)
+
+          if (conflicts.length > 0) {
+            setErrors(prev => ({ ...prev, cost_analysis_dimensions: conflicts.join('; ') }))
+            return
+          }
+        }
+      }
+    }
+
     let lineId = line.id || draftLineIds[index]
 
     if (!lineId) {
@@ -717,16 +759,6 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       setCostAnalysisModalOpen(true)
     } else {
       console.error('Failed to get or create line ID for cost analysis')
-    }
-  }
-
-  const handleCostAnalysisModalClose = () => {
-    setCostAnalysisModalOpen(false)
-    setSelectedLineForCostAnalysis(null)
-    // Re-fetch counts after modal closes, in case items were added/removed
-    const ids = Object.values(draftLineIds).concat(lines.map(l => l.id).filter(id => !!id) as string[])
-    if (ids.length > 0) {
-      getTransactionLineItemCounts(ids).then(setLineItemCounts)
     }
   }
 
@@ -815,6 +847,15 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   }
 
   // ========== BUSINESS RULE VALIDATION ==========
+
+  // Helper function to check if any line has cost analysis items
+  const hasCostAnalysisItems = useCallback((): boolean => {
+    const lineIds = Object.values(draftLineIds).concat(lines.map(l => l.id).filter(id => !!id) as string[])
+    return lineItemCounts && Object.entries(lineItemCounts).some(([lineId, count]) =>
+      lineIds.includes(lineId) && count > 0
+    )
+  }, [draftLineIds, lines, lineItemCounts])
+
   const validateBusinessRules = (): { isValid: boolean; errors: Record<string, string> } => {
     const validationErrors: Record<string, string> = {}
 
@@ -844,12 +885,42 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       validationErrors.org_id = 'المؤسسة مطلوبة'
     }
 
-    // 2. Validate lines exist
+    // 2. Cost Analysis Restrictions - Check if any line has cost analysis items
+    const hasCostAnalysis = hasCostAnalysisItems()
+
+    if (hasCostAnalysis) {
+      // Restrict to exactly 2 lines for cost analysis transactions
+      if (lines.length !== 2) {
+        validationErrors.cost_analysis_lines = 'Transactions with cost analysis must have exactly 2 lines (1 debit, 1 credit)'
+      }
+
+      // Validate dimension consistency for cost analysis transactions
+      if (lines.length === 2) {
+        const line1 = lines[0]
+        const line2 = lines[1]
+
+        // Helper function to validate dimension consistency
+        const validateDimension = (dimName: string, val1: string | undefined, val2: string | undefined) => {
+          if (val1 && val2 && val1 !== val2) {
+            validationErrors[`cost_analysis_${dimName}`] = `${dimName} dimensions cannot be different values between lines (same value or null/null or value/null allowed)`
+          }
+        }
+
+        validateDimension('Project', line1.project_id, line2.project_id)
+        validateDimension('Cost Center', line1.cost_center_id, line2.cost_center_id)
+        validateDimension('Work Item', line1.work_item_id, line2.work_item_id)
+        validateDimension('Analysis Work Item', line1.analysis_work_item_id, line2.analysis_work_item_id)
+        validateDimension('Classification', line1.classification_id, line2.classification_id)
+        validateDimension('Sub-tree', line1.sub_tree_id, line2.sub_tree_id)
+      }
+    }
+
+    // 3. Validate lines exist
     if (lines.length < 2) {
       validationErrors.lines = 'يجب إضافة سطرين على الأقل (مدين ودائن)'
     }
 
-    // 3. Validate each line
+    // 4. Validate each line
     let hasDebitLine = false
     let hasCreditLine = false
 
@@ -873,7 +944,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       if (credit > 0) hasCreditLine = true
     })
 
-    // 4. Must have at least one debit and one credit line
+    // 5. Must have at least one debit and one credit line
     if (!hasDebitLine) {
       validationErrors.no_debit = 'يجب وجود سطر مدين واحد على الأقل'
     }
@@ -881,7 +952,17 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
       validationErrors.no_credit = 'يجب وجود سطر دائن واحد على الأقل'
     }
 
-    // 5. Validate balance
+    // 6. For cost analysis transactions, ensure exactly 1 debit and 1 credit line
+    if (hasCostAnalysis && lines.length === 2) {
+      const debitLines = lines.filter(line => (Number(line.debit_amount) || 0) > 0)
+      const creditLines = lines.filter(line => (Number(line.credit_amount) || 0) > 0)
+
+      if (debitLines.length !== 1 || creditLines.length !== 1) {
+        validationErrors.cost_analysis_debit_credit = 'Transactions with cost analysis must have exactly 1 debit line and 1 credit line'
+      }
+    }
+
+    // 7. Validate balance
     if (!totals.isBalanced) {
       validationErrors.balance = `القيود غير متوازنة - الفرق: ${Math.abs(totals.diff).toLocaleString('ar-SA')} ريال`
     }
@@ -1053,6 +1134,12 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
   }
 
   const addLine = () => {
+    // Cost Analysis Restriction: Prevent adding lines if any line has cost analysis items
+    if (hasCostAnalysisItems()) {
+      setErrors(prev => ({ ...prev, cost_analysis_lines: 'Cannot add lines: transaction already has cost analysis items (limited to 2 lines)' }))
+      return
+    }
+
     const newLineNo = Math.max(...lines.map(l => l.line_no), 0) + 1
 
     // Load Step 1 project as default, but allow user to change to any accessible project
@@ -1103,7 +1190,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
             placeholder="اختر المؤسسة"
           />
         )
-      case 'project_id':
+      case 'project_id': {
         const effectiveOrgId = line.org_id || headerData.org_id
         return (
           <LineProjectSelector
@@ -1114,6 +1201,7 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
             placeholder={effectiveOrgId ? 'بدون مشروع' : 'اختر المؤسسة أولاً'}
           />
         )
+      }
       case 'cost_center_id':
         return (
           <SearchableSelect
@@ -1455,6 +1543,8 @@ const TransactionWizard: React.FC<TransactionWizardProps> = ({
                     onClick={addLine}
                     className="ultimate-btn ultimate-btn-success"
                     style={{ padding: '10px 20px', fontSize: '14px', fontWeight: 600 }}
+                    disabled={hasCostAnalysisItems()}
+                    title={hasCostAnalysisItems() ? "Cannot add lines: transaction has cost analysis items (limited to 2 lines)" : "Add new line"}
                   >
                     <div className="btn-content"><span className="btn-text">+ إضافة بند</span></div>
                   </button>

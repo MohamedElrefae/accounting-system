@@ -74,14 +74,30 @@ const ConnectionStatusInline: React.FC = () => {
     return <Wifi />;
   };
 
+  const [isChecking, React_useState] = React.useState(false);
+
+  const handleCheck = async () => {
+    if (isChecking) return;
+    React_useState(true);
+    if (typeof connectionHealth.forceCheck === 'function') {
+      await connectionHealth.forceCheck();
+    }
+    React_useState(false);
+  };
+
   return (
-    <Tooltip title={`الحالة: ${getStatusText()}`}>
+    <Tooltip title={!connectionHealth.isOnline ? 'انقر لإعادة فحص الاتصال' : `الحالة: ${getStatusText()}`}>
       <Chip
         icon={getStatusIcon()}
-        label={getStatusText()}
+        label={isChecking ? 'جاري الفحص...' : getStatusText()}
         color={getStatusColor()}
         size="small"
         variant="outlined"
+        onClick={!connectionHealth.isOnline ? handleCheck : undefined}
+        sx={{
+          cursor: !connectionHealth.isOnline ? 'pointer' : 'default',
+          opacity: isChecking ? 0.7 : 1
+        }}
       />
     </Tooltip>
   );

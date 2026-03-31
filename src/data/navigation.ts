@@ -364,6 +364,14 @@ const baseNavigation: NavigationItem[] = [
         path: "/reports/transaction-lines-report"
       },
       {
+        id: "cost-analysis-report",
+        label: "Cost Analysis Report",
+        titleEn: "Cost Analysis Report",
+        titleAr: "تقرير تحليل التكلفة",
+        icon: "analytics",
+        path: "/reports/cost-analysis-report"
+      },
+      {
         id: "custom-reports",
         label: "Custom Reports Builder",
         titleEn: "Custom Reports Builder",

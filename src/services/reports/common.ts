@@ -68,37 +68,26 @@ export async function fetchTransactionsDateRange(filters: DateRangeFilters): Pro
  */
 export async function getAccountBalance(accountId: string, dateFrom?: string, dateTo?: string, postedOnly: boolean = false): Promise<{ debit: number; credit: number; balance: number }> {
   try {
-    let query = supabase
-      .from('transactions')
-      .select('debit_account_id, credit_account_id, amount, is_wizard_draft')
-      .or('is_wizard_draft.is.null,is_wizard_draft.eq.false')
-      .or(`debit_account_id.eq.${accountId},credit_account_id.eq.${accountId}`)
-
-    if (dateFrom) {
-      query = query.gte('entry_date', dateFrom)
-    }
-    if (dateTo) {
-      query = query.lte('entry_date', dateTo)
-    }
-    if (postedOnly) {
-      query = query.eq('is_posted', true)
-    }
-
-    const { data, error } = await query
+    // Query transaction_lines instead of transactions header
+    const { data: lines, error } = await supabase
+      .from('transaction_lines')
+      .select('debit_amount, credit_amount, transactions!inner(is_posted, is_wizard_draft, entry_date)')
+      .eq('account_id', accountId)
+      .or('transactions.is_wizard_draft.is.null,transactions.is_wizard_draft.eq.false')
 
     if (error) throw error
 
     let debit = 0
     let credit = 0
 
-    for (const tx of data || []) {
-      const amount = Number(tx.amount || 0)
-      if (tx.debit_account_id === accountId) {
-        debit += amount
-      }
-      if (tx.credit_account_id === accountId) {
-        credit += amount
-      }
+    for (const line of lines || []) {
+      const tx = (line as any).transactions
+      if (postedOnly && !tx.is_posted) continue
+      if (dateFrom && tx.entry_date < dateFrom) continue
+      if (dateTo && tx.entry_date > dateTo) continue
+
+      debit += Number(line.debit_amount || 0)
+      credit += Number(line.credit_amount || 0)
     }
 
     return {

@@ -53,7 +53,7 @@ class ConnectionMonitor {
   private startPeriodicChecks() {
     // Check every 30 seconds
     this.checkInterval = setInterval(() => {
-      if (!this.isChecking && this.health.isOnline) {
+      if (!this.isChecking) {
         this.checkConnection();
       }
     }, 30000);
@@ -209,5 +209,9 @@ export const useConnectionHealth = () => {
     };
   }, []);
 
-  return health;
+  const forceCheck = React.useCallback(() => {
+    getConnectionMonitor().forceCheck();
+  }, []);
+
+  return { ...health, forceCheck };
 };

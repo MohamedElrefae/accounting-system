@@ -74,6 +74,26 @@ const TransactionLinesReportPage = () => {
         setExpandedGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }))
     }, [])
 
+    const renderApprovalStatusBadge = useCallback((status: string, isAr: boolean) => {
+        const map: Record<string, { label: string; cls: string; tip: string }> = {
+            draft: { label: isAr ? 'مسودة' : 'Draft', cls: 'ultimate-btn-neutral', tip: isAr ? 'لم يتم إرسالها للمراجعة بعد' : 'Not submitted for review yet' },
+            submitted: { label: isAr ? 'مُرسلة' : 'Submitted', cls: 'ultimate-btn-edit', tip: isAr ? 'بإنتظار المراجعة' : 'Awaiting review' },
+            pending: { label: isAr ? 'قيد المراجعة' : 'Pending', cls: 'ultimate-btn-edit', tip: isAr ? 'بإنتظار اعتماد السطور' : 'Awaiting line approval' },
+            revision_requested: { label: isAr ? 'طلب تعديل' : 'Revision Req', cls: 'ultimate-btn-warning', tip: isAr ? 'أُعيدت للتعديل' : 'Returned for revision' },
+            requires_revision: { label: isAr ? 'يحتاج تعديل' : 'Needs Revision', cls: 'ultimate-btn-warning', tip: isAr ? 'تم رفض بعض السطور' : 'Some lines were rejected' },
+            approved: { label: isAr ? 'معتمدة' : 'Approved', cls: 'ultimate-btn-success', tip: isAr ? 'تم اعتماد جميع السطور' : 'All lines approved' },
+            rejected: { label: isAr ? 'مرفوضة' : 'Rejected', cls: 'ultimate-btn-delete', tip: isAr ? 'تم الرفض' : 'Rejected' },
+            cancelled: { label: isAr ? 'ملغاة' : 'Cancelled', cls: 'ultimate-btn-neutral', tip: isAr ? 'ألغى المُرسل الإرسال' : 'Sender cancelled submission' },
+            posted: { label: isAr ? 'مرحلة' : 'Posted', cls: 'ultimate-btn-posted', tip: isAr ? 'تم الترحيل' : 'Posted to GL' },
+        }
+        const conf = map[status] || map['draft']
+        return (
+            <span className={`ultimate-btn ${conf.cls}`} style={{ cursor: 'default', padding: '6px 12px', minHeight: 32, fontSize: '13px' }} title={conf.tip}>
+                <span className="btn-text">{conf.label}</span>
+            </span>
+        )
+    }, [])
+
     const navigate = useNavigate()
     const hasPerm = useHasPermission()
     const queryClient = useQueryClient()
@@ -111,6 +131,58 @@ const TransactionLinesReportPage = () => {
 
     const { isOnline } = getConnectionMonitor().getHealth();
 
+    const fetchAllLinesOffline = useCallback(async () => {
+        const { getOfflineDB } = await import('../../services/offline/core/OfflineSchema');
+        const db = getOfflineDB();
+
+        const allTx = await db.transactions.toArray();
+        const filteredTx = allTx.filter(t => {
+            if (appliedFilters.orgId && t.org_id !== appliedFilters.orgId) return false;
+            if (appliedFilters.approvalStatus && t.approval_status !== appliedFilters.approvalStatus) return false;
+            if (appliedFilters.dateFrom && t.entry_date < appliedFilters.dateFrom) return false;
+            if (appliedFilters.dateTo && t.entry_date > appliedFilters.dateTo) return false;
+            return true;
+        });
+
+        const txIds = new Set(filteredTx.map(t => t.id));
+        const txMap = new Map(filteredTx.map(t => [t.id, t]));
+
+        const allLines = await db.transactionLines.where('transaction_id').anyOf(Array.from(txIds)).toArray();
+        const filteredLines = allLines.filter(line => {
+            const tx = txMap.get(line.transaction_id);
+            if (!tx) return false;
+            if (appliedFilters.projectId && line.project_id !== appliedFilters.projectId && tx.project_id !== appliedFilters.projectId) return false;
+            if (appliedFilters.costCenterId && line.cost_center_id !== appliedFilters.costCenterId) return false;
+            if (appliedFilters.workItemId && line.work_item_id !== appliedFilters.workItemId) return false;
+            if (appliedFilters.analysisWorkItemId && line.analysis_work_item_id !== appliedFilters.analysisWorkItemId) return false;
+            if (appliedFilters.expensesCategoryId && line.sub_tree_id !== appliedFilters.expensesCategoryId) return false;
+            if (appliedFilters.classificationId && line.classification_id !== appliedFilters.classificationId) return false;
+            if (appliedFilters.accountId && line.account_id !== appliedFilters.accountId) return false;
+            if (appliedFilters.debitAccountId && (line.account_id !== appliedFilters.debitAccountId || (line.debit_amount || 0) <= 0)) return false;
+            if (appliedFilters.creditAccountId && (line.account_id !== appliedFilters.creditAccountId || (line.credit_amount || 0) <= 0)) return false;
+            return true;
+        });
+
+        const rows = filteredLines.map(row => {
+            const tx = txMap.get(row.transaction_id)!;
+            return {
+                ...row,
+                entry_number: tx.entry_number,
+                entry_date: tx.entry_date,
+                header_description: tx.description,
+                header_org_id: tx.org_id,
+                header_project_id: tx.project_id,
+                approval_status: tx.approval_status,
+                is_posted: tx.approval_status === 'posted',
+                created_by: tx.created_by,
+                org_id: tx.org_id,
+                project_id: row.project_id || tx.project_id,
+            };
+        });
+
+        return { rows, total: rows.length };
+    }, [appliedFilters])
+
     // Fetch ALL lines with transaction header data (no user filter)
     const fetchAllLines = useCallback(async () => {
         if (!getConnectionMonitor().getHealth().isOnline) {
@@ -137,13 +209,14 @@ const TransactionLinesReportPage = () => {
         if (appliedFilters.dateTo) query = query.lte('transactions.entry_date', appliedFilters.dateTo)
         if (appliedFilters.orgId) query = query.eq('transactions.org_id', appliedFilters.orgId)
         if (appliedFilters.projectId) query = query.eq('project_id', appliedFilters.projectId)
+        if (appliedFilters.accountId) query = query.eq('account_id', appliedFilters.accountId)
         if (appliedFilters.debitAccountId) query = query.eq('account_id', appliedFilters.debitAccountId).gt('debit_amount', 0)
         if (appliedFilters.creditAccountId) query = query.eq('account_id', appliedFilters.creditAccountId).gt('credit_amount', 0)
         if (appliedFilters.approvalStatus) query = query.eq('transactions.approval_status', appliedFilters.approvalStatus)
         if (appliedFilters.classificationId) query = query.eq('classification_id', appliedFilters.classificationId)
         if (appliedFilters.costCenterId) query = query.eq('cost_center_id', appliedFilters.costCenterId)
         if (appliedFilters.workItemId) query = query.eq('work_item_id', appliedFilters.workItemId)
-        if (appliedFilters.analysisItemId) query = query.eq('analysis_work_item_id', appliedFilters.analysisItemId)
+        if (appliedFilters.analysisWorkItemId) query = query.eq('analysis_work_item_id', appliedFilters.analysisWorkItemId)
         if (appliedFilters.expensesCategoryId) query = query.eq('sub_tree_id', appliedFilters.expensesCategoryId)
 
         const [realSortField, referencedTable] = sortField.includes(':') ? sortField.split(':') : [sortField, undefined]
@@ -171,58 +244,7 @@ const TransactionLinesReportPage = () => {
         }))
 
         return { rows, total: count || 0 }
-    }, [appliedFilters, page, pageSize, sortField, sortOrder])
-
-    async function fetchAllLinesOffline() {
-        const { getOfflineDB } = await import('../../services/offline/core/OfflineSchema');
-        const db = getOfflineDB();
-
-        const allTx = await db.transactions.toArray();
-        const filteredTx = allTx.filter(t => {
-            if (appliedFilters.orgId && t.org_id !== appliedFilters.orgId) return false;
-            if (appliedFilters.approvalStatus && t.approval_status !== appliedFilters.approvalStatus) return false;
-            if (appliedFilters.dateFrom && t.entry_date < appliedFilters.dateFrom) return false;
-            if (appliedFilters.dateTo && t.entry_date > appliedFilters.dateTo) return false;
-            return true;
-        });
-
-        const txIds = new Set(filteredTx.map(t => t.id));
-        const txMap = new Map(filteredTx.map(t => [t.id, t]));
-
-        const allLines = await db.transactionLines.where('transaction_id').anyOf(Array.from(txIds)).toArray();
-        const filteredLines = allLines.filter(line => {
-            const tx = txMap.get(line.transaction_id);
-            if (!tx) return false;
-            if (appliedFilters.projectId && line.project_id !== appliedFilters.projectId && tx.project_id !== appliedFilters.projectId) return false;
-            if (appliedFilters.costCenterId && line.cost_center_id !== appliedFilters.costCenterId) return false;
-            if (appliedFilters.workItemId && line.work_item_id !== appliedFilters.workItemId) return false;
-            if (appliedFilters.analysisItemId && line.analysis_work_item_id !== appliedFilters.analysisItemId) return false;
-            if (appliedFilters.expensesCategoryId && line.sub_tree_id !== appliedFilters.expensesCategoryId) return false;
-            if (appliedFilters.classificationId && line.classification_id !== appliedFilters.classificationId) return false;
-            if (appliedFilters.debitAccountId && (line.account_id !== appliedFilters.debitAccountId || (line.debit_amount || 0) <= 0)) return false;
-            if (appliedFilters.creditAccountId && (line.account_id !== appliedFilters.creditAccountId || (line.credit_amount || 0) <= 0)) return false;
-            return true;
-        });
-
-        const rows = filteredLines.map(row => {
-            const tx = txMap.get(row.transaction_id)!;
-            return {
-                ...row,
-                entry_number: tx.entry_number,
-                entry_date: tx.entry_date,
-                header_description: tx.description,
-                header_org_id: tx.org_id,
-                header_project_id: tx.project_id,
-                approval_status: tx.approval_status,
-                is_posted: tx.approval_status === 'posted',
-                created_by: tx.created_by,
-                org_id: tx.org_id,
-                project_id: row.project_id || tx.project_id,
-            };
-        });
-
-        return { rows, total: rows.length };
-    }
+    }, [appliedFilters, page, pageSize, sortField, sortOrder, fetchAllLinesOffline])
 
     const fetchAllFilteredLines = useCallback(async () => {
         if (!navigator.onLine) {
@@ -245,18 +267,21 @@ const TransactionLinesReportPage = () => {
         if (appliedFilters.dateTo) query = query.lte('transactions.entry_date', appliedFilters.dateTo)
         if (appliedFilters.orgId) query = query.eq('transactions.org_id', appliedFilters.orgId)
         if (appliedFilters.projectId) query = query.eq('project_id', appliedFilters.projectId)
+        if (appliedFilters.accountId) query = query.eq('account_id', appliedFilters.accountId)
         if (appliedFilters.debitAccountId) query = query.eq('account_id', appliedFilters.debitAccountId).gt('debit_amount', 0)
         if (appliedFilters.creditAccountId) query = query.eq('account_id', appliedFilters.creditAccountId).gt('credit_amount', 0)
         if (appliedFilters.approvalStatus) query = query.eq('transactions.approval_status', appliedFilters.approvalStatus)
         if (appliedFilters.classificationId) query = query.eq('classification_id', appliedFilters.classificationId)
         if (appliedFilters.costCenterId) query = query.eq('cost_center_id', appliedFilters.costCenterId)
         if (appliedFilters.workItemId) query = query.eq('work_item_id', appliedFilters.workItemId)
-        if (appliedFilters.analysisItemId) query = query.eq('analysis_work_item_id', appliedFilters.analysisItemId)
+        if (appliedFilters.analysisWorkItemId) query = query.eq('analysis_work_item_id', appliedFilters.analysisWorkItemId)
         if (appliedFilters.expensesCategoryId) query = query.eq('sub_tree_id', appliedFilters.expensesCategoryId)
 
         const [realSortField, referencedTable] = sortField.includes(':') ? sortField.split(':') : [sortField, undefined]
 
-        const { data, error } = await query.order(realSortField, { ascending: sortOrder === 'asc', referencedTable })
+        const { data, error } = await query
+            .limit(10000) // Safety limit for grouping/export
+            .order(realSortField, { ascending: sortOrder === 'asc', referencedTable })
         if (error) throw error
 
         return (data || []).map((row: any) => ({
@@ -278,7 +303,7 @@ const TransactionLinesReportPage = () => {
     const { data: allData, isLoading: allLoading } = useQuery({
         queryKey: ['transaction-lines-report-all', appliedFilters],
         queryFn: fetchAllFilteredLines,
-        enabled: grouping !== 'none' && !contextLoading, // Removed isOnline requirement
+        enabled: !contextLoading, // Always enabled to support accurate global SummaryBar totals
     })
 
     const {
@@ -295,7 +320,12 @@ const TransactionLinesReportPage = () => {
 
     // ... existing sync ...
     useUnifiedSync({
-        // ...
+        channelId: 'transaction-lines-report-sync',
+        tables: ['transaction_lines', 'transactions'],
+        onDataChange: () => {
+            queryClient.invalidateQueries({ queryKey: ['transaction-lines-report'] })
+            queryClient.invalidateQueries({ queryKey: ['transaction-lines-report-all'] })
+        }
     })
 
     const rows = useMemo(() => queryData?.rows ?? [], [queryData?.rows])
@@ -409,7 +439,7 @@ const TransactionLinesReportPage = () => {
     }, [rows, accountLabel, projectLabel, costCenterLabel, workItemLabel, analysisLabel, subTreeLabel, classificationLabel, organizationLabel])
 
     const { groupedData, grandTotal, isGrouped } = useReportGrouping({
-        lines: (grouping !== 'none' ? allData : rows) || [],
+        lines: allData || [], // Always use complete filtered dataset for totals/grouping
         groupingField: grouping,
         contextData: { organizations, projects, accounts, costCenters, workItems, categories, classifications, analysisItemsMap }
     })
@@ -602,16 +632,17 @@ const TransactionLinesReportPage = () => {
                 preferencesKey="transaction_lines_report_filterbar"
                 config={{
                     showAmountRange: false,
+                    showAccount: true,
                 }}
             />
 
             <ReportControls
                 selectedGrouping={grouping}
-                onGroupingChange={setGrouping}
+                onGroupingChange={(val) => { setGrouping(val); setPage(1); setExpandedGroups({}); }}
                 selectedSortField={sortField}
-                onSortFieldChange={setSortField}
+                onSortFieldChange={(val) => { setSortField(val); setPage(1); }}
                 sortOrder={sortOrder}
-                onSortOrderChange={setSortOrder}
+                onSortOrderChange={(val) => { setSortOrder(val); setPage(1); }}
                 isSummaryMode={isSummaryMode}
                 onSummaryModeChange={setIsSummaryMode}
                 isAr={isAr}
@@ -678,23 +709,7 @@ const TransactionLinesReportPage = () => {
                                                 renderCell={(value, column, row: any) => {
                                                     if (column.key === 'approval_status') {
                                                         const st = row.original?.is_posted ? 'posted' : (row.approval_status || 'draft')
-                                                        const map: Record<string, { label: string; cls: string; tip: string }> = {
-                                                            draft: { label: isAr ? 'مسودة' : 'Draft', cls: 'ultimate-btn-neutral', tip: isAr ? 'لم يتم إرسالها للمراجعة بعد' : 'Not submitted for review yet' },
-                                                            submitted: { label: isAr ? 'مُرسلة' : 'Submitted', cls: 'ultimate-btn-edit', tip: isAr ? 'بإنتظار المراجعة' : 'Awaiting review' },
-                                                            pending: { label: isAr ? 'قيد المراجعة' : 'Pending', cls: 'ultimate-btn-edit', tip: isAr ? 'بإنتظار اعتماد السطور' : 'Awaiting line approval' },
-                                                            revision_requested: { label: isAr ? 'طلب تعديل' : 'Revision Req', cls: 'ultimate-btn-warning', tip: isAr ? 'أُعيدت للتعديل' : 'Returned for revision' },
-                                                            requires_revision: { label: isAr ? 'يحتاج تعديل' : 'Needs Revision', cls: 'ultimate-btn-warning', tip: isAr ? 'تم رفض بعض السطور' : 'Some lines were rejected' },
-                                                            approved: { label: isAr ? 'معتمدة' : 'Approved', cls: 'ultimate-btn-success', tip: isAr ? 'تم اعتماد جميع السطور' : 'All lines approved' },
-                                                            rejected: { label: isAr ? 'مرفوضة' : 'Rejected', cls: 'ultimate-btn-delete', tip: isAr ? 'تم الرفض' : 'Rejected' },
-                                                            cancelled: { label: isAr ? 'ملغاة' : 'Cancelled', cls: 'ultimate-btn-neutral', tip: isAr ? 'ألغى المُرسل الإرسال' : 'Sender cancelled submission' },
-                                                            posted: { label: isAr ? 'مرحلة' : 'Posted', cls: 'ultimate-btn-posted', tip: isAr ? 'تم الترحيل' : 'Posted to GL' },
-                                                        }
-                                                        const conf = map[st] || map['draft']
-                                                        return (
-                                                            <span className={`ultimate-btn ${conf.cls}`} style={{ cursor: 'default', padding: '6px 12px', minHeight: 32, fontSize: '13px' }} title={conf.tip}>
-                                                                <span className="btn-text">{conf.label}</span>
-                                                            </span>
-                                                        )
+                                                        return renderApprovalStatusBadge(st, isAr)
                                                     }
                                                     if (column.key === 'debit_amount' || column.key === 'credit_amount' || column.key === 'line_items_total') {
                                                         const num = Number(value) || 0
@@ -776,23 +791,7 @@ const TransactionLinesReportPage = () => {
                             renderCell={(value, column, row: any) => {
                                 if (column.key === 'approval_status') {
                                     const st = row.original?.is_posted ? 'posted' : (row.approval_status || 'draft')
-                                    const map: Record<string, { label: string; cls: string; tip: string }> = {
-                                        draft: { label: isAr ? 'مسودة' : 'Draft', cls: 'ultimate-btn-neutral', tip: isAr ? 'لم يتم إرسالها للمراجعة بعد' : 'Not submitted for review yet' },
-                                        submitted: { label: isAr ? 'مُرسلة' : 'Submitted', cls: 'ultimate-btn-edit', tip: isAr ? 'بإنتظار المراجعة' : 'Awaiting review' },
-                                        pending: { label: isAr ? 'قيد المراجعة' : 'Pending', cls: 'ultimate-btn-edit', tip: isAr ? 'بإنتظار اعتماد السطور' : 'Awaiting line approval' },
-                                        revision_requested: { label: isAr ? 'طلب تعديل' : 'Revision Req', cls: 'ultimate-btn-warning', tip: isAr ? 'أُعيدت للتعديل' : 'Returned for revision' },
-                                        requires_revision: { label: isAr ? 'يحتاج تعديل' : 'Needs Revision', cls: 'ultimate-btn-warning', tip: isAr ? 'تم رفض بعض السطور' : 'Some lines were rejected' },
-                                        approved: { label: isAr ? 'معتمدة' : 'Approved', cls: 'ultimate-btn-success', tip: isAr ? 'تم اعتماد جميع السطور' : 'All lines approved' },
-                                        rejected: { label: isAr ? 'مرفوضة' : 'Rejected', cls: 'ultimate-btn-delete', tip: isAr ? 'تم الرفض' : 'Rejected' },
-                                        cancelled: { label: isAr ? 'ملغاة' : 'Cancelled', cls: 'ultimate-btn-neutral', tip: isAr ? 'ألغى المُرسل الإرسال' : 'Sender cancelled submission' },
-                                        posted: { label: isAr ? 'مرحلة' : 'Posted', cls: 'ultimate-btn-posted', tip: isAr ? 'تم الترحيل' : 'Posted to GL' },
-                                    }
-                                    const conf = map[st] || map['draft']
-                                    return (
-                                        <span className={`ultimate-btn ${conf.cls}`} style={{ cursor: 'default', padding: '6px 12px', minHeight: 32, fontSize: '13px' }} title={conf.tip}>
-                                            <span className="btn-text">{conf.label}</span>
-                                        </span>
-                                    )
+                                    return renderApprovalStatusBadge(st, isAr)
                                 }
                                 if (column.key === 'debit_amount' || column.key === 'credit_amount' || column.key === 'line_items_total') {
                                     const num = Number(value) || 0
@@ -805,6 +804,16 @@ const TransactionLinesReportPage = () => {
                     </>
                 )}
 
+                <div className="report-summary-label" style={{ 
+                    padding: '0 20px', 
+                    fontSize: '13px', 
+                    color: '#6b7280', 
+                    fontWeight: 500,
+                    marginBottom: '-15px',
+                    textAlign: isAr ? 'right' : 'left'
+                }}>
+                    {isAr ? '* الإجمالي لجميع النتائج المفلترة (بحد أقصى 10,000 سطر)' : '* Total for all filtered results (max 10,000 lines)'}
+                </div>
                 <SummaryBar
                     debit={grandTotal.debit}
                     credit={grandTotal.credit}

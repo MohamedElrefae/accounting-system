@@ -11,6 +11,7 @@ import { getExpensesCategoriesList } from '../services/sub-tree'
 import { getCostCentersForSelector } from '../services/cost-centers'
 import { listWorkItemsAll } from '../services/work-items'
 import { listAnalysisWorkItems } from '../services/analysis-work-items'
+import { lineItemsCatalogService, type CatalogSelectorItem } from '../services/line-items-catalog'
 import type { Organization } from '../types'
 import type { ExpensesCategoryRow } from '../types/sub-tree'
 import type { WorkItemRow } from '../types/work-items'
@@ -49,6 +50,7 @@ export interface TransactionsDataContextValue {
   categories: ExpensesCategoryRow[]
   classifications: TransactionClassification[]
   analysisItemsMap: Record<string, AnalysisWorkItemLabel>
+  items: CatalogSelectorItem[]
 
   // Current user
   currentUserId: string | null
@@ -152,6 +154,7 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
   const [workItems, setWorkItems] = useState<WorkItemRow[]>([])
   const [categories, setCategories] = useState<ExpensesCategoryRow[]>([])
   const [analysisItemsMap, setAnalysisItemsMap] = useState<Record<string, AnalysisWorkItemLabel>>({})
+  const [items, setItems] = useState<CatalogSelectorItem[]>([])
 
   // Tracks which orgs we have fully loaded dimensions for
   const loadedDimensionsRef = useRef<Set<string>>(new Set())
@@ -173,12 +176,13 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
     if (!monitor.getHealth().isOnline) return
 
     try {
-      const [newCats, newCenters, newItems] = await Promise.all([
+      const [newCats, newCenters, newWorkItems, newCatalogItems] = await Promise.all([
         getExpensesCategoriesList(orgId).catch(() => []),
         getCostCentersForSelector(orgId)
           .then(list => list.map(cc => ({ ...cc, org_id: orgId })))
           .catch(() => []),
         listWorkItemsAll(orgId).catch(() => []),
+        lineItemsCatalogService.toSelectorItems(orgId).catch(() => []),
       ])
 
       // Merge avoiding duplicates
@@ -194,7 +198,12 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
 
       setWorkItems(prev => {
         const existing = new Set(prev.map(c => c.id))
-        return [...prev, ...newItems.filter(c => !existing.has(c.id))]
+        return [...prev, ...newWorkItems.filter(c => !existing.has(c.id))]
+      })
+
+      setItems(prev => {
+        const existing = new Set(prev.map(c => c.id))
+        return [...prev, ...newCatalogItems.filter(c => !existing.has(c.id))]
       })
 
       loadedDimensionsRef.current.add(orgId)
@@ -269,7 +278,6 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
     }
   }, [currentOrgId, authScopeData.isReady, organizationsFromAuth, ensureDimensionsLoaded, loadAnalysisItems])
 
-
   /**
    * Refresh All
    * 1. Invalidates core React Query caches
@@ -302,7 +310,7 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
     } finally {
       setIsRefreshing(false)
     }
-  }, [queryClient, organizationsFromAuth, ensureDimensionsLoaded, loadAnalysisItems])
+  }, [queryClient, organizationsFromAuth, ensureDimensionsLoaded, loadAnalysisItems, authScopeData])
 
   /**
    * Specific Refresh (Project/Dim)
@@ -384,6 +392,7 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
     categories,
     classifications,
     analysisItemsMap,
+    items,
     currentUserId,
     isLoading,
     isRefreshing,
@@ -397,7 +406,7 @@ export const TransactionsDataProvider: React.FC<TransactionsDataProviderProps> =
     refreshDimensions,
     refreshAnalysisItems,
   }), [
-    organizationsFromAuth, projectsFromAuth, accounts, costCenters, workItems, categories, classifications, analysisItemsMap,
+    organizationsFromAuth, projectsFromAuth, accounts, costCenters, workItems, categories, classifications, analysisItemsMap, items,
     currentUserId, isLoading, isRefreshing, error,
     getCostCentersForOrg, getWorkItemsForOrg, getCategoriesForOrg,
     loadDimensionsForOrg, ensureDimensionsLoaded,

@@ -20,6 +20,11 @@ export interface DbTxLineItem {
   item_code: string | null
   item_name: string | null
   item_name_ar: string | null
+  deduction_percentage: number | null
+  addition_percentage: number | null
+  deduction_amount: number | null
+  addition_amount: number | null
+  net_amount: number | null
   created_at: string
   updated_at: string
 }
