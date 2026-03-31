@@ -45,6 +45,8 @@ export interface FilterState {
   
   // Approval Status (enhanced - supports line-level approval)
   approvalStatus?: 'draft' | 'submitted' | 'pending' | 'approved' | 'posted' | 'revision_requested' | 'requires_revision' | 'rejected' | 'cancelled' | string
+  postedOnly?: boolean
+  includeOpening?: boolean
   
   // User & Scope
   createdBy?: string

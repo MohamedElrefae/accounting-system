@@ -338,9 +338,11 @@ const UnifiedRoutes: React.FC = () => {
                 } />
                 <Route path="general-ledger" element={
                     <OptimizedProtectedRoute>
-                        <OptimizedSuspense>
-                            <GeneralLedgerPage />
-                        </OptimizedSuspense>
+                        <TransactionsDataProvider>
+                            <OptimizedSuspense>
+                                <GeneralLedgerPage />
+                            </OptimizedSuspense>
+                        </TransactionsDataProvider>
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="running-balance" element={

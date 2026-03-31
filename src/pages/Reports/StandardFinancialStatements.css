@@ -33,7 +33,7 @@
   color: var(--text-primary);
 }
 
-/* Financial Report Content Wrapper */
+/* Financial Report Content Wrapper - Ensure scrollability in modern layout */
 .financial-report-content {
   background: var(--surface);
   border-radius: 8px;
@@ -43,6 +43,13 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: var(--text);
+  
+  /* Flexbox support for modern unified layout */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden; /* Force nested elements like .reportTableWrap to scroll */
 }
 
 /* STATEMENT HEADER */

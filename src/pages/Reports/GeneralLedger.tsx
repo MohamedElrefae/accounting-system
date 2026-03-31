@@ -6,9 +6,6 @@ import { fetchGeneralLedgerReport, type GLFilters, type GLRow } from '../../serv
 import ExportButtons from '../../components/Common/ExportButtons'
 import PresetBar from '../../components/Common/PresetBar'
 import { fetchGLAccountSummary, type GLAccountSummaryRow } from '../../services/reports/gl-account-summary'
-import { fetchAccountsMinimal, fetchOrganizations, fetchProjects, type LookupOption } from '../../services/lookups'
-import { getAllTransactionClassifications } from '../../services/transaction-classification'
-import { getCostCentersForSelector } from '../../services/cost-centers'
 import type { UniversalTableData } from '../../utils/UniversalExportManager'
 import { exportToExcel, exportToCSV } from '../../utils/UniversalExportManager'
 import { createStandardColumns, prepareTableData } from '../../hooks/useUniversalExport'
@@ -21,6 +18,11 @@ import { useScope } from '../../contexts/ScopeContext'
 import './StandardFinancialStatements.css'
 import { getConnectionMonitor } from '../../utils/connectionMonitor'
 import StalenessIndicator from '../../components/Common/StalenessIndicator'
+import { useTransactionsData } from '../../contexts/TransactionsDataContext'
+import useFilterOptions from '../../hooks/useFilterOptions'
+import UnifiedFilterBar from '../../components/Common/UnifiedFilterBar'
+import { useFilterState } from '../../hooks/useFilterState'
+import '../Transactions/Transactions.css'
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
 
@@ -66,32 +68,69 @@ const GeneralLedger: React.FC = () => {
   const isAr = uiLang === 'ar'
 
   // Filters
-  const [filters, setFilters] = useState<GLFilters>({
-    // Start with no dates so the app auto-expands to the full available range
-    dateFrom: '',
-    dateTo: '',
-    includeOpening: true,
-    postedOnly: false,
+  const {
+    filters: unifiedFilters,
+    updateFilter,
+    resetFilters: handleResetFilters,
+    setFilters,
+  } = useFilterState({
+    storageKey: 'gl_report_filters',
+    defaultValues: {
+      dateFrom: '',
+      dateTo: '',
+      accountId: '',
+      debitAccountId: '',
+      creditAccountId: '',
+      costCenterId: '',
+      classificationId: '',
+      analysisWorkItemId: '',
+      expensesCategoryId: '',
+      search: '',
+      postedOnly: false,
+      includeOpening: true,
+    }
   })
 
-  const [accountId, setAccountId] = useState<string>('')
-  const [costCenterId, setCostCenterId] = useState<string>('')
-  const [classificationId, setClassificationId] = useState<string>('')
-  const [analysisWorkItemId, setAnalysisWorkItemId] = useState<string>('')
-  const [expensesCategoryId, setExpensesCategoryId] = useState<string>('')
-  const [analysisItemOptions, setAnalysisItemOptions] = useState<{ id: string, code: string, name: string, name_ar?: string | null }[]>([])
-  const [expensesCategoryOptions, setExpensesCategoryOptions] = useState<{ id: string, code: string, description: string, name?: string }[]>([])
-  const [costCenterOptions, setCostCenterOptions] = useState<Array<{ id: string, code: string, name: string, name_ar?: string | null, level: number }>>([])
+  
+  // Extract values for easy access
+  const postedOnly = unifiedFilters.postedOnly ?? false
+  const includeOpening = unifiedFilters.includeOpening ?? true
 
-  // Debug logging for analysisItemOptions state changes
-  useEffect(() => {
-    console.log('📊 analysisItemOptions state changed:', analysisItemOptions.length, 'items:', analysisItemOptions)
-  }, [analysisItemOptions])
+  // Extract values for backward compatibility with existing code
+  const accountId = unifiedFilters.accountId || ''
+  const debitAccountId = unifiedFilters.debitAccountId || ''
+  const creditAccountId = unifiedFilters.creditAccountId || ''
+  const costCenterId = unifiedFilters.costCenterId || ''
+  const classificationId = unifiedFilters.classificationId || ''
+  const analysisWorkItemId = unifiedFilters.analysisWorkItemId || ''
+  const expensesCategoryId = unifiedFilters.expensesCategoryId || ''
+  const searchTerm = unifiedFilters.search || ''
+  
+  // Use a ref to store applied filters for the Apply button logic if needed, 
+  // but GeneralLedger currently auto-fetches on filter change.
+  // To match UnifiedFilterBar pattern, we might want to use appliedFilters.
+  const [appliedFilters, setAppliedFilters] = useState(unifiedFilters)
+  const filtersDirty = JSON.stringify(unifiedFilters) !== JSON.stringify(appliedFilters) || 
+                       postedOnly !== (appliedFilters as any).postedOnly
+  
+  const handleApplyFilters = useCallback(() => {
+    setAppliedFilters({ ...unifiedFilters })
+  }, [unifiedFilters])
 
-  // Debug logging for expensesCategoryOptions state changes  
-  useEffect(() => {
-    console.log('💰 expensesCategoryOptions state changed:', expensesCategoryOptions.length, 'items:', expensesCategoryOptions)
-  }, [expensesCategoryOptions])
+  // Filters object for fetch functions - use appliedFilters
+  const filters = useMemo(() => ({
+    ...appliedFilters,
+    includeOpening: appliedFilters.includeOpening ?? true,
+    postedOnly: appliedFilters.postedOnly ?? false,
+  }), [appliedFilters])
+  const { isLoading: contextLoading } = useTransactionsData()
+  const {
+    accountOptions: allAccountOptions,
+    costCenterOptions: allCostCenterOptions,
+    analysisOptions: allAnalysisOptions,
+    categoryOptions: allCategoryOptions,
+    classificationOptions: allClassificationOptions,
+  } = useFilterOptions()
 
   const [data, setData] = useState<GLRow[]>([])
   const [summaryRows, setSummaryRows] = useState<GLAccountSummaryRow[]>([])
@@ -126,11 +165,8 @@ const GeneralLedger: React.FC = () => {
   const [compareMode, setCompareMode] = useState<boolean>(false)
   const [compareTotals, setCompareTotals] = useState<{ prev: number, curr: number, variance: number, pct: number | null } | null>(null)
   const [showCompareOverview, setShowCompareOverview] = useState<boolean>(true)
-  const [accountOptions, setAccountOptions] = useState<LookupOption[]>([])
-  const [classificationOptions, setClassificationOptions] = useState<LookupOption[]>([])
 
   // Advanced features
-  const [searchTerm, setSearchTerm] = useState<string>('')
   const [densityMode, setDensityMode] = useState<DensityMode>('normal')
   // Numbers-only (hide currency symbol) setting for exports
   const [numbersOnly, setNumbersOnly] = useState<boolean>(true)
@@ -144,6 +180,7 @@ const GeneralLedger: React.FC = () => {
 
   // Advanced filtering and analytics
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false)
+  const [showAnalytics, setShowAnalytics] = useState<boolean>(false)
   const [savedFilterSets, setSavedFilterSets] = useState<SavedFilterSet[]>([])
   const [currentFilterSet, setCurrentFilterSet] = useState<string>('')
   const [newFilterSetName, setNewFilterSetName] = useState<string>('')
@@ -157,7 +194,6 @@ const GeneralLedger: React.FC = () => {
   })
   const [accountTypeFilter, setAccountTypeFilter] = useState<'all' | 'postable' | 'summary'>('all')
   const [balanceTypeFilter, setBalanceTypeFilter] = useState<'all' | 'debit' | 'credit' | 'zero'>('all')
-  const [showAnalytics, setShowAnalytics] = useState<boolean>(false)
 
   // Company for header
   const [companyName, setCompanyName] = useState<string>('')
@@ -328,32 +364,31 @@ const GeneralLedger: React.FC = () => {
           if (onlyPostable) chips.push('فلتر: حسابات ورقية فقط')
           if (onlyNonPostable) chips.push('فلتر: تجميعي فقط')
           if (analysisWorkItemId) {
-            const ai = analysisItemOptions.find(a => a.id === analysisWorkItemId)
-            if (ai) chips.push(`بند التحليل: ${ai.code ? ai.code + ' - ' : ''}${ai.name_ar || ai.name}`)
+            const ai = allAnalysisOptions.find(a => a.value === analysisWorkItemId)
+            if (ai) chips.push(`بند التحليل: ${ai.label}`)
           }
           if (expensesCategoryId) {
-            const ec = expensesCategoryOptions.find(e => e.id === expensesCategoryId)
-            if (ec) chips.push(`فئة المصروفات: ${ec.code ? ec.code + ' - ' : ''}${ec.description}`)
+            const ec = allCategoryOptions.find(e => e.value === expensesCategoryId)
+            if (ec) chips.push(`فئة المصروفات: ${ec.label}`)
           }
           return `ملخص دفتر الأستاذ العام — ${chips.join(' — ')}`
         })() : (() => {
           // Build details export title with account and chips
-          const acc = accountOptions.find(a => a.id === accountId)
+          const acc = allAccountOptions.find(a => a.value === accountId)
           const base = (() => {
             if (!acc) return 'تقرير دفتر الأستاذ العام'
-            const hasChildren = !!(acc.code && accountOptions.some(o => o.id !== acc.id && o.code && o.code.startsWith(acc.code || '')))
-            return `تقرير دفتر الأستاذ — ${acc.code ? acc.code + ' - ' : ''}${acc.name_ar || acc.name}`
+            return `تقرير دفتر الأستاذ — ${acc.label}`
           })()
           const chips: string[] = []
           if (filters.postedOnly) chips.push('فلتر: قيود معتمدة فقط')
           chips.push(includeChildrenInDrilldown ? 'الوضع: مدمج' : 'الوضع: توسيع أول فرعي')
           if (analysisWorkItemId) {
-            const ai = analysisItemOptions.find(a => a.id === analysisWorkItemId)
-            if (ai) chips.push(`بند التحليل: ${ai.code ? ai.code + ' - ' : ''}${ai.name_ar || ai.name}`)
+            const ai = allAnalysisOptions.find(a => a.value === analysisWorkItemId)
+            if (ai) chips.push(`بند التحليل: ${ai.label}`)
           }
           if (expensesCategoryId) {
-            const ec = expensesCategoryOptions.find(e => e.id === expensesCategoryId)
-            if (ec) chips.push(`فئة المصروفات: ${ec.code ? ec.code + ' - ' : ''}${ec.description}`)
+            const ec = allCategoryOptions.find(e => e.value === expensesCategoryId)
+            if (ec) chips.push(`فئة المصروفات: ${ec.label}`)
           }
           return chips.length ? `${base} — ${chips.join(' — ')}` : base
         })(),
@@ -523,40 +558,24 @@ const GeneralLedger: React.FC = () => {
           e.preventDefault()
           setCompareMode(c => !c)
           break
-        case 'r': // Ctrl+R: Reset filters
+          case 'r': // Ctrl+R: Reset filters
           e.preventDefault()
-          // Reset date range filters - clear dates to show all transactions
-          setFilters({ dateFrom: '', dateTo: '', includeOpening: true, postedOnly: false })
-          // Reset basic filters
-          setAccountId('');
-          setCostCenterId('');
-          setClassificationId(''); // Reset classification filter
-          setExpensesCategoryId(''); // Reset expenses category filter
-          setAnalysisWorkItemId(''); // Reset analysis work item filter
-          // Reset UI state filters
-          setHideZeroAccounts(true);
-          setActivityOnly(false);
-          setOnlyPostable(false);
-          setOnlyNonPostable(false);
-          setIncludeChildrenInDrilldown(true);
-          // Reset search/pagination
-          setCurrentPage(1);
-          setSearchTerm('');
-          setJumpCode(''); // Reset jump code
-          // Reset advanced filters
+          handleResetFilters()
+          setPostedOnly(false)
+          setHideZeroAccounts(true)
+          setActivityOnly(false)
+          setOnlyPostable(false)
+          setOnlyNonPostable(false)
+          setIncludeChildrenInDrilldown(true)
+          setCurrentPage(1)
+          setJumpCode('')
           setAmountFilters({
-            minDebit: '',
-            maxDebit: '',
-            minCredit: '',
-            maxCredit: '',
-            minBalance: '',
-            maxBalance: ''
-          });
-          setAccountTypeFilter('all');
-          setBalanceTypeFilter('all');
-          // Close any open filters or modals
-          setShowAdvancedFilters(false);
-          setShowAnalytics(false);
+            minDebit: '', maxDebit: '', minCredit: '', maxCredit: '', minBalance: '', maxBalance: ''
+          })
+          setAccountTypeFilter('all')
+          setBalanceTypeFilter('all')
+          setShowAdvancedFilters(false)
+          setShowAnalytics(false)
           break
         case 'h': // Ctrl+H: Show/hide shortcuts help
           e.preventDefault()
@@ -620,12 +639,12 @@ const GeneralLedger: React.FC = () => {
     const currentDate = new Date().toLocaleDateString('ar-EG')
     const orgName = currentOrg?.name || (uiLang === 'ar' ? 'الكل' : 'All')
     const projectName = currentProject?.name || (uiLang === 'ar' ? 'الكل' : 'All')
-    const accountName = accountId ? (accountOptions.find(a => a.id === accountId)?.name_ar || accountOptions.find(a => a.id === accountId)?.name || 'غير محدد') : 'كل الحسابات'
+    const accountName = accountId ? (allAccountOptions.find(a => a.value === accountId)?.label || 'غير محدد') : 'كل الحسابات'
     const analysisItemName = analysisWorkItemId ? (() => {
-      const ai = analysisItemOptions.find(a => a.id === analysisWorkItemId)
-      return ai ? `${ai.code ? ai.code + ' - ' : ''}${ai.name_ar || ai.name}` : '—'
+      const ai = allAnalysisOptions.find(a => a.value === analysisWorkItemId)
+      return ai ? ai.label : '—'
     })() : 'كل بنود التحليل'
-    const costCenterName = costCenterId ? (costCenterOptions.find(c => c.id === costCenterId)?.name_ar || costCenterOptions.find(c => c.id === costCenterId)?.name || 'غير محدد') : 'كل مراكز التكلفة'
+    const costCenterName = costCenterId ? (allCostCenterOptions.find(c => c.value === costCenterId)?.label || 'غير محدد') : 'كل مراكز التكلفة'
 
     // Build professional commercial report HTML
     const reportHTML = `
@@ -1221,191 +1240,7 @@ const GeneralLedger: React.FC = () => {
     } catch { /* noop */ }
   }, []);
 
-  // Load dropdown lookups
-  useEffect(() => {
-    (async () => {
-      console.log('🏢 Loading dropdown options...')
-
-      const [orgs, projects, accounts] = await Promise.all([
-        fetchOrganizations(),
-        fetchProjects(),
-        fetchAccountsMinimal(),
-      ])
-
-      console.log('🏢 Loaded organizations:', orgs)
-      console.log('📁 Loaded projects:', projects)
-      console.log('💰 Loaded accounts:', accounts.length, 'items')
-
-
-      setAccountOptions(accounts)
-
-
-
-      // Load classifications
-      try {
-        const classData = await getAllTransactionClassifications()
-        setClassificationOptions((classData || []).map(c => ({ id: c.id, name: c.name, name_ar: c.name, code: String(c.code || '') })))
-      } catch { /* noop */ }
-
-      // Load expenses categories for the first available org
-      if (orgs.length > 0) {
-        const firstOrgId = currentOrg?.id || orgs[0].id
-        try {
-          console.log('💰 Loading expenses categories for org:', firstOrgId)
-          const { data: expensesData } = await supabase
-            .from('sub_tree_full')
-            .select('id, code, description, is_active')
-            .eq('org_id', firstOrgId)
-            .eq('is_active', true)
-            .order('code')
-
-          console.log('💰 Loaded expenses categories:', expensesData)
-          setExpensesCategoryOptions((expensesData || []).map(c => ({
-            id: c.id,
-            code: c.code || '',
-            description: c.description || '',
-            name: c.description || ''
-          })))
-        } catch (err) {
-          console.warn('⚠️ Failed to load expenses categories:', err)
-        }
-      }
-    })()
-  }, [])
-
-  // Load cost centers when org/project changes
-  useEffect(() => {
-    let canceled = false
-    const run = async () => {
-      if (!currentOrg?.id) {
-        setCostCenterOptions([])
-        setCostCenterId('')
-        return
-      }
-      try {
-        const rows = await getCostCentersForSelector(currentOrg.id, currentProject?.id || null)
-        if (canceled) return
-        const opts = (rows || []).map(r => ({
-          id: r.id,
-          code: r.code || '',
-          name: r.name || '',
-          name_ar: (r as any).name_ar ?? null,
-          level: (r as any).level ?? 0,
-        }))
-        setCostCenterOptions(opts)
-        if (costCenterId && !opts.some(o => o.id === costCenterId)) {
-          setCostCenterId('')
-        }
-      } catch {
-        if (!canceled) setCostCenterOptions([])
-      }
-    }
-    run()
-    return () => { canceled = true }
-  }, [currentOrg?.id, currentProject?.id, costCenterId])
-
-  // Load analysis work item options when org/project changes
-  useEffect(() => {
-    (async () => {
-      // console.log('🔍 Analysis Work Items Loading - orgId:', currentOrg?.id, 'projectId:', currentProject?.id)
-
-      if (!currentOrg?.id) {
-        // console.log('🔍 No orgId provided, clearing analysis item options')
-        setAnalysisItemOptions([]);
-        return
-      }
-
-      try {
-        // console.log('🔍 First trying RPC function list_analysis_work_items')
-
-        // Try RPC function first
-        const { data: rpcItems, error: rpcError } = await supabase.rpc('list_analysis_work_items', {
-          p_org_id: currentOrg.id,
-          p_only_with_tx: false,
-          p_project_id: currentProject?.id || null,
-          p_search: null,
-          p_include_inactive: false, // Only active items
-        })
-
-        if (!rpcError && rpcItems) {
-          // console.log('✅ RPC function succeeded - data:', rpcItems)
-          const mappedOptions = (rpcItems || []).map((i: any) => ({
-            id: i.id,
-            code: i.code || '',
-            name: i.name || i.name_ar || '',
-            name_ar: i.name_ar
-          }))
-          setAnalysisItemOptions(mappedOptions)
-          return
-        }
-
-        // console.warn('⚠️ RPC function failed, trying direct table access. RPC Error:', rpcError)
-
-        // Fallback to direct table access
-        const { data: items, error } = await supabase
-          .from('analysis_work_items')
-          .select('id, code, name, name_ar, is_active')
-          .eq('org_id', currentOrg.id)
-          .eq('is_active', true)
-          .order('code')
-
-        // console.log('🔍 Direct table query result - data:', items, 'error:', error)
-
-        if (error) {
-          console.error('🚨 Direct table access also failed:', error)
-          // If both methods fail, set an empty array but don't throw
-          setAnalysisItemOptions([])
-          return
-        }
-
-        const mappedOptions = (items || []).map(i => ({
-          id: i.id,
-          code: i.code || '',
-          name: i.name || i.name_ar || '',
-          name_ar: i.name_ar
-        }))
-
-        // console.log('🔍 Setting analysis item options from direct access:', mappedOptions)
-        setAnalysisItemOptions(mappedOptions)
-
-      } catch (err) {
-        console.error('🚨 Failed to load analysis work items:', err)
-        setAnalysisItemOptions([])
-      }
-    })()
-  }, [currentOrg?.id, currentProject?.id])
-
-  // Load expenses categories when org changes
-  useEffect(() => {
-    (async () => {
-      if (!currentOrg?.id) {
-        // console.log('💰 No orgId provided, clearing expenses category options')
-        setExpensesCategoryOptions([]);
-        return
-      }
-
-      try {
-        // console.log('💰 Loading expenses categories for org change:', currentOrg.id)
-        const { data: expensesData } = await supabase
-          .from('sub_tree_full')
-          .select('id, code, description, is_active')
-          .eq('org_id', currentOrg.id)
-          .eq('is_active', true)
-          .order('code')
-
-        // console.log('💰 Loaded expenses categories for org:', expensesData)
-        setExpensesCategoryOptions((expensesData || []).map(c => ({
-          id: c.id,
-          code: c.code || '',
-          description: c.description || '',
-          name: c.description || ''
-        })))
-      } catch (err) {
-        console.warn('⚠️ Failed to load expenses categories:', err)
-        setExpensesCategoryOptions([])
-      }
-    })()
-  }, [currentOrg?.id])
+  // Lookups are now handled by TransactionsDataProvider
 
   // Load presets and auto-apply last used
   useEffect(() => {
@@ -1453,8 +1288,11 @@ const GeneralLedger: React.FC = () => {
       setLoading(true)
       setError(null)
       try {
+        // Determine effective account filter logic
+        let effectiveAccId = accountId || debitAccountId || creditAccountId || null;
+        
         const rows = await fetchGeneralLedgerReport({
-          accountId: accountId || null,
+          accountId: effectiveAccId,
           dateFrom: filters.dateFrom || null,
           dateTo: filters.dateTo || null,
           orgId: currentOrg?.id || null,
@@ -1468,7 +1306,17 @@ const GeneralLedger: React.FC = () => {
           analysisWorkItemId: analysisWorkItemId || null,
           expensesCategoryId: expensesCategoryId || null,
         })
-        setData(rows)
+        
+        // Post-filtering if we are using specialized account roles (debit/credit)
+        let filteredRows = rows;
+        if (debitAccountId) {
+          filteredRows = filteredRows.filter(r => r.account_id === debitAccountId && Number(r.debit) > 0);
+        }
+        if (creditAccountId) {
+          filteredRows = filteredRows.filter(r => r.account_id === creditAccountId && Number(r.credit) > 0);
+        }
+        
+        setData(filteredRows)
         if (rows && rows.length > 0 && typeof rows[0].total_rows === 'number') {
           setTotalRows(rows[0].total_rows as number)
         } else {
@@ -1483,7 +1331,7 @@ const GeneralLedger: React.FC = () => {
     }
     const t = setTimeout(() => { if (!canceled && !document.hidden) void run() }, 250)
     return () => { canceled = true; clearTimeout(t) }
-  }, [filters.dateFrom, filters.dateTo, filters.includeOpening, filters.postedOnly, accountId, currentOrg?.id, currentProject?.id, costCenterId, pageSize, currentPage, classificationId, analysisWorkItemId, expensesCategoryId])
+  }, [filters.dateFrom, filters.dateTo, filters.includeOpening, filters.postedOnly, accountId, debitAccountId, creditAccountId, currentOrg?.id, currentProject?.id, costCenterId, pageSize, currentPage, classificationId, analysisWorkItemId, expensesCategoryId])
 
   // Load account summary when on overview - smart pagination approach
   // Removed unused summary state variables
@@ -1549,7 +1397,7 @@ const GeneralLedger: React.FC = () => {
     }
     const t = setTimeout(() => { if (!canceled && !document.hidden) void loadSummary() }, 300)
     return () => { canceled = true; clearTimeout(t) }
-  }, [view, filters.dateFrom, filters.dateTo, filters.postedOnly, currentOrg?.id, currentProject?.id, costCenterId, classificationId, analysisWorkItemId, expensesCategoryId])
+  }, [view, filters.dateFrom, filters.dateTo, filters.postedOnly, accountId, debitAccountId, creditAccountId, currentOrg?.id, currentProject?.id, costCenterId, classificationId, analysisWorkItemId, expensesCategoryId])
 
   // Helper: derive previous period range matching the current window length
   const prevRange = useMemo(() => {
@@ -1663,11 +1511,11 @@ const GeneralLedger: React.FC = () => {
     }
 
     const analysisItemLabel = analysisWorkItemId ? (() => {
-      const ai = analysisItemOptions.find(a => a.id === analysisWorkItemId)
-      return ai ? `${ai.code ? ai.code + ' - ' : ''}${ai.name_ar || ai.name}` : ''
+      const ai = allAnalysisOptions.find(a => a.value === analysisWorkItemId)
+      return ai ? ai.label : ''
     })() : ''
     return { columns, rows, metadata: { generatedAt: new Date(), filters: { ...filters, includeChildrenInDrilldown, onlyPostable, hideZeroAccounts, activityOnly, analysisWorkItemId, analysisWorkItemLabel: analysisItemLabel }, prependRows: prependRows.length ? prependRows : undefined } }
-  }, [data, filters, visibleColumns, compareMode, compareTotals, analysisWorkItemId, analysisItemOptions])
+  }, [data, filters, visibleColumns, compareMode, compareTotals, analysisWorkItemId, allAnalysisOptions])
 
   const filteredSummaryRows = useMemo(() => {
     let rows = summaryRows
@@ -1819,11 +1667,11 @@ const GeneralLedger: React.FC = () => {
     }
 
     const analysisItemLabel = analysisWorkItemId ? (() => {
-      const ai = analysisItemOptions.find(a => a.id === analysisWorkItemId)
-      return ai ? `${ai.code ? ai.code + ' - ' : ''}${ai.name_ar || ai.name}` : ''
+      const ai = allAnalysisOptions.find(a => a.value === analysisWorkItemId)
+      return ai ? ai.label : ''
     })() : ''
     return { columns: exportColumns, rows, metadata: { generatedAt: new Date(), filters: { ...filters, includeChildrenInDrilldown, onlyPostable, onlyNonPostable, hideZeroAccounts, activityOnly, analysisWorkItemId, analysisWorkItemLabel: analysisItemLabel }, prependRows: prependRows.length ? prependRows : undefined } }
-  }, [filteredSummaryRows, filters, visibleOverviewColumns, compareMode, compareTotals, includeChildrenInDrilldown, onlyPostable, onlyNonPostable, hideZeroAccounts, activityOnly, summaryRows, analysisWorkItemId, analysisItemOptions])
+  }, [filteredSummaryRows, filters, visibleOverviewColumns, compareMode, compareTotals, includeChildrenInDrilldown, onlyPostable, onlyNonPostable, hideZeroAccounts, activityOnly, summaryRows, analysisWorkItemId, allAnalysisOptions])
 
   // Smart pagination calculation based on actual filtered data for overview
   // For overview mode, use client-side pagination with filtered results
@@ -1887,12 +1735,13 @@ const GeneralLedger: React.FC = () => {
       if ((!rows || rows.length === 0) && includeChildrenInDrilldown) {
         // Build child list on first time
         if (!state.childIds) {
-          const parentCode = (summaryRows.find(s => s.account_id === accountIdToLoad)?.account_code) || ''
-          const childIds = summaryRows
+          const parentRow = summaryRows.find(s => s.account_id === accountIdToLoad)
+          const parentCode = parentRow?.account_code || ''
+          const children = summaryRows
             .filter(s => s.account_id !== accountIdToLoad && s.account_code && parentCode && s.account_code.startsWith(parentCode))
             .filter(s => (Number(s.period_debits || 0) + Number(s.period_credits || 0)) > 0)
-            .sort((a, b) => (a.account_code || '').localeCompare(b.account_code || ''))[0]
-          newState.childIds = childIds
+            .sort((a, b) => (a.account_code || '').localeCompare(b.account_code || ''))
+          newState.childIds = children.map(c => c.account_id)
           newState.childIndex = 0
         }
         rows = []
@@ -1962,521 +1811,254 @@ const GeneralLedger: React.FC = () => {
     if (expandedAccountId) setExpandedAccountId(null)
   }, [view, filters.dateFrom, filters.dateTo, filters.includeOpening, filters.postedOnly, currentOrg?.id, currentProject?.id, costCenterId, analysisWorkItemId, expensesCategoryId])
 
+  if (contextLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
   return (
-    <div className={styles.container}>
-      {!isOnline && (
-        <StalenessIndicator
-          isStale={true}
-          lastUpdated={new Date().toLocaleDateString(isAr ? 'ar-EG' : 'en-US')}
-        />
-      )}
-      {/* Ultra-compact header with export buttons */}
-      <div className={`${styles.noPrint} ${styles.compactHeader}`}>
-        <h2 className={styles.compactTitle}>دفتر الأستاذ العام</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <PresetBar
-            presets={presets}
-            selectedPresetId={selectedPresetId}
-            newPresetName={newPresetName}
-            onChangePreset={async (id) => {
-              await selectPresetAndApply(String(id), (p) => {
-                type GLPresetFilters = Partial<GLFilters> & {
-                  accountId?: string
-                  orgId?: string
-                  projectId?: string
-                  costCenterId?: string
-                  analysisWorkItemId?: string
-                  hideZeroAccounts?: boolean
-                  activityOnly?: boolean
-                }
-                type ColumnsPreset = { details?: string[]; overview?: string[] } | string[] | undefined
-
-                const f = ((p as { filters?: GLPresetFilters }).filters) ?? {}
-                setAccountId(f.accountId || '')
-                // Removed undefined setOrgId and setProjectId
-                setCostCenterId(f.costCenterId || '')
-                setAnalysisWorkItemId(f.analysisWorkItemId || '')
-                setFilters(prev => ({
-                  ...prev,
-                  dateFrom: f.dateFrom !== undefined ? f.dateFrom : prev.dateFrom,
-                  dateTo: f.dateTo !== undefined ? f.dateTo : prev.dateTo,
-                  includeOpening: typeof f.includeOpening === 'boolean' ? f.includeOpening : prev.includeOpening,
-                  postedOnly: typeof f.postedOnly === 'boolean' ? f.postedOnly : prev.postedOnly,
-                }))
-                if (typeof f.hideZeroAccounts === 'boolean') setHideZeroAccounts(f.hideZeroAccounts)
-                if (typeof f.activityOnly === 'boolean') setActivityOnly(f.activityOnly)
-
-                const cols = (p as { columns?: ColumnsPreset }).columns
-                if (Array.isArray(cols)) setVisibleColumns(cols)
-                else if (cols && typeof cols === 'object') {
-                  if (Array.isArray(cols.details)) setVisibleColumns(cols.details)
-                  if (Array.isArray(cols.overview)) setVisibleOverviewColumns(cols.overview)
-                }
-              })
-            }}
-            onChangeName={(v) => setNewPresetName(v)}
-            onSave={async () => {
-              if (!newPresetName.trim()) return
-              const saved = await saveCurrentPreset({
-                name: newPresetName.trim(),
-                filters: {
-                  dateFrom: filters.dateFrom,
-                  dateTo: filters.dateTo,
-                  includeOpening: filters.includeOpening,
-                  postedOnly: filters.postedOnly,
-                  orgId: currentOrg?.id || null,
-                  projectId: currentProject?.id || null,
-                  costCenterId,
-                  accountId,
-                  analysisWorkItemId,
-                  hideZeroAccounts,
-                  activityOnly,
-                },
-                columns: { details: visibleColumns, overview: visibleOverviewColumns },
-              })
-              if (saved) setNewPresetName('')
-            }}
-            onDelete={async () => {
-              if (!selectedPresetId) return
-              await deleteSelectedPreset()
-            }}
-            wrapperClassName={styles.presetBar}
-            selectClassName={styles.presetSelect}
-            inputClassName={styles.presetInput}
-            buttonClassName={styles.presetButton}
-            placeholder='اسم التهيئة'
-            saveLabel='حفظ'
-            deleteLabel='حذف'
-          />
-
-          {/* Universal Export Buttons and Print Button */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {/* Print Button */}
+    <div className="transactions-container" dir={isAr ? 'rtl' : 'ltr'}>
+      <div className="transactions-header">
+        <div style={{ flex: 1 }}>
+          <h1 className="transactions-title" style={{ marginBottom: isOnline ? 0 : '0.5rem' }}>
+            {isAr ? 'تقرير دفتر الأستاذ العام' : 'General Ledger Report'}
+          </h1>
+          {!isOnline && (
+            <StalenessIndicator
+              isStale={true}
+              lastUpdated={new Date().toLocaleDateString(isAr ? 'ar-EG' : 'en-US')}
+            />
+          )}
+        </div>
+        <div className="transactions-actions">
+           <button className="ultimate-btn ultimate-btn-edit" onClick={() => setColumnMenuOpen(true)}>
+             <div className="btn-content">
+               <span className="btn-text">{isAr ? '⚙️ إعدادات الأعمدة' : '⚙️ Column Settings'}</span>
+             </div>
+           </button>
+           <ExportButtons
+              data={view === 'overview' ? exportDataOverview : exportDataDetails}
+              config={{
+                title: (() => {
+                  const acc = allAccountOptions.find(a => a.value === accountId)
+                  if (!acc) return isAr ? 'تقرير دفتر الأستاذ العام' : 'General Ledger Report'
+                  return isAr ? `تقرير دفتر الأستاذ — ${acc.label}` : `GL Report — ${acc.label}`
+                })(),
+                orientation: 'landscape',
+                useArabicNumerals: isAr,
+                rtlLayout: isAr,
+              }}
+              size="small"
+              layout="horizontal"
+            />
+            
             <button
-              onClick={printGeneralLedger}
-              className={styles.presetButton}
-              title="طباعة التقرير"
-              style={{
-                fontSize: '30px',
-                padding: '9px 14px',
-                minWidth: '54px',
-                minHeight: '42px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: '#6f42c1',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 2px 8px rgba(111, 66, 193, 0.3)'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = '#5a32a3'
-                e.currentTarget.style.transform = 'translateY(-1px)'
-                e.currentTarget.style.boxShadow = '0 4px 16px rgba(111, 66, 193, 0.4)'
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = '#6f42c1'
-                e.currentTarget.style.transform = 'translateY(0px)'
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(111, 66, 193, 0.3)'
-              }}
-            >
-              🖨️
-            </button>
-
-            {/* Universal Export Buttons - Larger with hover effects */}
-            {view === 'overview' ? (
-              <div style={{ transform: 'scale(0.7)', transformOrigin: 'center' }}>
-                <ExportButtons
-                  data={exportDataOverview}
-                  config={{
-                    title: (() => {
-                      const chips: string[] = []
-                      chips.push(includeChildrenInDrilldown ? 'الوضع: مدمج' : 'الوضع: توسيع أول فرعي')
-                      if (filters.postedOnly) chips.push('فلتر: قيود معتمدة فقط')
-                      if (hideZeroAccounts) chips.push('فلتر: إخفاء الحسابات ذات القيم 0')
-                      if (activityOnly) chips.push('فلتر: حركة فقط')
-                      if (onlyPostable) chips.push('فلتر: حسابات ورقية فقط')
-                      if (onlyNonPostable) chips.push('فلتر: تجميعي فقط')
-                      if (analysisWorkItemId) {
-                        const ai = analysisItemOptions.find(a => a.id === analysisWorkItemId)
-                        if (ai) chips.push(`بند التحليل: ${ai.code ? ai.code + ' - ' : ''}${ai.name_ar || ai.name}`)
-                      }
-                      return `ملخص دفتر الأستاذ العام — ${chips.join(' — ')}`
-                    })(),
-                    orientation: 'landscape',
-                    useArabicNumerals: true,
-                    rtlLayout: true,
-                  }}
-                  size="small"
-                  layout="horizontal"
-                />
-              </div>
-            ) : (
-              <div style={{ transform: 'scale(0.7)', transformOrigin: 'center' }}>
-                <ExportButtons
-                  data={exportDataDetails}
-                  config={{
-                    title: (() => {
-                      const acc = accountOptions.find(a => a.id === accountId)
-                      const base = (() => {
-                        if (!acc) return 'تقرير دفتر الأستاذ العام'
-                        const hasChildren = !!(acc.code && accountOptions.some(o => o.id !== acc.id && o.code && o.code.startsWith(acc.code || '')))
-                        return `تقرير دفتر الأستاذ — ${acc.code ? acc.code + ' - ' : ''}${acc.name_ar || acc.name}`
-                      })()
-                      const chips: string[] = []
-                      if (filters.postedOnly) chips.push('فلتر: قيود معتمدة فقط')
-                      chips.push(includeChildrenInDrilldown ? 'الوضع: مدمج' : 'الوضع: توسيع أول فرعي')
-                      if (analysisWorkItemId) {
-                        const ai = analysisItemOptions.find(a => a.id === analysisWorkItemId)
-                        if (ai) chips.push(`بند التحليل: ${ai.code ? ai.code + ' - ' : ''}${ai.name_ar || ai.name}`)
-                      }
-                      return chips.length ? `${base} — ${chips.join(' — ')}` : base
-                    })(),
-                    orientation: 'landscape',
-                    useArabicNumerals: true,
-                    rtlLayout: true,
-                  }}
-                  size="small"
-                  layout="horizontal"
-                />
-              </div>
-            )}
-
-            {/* Quick link to Analysis Item Usage report */}
-            <button
-              className={styles.presetButton}
+              className="ultimate-btn ultimate-btn-neutral"
               onClick={() => {
                 const p = new URLSearchParams()
-                if (orgId) p.set('orgId', orgId)
-                if (projectId) p.set('projectId', projectId)
+                if (currentOrg?.id) p.set('orgId', currentOrg.id)
+                if (currentProject?.id) p.set('projectId', currentProject.id)
                 if (costCenterId) p.set('costCenterId', costCenterId)
-                if (filters.dateFrom) p.set('dateFrom', filters.dateFrom)
-                if (filters.dateTo) p.set('dateTo', filters.dateTo)
+                if (unifiedFilters.dateFrom) p.set('dateFrom', unifiedFilters.dateFrom)
+                if (unifiedFilters.dateTo) p.set('dateTo', unifiedFilters.dateTo)
                 p.set('onlyWithTx', 'true')
                 const url = `/reports/analysis-item-usage?${p.toString()}`
                 try { window.open(url, '_blank', 'noopener') } catch { }
               }}
-              title="فتح تقرير استخدام بنود التحليل"
-              style={{ fontSize: '14px', padding: '8px 12px' }}
+              title={isAr ? "فتح تقرير استخدام بنود التحليل" : "Open Analysis Item Usage Report"}
             >
-              🔗 استخدام البنود التحليلية
+              <div className="btn-content">
+                <span className="btn-text">🔗 {isAr ? 'استخدام البنود التحليلية' : 'Analysis Usage'}</span>
+              </div>
+            </button>
+        </div>
+      </div>
+
+
+      {/* Ultra-compact unified toolbar */}
+      <div style={{ padding: '0 1.5rem 1.5rem', flexShrink: 0 }}>
+        <UnifiedFilterBar
+          values={unifiedFilters}
+          onChange={updateFilter}
+          onReset={() => {
+            handleResetFilters()
+            setPostedOnly(false)
+            setHideZeroAccounts(true)
+            setActivityOnly(false)
+            setCompareMode(false)
+            setNumbersOnly(true)
+            setAccountTypeFilter('all')
+            setBalanceTypeFilter('all')
+          }}
+          onApply={handleApplyFilters}
+          applyDisabled={!filtersDirty}
+          preferencesKey="gl_report_filterbar_v2"
+          config={{
+            showSearch: view === 'overview',
+            showDateRange: true,
+            showAccount: true,
+            showDebitAccount: true,
+            showCreditAccount: true,
+            showCostCenter: true,
+            showClassification: true,
+            showExpensesCategory: true,
+            showAnalysisWorkItem: true,
+            showApprovalStatus: false,
+          }}
+        />
+
+        <div className="transactions-filters-row" style={{ marginTop: '0.5rem', background: 'var(--surface)', borderRadius: '12px', border: '1px solid var(--border)', padding: '10px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button 
+              className={`ultimate-btn ${hideZeroAccounts ? 'ultimate-btn-success' : 'ultimate-btn-neutral'}`}
+              onClick={() => setHideZeroAccounts(!hideZeroAccounts)}
+              style={{ minHeight: '34px', fontSize: '13px' }}
+            >
+              <div className="btn-content"><span className="btn-text">🫥 إخفاء الأصفار</span></div>
+            </button>
+            
+            <button 
+              className={`ultimate-btn ${activityOnly ? 'ultimate-btn-success' : 'ultimate-btn-neutral'}`}
+              onClick={() => setActivityOnly(!activityOnly)}
+              style={{ minHeight: '34px', fontSize: '13px' }}
+            >
+              <div className="btn-content"><span className="btn-text">📈 حركة فقط</span></div>
+            </button>
+            
+            <button 
+              className={`ultimate-btn ${postedOnly ? 'ultimate-btn-success' : 'ultimate-btn-neutral'}`}
+              onClick={() => setPostedOnly(!postedOnly)}
+              style={{ minHeight: '34px', fontSize: '13px' }}
+            >
+              <div className="btn-content"><span className="btn-text">✅ مرحل فقط</span></div>
+            </button>
+            
+            <button 
+              className={`ultimate-btn ${compareMode ? 'ultimate-btn-success' : 'ultimate-btn-neutral'}`}
+              onClick={() => setCompareMode(!compareMode)}
+              style={{ minHeight: '34px', fontSize: '13px' }}
+            >
+              <div className="btn-content"><span className="btn-text">🔀 مقارنة</span></div>
+            </button>
+            
+            <button 
+              className={`ultimate-btn ${numbersOnly ? 'ultimate-btn-success' : 'ultimate-btn-neutral'}`}
+              onClick={() => setNumbersOnly(!numbersOnly)}
+              style={{ minHeight: '34px', fontSize: '13px' }}
+            >
+              <div className="btn-content"><span className="btn-text"># أرقام فقط</span></div>
+            </button>
+
+            <button 
+              className="ultimate-btn ultimate-btn-warning"
+              onClick={() => setShowAnalytics(!showAnalytics)}
+              style={{ minHeight: '34px', fontSize: '13px' }}
+            >
+              <div className="btn-content"><span className="btn-text">📊 التحليلات</span></div>
+            </button>
+
+            <button 
+              className="ultimate-btn ultimate-btn-neutral"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              style={{ minHeight: '34px', fontSize: '13px', background: 'var(--field_bg)' }}
+            >
+              <div className="btn-content"><span className="btn-text">🔍 متقدم</span></div>
+            </button>
+            
+            {/* View Mode Selector - Area marked 2 */}
+            <div style={{ display: 'flex', gap: '4px', border: '1px solid var(--border)', borderRadius: '6px', padding: '2px', background: 'var(--field_bg)' }}>
+               <button 
+                  className={`ultimate-btn ${view === 'overview' ? 'ultimate-btn-edit' : 'ultimate-btn-neutral'}`}
+                  onClick={() => setView('overview')}
+                  style={{ minHeight: '30px', fontSize: '12px', padding: '4px 10px', borderRadius: '4px' }}
+                  title="وضع الملخص - عرض حسابات مدمج"
+                >
+                  📊 ملخص
+                </button>
+                <button 
+                  className={`ultimate-btn ${view === 'details' ? 'ultimate-btn-edit' : 'ultimate-btn-neutral'}`}
+                  onClick={() => setView('details')}
+                  style={{ minHeight: '30px', fontSize: '12px', padding: '4px 10px', borderRadius: '4px' }}
+                  title="وضع التفاصيل - عرض قيود منفصلة"
+                >
+                  📝 تفاصيل
+                </button>
+            </div>
+            
+            <div style={{ borderLeft: '1px solid var(--border)', height: '20px', margin: '0 8px' }} />
+
+            <div style={{ display: 'flex', gap: '4px' }}>
+               <button 
+                  className={`ultimate-btn ${!includeChildrenInDrilldown ? 'ultimate-btn-edit' : 'ultimate-btn-neutral'}`}
+                  onClick={() => setIncludeChildrenInDrilldown(false)}
+                  style={{ minHeight: '30px', fontSize: '11px', padding: '4px 8px' }}
+                  title="توسيع أول حساب فرعي فقط عند الضغط"
+                >
+                  فرعي
+                </button>
+                <button 
+                  className={`ultimate-btn ${includeChildrenInDrilldown ? 'ultimate-btn-edit' : 'ultimate-btn-neutral'}`}
+                  onClick={() => setIncludeChildrenInDrilldown(true)}
+                  style={{ minHeight: '30px', fontSize: '11px', padding: '4px 8px' }}
+                  title="دمج حركات الحسابات الفرعية"
+                >
+                  دمج
+                </button>
+            </div>
+            
+            <div style={{ flex: 1 }} />
+            
+            {view === 'overview' && (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input 
+                  type="text" 
+                  placeholder="بحث..." 
+                  value={jumpCode}
+                  onChange={e => setJumpCode(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      setSearchTerm(jumpCode)
+                      setPageSize(1000)
+                      setCurrentPage(1)
+                    }
+                  }}
+                  className="filter-input"
+                  style={{ width: '120px', height: '34px' }}
+                />
+                <button 
+                   className="ultimate-btn ultimate-btn-icon" 
+                   onClick={() => { setSearchTerm(jumpCode); setPageSize(1000); setCurrentPage(1) }}
+                   style={{ minWidth: '34px', minHeight: '34px' }}
+                >
+                  ↪️
+                </button>
+              </div>
+            )}
+            
+            <button 
+               className="ultimate-btn ultimate-btn-delete"
+               onClick={() => {
+                  handleResetFilters()
+                  setPostedOnly(false)
+                  setHideZeroAccounts(true)
+                  setActivityOnly(false)
+                  setNumbersOnly(true)
+                  setAccountTypeFilter('all')
+                  setBalanceTypeFilter('all')
+                  setIncludeChildrenInDrilldown(true)
+                  setCurrentPage(1)
+                  setJumpCode('')
+               }}
+               style={{ minWidth: '34px', minHeight: '34px' }}
+               title="مسح الكل"
+            >
+               🧹
             </button>
           </div>
         </div>
-      </div>
-
-      {/* Ultra-compact unified toolbar */}
-      <div className={`${styles.noPrint} ${styles.compactToolbar}`}>
-        {/* Compact view switch */}
-        <select
-          value={view}
-          onChange={e => setView(e.target.value as ViewMode)}
-          className={styles.compactSelect}
-        >
-          <option value="overview">ملخص</option>
-          <option value="details">تفاصيل</option>
-        </select>
-
-        {/* Core filters in one row */}
-        <input
-          className={styles.input}
-          type="date"
-          value={filters.dateFrom ?? ''}
-          onChange={e => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
-          style={{ width: '130px', fontSize: '12px' }}
-        />
-        <input
-          className={styles.input}
-          type="date"
-          value={filters.dateTo ?? ''}
-          onChange={e => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
-          style={{ width: '130px', fontSize: '12px' }}
-        />
-
-        {/* Cost Center filter (both views) */}
-        <select className={styles.select} value={costCenterId} onChange={e => setCostCenterId(e.target.value)} style={{ maxWidth: '200px', fontSize: '12px' }}>
-          <option value=''>كل مراكز التكلفة</option>
-          {costCenterOptions.map(o => (
-            <option key={o.id} value={o.id}>
-              {`${o.code ? `${o.code} - ` : ''}${o.name_ar || o.name}`.substring(0, 60)}
-            </option>
-          ))}
-        </select>
-
-        {/* Classification filter - for both views */}
-        <select className={styles.select} value={classificationId} onChange={e => setClassificationId(e.target.value)} style={{ maxWidth: '180px', fontSize: '12px' }}>
-          <option value=''>جميع التصنيفات</option>
-          {classificationOptions.map(o => (
-            <option key={o.id} value={o.id}>
-              {(o.name_ar || o.name).substring(0, 30)}
-            </option>
-          ))}
-        </select>
-
-        {/* Analysis Work Item filter (details view supported) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <select className={styles.select} value={analysisWorkItemId} onChange={e => setAnalysisWorkItemId(e.target.value)} style={{ maxWidth: '220px', fontSize: '12px' }}>
-            <option value=''>جميع بنود التحليل</option>
-            {analysisItemOptions.map(o => (
-              <option key={o.id} value={o.id}>
-                {`${o.code ? o.code + ' - ' : ''}${o.name_ar || o.name}`.substring(0, 60)}
-              </option>
-            ))}
-          </select>
-          {analysisWorkItemId && (
-            <button
-              className={styles.presetButton}
-              onClick={() => setAnalysisWorkItemId('')}
-              title="مسح فلتر بند التحليل"
-              style={{ fontSize: '18px', padding: '6px 10px' }}
-            >
-              ✖️
-            </button>
-          )}
-        </div>
-
-        {/* Expenses Category filter */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <select className={styles.select} value={expensesCategoryId} onChange={e => setExpensesCategoryId(e.target.value)} style={{ maxWidth: '220px', fontSize: '12px' }}>
-            <option value=''>جميع فئات المصروفات</option>
-            {expensesCategoryOptions.map(o => (
-              <option key={o.id} value={o.id}>
-                {`${o.code ? o.code + ' - ' : ''}${o.description || o.name}`.substring(0, 60)}
-              </option>
-            ))}
-          </select>
-          {expensesCategoryId && (
-            <button
-              className={styles.presetButton}
-              onClick={() => setExpensesCategoryId('')}
-              title="مسح فلتر فئة المصروف"
-              style={{ fontSize: '18px', padding: '6px 10px' }}
-            >
-              ✖️
-            </button>
-          )}
-        </div>
-
-        {/* Account filter - only for details view */}
-        {view === 'details' && (
-          <select className={styles.select} value={accountId} onChange={e => setAccountId(e.target.value)} style={{ maxWidth: '200px', fontSize: '12px' }}>
-            <option value=''>جميع الحسابات</option>
-            {accountOptions.map(o => (
-              <option key={o.id} value={o.id}>
-                {`${o.code ? `${o.code} - ` : ''}${o.name_ar || o.name}`.substring(0, 50)}
-              </option>
-            ))}
-          </select>
-        )}
-
-        {/* Search for overview */}
-        {view === 'overview' && (
-          <>
-            <input
-              ref={searchInputRef}
-              className={styles.input}
-              type="text"
-              placeholder="بحث..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              style={{ width: '120px', fontSize: '12px' }}
-            />
-            {/* Jump to account code: sets a large page size and filters by code */}
-            <input
-              className={styles.input}
-              type="text"
-              placeholder="اذهب إلى رمز (مثال: 51)"
-              value={jumpCode}
-              onChange={e => setJumpCode(e.target.value)}
-              style={{ width: '120px', fontSize: '12px' }}
-            />
-            <button
-              className={styles.presetButton}
-              onClick={() => { setSearchTerm(jumpCode); setPageSize(1000); setCurrentPage(1) }}
-              title="اذهب إلى الرمز"
-              style={{ fontSize: '18px', padding: '6px 10px' }}
-            >
-              ↪️
-            </button>
-          </>
-        )}
-
-        {/* Smaller option toggles - 1.5x bigger */}
-        <button className={styles.presetButton} onClick={() => setHideZeroAccounts(v => !v)} title="إخفاء قيم 0" style={{ backgroundColor: hideZeroAccounts ? '#28a745' : 'transparent', fontSize: '30px', padding: '9px 14px', minWidth: '54px', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          🫥
-        </button>
-        <button className={styles.presetButton} onClick={() => setActivityOnly(v => !v)} title="حركة فقط" style={{ backgroundColor: activityOnly ? '#28a745' : 'transparent', fontSize: '30px', padding: '9px 14px', minWidth: '54px', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          📈
-        </button>
-        <button className={styles.presetButton} onClick={() => setFilters(prev => ({ ...prev, postedOnly: !prev.postedOnly }))} title="قيود معتمدة فقط" style={{ backgroundColor: filters.postedOnly ? '#28a745' : 'transparent', fontSize: '30px', padding: '9px 14px', minWidth: '54px', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          ✅
-        </button>
-        <button className={styles.presetButton} onClick={() => setCompareMode(v => !v)} title="وضع المقارنة" style={{ backgroundColor: compareMode ? '#28a745' : 'transparent', fontSize: '30px', padding: '9px 14px', minWidth: '54px', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          🔀
-        </button>
-        <button className={styles.presetButton} onClick={() => setNumbersOnly(v => !v)} title="أرقام فقط (بدون عملة في التصدير)" style={{ backgroundColor: numbersOnly ? '#28a745' : 'transparent', fontSize: '30px', padding: '9px 14px', minWidth: '54px', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          #
-        </button>
-
-        {/* Clean: turn ALL filters off, including dates (show everything, including zero balances) */}
-        <button
-          className={styles.presetButton}
-          onClick={() => {
-            // Reset date range filters - clear dates to show all transactions
-            setFilters({ dateFrom: '', dateTo: '', includeOpening: true, postedOnly: false })
-
-            // Reset basic filters
-            setAccountId('');
-            // Removed undefined setOrgId and setProjectId
-            setCostCenterId('');
-            setClassificationId(''); // Reset classification filter
-            setExpensesCategoryId(''); // Reset expenses category filter
-
-            // Turn OFF all additional filters (show zero balances, no special modes)
-            setHideZeroAccounts(false);
-            setActivityOnly(false);
-            setOnlyPostable(false);
-            setOnlyNonPostable(false);
-            setIncludeChildrenInDrilldown(true);
-
-            // Clear search and pagination helpers
-            setCurrentPage(1);
-            setSearchTerm('');
-            setJumpCode('');
-
-            // Clear advanced amount/type filters
-            setAmountFilters({
-              minDebit: '',
-              maxDebit: '',
-              minCredit: '',
-              maxCredit: '',
-              minBalance: '',
-              maxBalance: ''
-            });
-            setAccountTypeFilter('all');
-            setBalanceTypeFilter('all');
-
-            // Close panels
-            setShowAdvancedFilters(false);
-            setShowAnalytics(false);
-          }}
-          title="تنظيف المرشحات (عرض كل شيء بما في ذلك الأرصدة الصفرية)"
-          style={{ fontSize: '28px', padding: '9px 14px', minWidth: '54px', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          🧹
-        </button>
-
-        {/* Show All: clear date limits (select all dates) and keep hide-zero ON */}
-        <button
-          className={styles.presetButton}
-          onClick={() => {
-            // Remove date filters (all dates)
-            setFilters({ dateFrom: '', dateTo: '', includeOpening: true, postedOnly: false })
-
-            // Reset basic filters
-            setAccountId('');
-            // Removed undefined setOrgId and setProjectId
-            setClassificationId('');
-
-            // Keep "has balance" view
-            setHideZeroAccounts(true);
-            setActivityOnly(false);
-            setOnlyPostable(false);
-            setOnlyNonPostable(false);
-            setIncludeChildrenInDrilldown(true);
-
-            // Reset search/pagination
-            setCurrentPage(1);
-            setSearchTerm('');
-            setJumpCode('');
-
-            // Clear advanced filters
-            setAmountFilters({
-              minDebit: '',
-              maxDebit: '',
-              minCredit: '',
-              maxCredit: '',
-              minBalance: '',
-              maxBalance: ''
-            });
-            setAccountTypeFilter('all');
-            setBalanceTypeFilter('all');
-
-            // Close panels
-            setShowAdvancedFilters(false);
-            setShowAnalytics(false);
-          }}
-          title="عرض جميع البيانات (كل التواريخ وإخفاء الأرصدة الصفرية)"
-          style={{
-            fontSize: '16px',
-            padding: '8px 16px',
-            marginLeft: '8px',
-            minWidth: '100px',
-            minHeight: '42px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#28a745',
-            color: 'white',
-            fontWeight: 'bold',
-            border: 'none',
-            borderRadius: '4px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.backgroundColor = '#218838'
-            e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)'
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.backgroundColor = '#28a745'
-            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
-          }}
-        >
-          🗂️ عرض الكل
-        </button>
-
-
-        {/* Full export buttons - smaller */}
-        <button className={styles.presetButton} disabled={isExportingFull} onClick={() => handleFullExport('excel')} title="تصدير كل الصفوف (Excel)" style={{ fontSize: '30px', padding: '9px 14px', minWidth: '54px', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          📈
-        </button>
-        <button className={styles.presetButton} disabled={isExportingFull} onClick={() => handleFullExport('csv')} title="تصدير كل الصفوف (CSV)" style={{ fontSize: '30px', padding: '9px 14px', minWidth: '54px', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          📄
-        </button>
-
-        {/* Column settings - smaller */}
-        <button className={styles.presetButton} onClick={() => {
-          // Initialize temp states with current values
-          setTempVisibleColumns([...visibleColumns])
-          setTempVisibleOverviewColumns([...visibleOverviewColumns])
-          setColumnMenuOpen(true)
-        }} title="اختيار الأعمدة" style={{ fontSize: '30px', padding: '9px 14px', minWidth: '54px', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          ⚙️
-        </button>
-
-        {/* Action buttons - smaller */}
-        <button className={styles.presetButton} onClick={() => setShowShortcutsHelp(true)} title="عرض اختصارات لوحة المفاتيح (F1 أو Ctrl+H)" style={{ fontSize: '30px', padding: '9px 14px', minWidth: '54px', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          ⌨️
-        </button>
-        <button className={styles.presetButton} onClick={() => setShowAdvancedFilters(true)} title="فتح المرشحات المتقدمة (Ctrl+F)" style={{ fontSize: '30px', padding: '9px 14px', minWidth: '54px', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          🔍
-        </button>
-        <button className={styles.presetButton} onClick={() => setShowAnalytics(true)} title="عرض لوحة التحليلات والإحصائيات (Ctrl+A)" style={{ fontSize: '30px', padding: '9px 14px', minWidth: '54px', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          📈
-        </button>
-      </div>
-
-      {/* Export controls for in-report PDF (legacy approach, not universal) */}
-      <div className="export-controls">
-        <button onClick={exportGLToPDF} className="export-pdf-btn" title="تصدير إلى PDF">
-          <span className="export-icon">📄</span>
-          تصدير PDF
-        </button>
-      </div>
       {/* Report content container for PDF export */}
       <div id="gl-report-content" className="financial-report-content">
         {/* Report header (on-screen and printed) */}
@@ -2487,7 +2069,7 @@ const GeneralLedger: React.FC = () => {
             <span>الفترة: {filters.dateFrom || '—'} ← {filters.dateTo || '—'}</span>
             {currentOrg && (<span>المنظمة: {(currentOrg.name || '')}</span>)}
             {currentProject && (<span>المشروع: {(currentProject.name || '')}</span>)}
-            {costCenterId && (<span>مركز التكلفة: {(() => { const cc = costCenterOptions.find(c => c.id === costCenterId); return (cc?.name_ar || cc?.name || costCenterId) })()}</span>)}
+            {costCenterId && (<span>مركز التكلفة: {(() => { const cc = allCostCenterOptions.find(c => c.value === costCenterId); return (cc?.label || costCenterId) })()}</span>)}
             {filters.postedOnly && (<span>قيود معتمدة فقط</span>)}
           </div>
         </div>
@@ -2787,36 +2369,25 @@ const GeneralLedger: React.FC = () => {
 
         {view === 'overview' && (
           <>
-            {/* Compact overview info bar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '6px 0', fontSize: '14px', borderBottom: '1px solid #eee' }}>
-              <span><strong>عدد الحسابات:</strong> {filteredSummaryRows.length.toLocaleString('ar-EG')}</span>
-              {/* Filters summary chips */}
-              <span style={{ display: 'inline-flex', gap: '8px', flexWrap: 'wrap', fontSize: '12px', color: 'var(--muted_text)' }} aria-label="ملخص المرشحات">
-                {filters.postedOnly && <span style={{ background: 'var(--field_bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '2px 8px' }}>معتمدة فقط</span>}
-                {currentOrg && <span style={{ background: 'var(--field_bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '2px 8px' }}>منظمة: {(currentOrg.name || '')}</span>}
-                {currentProject && <span style={{ background: 'var(--field_bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '2px 8px' }}>مشروع: {(currentProject.name || '')}</span>}
-                {costCenterId && <span style={{ background: 'var(--field_bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '2px 8px' }}>مركز تكلفة: {(() => { const cc = costCenterOptions.find(o => o.id === costCenterId); return cc ? `${cc.code ? cc.code + ' - ' : ''}${cc.name_ar || cc.name}` : costCenterId })()}</span>}
-                {accountId && <span style={{ background: 'var(--field_bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '2px 8px' }}>حساب: {(() => { const a = accountOptions.find(o => o.id === accountId); return a ? `${a.code ? a.code + ' - ' : ''}${a.name_ar || a.name}` : accountId })()}</span>}
-                {hideZeroAccounts && <span style={{ background: 'var(--field_bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '2px 8px' }}>إخفاء الأصفار</span>}
-                {activityOnly && <span style={{ background: 'var(--field_bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '2px 8px' }}>حركة فقط</span>}
-                {onlyPostable && <span style={{ background: 'var(--field_bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '2px 8px' }}>قابلة للترحيل</span>}
-                {onlyNonPostable && <span style={{ background: 'var(--field_bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '2px 8px' }}>تجميعية</span>}
-                {filters.dateFrom && filters.dateTo && <span style={{ background: 'var(--field_bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '2px 8px' }}>الفترة: {filters.dateFrom} → {filters.dateTo}</span>}
-              </span>
-              {compareMode && compareTotals && showCompareOverview && (
-                <>
-                  <span title={compareTooltip}><strong>صافي السابق:</strong> {Number(compareTotals.prev || 0).toLocaleString('ar-EG', { minimumFractionDigits: 0 })}</span>
-                  <span title={compareTooltip}><strong>صافي الحالي:</strong> {Number(compareTotals.curr || 0).toLocaleString('ar-EG', { minimumFractionDigits: 0 })}</span>
-                  <span title={compareTooltip}><strong>الفرق:</strong> {Number(compareTotals.variance || 0).toLocaleString('ar-EG', { minimumFractionDigits: 0 })}</span>
-                  <span title={compareTooltip}><strong>التغير:</strong> {compareTotals.pct == null ? '—' : `${(compareTotals.pct * 100).toFixed(1)}%`}</span>
-                </>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '12px 16px', background: 'var(--field_bg)', borderRadius: '8px', border: '1px solid var(--border)', marginBottom: '1rem', fontSize: '14px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <span style={{ color: 'var(--muted_text)' }}>عدد الحسابات:</span>
+                <span style={{ fontWeight: '600' }}>{filteredSummaryRows.length.toLocaleString('ar-EG')}</span>
+              </div>
+              {compareMode && compareTotals && (
+                <div style={{ display: 'flex', gap: '16px', borderLeft: '1px solid var(--border)', paddingLeft: '16px', marginLeft: '8px' }}>
+                  <div><span style={{ color: 'var(--muted_text)' }}>صافي السابق:</span> <span style={{ fontWeight: '600' }}>{Number(compareTotals.prev || 0).toLocaleString('ar-EG')}</span></div>
+                  <div><span style={{ color: 'var(--muted_text)' }}>صافي الحالي:</span> <span style={{ fontWeight: '600' }}>{Number(compareTotals.curr || 0).toLocaleString('ar-EG')}</span></div>
+                  <div><span style={{ color: 'var(--muted_text)' }}>التغير:</span> <span style={{ fontWeight: '600', color: compareTotals.variance >= 0 ? 'var(--success)' : 'var(--error)' }}>{compareTotals.pct == null ? '—' : `${(compareTotals.pct * 100).toFixed(1)}%`}</span></div>
+                </div>
               )}
-              {/* Inline pagination info */}
-              <span style={{ marginLeft: 'auto', fontSize: '13px', opacity: 0.8 }}>
-                الصفحة {currentPage}/{totalPages} • إجمالي: {totalRows.toLocaleString('ar-EG')} • معروض: {filteredSummaryRows.length.toLocaleString('ar-EG')}
-              </span>
+              <div style={{ marginLeft: 'auto', opacity: 0.8 }}>
+                 إجمالي الصفوف: {totalRows.toLocaleString('ar-EG')} • صفحة {currentPage} من {totalPages}
+              </div>
             </div>
+            
             <div className={`${styles.reportTableWrap} ${densityMode === 'dense' ? styles.dense : ''}`}>
+
               {loadingSummary ? (
                 <div className={styles.footer}>جاري تحميل الملخص...</div>
               ) : (
@@ -2901,7 +2472,7 @@ const GeneralLedger: React.FC = () => {
                                       >تبديل الوضع</button>
                                       <button
                                         className={styles.presetButton}
-                                        onClick={(e) => { e.stopPropagation(); setAccountId(row.account_id); setView('details'); setCurrentPage(1); }}
+                                        onClick={(e) => { e.stopPropagation(); updateFilter('accountId', row.account_id); setView('details'); setCurrentPage(1); }}
                                       >فتح التفاصيل الكاملة</button>
                                       <button
                                         className={styles.presetButton}
@@ -3000,20 +2571,13 @@ const GeneralLedger: React.FC = () => {
         {view === 'details' && accountId && (
           <div className={styles.detailsHeader}>
             {(() => {
-              const acc = accountOptions.find(a => a.id === accountId)
+              const acc = allAccountOptions.find(a => a.value === accountId)
               if (!acc) return null
-              const hasChildren = !!(acc.code && accountOptions.some(o => o.id !== acc.id && o.code && o.code.startsWith(acc.code || '')))
-              const isPostable = !hasChildren
               return (
                 <>
                   <div className={styles.detailsHeaderTitle}>
-                    {acc.code ? `${acc.code} - ` : ''}{acc.name_ar || acc.name}
+                    {acc.label}
                   </div>
-                  {(acc.category || acc.normal_balance) && (
-                    <div className={styles.detailsHeaderMeta}>
-                      {acc.category || ''}{acc.category && acc.normal_balance ? ' / ' : ''}{acc.normal_balance || ''}
-                    </div>
-                  )}
                 </>
               )
             })()}
@@ -3023,18 +2587,14 @@ const GeneralLedger: React.FC = () => {
         {view === 'details' && (
           <>
             {/* Compact details info bar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '6px 0', fontSize: '13px', borderBottom: '1px solid #eee', flexWrap: 'wrap' }}>
-              <span><strong>عدد السجلات:</strong> {totalRows.toLocaleString('ar-EG')}</span>
-              <span><strong>افتتاحي مدين:</strong> {summary.openingDebit.toLocaleString('ar-EG', { minimumFractionDigits: 0 })}</span>
-              <span><strong>افتتاحي دائن:</strong> {summary.openingCredit.toLocaleString('ar-EG', { minimumFractionDigits: 0 })}</span>
-              <span><strong>فترة مدين:</strong> {summary.periodDebit.toLocaleString('ar-EG', { minimumFractionDigits: 0 })}</span>
-              <span><strong>فترة دائن:</strong> {summary.periodCredit.toLocaleString('ar-EG', { minimumFractionDigits: 0 })}</span>
-              <span><strong>ختامي مدين:</strong> {summary.closingDebit.toLocaleString('ar-EG', { minimumFractionDigits: 0 })}</span>
-              <span><strong>ختامي دائن:</strong> {summary.closingCredit.toLocaleString('ar-EG', { minimumFractionDigits: 0 })}</span>
-              {/* Inline pagination info */}
-              <span style={{ marginLeft: 'auto', fontSize: '12px', opacity: 0.8 }}>
-                صفحة {currentPage}/{totalPages}
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '12px 16px', background: 'var(--field_bg)', borderRadius: '8px', border: '1px solid var(--border)', marginBottom: '1rem', fontSize: '13px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <div><span style={{ color: 'var(--muted_text)' }}>السجلات:</span> <strong>{totalRows.toLocaleString('ar-EG')}</strong></div>
+                <div><span style={{ color: 'var(--muted_text)' }}>افتتاحي:</span> <strong>{((summary.openingDebit || 0) - (summary.openingCredit || 0)).toLocaleString('ar-EG')}</strong></div>
+                <div><span style={{ color: 'var(--muted_text)' }}>الفترة:</span> <strong>{((summary.periodDebit || 0) - (summary.periodCredit || 0)).toLocaleString('ar-EG')}</strong></div>
+                <div><span style={{ color: 'var(--muted_text)' }}>ختامي:</span> <strong>{((summary.closingDebit || 0) - (summary.closingCredit || 0)).toLocaleString('ar-EG')}</strong></div>
+              </div>
+              <div style={{ marginLeft: 'auto', opacity: 0.8 }}>صفحة {currentPage} من {totalPages}</div>
             </div>
           </>
         )}
@@ -3463,8 +3023,8 @@ const GeneralLedger: React.FC = () => {
                     onChange={(e) => setCostCenterId(e.target.value)}
                   >
                     <option value="">كل مراكز التكلفة</option>
-                    {costCenterOptions.map(o => (
-                      <option key={o.id} value={o.id}>{`${o.code ? o.code + ' - ' : ''}${o.name_ar || o.name}`}</option>
+                    {allCostCenterOptions.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
                   </select>
                 </div>
@@ -3476,8 +3036,8 @@ const GeneralLedger: React.FC = () => {
                     onChange={(e) => setAccountId(e.target.value)}
                   >
                     <option value="">جميع الحسابات</option>
-                    {accountOptions.map(o => (
-                      <option key={o.id} value={o.id}>{`${o.code ? o.code + ' - ' : ''}${o.name_ar || o.name}`}</option>
+                    {allAccountOptions.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
                   </select>
                 </div>
@@ -3821,6 +3381,7 @@ const GeneralLedger: React.FC = () => {
       )}
 
       {/* Reserved for pagination / future actions (no inline styles) */}
+      </div>
     </div>
   )
 }

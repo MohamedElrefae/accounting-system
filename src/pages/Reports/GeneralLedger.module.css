@@ -268,12 +268,18 @@
   margin: 12px 20px 20px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
+  max-height: calc(100vh - 300px);
+  min-height: 400px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
   table-layout: auto;
+  min-height: 100%;
 }
 
 .table th, .table td {
@@ -496,11 +502,24 @@
   text-align: right;
 }
 
+/* Enhanced sticky headers for better scroll experience */
 .table thead th {
   position: sticky;
   top: 0;
-  background: var(--table_header_bg);
-  z-index: 1;
+  background: var(--table_header_bg, var(--surface-variant));
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.reportTableWrap .table thead th {
+  position: sticky;
+  top: 0;
+  background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%) !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  border: 1px solid #cbd5e1;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
 .footer {
@@ -635,6 +654,11 @@
   background: var(--surface);
   margin: 0;
   border: none;
+  max-height: calc(100vh - 350px);
+  min-height: 400px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
 }
 
 .reportHeader {
@@ -666,6 +690,7 @@
 
 .noPrint {
   /* This class will be used to hide elements in print mode */
+  display: inline;
 }
 
 @media print {
@@ -952,17 +977,16 @@
   border: 1px solid var(--border-color);
   border-top: none;
   border-radius: 0 0 12px 12px;
+  max-height: calc(100vh - 300px);
+  min-height: 400px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
 }
 
 /* Stronger table look like the legacy app */
 .reportTableWrap .table {
   border: 2px solid #d1d5db;
-}
-.reportTableWrap .table thead th {
-  background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%) !important;
-  color: #ffffff !important;
-  font-weight: 700;
-  border: 1px solid #cbd5e1;
 }
 .reportTableWrap .table td {
   border: 1px solid #e2e8f0;
@@ -1434,7 +1458,9 @@
 }
 
 /* Elements to hide during print */
-.noPrint {}
+.noPrint {
+  display: inline;
+}
 
 /* Print rules to mirror on-screen layout */
 @media print {
