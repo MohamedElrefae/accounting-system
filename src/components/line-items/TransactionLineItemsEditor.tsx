@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import type { EditableTxLineItem } from '../../services/transaction-line-items-enhanced'
-import CostAnalysisModal from './CostAnalysisModal'
+import CostAnalysisModal from '../Transactions/CostAnalysisModal'
 
 export interface TransactionLineItemsEditorProps {
   transactionLineId: string
