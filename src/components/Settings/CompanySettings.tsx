@@ -20,6 +20,8 @@ const CompanySettings: React.FC = () => {
     transaction_number_use_year_month: true,
     transaction_number_length: 4,
     transaction_number_separator: '-',
+    transaction_number_start: 1,
+    transaction_number_year_month_separator: '' as string | '',
     fiscal_year_start_month: 1,
     currency_code: 'SAR',
     currency_symbol: 'ر.س',
@@ -54,6 +56,8 @@ const CompanySettings: React.FC = () => {
         transaction_number_use_year_month: currentConfig.transaction_number_use_year_month,
         transaction_number_length: currentConfig.transaction_number_length,
         transaction_number_separator: currentConfig.transaction_number_separator,
+        transaction_number_start: currentConfig.transaction_number_start ?? 1,
+        transaction_number_year_month_separator: currentConfig.transaction_number_year_month_separator ?? '',
         fiscal_year_start_month: currentConfig.fiscal_year_start_month,
         currency_code: currentConfig.currency_code,
         currency_symbol: currentConfig.currency_symbol,
@@ -74,15 +78,20 @@ const CompanySettings: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!config) return
-
     setSaving(true)
     try {
-      await updateCompanyConfig(formData)
+      const submitData = {
+        ...formData,
+        transaction_number_prefix: formData.transaction_number_prefix || null,
+        transaction_number_start: formData.transaction_number_start ?? null,
+        default_org_id: formData.default_org_id || null,
+        default_project_id: formData.default_project_id || null,
+      }
+      await updateCompanyConfig(submitData as any)
       clearDateFormatCache()
       showToast('تم حفظ الإعدادات بنجاح', { severity: 'success' })
-      await loadConfig() // Reload to get updated config
-    } catch (error) {
-      console.error('Error saving config:', error)
+      await loadConfig()
+    } catch {
       showToast('فشل حفظ الإعدادات', { severity: 'error' })
     } finally {
       setSaving(false)
@@ -93,12 +102,15 @@ const CompanySettings: React.FC = () => {
     const today = new Date()
     const year = today.getFullYear()
     const month = String(today.getMonth() + 1).padStart(2, '0')
-    const numberPart = String(1).padStart(formData.transaction_number_length, '0')
+    const startNum = formData.transaction_number_start ?? 1
+    const numberPart = String(startNum).padStart(formData.transaction_number_length, '0')
+    const prefixPart = formData.transaction_number_prefix ? `${formData.transaction_number_prefix}${formData.transaction_number_separator}` : ''
     
     if (formData.transaction_number_use_year_month) {
-      return `${formData.transaction_number_prefix}${formData.transaction_number_separator}${year}${month}${formData.transaction_number_separator}${numberPart}`
+      const yearMonthSep = formData.transaction_number_year_month_separator || ''
+      return `${prefixPart}${year}${yearMonthSep}${month}${formData.transaction_number_separator}${numberPart}`
     } else {
-      return `${formData.transaction_number_prefix}${formData.transaction_number_separator}${numberPart}`
+      return `${prefixPart}${numberPart}`
     }
   }
 
@@ -157,17 +169,16 @@ const CompanySettings: React.FC = () => {
           
           <div className="form-grid">
             <div className="form-field">
-              <label htmlFor="transaction_number_prefix">بادئة رقم المعاملة</label>
+              <label htmlFor="transaction_number_prefix">بادئة رقم المعاملة (اختياري)</label>
               <input
                 type="text"
                 id="transaction_number_prefix"
                 value={formData.transaction_number_prefix}
                 onChange={(e) => setFormData(prev => ({ ...prev, transaction_number_prefix: e.target.value.toUpperCase() }))}
-                placeholder="JE"
+                placeholder="JE أو اتركه فارغاً"
                 maxLength={5}
-                required
               />
-              <small>مثال: JE للقيود العامة، INV للفواتير</small>
+              <small>مثال: JE للقيود العامة، INV للفواتير. اتركه فارغاً للرقم بدون بادئة.</small>
             </div>
 
             <div className="form-field">
@@ -196,6 +207,37 @@ const CompanySettings: React.FC = () => {
                 required
               />
               <small>عدد الأرقام في الجزء التسلسلي (مثال: 4 للحصول على 0001)</small>
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="transaction_number_start">رقم البداية (اختياري)</label>
+              <input
+                type="number"
+                id="transaction_number_start"
+                value={formData.transaction_number_start ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setFormData(prev => ({ ...prev, transaction_number_start: val === '' ? null : parseInt(val) }))
+                }}
+                min={1}
+              />
+              <small>الرقم الأول في التسلسل (افتراضي: 1)</small>
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="transaction_number_year_month_separator">فاصل السنة والشهر (اختياري)</label>
+              <select
+                id="transaction_number_year_month_separator"
+                value={formData.transaction_number_year_month_separator}
+                onChange={(e) => setFormData(prev => ({ ...prev, transaction_number_year_month_separator: e.target.value }))}
+              >
+                <option value="">بدون فاصل (YYYYMM)</option>
+                <option value="-">شرطة (-) YYYY-MM</option>
+                <option value="_">شرطة سفلية (_) YYYY_MM</option>
+                <option value=".">نقطة (.) YYYY.MM</option>
+                <option value="/">斜杠 (/) YYYY/MM</option>
+              </select>
+              <small>فاصل بين السنة والشهر في رقم المعاملة</small>
             </div>
 
             <div className="form-field checkbox-field">

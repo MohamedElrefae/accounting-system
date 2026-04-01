@@ -7,6 +7,8 @@ export interface CompanyConfig {
   transaction_number_use_year_month: boolean
   transaction_number_length: number
   transaction_number_separator: string
+  transaction_number_start?: number | null  // Optional starting number (defaults to 1)
+  transaction_number_year_month_separator?: string | null  // Optional separator between year/month (e.g., '-', null=YYYYMM)
   fiscal_year_start_month: number
   currency_code: string
   currency_symbol: string
@@ -26,10 +28,12 @@ export interface CompanyConfig {
 // Default configuration
 const DEFAULT_COMPANY_CONFIG: Partial<CompanyConfig> = {
   company_name: 'شركتي',
-  transaction_number_prefix: 'JE',
+  transaction_number_prefix: '',  // Empty prefix by default (optional)
   transaction_number_use_year_month: true,
   transaction_number_length: 4,
   transaction_number_separator: '-',
+  transaction_number_start: 1,
+  transaction_number_year_month_separator: null,
   fiscal_year_start_month: 1, // January
   currency_code: 'SAR',
   currency_symbol: 'none', // default to numbers only unless configured
@@ -166,54 +170,80 @@ export async function createDefaultConfig(): Promise<CompanyConfig> {
  * Update company configuration
  */
 export async function updateCompanyConfig(updates: Partial<CompanyConfig>, orgId?: string | null): Promise<CompanyConfig> {
-  // Only send columns that certainly exist in the DB to avoid PostgREST 400 (unknown column)
-  const ALLOWED_COLUMNS: (keyof CompanyConfig)[] = [
-    'company_name',
-    'transaction_number_prefix',
-    'transaction_number_use_year_month',
-    'transaction_number_length',
-    'transaction_number_separator',
-    'fiscal_year_start_month',
-    'currency_code',
-    'currency_symbol',
-    'date_format',
-    'number_format',
-    'default_org_id',
-    'default_project_id',
-    'auto_post_on_approve',
-    'renumber_transactions_after_delete',
-  ] as any;
-
-  const payload: Record<string, any> = {};
-  for (const k of ALLOWED_COLUMNS as string[]) {
-    if ((updates as any)[k] !== undefined) payload[k] = (updates as any)[k];
-  }
-
   try {
     const currentConfig = await getCompanyConfig(orgId ?? null);
+    const isNewConfig = !currentConfig || currentConfig.id === 'default';
 
-    // Include optional columns only if they exist in current config shape
-    const OPTIONAL_KEYS = [
+    // Build payload only from columns that exist in database
+    const payload: Record<string, any> = {};
+    
+    // Core columns that definitely exist in all versions
+    const CORE_COLUMNS = [
+      'company_name',
+      'transaction_number_prefix',
+      'transaction_number_use_year_month',
+      'transaction_number_length',
+      'transaction_number_separator',
+      'fiscal_year_start_month',
+      'currency_code',
+      'currency_symbol',
+      'date_format',
+      'number_format',
+    ];
+    
+    // New columns that may not exist in DB yet
+    const NEW_COLUMNS = [
       'default_org_id',
       'default_project_id',
       'renumber_transactions_after_delete',
       'auto_post_on_approve',
+      'transaction_number_start',
+      'transaction_number_year_month_separator',
     ];
-    for (const k of OPTIONAL_KEYS) {
-      if ((currentConfig as any)[k] !== undefined && (updates as any)[k] !== undefined) {
-        (payload as any)[k] = (updates as any)[k];
+    
+    // Always include core columns if provided
+    for (const k of CORE_COLUMNS) {
+      if ((updates as any)[k] !== undefined) {
+        // Convert empty string prefix to null to satisfy DB constraint
+        if (k === 'transaction_number_prefix' && (updates as any)[k] === '') {
+          payload[k] = null;
+        } else {
+          payload[k] = (updates as any)[k];
+        }
+      }
+    }
+    
+    // For new configs (no DB row yet), NEVER send new columns - they don't exist in DB
+    // For existing configs, only send if the column already exists (has value in currentConfig)
+    if (!isNewConfig) {
+      for (const k of NEW_COLUMNS) {
+        // Check if DB row has this column by checking if the field exists in currentConfig
+        // (undefined means column doesn't exist in DB, null means it exists but is empty)
+        const currentValue = (currentConfig as any)[k];
+        if ((updates as any)[k] !== undefined && currentValue !== undefined) {
+          payload[k] = (updates as any)[k];
+        }
       }
     }
 
     // If no persistent row exists yet (cache fallback id), insert a new row
-    if (!currentConfig || currentConfig.id === 'default') {
-      const insertPayload = { ...payload, updated_at: new Date().toISOString(), org_id: (orgId ?? null) }
+    if (isNewConfig) {
+      const insertPayload = { 
+        ...payload, 
+        updated_at: new Date().toISOString(), 
+        org_id: (orgId ?? null) 
+      };
+      
       const { data, error } = await supabase
         .from('company_config')
         .insert(insertPayload)
         .select('*')
         .single();
-      if (error) throw error;
+        
+      if (error) {
+        console.error('Insert error:', error);
+        throw error;
+      }
 
       // Clear cache
       configCache = null;
@@ -222,6 +252,7 @@ export async function updateCompanyConfig(updates: Partial<CompanyConfig>, orgId
       return data as CompanyConfig;
     }
 
+    // Update existing row
     const { data, error } = await supabase
       .from('company_config')
       .update({
@@ -232,7 +263,10 @@ export async function updateCompanyConfig(updates: Partial<CompanyConfig>, orgId
       .select('*')
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Update error:', error);
+      throw error;
+    }
 
     // Clear cache
     configCache = null;
@@ -256,7 +290,9 @@ export async function getTransactionNumberConfig() {
     prefix: config.transaction_number_prefix,
     useYearMonth: config.transaction_number_use_year_month,
     numberLength: config.transaction_number_length,
-    separator: config.transaction_number_separator
+    separator: config.transaction_number_separator,
+    startNumber: config.transaction_number_start ?? 1,
+    yearMonthSeparator: config.transaction_number_year_month_separator
   }
 }
 

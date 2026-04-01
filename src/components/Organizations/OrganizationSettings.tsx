@@ -22,6 +22,8 @@ const OrganizationSettings: React.FC = () => {
     transaction_number_use_year_month: true,
     transaction_number_length: 4,
     transaction_number_separator: '-',
+    transaction_number_start: 1,
+    transaction_number_year_month_separator: '' as string | '',
     fiscal_year_start_month: 1,
     currency_code: 'SAR',
     currency_symbol: 'ر.س',
@@ -50,6 +52,8 @@ const OrganizationSettings: React.FC = () => {
         transaction_number_use_year_month: currentConfig.transaction_number_use_year_month,
         transaction_number_length: currentConfig.transaction_number_length,
         transaction_number_separator: currentConfig.transaction_number_separator,
+        transaction_number_start: currentConfig.transaction_number_start ?? 1,
+        transaction_number_year_month_separator: currentConfig.transaction_number_year_month_separator ?? '',
         fiscal_year_start_month: currentConfig.fiscal_year_start_month,
         currency_code: currentConfig.currency_code,
         currency_symbol: currentConfig.currency_symbol,
@@ -73,12 +77,20 @@ const OrganizationSettings: React.FC = () => {
     if (!config) return;
     setSaving(true);
     try {
-      await updateCompanyConfig({ ...formData } as any, orgId);
+      // Prepare data - convert empty strings to null for optional fields
+      const submitData = {
+        ...formData,
+        transaction_number_prefix: formData.transaction_number_prefix || null,
+        transaction_number_start: formData.transaction_number_start ?? null,
+        default_org_id: formData.default_org_id || null,
+        default_project_id: formData.default_project_id || null,
+      };
+      await updateCompanyConfig(submitData as any, orgId);
       clearDateFormatCache();
       // Apply defaults to scope immediately
       if (scope) {
-        await scope.setOrganization(formData.default_org_id || null);
-        await scope.setProject(formData.default_project_id || null);
+        await scope.setOrganization(submitData.default_org_id);
+        await scope.setProject(submitData.default_project_id);
       }
       showToast('تم حفظ الإعدادات بنجاح', { severity: 'success' });
       await loadConfig();
@@ -93,11 +105,15 @@ const OrganizationSettings: React.FC = () => {
     const today = new Date();
     const year = today.getFullYear();
     const month = String(today.getMonth() + 1).padStart(2, '0');
-    const numberPart = String(1).padStart(formData.transaction_number_length, '0');
+    const startNum = formData.transaction_number_start ?? 1;
+    const numberPart = String(startNum).padStart(formData.transaction_number_length, '0');
+    const prefixPart = formData.transaction_number_prefix ? `${formData.transaction_number_prefix}${formData.transaction_number_separator}` : '';
+    
     if (formData.transaction_number_use_year_month) {
-      return `${formData.transaction_number_prefix}${formData.transaction_number_separator}${year}${month}${formData.transaction_number_separator}${numberPart}`;
+      const yearMonthSep = formData.transaction_number_year_month_separator || '';
+      return `${prefixPart}${year}${yearMonthSep}${month}${formData.transaction_number_separator}${numberPart}`;
     } else {
-      return `${formData.transaction_number_prefix}${formData.transaction_number_separator}${numberPart}`;
+      return `${prefixPart}${numberPart}`;
     }
   };
 
@@ -141,9 +157,9 @@ const OrganizationSettings: React.FC = () => {
           <div className={styles.sectionHeader}><Hash size={18} /><h2>إعدادات أرقام المعاملات</h2></div>
           <div className={styles.formGrid}>
             <div className={styles.formField}>
-              <label htmlFor="transaction_number_prefix">بادئة رقم المعاملة</label>
-              <input id="transaction_number_prefix" type="text" value={formData.transaction_number_prefix} onChange={e=>setFormData(p=>({...p,transaction_number_prefix:e.target.value.toUpperCase()}))} placeholder="JE" maxLength={5} required />
-              <small>مثال: JE للقيود العامة، INV للفواتير</small>
+              <label htmlFor="transaction_number_prefix">بادئة رقم المعاملة (اختياري)</label>
+              <input id="transaction_number_prefix" type="text" value={formData.transaction_number_prefix} onChange={e=>setFormData(p=>({...p,transaction_number_prefix:e.target.value.toUpperCase()}))} placeholder="JE أو اتركه فارغاً" maxLength={5} />
+              <small>مثال: JE للقيود العامة، INV للفواتير. اتركه فارغاً للرقم بدون بادئة.</small>
             </div>
             <div className={styles.formField}>
               <label htmlFor="transaction_number_separator">الفاصل</label>
@@ -158,6 +174,25 @@ const OrganizationSettings: React.FC = () => {
               <label htmlFor="transaction_number_length">طول الرقم التسلسلي</label>
               <input id="transaction_number_length" type="number" min={3} max={8} value={formData.transaction_number_length} onChange={e=>setFormData(p=>({...p,transaction_number_length: parseInt(e.target.value)||4}))} required />
               <small>عدد الأرقام في الجزء التسلسلي (مثال: 4 للحصول على 0001)</small>
+            </div>
+            <div className={styles.formField}>
+              <label htmlFor="transaction_number_start">رقم البداية (اختياري)</label>
+              <input id="transaction_number_start" type="number" min={1} value={formData.transaction_number_start ?? ''} onChange={e=>{
+                const val = e.target.value;
+                setFormData(p=>({...p,transaction_number_start: val === '' ? null : parseInt(val)}));
+              }} />
+              <small>الرقم الأول في التسلسل (افتراضي: 1)</small>
+            </div>
+            <div className={styles.formField}>
+              <label htmlFor="transaction_number_year_month_separator">فاصل السنة والشهر (اختياري)</label>
+              <select id="transaction_number_year_month_separator" value={formData.transaction_number_year_month_separator} onChange={e=>setFormData(p=>({...p,transaction_number_year_month_separator:e.target.value}))}>
+                <option value="">بدون فاصل (YYYYMM)</option>
+                <option value="-">شرطة (-) YYYY-MM</option>
+                <option value="_">شرطة سفلية (_) YYYY_MM</option>
+                <option value=".">نقطة (.) YYYY.MM</option>
+                <option value="/">斜杠 (/) YYYY/MM</option>
+              </select>
+              <small>فاصل بين السنة والشهر في رقم المعاملة</small>
             </div>
             <div className={`${styles.formField} ${styles.checkboxField}`}>
               <label>
