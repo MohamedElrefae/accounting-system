@@ -4,7 +4,8 @@ import { CircularProgress, Box, Typography, Button, Chip, Stack, Grid, TextField
 import UnifiedTransactionDetailsPanel from '@/components/Transactions/UnifiedTransactionDetailsPanel'
 import EnhancedLineApprovalManager from '@/components/Approvals/EnhancedLineApprovalManager'
 import { findInventoryDocumentByTransaction, listInventoryPostingsByTransaction, listMovementsByDocument, listTransactionsLinkedToDocuments, type InventoryPostingLink } from '@/services/inventory/documents'
-import { getTransactionById, getTransactionAudit, getUserDisplayMap, type TransactionRecord, getAccounts, getProjects } from '@/services/transactions'
+import { getTransactionById, getTransactionAudit, getUserDisplayMap, type TransactionRecord } from '@/services/transactions'
+import { getTransactionLinesWithCosts } from '@/services/transaction-lines'
 import { useScopeOptional } from '@/contexts/ScopeContext'
 import { useTransactionsData } from '@/contexts/TransactionsDataContext'
 
@@ -36,7 +37,7 @@ const TransactionDetailsPage: React.FC = () => {
     classifications,
     analysisItemsMap,
     currentUserId,
-    isLoading: contextLoading,
+    isLoading: _contextLoading,
   } = useTransactionsData()
 
   const [loading, setLoading] = useState(true)
@@ -44,6 +45,7 @@ const TransactionDetailsPage: React.FC = () => {
   const [audit, setAudit] = useState<any[]>([])
   const [userMap, setUserMap] = useState<Record<string, string>>({})
   const [approvalHistory, setApprovalHistory] = useState<ApprovalHistoryRow[]>([])
+  const [transactionLines, setTransactionLines] = useState<any[]>([])
   const [linkedDocId, setLinkedDocId] = useState<string | null>(null)
   const [postings, setPostings] = useState<InventoryPostingLink[]>([])
   const [movements, setMovements] = useState<any[]>([])
@@ -150,13 +152,16 @@ const TransactionDetailsPage: React.FC = () => {
             } catch { }
           }
         }
-        // Build user map from fields
-        const ids = [] as string[]
-        if (txRow?.created_by) ids.push(txRow.created_by)
-        if (txRow?.posted_by) ids.push(txRow.posted_by)
-        const map = await getUserDisplayMap(ids)
-        if (!mounted) return
-        setUserMap(map)
+        // Load transaction lines
+        try {
+          if (import.meta.env.DEV) console.log('🔄 Fetching transaction lines...')
+          const lines = await getTransactionLinesWithCosts(id)
+          if (import.meta.env.DEV) console.log(`✅ Loaded ${lines.length} transaction lines`)
+          setTransactionLines(lines)
+        } catch (error) {
+          console.error('❌ Failed to fetch transaction lines:', error)
+          setTransactionLines([])
+        }
       } finally {
         if (mounted) setLoading(false)
       }
@@ -344,6 +349,7 @@ const TransactionDetailsPage: React.FC = () => {
         audit={audit}
         approvalHistory={approvalHistory}
         userNames={userMap}
+        transactionLines={transactionLines}
         accounts={accounts}
         projects={projects}
         organizations={organizations || []}
