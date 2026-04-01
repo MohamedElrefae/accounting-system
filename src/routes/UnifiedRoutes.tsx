@@ -131,26 +131,32 @@ const UnifiedRoutes: React.FC = () => {
             {/* ============================================================ */}
             <Route path="main-data">
                 <Route path="accounts-tree" element={
-                    <OptimizedSuspense>
-                        <AccountsTreeLazy />
-                    </OptimizedSuspense>
+                    <OptimizedProtectedRoute requiredPermission="accounts.view">
+                        <OptimizedSuspense>
+                            <AccountsTreeLazy />
+                        </OptimizedSuspense>
+                    </OptimizedProtectedRoute>
                 } />
                 <Route path="sub-tree" element={
-                    <OptimizedProtectedRoute requiredPermission={undefined} scope="global">
+                    <OptimizedProtectedRoute requiredPermission="sub_tree.view" scope="global">
                         <OptimizedSuspense>
                             <SubTreePage />
                         </OptimizedSuspense>
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="work-items" element={
-                    <OptimizedSuspense>
-                        <WorkItemsPage />
-                    </OptimizedSuspense>
+                    <OptimizedProtectedRoute requiredPermission="work_items.view">
+                        <OptimizedSuspense>
+                            <WorkItemsPage />
+                        </OptimizedSuspense>
+                    </OptimizedProtectedRoute>
                 } />
                 <Route path="document-categories" element={
-                    <OptimizedSuspense>
-                        <DocumentCategoriesPage />
-                    </OptimizedSuspense>
+                    <OptimizedProtectedRoute requiredPermission="templates.view">
+                        <OptimizedSuspense>
+                            <DocumentCategoriesPage />
+                        </OptimizedSuspense>
+                    </OptimizedProtectedRoute>
                 } />
                 {/* Templates */}
                 <Route path="document-templates" element={
@@ -197,19 +203,25 @@ const UnifiedRoutes: React.FC = () => {
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="organizations" element={
-                    <OptimizedSuspense>
-                        <OrgManagementTabs />
-                    </OptimizedSuspense>
+                    <OptimizedProtectedRoute requiredPermission="organizations.view">
+                        <OptimizedSuspense>
+                            <OrgManagementTabs />
+                        </OptimizedSuspense>
+                    </OptimizedProtectedRoute>
                 } />
                 <Route path="projects" element={
-                    <OptimizedSuspense>
-                        <ProjectManagement />
-                    </OptimizedSuspense>
+                    <OptimizedProtectedRoute requiredPermission="projects.view">
+                        <OptimizedSuspense>
+                            <ProjectManagement />
+                        </OptimizedSuspense>
+                    </OptimizedProtectedRoute>
                 } />
                 <Route path="transaction-classification" element={
-                    <OptimizedSuspense>
-                        <TransactionClassificationPage />
-                    </OptimizedSuspense>
+                    <OptimizedProtectedRoute requiredPermission="classification.view">
+                        <OptimizedSuspense>
+                            <TransactionClassificationPage />
+                        </OptimizedSuspense>
+                    </OptimizedProtectedRoute>
                 } />
                 <Route path="addition-deduction-analysis" element={
                     <OptimizedProtectedRoute requiredPermission="adjustment_types.read">
@@ -251,9 +263,11 @@ const UnifiedRoutes: React.FC = () => {
                         <Routes>
                             {/* My Transactions */}
                             <Route path="my" element={
-                                <OptimizedSuspense>
-                                    <TransactionsPage />
-                                </OptimizedSuspense>
+                                <OptimizedProtectedRoute requiredPermission="transactions.view.own">
+                                    <OptimizedSuspense>
+                                        <TransactionsPage />
+                                    </OptimizedSuspense>
+                                </OptimizedProtectedRoute>
                             } />
 
                             <Route path="pending" element={
@@ -265,31 +279,39 @@ const UnifiedRoutes: React.FC = () => {
                             } />
 
                             <Route path="all" element={
-                                <OptimizedSuspense>
-                                    <TransactionsPage />
-                                </OptimizedSuspense>
+                                <OptimizedProtectedRoute requiredPermission="transactions.view.all">
+                                    <OptimizedSuspense>
+                                        <TransactionsPage />
+                                    </OptimizedSuspense>
+                                </OptimizedProtectedRoute>
                             } />
 
                             <Route path="my-enriched" element={
-                                <OptimizedSuspense>
-                                    <TransactionsEnrichedPage />
-                                </OptimizedSuspense>
+                                <OptimizedProtectedRoute requiredPermission="transactions.view.own">
+                                    <OptimizedSuspense>
+                                        <TransactionsEnrichedPage />
+                                    </OptimizedSuspense>
+                                </OptimizedProtectedRoute>
                             } />
 
                             <Route path="all-enriched" element={
-                                <OptimizedSuspense>
-                                    <TransactionsEnrichedPage />
-                                </OptimizedSuspense>
+                                <OptimizedProtectedRoute requiredPermission="transactions.view.all">
+                                    <OptimizedSuspense>
+                                        <TransactionsEnrichedPage />
+                                    </OptimizedSuspense>
+                                </OptimizedProtectedRoute>
                             } />
 
                             <Route path="my-lines" element={
-                                <OptimizedSuspense>
-                                    <MyLinesEnrichedPage />
-                                </OptimizedSuspense>
+                                <OptimizedProtectedRoute requiredPermission="transactions.view.own">
+                                    <OptimizedSuspense>
+                                        <MyLinesEnrichedPage />
+                                    </OptimizedSuspense>
+                                </OptimizedProtectedRoute>
                             } />
 
                             <Route path="all-lines" element={
-                                <OptimizedProtectedRoute requiredPermission="transactions.read.all">
+                                <OptimizedProtectedRoute requiredPermission="transactions.view.all">
                                     <OptimizedSuspense>
                                         <AllLinesEnrichedPage />
                                     </OptimizedSuspense>
@@ -297,21 +319,27 @@ const UnifiedRoutes: React.FC = () => {
                             } />
 
                             <Route path=":id" element={
-                                <OptimizedSuspense>
-                                    <TransactionDetailsPage />
-                                </OptimizedSuspense>
+                                <OptimizedProtectedRoute requiredPermission="transactions.view.own">
+                                    <OptimizedSuspense>
+                                        <TransactionDetailsPage />
+                                    </OptimizedSuspense>
+                                </OptimizedProtectedRoute>
                             } />
 
                             <Route path="line-items" element={
-                                <OptimizedSuspense>
-                                    <TxLineItemsPage />
-                                </OptimizedSuspense>
+                                <OptimizedProtectedRoute requiredPermission="transaction_line_items.read">
+                                    <OptimizedSuspense>
+                                        <TxLineItemsPage />
+                                    </OptimizedSuspense>
+                                </OptimizedProtectedRoute>
                             } />
 
                             <Route path="TransactionLineItems" element={
-                                <OptimizedSuspense>
-                                    <TxLineItemsPage />
-                                </OptimizedSuspense>
+                                <OptimizedProtectedRoute requiredPermission="transaction_line_items.read">
+                                    <OptimizedSuspense>
+                                        <TxLineItemsPage />
+                                    </OptimizedSuspense>
+                                </OptimizedProtectedRoute>
                             } />
                         </Routes>
                     </TransactionsErrorBoundary>
@@ -323,21 +351,21 @@ const UnifiedRoutes: React.FC = () => {
             {/* ============================================================ */}
             <Route path="reports">
                 <Route path="trial-balance" element={
-                    <OptimizedProtectedRoute>
+                    <OptimizedProtectedRoute requiredPermission="reports.view">
                         <OptimizedSuspense>
                             <TrialBalanceOriginalPage />
                         </OptimizedSuspense>
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="trial-balance-all-levels" element={
-                    <OptimizedProtectedRoute>
+                    <OptimizedProtectedRoute requiredPermission="reports.view">
                         <OptimizedSuspense>
                             <TrialBalanceAllLevelsPage />
                         </OptimizedSuspense>
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="general-ledger" element={
-                    <OptimizedProtectedRoute>
+                    <OptimizedProtectedRoute requiredPermission="reports.view">
                         <TransactionsDataProvider>
                             <OptimizedSuspense>
                                 <GeneralLedgerPage />
@@ -346,7 +374,7 @@ const UnifiedRoutes: React.FC = () => {
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="running-balance" element={
-                    <OptimizedProtectedRoute>
+                    <OptimizedProtectedRoute requiredPermission="reports.view">
                         <TransactionsDataProvider>
                             <OptimizedSuspense>
                                 <RunningBalanceEnrichedPage />
@@ -355,49 +383,49 @@ const UnifiedRoutes: React.FC = () => {
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="account-explorer" element={
-                    <OptimizedProtectedRoute>
+                    <OptimizedProtectedRoute requiredPermission="reports.view">
                         <OptimizedSuspense>
                             <AccountExplorerReportPage />
                         </OptimizedSuspense>
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="profit-loss" element={
-                    <OptimizedProtectedRoute>
+                    <OptimizedProtectedRoute requiredPermission="reports.view">
                         <OptimizedSuspense>
                             <ProfitLossPage />
                         </OptimizedSuspense>
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="balance-sheet" element={
-                    <OptimizedProtectedRoute>
+                    <OptimizedProtectedRoute requiredPermission="reports.view">
                         <OptimizedSuspense>
                             <BalanceSheetPage />
                         </OptimizedSuspense>
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="main-data/work-item-usage" element={
-                    <OptimizedProtectedRoute>
+                    <OptimizedProtectedRoute requiredPermission="reports.view">
                         <OptimizedSuspense>
                             <WorkItemUsagePage />
                         </OptimizedSuspense>
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="main-data/analysis-item-usage" element={
-                    <OptimizedProtectedRoute>
+                    <OptimizedProtectedRoute requiredPermission="reports.view">
                         <OptimizedSuspense>
                             <AnalysisItemUsagePage />
                         </OptimizedSuspense>
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="main-data/transaction-classification" element={
-                    <OptimizedProtectedRoute>
+                    <OptimizedProtectedRoute requiredPermission="reports.view">
                         <OptimizedSuspense>
                             <TransactionClassificationReportsPage />
                         </OptimizedSuspense>
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="transaction-lines-report" element={
-                    <OptimizedProtectedRoute>
+                    <OptimizedProtectedRoute requiredPermission="reports.view">
                         <TransactionsDataProvider>
                             <OptimizedSuspense>
                                 <TransactionLinesReportPage />
@@ -406,7 +434,7 @@ const UnifiedRoutes: React.FC = () => {
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="cost-analysis-report" element={
-                    <OptimizedProtectedRoute>
+                    <OptimizedProtectedRoute requiredPermission="reports.view">
                         <TransactionsDataProvider>
                             <OptimizedSuspense>
                                 <CostAnalysisReportPage />
@@ -415,9 +443,11 @@ const UnifiedRoutes: React.FC = () => {
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="custom" element={
-                    <OptimizedSuspense>
-                        <CustomReportsPage />
-                    </OptimizedSuspense>
+                    <OptimizedProtectedRoute requiredPermission="reports.view">
+                        <OptimizedSuspense>
+                            <CustomReportsPage />
+                        </OptimizedSuspense>
+                    </OptimizedProtectedRoute>
                 } />
             </Route>
 
@@ -439,24 +469,32 @@ const UnifiedRoutes: React.FC = () => {
                 <TransactionsDataProvider>
                     <Routes>
                         <Route path="dashboard" element={
-                            <OptimizedSuspense>
-                                <FiscalYearDashboardPage />
-                            </OptimizedSuspense>
+                            <OptimizedProtectedRoute requiredPermission="fiscal.view">
+                                <OptimizedSuspense>
+                                    <FiscalYearDashboardPage />
+                                </OptimizedSuspense>
+                            </OptimizedProtectedRoute>
                         } />
                         <Route path="periods" element={
-                            <OptimizedSuspense>
-                                <FiscalPeriodManagerPage />
-                            </OptimizedSuspense>
+                            <OptimizedProtectedRoute requiredPermission="fiscal.view">
+                                <OptimizedSuspense>
+                                    <FiscalPeriodManagerPage />
+                                </OptimizedSuspense>
+                            </OptimizedProtectedRoute>
                         } />
                         <Route path="opening-balance" element={
-                            <OptimizedSuspense>
-                                <OpeningBalanceImportPage />
-                            </OptimizedSuspense>
+                            <OptimizedProtectedRoute requiredPermission="fiscal.view">
+                                <OptimizedSuspense>
+                                    <OpeningBalanceImportPage />
+                                </OptimizedSuspense>
+                            </OptimizedProtectedRoute>
                         } />
                         <Route index element={
-                            <OptimizedSuspense>
-                                <FiscalYearDashboardPage />
-                            </OptimizedSuspense>
+                            <OptimizedProtectedRoute requiredPermission="fiscal.view">
+                                <OptimizedSuspense>
+                                    <FiscalYearDashboardPage />
+                                </OptimizedSuspense>
+                            </OptimizedProtectedRoute>
                         } />
                     </Routes>
                 </TransactionsDataProvider>
@@ -500,9 +538,11 @@ const UnifiedRoutes: React.FC = () => {
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="audit" element={
-                    <OptimizedSuspense>
-                        <AuditManagement />
-                    </OptimizedSuspense>
+                    <OptimizedProtectedRoute requiredPermission="settings.audit">
+                        <OptimizedSuspense>
+                            <AuditManagement />
+                        </OptimizedSuspense>
+                    </OptimizedProtectedRoute>
                 } />
             </Route>
 
@@ -522,9 +562,11 @@ const UnifiedRoutes: React.FC = () => {
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="organization-management" element={
-                    <OptimizedSuspense>
-                        <OrganizationManagement />
-                    </OptimizedSuspense>
+                    <OptimizedProtectedRoute requiredPermission="settings.manage">
+                        <OptimizedSuspense>
+                            <OrganizationManagement />
+                        </OptimizedSuspense>
+                    </OptimizedProtectedRoute>
                 } />
                 <Route path="account-prefix-mapping" element={
                     <OptimizedProtectedRoute requiredPermission="accounts.manage">
@@ -534,9 +576,11 @@ const UnifiedRoutes: React.FC = () => {
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="font-preferences" element={
-                    <OptimizedSuspense>
-                        <FontSettings />
-                    </OptimizedSuspense>
+                    <OptimizedProtectedRoute requiredPermission="settings.preferences">
+                        <OptimizedSuspense>
+                            <FontSettings />
+                        </OptimizedSuspense>
+                    </OptimizedProtectedRoute>
                 } />
                 <Route path="export-database" element={
                     <OptimizedProtectedRoute requiredPermission="data.export">
@@ -585,6 +629,13 @@ const UnifiedRoutes: React.FC = () => {
                     </OptimizedProtectedRoute>
                 } />
                 <Route path="workflows" element={
+                    <OptimizedProtectedRoute requiredPermission="approvals.manage">
+                        <OptimizedSuspense>
+                            <ApprovalsWorkflowsPage />
+                        </OptimizedSuspense>
+                    </OptimizedProtectedRoute>
+                } />
+                <Route path="test" element={
                     <OptimizedProtectedRoute requiredPermission="approvals.manage">
                         <OptimizedSuspense>
                             <ApprovalsWorkflowsPage />

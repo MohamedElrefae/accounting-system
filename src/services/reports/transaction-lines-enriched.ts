@@ -95,7 +95,11 @@ export async function getEnrichedTransactionLines(
     has_cost_analysis,
     is_cost_analysis_compliant,
     approval_status,
+    page,
+    page_size,
+  } = filters
 
+  try {
     // Group by transaction and validate cost analysis compliance
     const transactionGroups = enrichedData.reduce((groups, line) => {
       if (!groups[line.transaction_id]) {
